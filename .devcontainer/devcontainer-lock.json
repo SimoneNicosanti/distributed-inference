@@ -1,0 +1,9 @@
+{
+  "features": {
+    "ghcr.io/trunk-io/devcontainer-feature/trunk": {
+      "version": "1.1.0",
+      "resolved": "ghcr.io/trunk-io/devcontainer-feature/trunk@sha256:8d913c1753a4e188400da05c64c958c78caedb2c92b984988891c443c3cc1e4d",
+      "integrity": "sha256:8d913c1753a4e188400da05c64c958c78caedb2c92b984988891c443c3cc1e4d"
+    }
+  }
+}
