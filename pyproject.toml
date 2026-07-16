@@ -1,0 +1,63 @@
+[project]
+name = "distributed-inference"
+version = "0.1.0"
+requires-python = ">=3.14"
+
+dependencies = ["numpy>=2.0", "pydantic>=2.8", "pyyaml>=6.0", "structlog>=24.0"]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.24",
+  "pytest-cov>=5.0",
+  "ruff>=0.9",
+  "mypy>=1.14",
+  "pre-commit>=4.0",
+  "ipython>=8.0",
+]
+
+runtime = [
+  "onnxruntime>=1.20",
+  "pyarrow>=18.0",
+  "pyro5>=5.15",
+  "prometheus-client>=0.21",
+]
+
+control = ["pyomo>=6.8", "kubernetes>=32.0", "pyro5>=5.15"]
+
+measurement = [
+  "sqlalchemy>=2.0",
+  "psycopg[binary]>=3.2",
+  "prometheus-client>=0.21",
+  "pandas>=2.2",
+]
+
+network-agent = ["pyroute2>=0.7", "prometheus-client>=0.21"]
+
+model-management = ["onnx>=1.17", "onnxruntime>=1.20", "networkx>=3.4"]
+
+gcp = ["google-cloud-storage>=3.0"]
+
+[tool.mypy]
+python_version = ">=3.14"
+
+files = ["src", "services", "jobs", "tests"]
+
+mypy_path = "src"
+
+strict = true
+warn_unused_configs = true
+warn_unreachable = true
+disallow_any_generics = true
+warn_return_any = true
+
+pretty = true
+show_error_codes = true
+show_column_numbers = true
+show_error_context = true
+
+exclude = ["^deployment/", "^experiments/", "^tools/", "^\\.venv/"]
+
+[[tool.mypy.overrides]]
+module = ["Pyro5.*", "onnxruntime.*"]
+ignore_missing_imports = true

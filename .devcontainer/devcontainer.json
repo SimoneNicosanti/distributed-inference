@@ -1,0 +1,74 @@
+// .devcontainer/devcontainer.json
+{
+  "name": "distributed-inference-container",
+  "build": {
+    "dockerfile": "./DevEnv.dockerfile",
+    "context": "."
+  },
+
+  // Declaring and mounting volumes for local development
+  // Also adding uv cache for not reinstalling uv on every run
+  "workspaceFolder": "/workspace/distributed-inference",
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace/distributed-inference,type=bind",
+    "source=distributed-inference-uv-cache,target=/root/.cache/uv,type=volume"
+  ],
+
+  // Installing trunk.io inside the devcontainer for project wide formatting
+  "features": {
+    "ghcr.io/trunk-io/devcontainer-feature/trunk": "latest"
+  },
+
+  // Running post create script for installing dependencies inside the devcontainer
+  "postCreateCommand": ".devcontainer/post-create.sh",
+
+  // Declaring remote user as the non root one
+  "remoteUser": "vscode",
+  "containerUser": "vscode",
+  "updateRemoteUserUID": true,
+
+  // Declaring as remote env the one created by the post create script
+  "remoteEnv": {
+    "PATH": "${containerWorkspaceFolder}/.venv/bin:${containerEnv:PATH}",
+    "VIRTUAL_ENV": "${containerWorkspaceFolder}/.venv"
+  },
+
+  "customizations": {
+    "vscode": {
+      // Declaring the extensions to be installed inside the remote env
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.mypy-type-checker",
+        "trunk.io",
+        "codeium.codeium",
+        "vincent-templier.vscode-netron",
+        "ms-python.python"
+      ],
+
+      "settings": {
+        // Setting the default interpreter as the one created by the post create script
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
+
+        // Setting the default formatter as trunk.io
+        "editor.defaultFormatter": "trunk.io",
+
+        // Disabling type checking from pylint
+        "python.analysis.typeCheckingMode": "basic",
+
+        // Setting the mypy type checker
+        "mypy-type-checker.importStrategy": "fromEnvironment",
+        "mypy-type-checker.path": [
+          "${containerWorkspaceFolder}/.venv/bin/mypy"
+        ],
+        "mypy-type-checker.args": [
+          "--config-file",
+          "${containerWorkspaceFolder}/pyproject.toml"
+        ],
+
+        // Enabling auto formatting on file save
+        "editor.formatOnSave": true
+      }
+    }
+  }
+}
