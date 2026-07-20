@@ -1,26 +1,21 @@
 import onnx
 
-import networkx as nx
-
-from distributed_inference.domain.ModelGraph import LayerInfo, EdgeInfo
-from distributed_inference.domain import ModelGraph
+from distributed_inference.domain.ModelGraphInfo import LayerInfo, EdgeInfo, ModelGraph
+from distributed_inference.domain import ModelGraphInfo
 import numpy as np
 import onnx_tool
 
 
-def profile_model(model_proto: onnx.ModelProto) -> nx.DiGraph:
+def profile_model(model_proto: onnx.ModelProto, profile_flops: bool = True) -> ModelGraph:
 
-    model_graph: nx.DiGraph[
-        str,
-        dict[str, object],
-        dict[str, object],
-    ] = nx.DiGraph()
+    # TODO: Add support for model information
+    model_graph: ModelGraph = ModelGraph()
 
     try:
         onnx.checker.check_model(model_proto)
 
         __init_model_graph(model_proto, model_graph)
-        __add_model_nodes(model_proto, model_graph)
+        __add_model_nodes(model_proto, model_graph, profile_flops)
         __add_model_edges(model_proto, model_graph)
         __add_model_info(model_proto, model_graph)
         __clear_model_graph(model_graph)
@@ -31,18 +26,21 @@ def profile_model(model_proto: onnx.ModelProto) -> nx.DiGraph:
     return model_graph
 
 
-def __clear_model_graph(model_graph: nx.DiGraph) -> None:
+def __clear_model_graph(model_graph: ModelGraph) -> None:
     # Removing all nodes that are not reachable from the input node
     # In some cases, there are nodes used to define the weights
     # Or pre-processing operations on them (likq quantization)
-    reachable = {ModelGraph.INPUT_LAYER_NAME} | nx.descendants(
-        model_graph, ModelGraph.INPUT_LAYER_NAME)
+    reachable = model_graph.get_reachable_from_layer(
+        ModelGraphInfo.INPUT_LAYER_NAME).keys()
 
-    model_graph.remove_nodes_from(
-        [node for node in model_graph.nodes if node not in reachable])
+    all_layers = model_graph.get_all_layers().keys()
+
+    unreachable = set(all_layers) - set(reachable)
+
+    model_graph.remove_layers_from_iterable(unreachable)
 
 
-def __init_model_graph(model_proto: onnx.ModelProto, model_graph: nx.DiGraph) -> None:
+def __init_model_graph(model_proto: onnx.ModelProto, model_graph: ModelGraph) -> None:
 
     input_names: list[str] = []
     input_sizes: list[float] = []
@@ -51,8 +49,8 @@ def __init_model_graph(model_proto: onnx.ModelProto, model_graph: nx.DiGraph) ->
         input_size = __compute_tensor_size(input)
         input_sizes.append(input_size)
 
-    input_layer_info = LayerInfo(name=ModelGraph.INPUT_LAYER_NAME,
-                                 type=ModelGraph.INPUT_LAYER_NAME,
+    input_layer_info = LayerInfo(name=ModelGraphInfo.INPUT_LAYER_NAME,
+                                 type=ModelGraphInfo.INPUT_LAYER_NAME,
                                  flops=0,
                                  weights_size=0,
                                  inputs={
@@ -60,9 +58,10 @@ def __init_model_graph(model_proto: onnx.ModelProto, model_graph: nx.DiGraph) ->
                                  outputs={
                                      input_name: input_size for input_name, input_size in zip(input_names, input_sizes)},
                                  is_input=True,
-                                 is_output=False)
-    model_graph.add_node(ModelGraph.INPUT_LAYER_NAME,
-                         layer_info=input_layer_info)
+                                 is_output=False,
+                                 is_aggregated=False,
+                                 aggregated_layers=[])
+    model_graph.add_layer(layer_info=input_layer_info)
 
     output_names: list[str] = []
     output_sizes: list[float] = []
@@ -71,8 +70,8 @@ def __init_model_graph(model_proto: onnx.ModelProto, model_graph: nx.DiGraph) ->
         output_size = __compute_tensor_size(output)
         output_sizes.append(output_size)
 
-    output_layer_info = LayerInfo(name=ModelGraph.OUTPUT_LAYER_NAME,
-                                  type=ModelGraph.OUTPUT_LAYER_NAME,
+    output_layer_info = LayerInfo(name=ModelGraphInfo.OUTPUT_LAYER_NAME,
+                                  type=ModelGraphInfo.OUTPUT_LAYER_NAME,
                                   flops=0,
                                   weights_size=0,
                                   inputs={
@@ -83,14 +82,17 @@ def __init_model_graph(model_proto: onnx.ModelProto, model_graph: nx.DiGraph) ->
                                       for output_name, output_size in zip(output_names, output_sizes)
                                   },
                                   is_input=False,
-                                  is_output=True)
-    model_graph.add_node(ModelGraph.OUTPUT_LAYER_NAME,
-                         layer_info=output_layer_info)
+                                  is_output=True,
+                                  is_aggregated=False,
+                                  aggregated_layers=[])
+    model_graph.add_layer(layer_info=output_layer_info)
 
 
-def __add_model_nodes(model_proto: onnx.ModelProto, model_graph: nx.DiGraph) -> None:
+def __add_model_nodes(model_proto: onnx.ModelProto, model_graph: ModelGraph, profile_flops: bool) -> None:
 
-    flops_dict: dict[str, float] = __build_flops_dict(model_proto)
+    flops_dict: dict[str, float] = {}
+    if profile_flops:
+        flops_dict = __build_flops_dict(model_proto)
 
     model_inputs: dict[str, onnx.ValueInfoProto] = {
         input.name: input
@@ -112,16 +114,18 @@ def __add_model_nodes(model_proto: onnx.ModelProto, model_graph: nx.DiGraph) -> 
 
         layer_info = LayerInfo(name=node.name,
                                type=node.op_type,
-                               flops=flops_dict[node.name],
+                               flops=flops_dict.get(node.name, 0),
                                weights_size=weights_size,
                                inputs={input_name: input_size for input_name,
                                        input_size in zip(input_names, input_sizes)},
                                outputs={output_name: output_size for output_name,
                                         output_size in zip(output_names, output_sizes)},
                                is_input=False,
-                               is_output=False)
+                               is_output=False,
+                               is_aggregated=False,
+                               aggregated_layers=[])
 
-        model_graph.add_node(node.name, layer_info=layer_info)
+        model_graph.add_layer(layer_info=layer_info)
     pass
 
 
@@ -177,21 +181,17 @@ def __extract_node_info(
     return input_names, input_sizes, output_names, output_sizes, weights_size
 
 
-def __add_model_edges(model_proto: onnx.ModelProto, model_graph: nx.DiGraph) -> None:
+def __add_model_edges(model_proto: onnx.ModelProto, model_graph: ModelGraph) -> None:
     first_layer_name: str
     second_layer_name: str
-    for first_layer_name in model_graph.nodes.keys():
-        first_layer_info: LayerInfo = model_graph.nodes.get(
-            first_layer_name).get("layer_info")
+    for first_layer_name, first_layer_info in model_graph.get_all_layers().items():
         first_out_names: set[str] = set(
             list(first_layer_info.outputs.keys()))
 
-        for second_layer_name in model_graph.nodes.keys():
+        for second_layer_name, second_layer_info in model_graph.get_all_layers().items():
             if first_layer_name == second_layer_name:
                 continue
 
-            second_layer_info: LayerInfo = model_graph.nodes.get(
-                second_layer_name).get("layer_info")
             second_in_names: set[str] = set(
                 list(second_layer_info.inputs.keys()))
 
@@ -202,11 +202,10 @@ def __add_model_edges(model_proto: onnx.ModelProto, model_graph: nx.DiGraph) -> 
                 tensors = {
                     act_name: act_size for act_name, act_size in second_layer_info.inputs.items() if act_name in comm_elements}
 
-                edge = EdgeInfo(source=first_layer_name,
-                                target=second_layer_name,
-                                tensors=tensors)
-                model_graph.add_edge(
-                    first_layer_name, second_layer_name, edge_info=edge)
+                edge_info = EdgeInfo(source=first_layer_name,
+                                     target=second_layer_name,
+                                     tensors=tensors)
+                model_graph.add_edge(edge_info=edge_info)
     pass
 
 
@@ -218,7 +217,7 @@ def __get_common_elements(first_node_outs: set[str], second_node_ins: set[str]) 
     return common_elements
 
 
-def __add_model_info(model_proto: onnx.ModelProto, model_graph: nx.DiGraph) -> None:
+def __add_model_info(model_proto: onnx.ModelProto, model_graph: ModelGraph) -> None:
     pass
 
 

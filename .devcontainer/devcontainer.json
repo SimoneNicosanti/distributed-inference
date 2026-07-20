@@ -47,16 +47,37 @@
       ],
 
       "settings": {
-        // Setting the default interpreter as the one created by the post create script
         "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
 
-        // Setting the default formatter as trunk.io
-        "editor.defaultFormatter": "trunk.io",
+        "editor.formatOnSave": true,
 
-        // Disabling type checking from pylint
+        "[python]": {
+          "editor.defaultFormatter": "trunk.io",
+          "editor.formatOnSave": true
+        },
+
+        "[toml]": {
+          "editor.defaultFormatter": "trunk.io",
+          "editor.formatOnSave": true
+        },
+
+        "[yaml]": {
+          "editor.defaultFormatter": "trunk.io",
+          "editor.formatOnSave": true
+        },
+
+        "[markdown]": {
+          "editor.defaultFormatter": "trunk.io",
+          "editor.formatOnSave": true
+        },
+
+        "[shellscript]": {
+          "editor.defaultFormatter": "trunk.io",
+          "editor.formatOnSave": true
+        },
+
         "python.analysis.typeCheckingMode": "basic",
 
-        // Setting the mypy type checker
         "mypy-type-checker.importStrategy": "fromEnvironment",
         "mypy-type-checker.path": [
           "${containerWorkspaceFolder}/.venv/bin/mypy"
@@ -64,10 +85,7 @@
         "mypy-type-checker.args": [
           "--config-file",
           "${containerWorkspaceFolder}/pyproject.toml"
-        ],
-
-        // Enabling auto formatting on file save
-        "editor.formatOnSave": true
+        ]
       }
     }
   }

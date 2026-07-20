@@ -19,6 +19,7 @@ RUN apt-get update \
         git \
         iproute2 \
         iputils-ping \
+        graphviz \
     && rm -rf /var/lib/apt/lists/*
 
 USER vscode
