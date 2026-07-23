@@ -1,0 +1,11 @@
+torch
+torchvision
+onnx
+onnxruntime
+onnxscript
+onnxconverter-common
+transformers
+ultralytics
+numpy
+pillow
+safetensors

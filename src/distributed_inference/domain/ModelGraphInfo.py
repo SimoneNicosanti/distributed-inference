@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 
-from pydantic import BaseModel, ConfigDict, PrivateAttr
+from pydantic import BaseModel, ConfigDict, PrivateAttr, Field
 
 
 from collections.abc import Mapping, Iterable
-from typing import TypedDict, cast, Tuple, List
+from typing import TypedDict, cast, Tuple, List, Any, Self
 
 from enum import Enum
 import networkx as nx
@@ -25,6 +25,47 @@ class TaskType(Enum):
     REGRESSION = "regression"
 
 
+class ModelType(Enum):
+    CNN = "cnn"
+    VIT = "vit"
+    BERT = "bert"
+
+
+class FlopsInfo(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    flops: dict[int, float] = Field(default_factory=dict)
+
+    def __add__(self, other: object) -> Self:
+        if not isinstance(other, FlopsInfo):
+            return NotImplemented
+
+        if not self.flops:
+            return type(self)(flops=dict(other.flops))
+
+        if not other.flops:
+            return type(self)(flops=dict(self.flops))
+
+        if self.flops.keys() != other.flops.keys():
+            raise ValueError("FlopsInfo objects must have the same sequence lengths")
+
+        return type(self)(
+            flops={
+                sequence_length: (value + other.flops[sequence_length])
+                for sequence_length, value in self.flops.items()
+            }
+        )
+
+
+class TensorInfo(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+
+    shapes: dict[int, list[int]]  ## sequence length -> shape
+    sizes: dict[int, float]  ## sequence length -> size
+
+
 class LayerInfo(BaseModel):
     model_config = ConfigDict(frozen=False)
 
@@ -32,12 +73,12 @@ class LayerInfo(BaseModel):
 
     type: str
 
-    flops: float
+    flops: FlopsInfo
     weights_size: float
 
-    inputs: dict[str, float]
+    inputs: set[str] = Field(default_factory=set)
 
-    outputs: dict[str, float]
+    outputs: set[str] = Field(default_factory=set)
 
     is_input: bool
     is_output: bool
@@ -52,18 +93,29 @@ class EdgeInfo(BaseModel):
     source: str
     target: str
 
-    tensors: dict[str, float]
+    tensors: set[str] = Field(default_factory=set)
+
+
+class DynamicShapeType(Enum):
+    BATCH = "batch"
+    SEQUENCE = "sequence"
 
 
 class ModelInfo(BaseModel):
     model_config = ConfigDict(frozen=True)
 
+    name: str
+
     accuracy: float
     task: TaskType
 
+    type: ModelType
 
-class ModelAttributes(TypedDict):
-    info: ModelInfo
+    dynamic_shapes: dict[str, DynamicShapeType]  ## Shape-name to shape type
+    sequence_sizes: List[int] = [1]
+
+    num_heads: int = 0
+    hidden_size: int = 0
 
 
 class LayerAttributes(TypedDict):
@@ -92,11 +144,35 @@ class ModelGraph(BaseModel):
         frozen=False,
     )
 
-    info: ModelInfo | None = None
+    model_info: ModelInfo | None = None
+    _tensors_map: Mapping[str, TensorInfo] = PrivateAttr(default_factory=dict)
 
     _graph: RawModelGraph = PrivateAttr(
         default_factory=create_raw_model_graph,
     )
+
+    def set_model_info(self, model_info: ModelInfo) -> None:
+        self.model_info = model_info
+
+    def get_model_info(self) -> ModelInfo | None:
+        return self.model_info
+
+    def set_tensors_map(self, tensors_map: Mapping[str, TensorInfo]) -> None:
+        self._tensors_map = tensors_map
+
+    def get_tensors_info(self) -> Mapping[str, TensorInfo]:
+        return self._tensors_map
+
+    def get_default_sizes_for_tensors_set(
+        self, tensors_set: set[str]
+    ) -> dict[str, float]:
+        assert self.model_info is not None
+        min_size = min(self.model_info.sequence_sizes)
+
+        return {
+            tensor_name: self._tensors_map[tensor_name].sizes[min_size]
+            for tensor_name in tensors_set
+        }
 
     def add_layer(self, layer_info: LayerInfo) -> None:
         self._graph.add_node(layer_info.name, info=layer_info)
@@ -220,10 +296,13 @@ class ModelGraph(BaseModel):
         for edge_info in outgoing_edges:
             self.add_edge(edge_info)
 
+        if not nx.is_directed_acyclic_graph(self._graph):  # type: ignore
+            raise ValueError("The graph must be a DAG.")
+
     def _create_contracted_edges(
         self,
-        incoming: dict[LayerKey, dict[str, float]],
-        outgoing: dict[LayerKey, dict[str, float]],
+        incoming: dict[LayerKey, set[str]],
+        outgoing: dict[LayerKey, set[str]],
         aggregated_name: LayerKey,
     ) -> Tuple[List[EdgeInfo], List[EdgeInfo]]:
         incoming_edges = [
@@ -252,14 +331,14 @@ class ModelGraph(BaseModel):
         target: LayerKey,
         source_info: LayerInfo,
         target_info: LayerInfo,
-        incoming: dict[LayerKey, dict[str, float]],
-        outgoing: dict[LayerKey, dict[str, float]],
+        incoming: dict[LayerKey, set[str]],
+        outgoing: dict[LayerKey, set[str]],
     ) -> Tuple[LayerKey, LayerInfo]:
-        aggregated_inputs: dict[str, float] = {}
+        aggregated_inputs: set[str] = set()
         for tensors in incoming.values():
             ModelGraph._merge_tensors(aggregated_inputs, tensors)
 
-        aggregated_outputs: dict[str, float] = {}
+        aggregated_outputs: set[str] = set()
         for tensors in outgoing.values():
             ModelGraph._merge_tensors(aggregated_outputs, tensors)
 
@@ -323,29 +402,21 @@ class ModelGraph(BaseModel):
 
     @staticmethod
     def _merge_tensors(
-        destination: dict[str, float],
-        tensors: Mapping[str, float],
+        destination: set[str],
+        tensors: set[str],
     ) -> None:
-        for tensor_name, tensor_size in tensors.items():
-            existing_size = destination.get(tensor_name)
-
-            if existing_size is not None and existing_size != tensor_size:
-                raise ValueError(
-                    f"Inconsistent size for tensor {tensor_name!r}: "
-                    f"{existing_size} != {tensor_size}"
-                )
-
-            destination[tensor_name] = tensor_size
+        for tensor_name in tensors:
+            destination.add(tensor_name)
 
     def _get_layer_set_boundary(
         self,
         layers: set[LayerKey],
     ) -> tuple[
-        dict[LayerKey, dict[str, float]],
-        dict[LayerKey, dict[str, float]],
+        dict[LayerKey, set[str]],
+        dict[LayerKey, set[str]],
     ]:
-        incoming: dict[LayerKey, dict[str, float]] = {}
-        outgoing: dict[LayerKey, dict[str, float]] = {}
+        incoming: dict[LayerKey, set[str]] = {}
+        outgoing: dict[LayerKey, set[str]] = {}
 
         for layer in layers:
             # Edges: external node -> internal node
@@ -356,7 +427,7 @@ class ModelGraph(BaseModel):
                 if source in layers:
                     continue
 
-                tensors = incoming.setdefault(source, {})
+                tensors = incoming.setdefault(source, set())
                 ModelGraph._merge_tensors(tensors, edge_info.tensors)
 
             # Edges: internal node -> external node
@@ -367,7 +438,7 @@ class ModelGraph(BaseModel):
                 if target in layers:
                     continue
 
-                tensors = outgoing.setdefault(target, {})
+                tensors = outgoing.setdefault(target, set())
                 ModelGraph._merge_tensors(tensors, edge_info.tensors)
 
         return incoming, outgoing
