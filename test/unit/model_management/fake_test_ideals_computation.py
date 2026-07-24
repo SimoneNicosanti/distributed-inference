@@ -4,7 +4,7 @@ from math import inf, isclose
 
 import networkx as nx
 
-from distributed_inference.domain.ModelGraphInfo import (
+from distributed_inference.domain.model_graph_info import (
     ModelGraph,
     LayerKey,
     EdgeKey,
@@ -13,8 +13,6 @@ from distributed_inference.domain.ModelGraphInfo import (
 from pathlib import Path
 
 from argparse import ArgumentParser, Namespace
-
-pase_model_path = Path("/workspace/distributed-inference/assets/models")
 
 
 @dataclass(frozen=True, slots=True)

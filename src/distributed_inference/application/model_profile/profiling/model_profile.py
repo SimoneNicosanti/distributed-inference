@@ -1,6 +1,6 @@
 import onnx
 
-from distributed_inference.domain.ModelGraphInfo import (
+from distributed_inference.domain.model_graph_info import (
     LayerInfo,
     EdgeInfo,
     ModelGraph,
@@ -9,13 +9,16 @@ from distributed_inference.domain.ModelGraphInfo import (
     TensorInfo,
     DynamicShapeType,
 )
-from distributed_inference.domain import ModelGraphInfo
+from distributed_inference.domain import model_graph_info
 import numpy as np
 import onnx_tool
 
 import sympy
 
-from distributed_inference.model_management import onnx_tool_custom_nodes  # noqa: F401
+from distributed_inference.application.model_profile.profiling import (
+    # trunk-ignore(ruff/F401)
+    onnx_tool_custom_nodes,
+)  # noqa: F401
 
 
 def profile_model(
@@ -75,7 +78,7 @@ def __clear_model_graph(model_graph: ModelGraph) -> None:
     # In some cases, there are nodes used to define the weights
     # Or pre-processing operations on them (likq quantization)
     reachable = model_graph.get_reachable_from_layer(
-        ModelGraphInfo.INPUT_LAYER_NAME
+        model_graph_info.INPUT_LAYER_NAME
     ).keys()
 
     all_layers = model_graph.get_all_layers().keys()
@@ -94,8 +97,8 @@ def __init_model_graph(
         input_names.add(input.name)
 
     input_layer_info = LayerInfo(
-        name=ModelGraphInfo.INPUT_LAYER_NAME,
-        type=ModelGraphInfo.INPUT_LAYER_NAME,
+        name=model_graph_info.INPUT_LAYER_NAME,
+        type=model_graph_info.INPUT_LAYER_NAME,
         flops=FlopsInfo(flops={seq_size: 0 for seq_size in model_info.sequence_sizes}),
         weights_size=0,
         inputs=input_names,
@@ -112,8 +115,8 @@ def __init_model_graph(
         output_names.add(output.name)
 
     output_layer_info = LayerInfo(
-        name=ModelGraphInfo.OUTPUT_LAYER_NAME,
-        type=ModelGraphInfo.OUTPUT_LAYER_NAME,
+        name=model_graph_info.OUTPUT_LAYER_NAME,
+        type=model_graph_info.OUTPUT_LAYER_NAME,
         flops=FlopsInfo(flops={seq_size: 0 for seq_size in model_info.sequence_sizes}),
         weights_size=0,
         inputs=output_names,

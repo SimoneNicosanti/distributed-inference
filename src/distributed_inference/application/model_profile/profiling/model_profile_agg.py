@@ -1,5 +1,7 @@
-from distributed_inference.model_management.model_profile import profile_model
-from distributed_inference.domain.ModelGraphInfo import (
+from distributed_inference.application.model_profile.profiling.model_profile import (
+    profile_model,
+)
+from distributed_inference.domain.model_graph_info import (
     ModelGraph,
     LayerInfo,
     ModelInfo,
@@ -8,7 +10,7 @@ from distributed_inference.domain.ModelGraphInfo import (
 from typing import cast
 
 
-from distributed_inference.model_management.model_optimize import (
+from distributed_inference.application.model_profile.optimization.model_optimize import (
     optimize_model,
     OptimizationLevel,
 )
@@ -66,7 +68,7 @@ def compute_aggregate_model_graph(
         if fused_layers is None:
             continue
 
-        fused_layers_info = basic_model_graph.gat_layer_info_from_iterable(fused_layers)
+        fused_layers_info = basic_model_graph.get_layer_info_from_iterable(fused_layers)
 
         agg_layer_info = agg_model_graph.get_layer_info(ext_layer_name)
         agg_layer_info.aggregated_layers = list(fused_layers_info.values())
@@ -77,7 +79,7 @@ def compute_aggregate_model_graph(
         # This is an aggregated node, but not in the sense of a coarsening
         agg_layer_info.is_aggregated = False
 
-    agg_model_graph.set_tensors_map(basic_model_graph._tensors_mapping)
+    agg_model_graph.set_tensors_map(basic_model_graph.get_tensors_map())
 
     return agg_model_graph
 

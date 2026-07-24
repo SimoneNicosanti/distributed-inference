@@ -8,11 +8,10 @@ from typing import List
 from typing import Any
 
 from onnx_tool.node import DIV_MACS, EXP_MACS, Node
-from onnx_tool.tensor import Tensor
 from onnx_tool.utils import NODE_REGISTRY
 
 
-@NODE_REGISTRY.register()
+@NODE_REGISTRY.register()  # type: ignore
 class DynamicQuantizeLinearNode(onnx_tool.Node):
     def shape_infer(self, intensors: List[Tensor], outtensors: List[Tensor]) -> None:
         input_shape = intensors[0].get_shape()
@@ -30,7 +29,7 @@ class DynamicQuantizeLinearNode(onnx_tool.Node):
         outtensors[2].update_dtype(np.uint8)
 
 
-@NODE_REGISTRY.register()
+@NODE_REGISTRY.register()  # type: ignore
 class MultiHeadAttentionNode(Node):
     """Profiler per com.microsoft::MultiHeadAttention senza KV-cache."""
 

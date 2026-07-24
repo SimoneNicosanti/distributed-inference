@@ -1,13 +1,13 @@
-from distributed_inference.model_management.model_profile import profile_model
-from distributed_inference.domain.ModelGraphInfo import (
+from distributed_inference.application.model_management.profiling.model_profile import (
+    profile_model,
+)
+from distributed_inference.domain.model_graph_info import (
     ModelGraph,
 )
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 import onnx
-from models_info import get_model_info
-
-pase_model_path = Path("/workspace/distributed-inference/assets/models")
+from models_info import get_model_info, BASE_MODEL_PATH
 
 
 def parse_args() -> Namespace:
@@ -21,7 +21,7 @@ def main() -> None:
     args = parse_args()
 
     model_name = args.model
-    model_path = pase_model_path / f"{model_name}.onnx"
+    model_path = BASE_MODEL_PATH / f"{model_name}.onnx"
 
     model_proto = onnx.load(str(model_path))
     model_info = get_model_info(model_name)
@@ -35,7 +35,7 @@ def main() -> None:
     for edge, edge_info in model_profile.get_all_edges().items():
         print(edge_info)
 
-    for tensor, tensor_info in model_profile.get_tensors_info().items():
+    for tensor, tensor_info in model_profile.get_tensors_map().items():
         print(tensor_info)
 
 

@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr, Field
 
 
 from collections.abc import Mapping, Iterable
-from typing import TypedDict, cast, Tuple, List, Any, Self
+from typing import TypedDict, cast, Tuple, List, Self
 
 from enum import Enum
 import networkx as nx
@@ -112,7 +112,9 @@ class ModelInfo(BaseModel):
     type: ModelType
 
     dynamic_shapes: dict[str, DynamicShapeType]  ## Shape-name to shape type
-    sequence_sizes: List[int] = [1]
+
+    batch_size: int = 1  ## Default to 1
+    sequence_sizes: List[int] = [1]  ## Default to 1 for no sequence
 
     num_heads: int = 0
     hidden_size: int = 0
@@ -160,7 +162,7 @@ class ModelGraph(BaseModel):
     def set_tensors_map(self, tensors_map: Mapping[str, TensorInfo]) -> None:
         self._tensors_map = tensors_map
 
-    def get_tensors_info(self) -> Mapping[str, TensorInfo]:
+    def get_tensors_map(self) -> Mapping[str, TensorInfo]:
         return self._tensors_map
 
     def get_default_sizes_for_tensors_set(
@@ -172,6 +174,15 @@ class ModelGraph(BaseModel):
         return {
             tensor_name: self._tensors_map[tensor_name].sizes[min_size]
             for tensor_name in tensors_set
+        }
+
+    def get_default_flops_for_layer_set(self, layer_set: set[str]) -> dict[str, float]:
+        assert self.model_info is not None
+        min_size = min(self.model_info.sequence_sizes)
+
+        return {
+            layer_name: self._graph.nodes[layer_name]["info"].flops.flops[min_size]
+            for layer_name in layer_set
         }
 
     def add_layer(self, layer_info: LayerInfo) -> None:
@@ -213,7 +224,7 @@ class ModelGraph(BaseModel):
     def get_layer_info(self, layer: LayerKey) -> LayerInfo:
         return self._graph.nodes[layer]["info"]
 
-    def gat_layer_info_from_iterable(
+    def get_layer_info_from_iterable(
         self, layers: Iterable[LayerKey]
     ) -> Mapping[LayerKey, LayerInfo]:
         return {layer: self.get_layer_info(layer) for layer in layers}
@@ -276,7 +287,7 @@ class ModelGraph(BaseModel):
 
         contracted_nodes = {source, target}
 
-        incoming, outgoing = self._get_layer_set_boundary(contracted_nodes)
+        incoming, outgoing = self._get_layer_set_boundary_tensors(contracted_nodes)
 
         aggregated_name, aggregated_info = self._create_contracted_layer(
             source, target, source_info, target_info, incoming, outgoing
@@ -336,11 +347,11 @@ class ModelGraph(BaseModel):
     ) -> Tuple[LayerKey, LayerInfo]:
         aggregated_inputs: set[str] = set()
         for tensors in incoming.values():
-            ModelGraph._merge_tensors(aggregated_inputs, tensors)
+            aggregated_inputs.update(tensors)
 
         aggregated_outputs: set[str] = set()
         for tensors in outgoing.values():
-            ModelGraph._merge_tensors(aggregated_outputs, tensors)
+            aggregated_outputs.update(tensors)
 
         aggregated_name = f"{source}∘{target}"
 
@@ -400,23 +411,45 @@ class ModelGraph(BaseModel):
 
         return True
 
-    @staticmethod
-    def _merge_tensors(
-        destination: set[str],
-        tensors: set[str],
-    ) -> None:
-        for tensor_name in tensors:
-            destination.add(tensor_name)
+    def extract_incoming_outgoing_tensors_of_sub_model(
+        self, layers: set[LayerKey]
+    ) -> Tuple[set[str], set[str]]:
+        per_source_incoming, per_target_outgoing = self._get_layer_set_boundary_tensors(
+            layers
+        )
 
-    def _get_layer_set_boundary(
+        incoming: set[str] = set()
+        outgoing: set[str] = set()
+        for _, source_incoming in per_source_incoming.items():
+            incoming.update(source_incoming)
+
+        for _, target_outgoing in per_target_outgoing.items():
+            outgoing.update(target_outgoing)
+
+        for _, layer_info in self.get_layer_info_from_iterable(layers).items():
+            if layer_info.is_input:
+                incoming.update(layer_info.outputs)
+            if layer_info.is_output:
+                outgoing.update(layer_info.outputs)
+
+        return incoming, outgoing
+
+    def get_topological_sort(self) -> List[LayerKey]:
+        return list(nx.topological_sort(self._graph))  # type: ignore
+
+    def _get_layer_set_boundary_tensors(
         self,
         layers: set[LayerKey],
     ) -> tuple[
         dict[LayerKey, set[str]],
         dict[LayerKey, set[str]],
     ]:
-        incoming: dict[LayerKey, set[str]] = {}
-        outgoing: dict[LayerKey, set[str]] = {}
+        incoming: dict[
+            LayerKey, set[str]
+        ] = {}  ## Map tensor source -> set of tensors received by layers in set
+        outgoing: dict[
+            LayerKey, set[str]
+        ] = {}  ## Map tensor target -> set of tensors sent by layers in set
 
         for layer in layers:
             # Edges: external node -> internal node
@@ -428,7 +461,7 @@ class ModelGraph(BaseModel):
                     continue
 
                 tensors = incoming.setdefault(source, set())
-                ModelGraph._merge_tensors(tensors, edge_info.tensors)
+                tensors.update(edge_info.tensors)
 
             # Edges: internal node -> external node
             for (
@@ -439,7 +472,7 @@ class ModelGraph(BaseModel):
                     continue
 
                 tensors = outgoing.setdefault(target, set())
-                ModelGraph._merge_tensors(tensors, edge_info.tensors)
+                tensors.update(edge_info.tensors)
 
         return incoming, outgoing
 

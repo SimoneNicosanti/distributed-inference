@@ -1,4 +1,4 @@
-from distributed_inference.domain.ModelGraphInfo import (
+from distributed_inference.domain.model_graph_info import (
     ModelGraph,
     EdgeKey,
 )

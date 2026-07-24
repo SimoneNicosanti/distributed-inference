@@ -1,9 +1,14 @@
-from distributed_inference.domain.ModelGraphInfo import (
+from distributed_inference.domain.model_graph_info import (
     ModelInfo,
     TaskType,
     ModelType,
     DynamicShapeType,
 )
+
+from pathlib import Path
+
+BASE_MODEL_PATH = Path("/workspace/distributed-inference/assets/models")
+
 
 TEST_MODELS_INFO = {
     # "yolos": ModelInfo(

@@ -1,10 +1,9 @@
 import onnx
 import networkx as nx
 
-from distributed_inference.domain.ModelGraphInfo import (
+from distributed_inference.domain.model_graph_info import (
     ModelGraph,
     LayerKey,
-    EdgeKey,
 )
 from pathlib import Path
 
@@ -143,7 +142,6 @@ def export_model_graph_to_dummy_onnx(
 
     # A tensor produced by one layer can be consumed by several layers.
     tensor_values: dict[tuple[LayerKey, str], str] = {}
-    tensor_sizes: dict[tuple[LayerKey, str], float] = {}
 
     graph_inputs: list[onnx.ValueInfoProto] = []
     graph_outputs: list[onnx.ValueInfoProto] = []
@@ -156,19 +154,13 @@ def export_model_graph_to_dummy_onnx(
         if target not in layers:
             raise ValueError(f"Unknown edge target: {target!r}")
 
-        edge_tensors = edge_info.tensors or {f"{source}_to_{target}": 1.0}
+        edge_tensors = edge_info.tensors or {f"{source}_to_{target}"}
 
-        for tensor_name, tensor_size in edge_tensors.items():
+        for tensor_name in edge_tensors:
             tensor_key = (source, tensor_name)
-
-            previous_size = tensor_sizes.get(tensor_key)
-
-            if previous_size is not None and previous_size != tensor_size:
-                raise ValueError(
-                    f"Inconsistent size for tensor {tensor_name!r} "
-                    f"produced by {source!r}: "
-                    f"{previous_size} != {tensor_size}"
-                )
+            tensor_size = model_graph.get_default_sizes_for_tensors_set({tensor_name})[
+                tensor_name
+            ]
 
             onnx_value_name = tensor_values.get(tensor_key)
 
@@ -177,9 +169,6 @@ def export_model_graph_to_dummy_onnx(
                     f"{source}__{tensor_name}",
                     used_value_names,
                 )
-
-                tensor_values[tensor_key] = onnx_value_name
-                tensor_sizes[tensor_key] = tensor_size
 
                 node_outputs[source].append(onnx_value_name)
 
@@ -202,9 +191,9 @@ def export_model_graph_to_dummy_onnx(
         outputs = list(dict.fromkeys(node_outputs[layer_key]))
 
         if not inputs:
-            declared_inputs = layer_info.inputs or {f"{layer_key}_input": 1.0}
+            declared_inputs = layer_info.inputs or {f"{layer_key}_input"}
 
-            for tensor_name, tensor_size in declared_inputs.items():
+            for tensor_name in declared_inputs:
                 value_name = _make_unique_identifier(
                     f"graph_input__{layer_key}__{tensor_name}",
                     used_value_names,
@@ -221,9 +210,9 @@ def export_model_graph_to_dummy_onnx(
                 )
 
         if not outputs:
-            declared_outputs = layer_info.outputs or {f"{layer_key}_output": 1.0}
+            declared_outputs = layer_info.outputs or {f"{layer_key}_output"}
 
-            for tensor_name, tensor_size in declared_outputs.items():
+            for tensor_name in declared_outputs:
                 value_name = _make_unique_identifier(
                     f"graph_output__{layer_key}__{tensor_name}",
                     used_value_names,
@@ -241,10 +230,24 @@ def export_model_graph_to_dummy_onnx(
 
         attributes: dict[str, object] = {
             "original_type": layer_info.type,
-            "flops": float(layer_info.flops),
+            "flops": model_graph.get_default_flops_for_layer_set({layer_info.name})[
+                layer_info.name
+            ],
             "weights_size": float(layer_info.weights_size),
-            "total_input_size": float(sum(layer_info.inputs.values())),
-            "total_output_size": float(sum(layer_info.outputs.values())),
+            "total_input_size": float(
+                sum(
+                    model_graph.get_default_sizes_for_tensors_set(
+                        layer_info.inputs
+                    ).values()
+                )
+            ),
+            "total_output_size": float(
+                sum(
+                    model_graph.get_default_sizes_for_tensors_set(
+                        layer_info.outputs
+                    ).values()
+                )
+            ),
             "is_input": int(layer_info.is_input),
             "is_output": int(layer_info.is_output),
             "is_aggregated": int(layer_info.is_aggregated),
@@ -264,7 +267,7 @@ def export_model_graph_to_dummy_onnx(
             outputs=outputs,
             name=layer_info.name,
             domain=_VISUALIZATION_DOMAIN,
-            **attributes,
+            **attributes,  # type: ignore
         )
 
         onnx_nodes.append(node)

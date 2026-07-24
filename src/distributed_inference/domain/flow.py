@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from distributed_inference.domain.ModelGraphInfo import TaskType
+from distributed_inference.domain.model_graph_info import TaskType
 
 
 class FlowInfo(BaseModel):

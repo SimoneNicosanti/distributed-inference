@@ -14,6 +14,8 @@ from export_common import finalize_model
 
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent.parent / "models"
 
+## TODO: EXPORT TO BE FIXED FOR ATTENTION FUSION AND FOR DYNAMIC SIZES
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(

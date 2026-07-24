@@ -7,7 +7,7 @@ import onnxruntime as ort
 import onnxruntime.transformers.optimizer as ort_transformers_opt
 from onnxruntime.transformers.fusion_options import FusionOptions
 
-from distributed_inference.domain.ModelGraphInfo import ModelInfo, ModelType
+from distributed_inference.domain.model_graph_info import ModelInfo, ModelType
 
 from enum import Enum
 

@@ -10,6 +10,8 @@ import onnx
 from transformers import AutoConfig
 from export_common import finalize_model
 
+## TODO: TO CHECK FOR CORRECT EXPORT AND FUSION
+
 
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent.parent / "models"
 

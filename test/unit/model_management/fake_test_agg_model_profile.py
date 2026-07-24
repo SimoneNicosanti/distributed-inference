@@ -1,17 +1,17 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
-from models_info import get_model_info
+from models_info import get_model_info, BASE_MODEL_PATH
 
 
-from distributed_inference.model_management.model_profile_agg import (
+from distributed_inference.application.model_management.profiling.model_profile_agg import (
     compute_aggregate_model_graph,
     profile_with_model_optimization,
 )
 
 
-from distributed_inference.model_management.model_optimize import OptimizationLevel
-
-pase_model_path = Path("/workspace/distributed-inference/assets/models")
+from distributed_inference.application.model_management.optimization.model_optimize import (
+    OptimizationLevel,
+)
 
 
 def parse_args() -> Namespace:
@@ -25,7 +25,7 @@ def main() -> None:
     args = parse_args()
 
     model_name = args.model
-    model_path = pase_model_path / f"{model_name}.onnx"
+    model_path = BASE_MODEL_PATH / f"{model_name}.onnx"
 
     # model_proto = onnx.load(str(model_path))
     model_info = get_model_info(model_name)
