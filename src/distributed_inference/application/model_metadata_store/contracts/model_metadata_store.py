@@ -21,6 +21,7 @@ class ModelMetadataStore(ABC):
     def register_model(
         self,
         owner_id: UserId,
+        model_name: str,
     ) -> ModelId: ...
 
     @abstractmethod

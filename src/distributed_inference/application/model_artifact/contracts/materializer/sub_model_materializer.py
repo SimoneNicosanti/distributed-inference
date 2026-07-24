@@ -1,5 +1,5 @@
 from distributed_inference.domain.identifiers import (
-    ModelVersionId,
+    SubModelId,
 )
 from contextlib import AbstractContextManager
 
@@ -12,5 +12,5 @@ class SubModelMaterializer(ABC):
     @abstractmethod
     def materialize_sub_model(
         self,
-        sub_model_id: ModelVersionId,
+        sub_model_id: SubModelId,
     ) -> AbstractContextManager[Path]: ...

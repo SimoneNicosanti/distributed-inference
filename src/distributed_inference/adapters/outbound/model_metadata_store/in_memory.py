@@ -31,8 +31,8 @@ from typing import override
 class InMemoryModelMetadataStore(ModelMetadataStore):
     def __init__(self) -> None:
         self.lock = Lock()
-        self.model_metadata: dict[ModelId, ModelMetadata] = {}
-        self.model_version_metadata: dict[ModelVersionId, ModelVersionMetadata] = {}
+        self._model_metadata: dict[ModelId, ModelMetadata] = {}
+        self._model_version_metadata: dict[ModelVersionId, ModelVersionMetadata] = {}
         self.sub_model_metadata: dict[SubModelId, SubModelMetadata] = {}
 
     @override
@@ -50,10 +50,10 @@ class InMemoryModelMetadataStore(ModelMetadataStore):
         )
 
         with self.lock:
-            if model_id in self.model_metadata.keys():
+            if model_id in self._model_metadata.keys():
                 ## We do not allow registering the same model twice
                 raise ValueError(f"Model {model_id} already exists")
-            self.model_metadata[model_id] = model_metdata
+            self._model_metadata[model_id] = model_metdata
 
         return model_id
 
@@ -65,11 +65,11 @@ class InMemoryModelMetadataStore(ModelMetadataStore):
     ) -> ModelVersionId:
 
         with self.lock:
-            if model_id not in self.model_metadata.keys():
+            if model_id not in self._model_metadata.keys():
                 raise ValueError(f"Model {model_id} does not exist")
 
             current_version_number = 0
-            for model_version_metadata in self.model_version_metadata.values():
+            for model_version_metadata in self._model_version_metadata.values():
                 if model_version_metadata.model_id == model_id:
                     current_version_number = max(
                         current_version_number,
@@ -80,7 +80,7 @@ class InMemoryModelMetadataStore(ModelMetadataStore):
                 model_id=model_id, version_number=current_version_number + 1
             )
 
-            self.model_version_metadata[model_version_id] = ModelVersionMetadata(
+            self._model_version_metadata[model_version_id] = ModelVersionMetadata(
                 model_id=model_id,
                 model_version_id=model_version_id,
                 version_number=current_version_number + 1,
@@ -97,11 +97,11 @@ class InMemoryModelMetadataStore(ModelMetadataStore):
     ) -> None:
 
         with self.lock:
-            if model_version_id.model_id not in self.model_metadata.keys():
+            if model_version_id.model_id not in self._model_metadata.keys():
                 raise ValueError(f"Model {model_version_id.model_id} does not exist")
-            if model_version_id not in self.model_version_metadata.keys():
+            if model_version_id not in self._model_version_metadata.keys():
                 raise ValueError(f"Model version {model_version_id} does not exist")
-            self.model_version_metadata[model_version_id].model_graph = model_graph
+            self._model_version_metadata[model_version_id].model_graph = model_graph
 
     @override
     def register_sub_model(
@@ -119,9 +119,9 @@ class InMemoryModelMetadataStore(ModelMetadataStore):
         )
 
         with self.lock:
-            if model_version_id not in self.model_version_metadata.keys():
+            if model_version_id not in self._model_version_metadata.keys():
                 raise ValueError(f"Model version {model_version_id} does not exist")
-            if model_version_id.model_id not in self.model_metadata.keys():
+            if model_version_id.model_id not in self._model_metadata.keys():
                 raise ValueError(f"Model {model_version_id.model_id} does not exist")
 
             if sub_model_id in self.sub_model_metadata.keys():
@@ -135,25 +135,25 @@ class InMemoryModelMetadataStore(ModelMetadataStore):
     @override
     def get_model_graph(self, model_version_id: ModelVersionId) -> ModelGraph | None:
         with self.lock:
-            if model_version_id.model_id not in self.model_metadata.keys():
+            if model_version_id.model_id not in self._model_metadata.keys():
                 raise ValueError(f"Model {model_version_id.model_id} does not exist")
-            if model_version_id not in self.model_version_metadata.keys():
+            if model_version_id not in self._model_version_metadata.keys():
                 raise ValueError(f"Model version {model_version_id} does not exist")
-            return self.model_version_metadata[model_version_id].model_graph
+            return self._model_version_metadata[model_version_id].model_graph
 
     @override
     def get_model_info(self, model_version_id: ModelVersionId) -> ModelInfo:
         with self.lock:
-            if model_version_id.model_id not in self.model_metadata.keys():
+            if model_version_id.model_id not in self._model_metadata.keys():
                 raise ValueError(f"Model {model_version_id.model_id} does not exist")
-            if model_version_id not in self.model_version_metadata.keys():
+            if model_version_id not in self._model_version_metadata.keys():
                 raise ValueError(f"Model version {model_version_id} does not exist")
-            return self.model_version_metadata[model_version_id].model_info
+            return self._model_version_metadata[model_version_id].model_info
 
     @override
     def check_model_existence(self, model_id: ModelId) -> bool:
         with self.lock:
-            return model_id in self.model_metadata.keys()
+            return model_id in self._model_metadata.keys()
 
     @override
     def check_model_version_existence(
@@ -162,8 +162,8 @@ class InMemoryModelMetadataStore(ModelMetadataStore):
     ) -> bool:
         with self.lock:
             return (
-                model_version_id in self.model_version_metadata.keys()
-                and model_version_id.model_id in self.model_metadata.keys()
+                model_version_id in self._model_version_metadata.keys()
+                and model_version_id.model_id in self._model_metadata.keys()
             )
 
     @override

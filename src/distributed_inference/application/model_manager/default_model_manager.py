@@ -64,8 +64,8 @@ class DefaultModelManager(ModelManager):
         pass
 
     @override
-    def register_model(self, owner_id: UserId) -> ModelId:
-        return self._model_metadata_store.register_model(owner_id)
+    def register_model(self, owner_id: UserId, model_name: str) -> ModelId:
+        return self._model_metadata_store.register_model(owner_id, model_name)
         pass
 
     @override

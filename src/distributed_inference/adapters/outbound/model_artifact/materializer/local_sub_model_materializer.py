@@ -1,8 +1,8 @@
-from distributed_inference.application.model_artifact.contracts.materializer.model_version_materializer import (
-    ModelVersionMaterializer,
+from distributed_inference.application.model_artifact.contracts.materializer.sub_model_materializer import (
+    SubModelMaterializer,
 )
 
-from distributed_inference.adapters.outbound.model_artifact.model_artifact_store.local_sub_model_store import (
+from distributed_inference.adapters.outbound.model_artifact.store.local_sub_model_artifact_store import (
     LocalSubModelArtifactStore,
 )
 
@@ -17,7 +17,7 @@ from pathlib import Path
 from collections.abc import Generator
 
 
-class LocalSubModelVersionMaterializer(ModelVersionMaterializer):
+class LocalSubModelMaterializer(SubModelMaterializer):
     def __init__(
         self,
         sub_model_artifact_store: LocalSubModelArtifactStore,

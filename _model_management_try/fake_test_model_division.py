@@ -1,6 +1,6 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
-from models_info import get_model_info, BASE_MODEL_PATH
+from model_management.models_info import get_model_info, BASE_MODEL_PATH
 
 
 from distributed_inference.application.model_management.profiling.model_profile_agg import (
@@ -11,6 +11,10 @@ from distributed_inference.application.model_management.profiling.model_profile_
 
 from distributed_inference.application.model_management.optimization.model_optimize import (
     OptimizationLevel,
+)
+
+from distributed_inference.application.model_management.division.model_division import (
+    divide_model,
 )
 
 
@@ -40,14 +44,30 @@ def main() -> None:
 
     agg_model_graph = compute_aggregate_model_graph(base_model_graph, ext_model_graph)
 
-    print("Numero di nodi Base:", len(base_model_graph.get_all_layers()))
-    print("Numero di archi Base:", len(base_model_graph.get_all_edges()))
+    topological_sort = agg_model_graph.get_topological_sort()
 
-    print("Numero di nodi Extended:", len(ext_model_graph.get_all_layers()))
-    print("Numero di archi Extended:", len(ext_model_graph.get_all_edges()))
+    sub_layers_1 = topological_sort[0:100]
+    sub_layers_2 = topological_sort[100:200]
+    sub_layers_3 = topological_sort[-100:]
 
-    print("Numero di nodi Aggregate:", len(agg_model_graph.get_all_layers()))
-    print("Numero di archi Aggregate:", len(agg_model_graph.get_all_edges()))
+    divide_model(
+        agg_model_graph,
+        set(sub_layers_1),
+        model_path,
+        Path("./outputs/model_divide/test_1.onnx"),
+    )
+    divide_model(
+        agg_model_graph,
+        set(sub_layers_2),
+        model_path,
+        Path("./outputs/model_divide/test_2.onnx"),
+    )
+    divide_model(
+        agg_model_graph,
+        set(sub_layers_3),
+        model_path,
+        Path("./outputs/model_divide/test_3.onnx"),
+    )
 
 
 if __name__ == "__main__":

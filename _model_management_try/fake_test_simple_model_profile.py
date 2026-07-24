@@ -7,7 +7,7 @@ from distributed_inference.domain.model_graph_info import (
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 import onnx
-from models_info import get_model_info, BASE_MODEL_PATH
+from model_management.models_info import get_model_info, BASE_MODEL_PATH
 
 
 def parse_args() -> Namespace:

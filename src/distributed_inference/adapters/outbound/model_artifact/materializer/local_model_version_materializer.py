@@ -2,7 +2,7 @@ from distributed_inference.application.model_artifact.contracts.materializer.mod
     ModelVersionMaterializer,
 )
 
-from distributed_inference.adapters.outbound.model_artifact.model_artifact_store.local_model_version_store import (
+from distributed_inference.adapters.outbound.model_artifact.store.local_model_version_artifact_store import (
     LocalModelVersionArtifactStore,
 )
 
@@ -27,7 +27,7 @@ class LocalModelVersionMaterializer(ModelVersionMaterializer):
 
     @override
     @contextmanager
-    def materialize_model(
+    def materialize_model_version(
         self,
         model_version_id: ModelVersionId,
     ) -> Generator[Path]:
