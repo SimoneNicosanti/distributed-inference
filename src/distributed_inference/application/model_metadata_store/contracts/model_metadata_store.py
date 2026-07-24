@@ -1,19 +1,17 @@
+from abc import ABC, abstractmethod
 from typing import Iterable
-
 
 from distributed_inference.domain.identifiers import (
     ModelId,
     ModelVersionId,
-    UserId,
     SubModelId,
+    UserId,
 )
 from distributed_inference.domain.model_graph_info import (
-    ModelInfo,
-    ModelGraph,
     LayerKey,
+    ModelGraph,
+    ModelInfo,
 )
-
-from abc import ABC, abstractmethod
 
 
 class ModelMetadataStore(ABC):

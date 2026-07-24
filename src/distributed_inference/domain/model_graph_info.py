@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-
-from pydantic import BaseModel, ConfigDict, PrivateAttr, Field
-
-
-from collections.abc import Mapping, Iterable
-from typing import TypedDict, cast, Tuple, List, Self
-
+from collections.abc import Iterable, Mapping
 from enum import Enum
-import networkx as nx
+from typing import List, Self, Tuple, TypedDict, cast
 
+import networkx as nx
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 INPUT_LAYER_NAME = "InputLayer"
 OUTPUT_LAYER_NAME = "OutputLayer"
@@ -146,7 +142,7 @@ class ModelGraph(BaseModel):
         frozen=False,
     )
 
-    model_info: ModelInfo | None = None
+    model_info: ModelInfo
     _tensors_map: Mapping[str, TensorInfo] = PrivateAttr(default_factory=dict)
 
     _graph: RawModelGraph = PrivateAttr(

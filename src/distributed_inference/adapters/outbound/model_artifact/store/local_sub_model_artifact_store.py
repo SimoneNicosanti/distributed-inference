@@ -1,23 +1,17 @@
+import fcntl
+import shutil
+from collections.abc import Generator
+from contextlib import contextmanager
+from pathlib import Path
+from typing import BinaryIO, Tuple, override
+
 from distributed_inference.application.model_artifact.contracts.store.sub_model_artifact_store import (
     SubModelArtifactStore,
 )
-
-from collections.abc import Generator
-from typing import BinaryIO, override, Tuple
-
 from distributed_inference.domain.identifiers import (
     SubModelId,
 )
-
 from distributed_inference.domain.model_graph_info import LayerKey
-
-from contextlib import contextmanager
-
-import shutil
-
-from pathlib import Path
-
-import fcntl
 
 
 class LocalSubModelArtifactStore(SubModelArtifactStore):

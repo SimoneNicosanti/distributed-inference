@@ -3,12 +3,12 @@ from __future__ import annotations
 import re
 import shutil
 import tempfile
+import warnings
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
-import warnings
 
 Precision = Literal["fp32", "fp16", "int8"]
 

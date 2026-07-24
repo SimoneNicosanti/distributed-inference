@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-
-from distributed_inference.domain.model_graph_info import LayerKey, ModelGraph
 from pathlib import Path
 from typing import Iterable
+
+from distributed_inference.domain.model_graph_info import LayerKey, ModelGraph
 
 
 class ModelSplitter(ABC):

@@ -1,11 +1,12 @@
 from pydantic import BaseModel, ConfigDict
-from distributed_inference.domain.model_graph_info import ModelInfo, ModelGraph
+
 from distributed_inference.domain.identifiers import (
     ModelId,
-    UserId,
     ModelVersionId,
     SubModelId,
+    UserId,
 )
+from distributed_inference.domain.model_graph_info import ModelGraph, ModelInfo
 
 
 class ModelMetadata(BaseModel):

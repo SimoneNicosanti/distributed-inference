@@ -1,11 +1,12 @@
-from distributed_inference.domain.model_graph_info import (
-    ModelGraph,
-    EdgeKey,
-)
 import copy
+from typing import List, Tuple
+
 import numpy as np
 
-from typing import Tuple, List
+from distributed_inference.domain.model_graph_info import (
+    EdgeKey,
+    ModelGraph,
+)
 
 
 def coarse_graph(model_graph: ModelGraph, iterations: int) -> ModelGraph:

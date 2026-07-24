@@ -60,6 +60,8 @@ model-management = [
   "onnxscript>=0.7",
   "onnxsim>=0.6.5",
   "onnxslim>=0.1.94",
+  "pyro5>=5.15",
+  "fastapi>=0.139",
 ]
 
 gcp = ["google-cloud-storage>=3.0"]
@@ -117,6 +119,10 @@ markers = [
   "unit: test isolati",
   "integration: test di integrazione",
   "contract: test comuni ai diversi backend",
-  "e2e: test end-to-end",
-  "redis: richiede un'istanza Redis",
 ]
+
+[tool.ruff.lint]
+extend-select = ["I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["distributed_inference"]

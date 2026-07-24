@@ -1,11 +1,11 @@
-from distributed_inference.domain.model_graph_info import (
-    ModelInfo,
-    TaskType,
-    ModelType,
-    DynamicShapeType,
-)
-
 from pathlib import Path
+
+from distributed_inference.domain.model_graph_info import (
+    DynamicShapeType,
+    ModelInfo,
+    ModelType,
+    TaskType,
+)
 
 BASE_MODEL_PATH = Path("/workspace/distributed-inference/assets/models")
 

@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 
 import onnx
-from transformers import AutoConfig
 from export_common import finalize_model
+from transformers import AutoConfig
 
 ## TODO: TO CHECK FOR CORRECT EXPORT AND FUSION
 

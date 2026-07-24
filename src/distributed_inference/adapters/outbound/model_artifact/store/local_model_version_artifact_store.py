@@ -1,25 +1,16 @@
+import fcntl
+import shutil
+from collections.abc import Generator
+from contextlib import contextmanager
+from pathlib import Path
+from typing import BinaryIO, Tuple, override
+
 from distributed_inference.application.model_artifact.contracts.store.model_version_artifact_store import (
     ModelVersionArtifactStore,
 )
-
-from collections.abc import Generator
-from typing import BinaryIO, override, Tuple
-
-
 from distributed_inference.domain.identifiers import (
     ModelVersionId,
 )
-
-
-from contextlib import contextmanager
-
-import shutil
-
-
-from pathlib import Path
-
-
-import fcntl
 
 
 class LocalModelVersionArtifactStore(ModelVersionArtifactStore):

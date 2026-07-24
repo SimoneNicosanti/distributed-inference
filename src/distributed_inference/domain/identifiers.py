@@ -1,4 +1,4 @@
-from typing import Tuple, Any
+from typing import Any, Tuple
 from uuid import UUID
 
 from pydantic import (

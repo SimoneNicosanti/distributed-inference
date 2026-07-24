@@ -1,20 +1,18 @@
-from typing import Iterable, BinaryIO
+from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
-
+from typing import BinaryIO, Iterable
 
 from distributed_inference.domain.identifiers import (
     ModelId,
     ModelVersionId,
-    UserId,
     SubModelId,
+    UserId,
 )
 from distributed_inference.domain.model_graph_info import (
-    ModelInfo,
     LayerKey,
     ModelGraph,
+    ModelInfo,
 )
-
-from abc import ABC, abstractmethod
 
 
 class ModelManager(ABC):
@@ -22,6 +20,7 @@ class ModelManager(ABC):
     def register_model(
         self,
         owner_id: UserId,
+        model_name: str,
     ) -> ModelId: ...
 
     @abstractmethod
@@ -33,16 +32,16 @@ class ModelManager(ABC):
     ) -> ModelVersionId: ...
 
     @abstractmethod
-    def generate_submodel(
+    def generate_sub_model(
         self,
-        version_id: ModelVersionId,
-        component_layers: Iterable[LayerKey],
+        model_version_id: ModelVersionId,
+        layers: Iterable[LayerKey],
     ) -> SubModelId: ...
 
     @abstractmethod
-    def open_submodel(
+    def download_sub_model(
         self,
-        submodel_id: SubModelId,
+        sub_model_id: SubModelId,
     ) -> AbstractContextManager[BinaryIO]: ...
 
     @abstractmethod

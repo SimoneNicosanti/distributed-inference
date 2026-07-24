@@ -43,7 +43,8 @@
         "trunk.io",
         "codeium.codeium",
         "vincent-templier.vscode-netron",
-        "ms-python.python"
+        "ms-python.python",
+        "charliermarsh.ruff"
       ],
 
       "settings": {
@@ -57,7 +58,11 @@
 
         "[python]": {
           "editor.defaultFormatter": "trunk.io",
-          "editor.formatOnSave": true
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+          }
         },
 
         "[toml]": {

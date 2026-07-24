@@ -1,11 +1,10 @@
+from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager
+from pathlib import Path
+
 from distributed_inference.domain.identifiers import (
     SubModelId,
 )
-from contextlib import AbstractContextManager
-
-from pathlib import Path
-
-from abc import ABC, abstractmethod
 
 
 class SubModelMaterializer(ABC):

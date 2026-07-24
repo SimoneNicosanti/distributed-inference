@@ -1,17 +1,15 @@
-from distributed_inference.domain.model_graph_info import LayerKey, ModelGraph
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, override
 
-from typing import override
+from onnx.utils import extract_model
 
 from distributed_inference.application.model_splitter.contracts.model_splitter import (
     ModelSplitter,
 )
+from distributed_inference.domain.model_graph_info import LayerKey, ModelGraph
 
-from onnx.utils import extract_model
 
-
-class DefaultModelSplitter(ModelSplitter):
+class OnnxModelSplitter(ModelSplitter):
     @override
     def split_model(
         self,

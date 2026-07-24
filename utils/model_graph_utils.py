@@ -1,113 +1,14 @@
-import onnx
-import networkx as nx
-
-from distributed_inference.domain.model_graph_info import (
-    ModelGraph,
-    LayerKey,
-)
+import re
 from pathlib import Path
 
-from onnx.external_data_helper import uses_external_data
+import networkx as nx
+import onnx
+from onnx import TensorProto, helper
 
-
-from onnx import helper, TensorProto
-import re
-
-
-def ensure_opset_to_path(
-    input_path: str | Path,
-    output_path: str | Path,
-    target_opset: int,
-) -> Path:
-    """
-    Ensure that the default ONNX opset is at least `target_opset` and save
-    the resulting model to `output_path`.
-
-    If the input uses external data, the output uses a single adjacent
-    `<output_name>.data` file.
-    """
-    input_path = Path(input_path).resolve()
-    output_path = Path(output_path).resolve()
-
-    if not input_path.is_file():
-        raise FileNotFoundError(f"ONNX model not found: {input_path}")
-
-    if input_path == output_path:
-        raise ValueError("input_path and output_path must be different")
-
-    output_path.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    # Inspect the original representation without loading the weights.
-    metadata_model = onnx.load(
-        input_path,
-        load_external_data=False,
-    )
-
-    current_opset = next(
-        (
-            opset.version
-            for opset in metadata_model.opset_import
-            if opset.domain in {"", "ai.onnx"}
-        ),
-        None,
-    )
-
-    if current_opset is None:
-        raise ValueError("The model does not import the default ONNX opset")
-
-    uses_external_weights = any(
-        uses_external_data(initializer)
-        for initializer in metadata_model.graph.initializer
-    )
-
-    # The converter may need the initializer values, so load external data.
-    model = onnx.load(
-        input_path,
-        load_external_data=True,
-    )
-
-    if current_opset < target_opset:
-        model = onnx.version_converter.convert_version(
-            model,
-            target_opset,
-        )
-
-    # Remove stale outputs from previous executions.
-    output_path.unlink(missing_ok=True)
-
-    external_data_path = output_path.with_name(f"{output_path.name}.data")
-    external_data_path.unlink(missing_ok=True)
-
-    if uses_external_weights:
-        onnx.save_model(
-            model,
-            output_path,
-            save_as_external_data=True,
-            all_tensors_to_one_file=True,
-            location=external_data_path.name,
-            size_threshold=0,
-            # Keep Constant tensor attributes embedded: this avoids
-            # shape-inference problems previously encountered with ORT.
-            convert_attribute=False,
-        )
-    else:
-        onnx.save_model(
-            model,
-            output_path,
-            save_as_external_data=False,
-        )
-
-    # Checking through the path lets ONNX resolve adjacent external data.
-    onnx.checker.check_model(
-        output_path.as_posix(),
-        full_check=True,
-    )
-
-    return output_path
-
+from distributed_inference.domain.model_graph_info import (
+    LayerKey,
+    ModelGraph,
+)
 
 _VISUALIZATION_DOMAIN = "distributed_inference.visualization"
 

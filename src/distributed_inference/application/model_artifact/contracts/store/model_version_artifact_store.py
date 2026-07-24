@@ -1,11 +1,10 @@
+from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager
 from typing import BinaryIO
 
 from distributed_inference.domain.identifiers import (
     ModelVersionId,
 )
-from contextlib import AbstractContextManager
-
-from abc import ABC, abstractmethod
 
 
 class ModelVersionArtifactStore(ABC):

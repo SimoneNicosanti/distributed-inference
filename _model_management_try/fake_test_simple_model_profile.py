@@ -1,13 +1,11 @@
+from argparse import ArgumentParser, Namespace
+
+import onnx
+from model_management.models_info import BASE_MODEL_PATH, get_model_info
+
 from distributed_inference.application.model_management.profiling.model_profile import (
     profile_model,
 )
-from distributed_inference.domain.model_graph_info import (
-    ModelGraph,
-)
-from argparse import ArgumentParser, Namespace
-from pathlib import Path
-import onnx
-from model_management.models_info import get_model_info, BASE_MODEL_PATH
 
 
 def parse_args() -> Namespace:

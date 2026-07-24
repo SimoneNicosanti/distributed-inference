@@ -4,8 +4,6 @@ import argparse
 from pathlib import Path
 
 import torch
-from torchvision.models import get_model, get_model_weights
-
 from export_common import (
     DEFAULT_OUTPUT_DIR,
     ImageCalibrationReader,
@@ -18,6 +16,7 @@ from export_common import (
     resolve_opset,
     sanitize_model_name,
 )
+from torchvision.models import get_model, get_model_weights
 
 
 def parse_args() -> argparse.Namespace:

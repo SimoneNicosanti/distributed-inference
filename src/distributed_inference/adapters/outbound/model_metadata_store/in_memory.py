@@ -1,31 +1,25 @@
+from threading import Lock
+from typing import Iterable, override
+
 from distributed_inference.application.model_metadata_store.contracts.model_metadata_store import (
     ModelMetadataStore,
 )
-
-from distributed_inference.domain.identifiers import (
-    ModelId,
-    ModelVersionId,
-    UserId,
-    SubModelId,
-)
-
 from distributed_inference.application.model_metadata_store.domain.model_metadata import (
     ModelMetadata,
     ModelVersionMetadata,
     SubModelMetadata,
 )
-
-from distributed_inference.domain.model_graph_info import (
-    ModelInfo,
-    ModelGraph,
-    LayerKey,
+from distributed_inference.domain.identifiers import (
+    ModelId,
+    ModelVersionId,
+    SubModelId,
+    UserId,
 )
-
-from threading import Lock
-
-from typing import Iterable
-
-from typing import override
+from distributed_inference.domain.model_graph_info import (
+    LayerKey,
+    ModelGraph,
+    ModelInfo,
+)
 
 
 class InMemoryModelMetadataStore(ModelMetadataStore):

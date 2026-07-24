@@ -1,13 +1,9 @@
-import onnx_tool
+from typing import Any, List
+
 import numpy as np
-
-from onnx_tool.tensor import Tensor
-
-from typing import List
-
-from typing import Any
-
+import onnx_tool
 from onnx_tool.node import DIV_MACS, EXP_MACS, Node
+from onnx_tool.tensor import Tensor
 from onnx_tool.utils import NODE_REGISTRY
 
 

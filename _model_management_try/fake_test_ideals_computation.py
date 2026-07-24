@@ -1,3 +1,4 @@
+from argparse import ArgumentParser, Namespace
 from collections.abc import Iterator
 from dataclasses import dataclass
 from math import inf, isclose
@@ -5,14 +6,9 @@ from math import inf, isclose
 import networkx as nx
 
 from distributed_inference.domain.model_graph_info import (
-    ModelGraph,
-    LayerKey,
     EdgeKey,
+    ModelGraph,
 )
-
-from pathlib import Path
-
-from argparse import ArgumentParser, Namespace
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,7 +210,7 @@ def main() -> None:
         model_path, model_info, OptimizationLevel.EXTENDED
     )
 
-    agg_model_graph = compute_aggregate_model_graph(base_model_graph, ext_model_graph)
+    compute_aggregate_model_graph(base_model_graph, ext_model_graph)
 
     pass
 

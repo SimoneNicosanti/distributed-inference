@@ -1,20 +1,17 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
-from model_management.models_info import get_model_info, BASE_MODEL_PATH
 
-
-from distributed_inference.application.model_management.profiling.model_profile_agg import (
-    compute_aggregate_model_graph,
-    profile_with_model_optimization,
-)
-
-
-from distributed_inference.application.model_management.optimization.model_optimize import (
-    OptimizationLevel,
-)
+from model_management.models_info import BASE_MODEL_PATH, get_model_info
 
 from distributed_inference.application.model_management.division.model_division import (
     divide_model,
+)
+from distributed_inference.application.model_management.optimization.model_optimize import (
+    OptimizationLevel,
+)
+from distributed_inference.application.model_management.profiling.model_profile_agg import (
+    compute_aggregate_model_graph,
+    profile_with_model_optimization,
 )
 
 

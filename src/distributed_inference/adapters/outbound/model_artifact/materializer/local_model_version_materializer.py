@@ -1,20 +1,15 @@
-from distributed_inference.application.model_artifact.contracts.materializer.model_version_materializer import (
-    ModelVersionMaterializer,
-)
+from collections.abc import Generator
+from contextlib import contextmanager
+from pathlib import Path
+from typing import override
 
 from distributed_inference.adapters.outbound.model_artifact.store.local_model_version_artifact_store import (
     LocalModelVersionArtifactStore,
 )
-
+from distributed_inference.application.model_artifact.contracts.materializer.model_version_materializer import (
+    ModelVersionMaterializer,
+)
 from distributed_inference.domain.identifiers import ModelVersionId
-
-from typing import override
-
-from contextlib import contextmanager
-
-from pathlib import Path
-
-from collections.abc import Generator
 
 
 class LocalModelVersionMaterializer(ModelVersionMaterializer):
