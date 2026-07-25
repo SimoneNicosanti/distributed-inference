@@ -1,13 +1,14 @@
-from collections.abc import Generator
-from contextlib import contextmanager
-from pathlib import Path
+from contextlib import AbstractContextManager
 from typing import override
 
-from distributed_inference.adapters.outbound.model_artifact.store.local_sub_model_artifact_store import (
+from distributed_inference.adapters.outbound.model_artifact.store.local.local_sub_model_artifact_store import (
     LocalSubModelArtifactStore,
 )
 from distributed_inference.application.model_artifact.contracts.materializer.sub_model_materializer import (
     SubModelMaterializer,
+)
+from distributed_inference.application.model_artifact.domain.artifact_bundle import (
+    MaterializedArtifact,
 )
 from distributed_inference.domain.identifiers import SubModelId
 
@@ -21,12 +22,8 @@ class LocalSubModelMaterializer(SubModelMaterializer):
         pass
 
     @override
-    @contextmanager
     def materialize_sub_model(
         self,
         sub_model_id: SubModelId,
-    ) -> Generator[Path]:
-        with self._local_sub_model_artifact_store.get_sub_model_path(
-            sub_model_id
-        ) as sub_model_path:
-            yield sub_model_path
+    ) -> AbstractContextManager[MaterializedArtifact]:
+        return self._local_sub_model_artifact_store.get_sub_model_path(sub_model_id)

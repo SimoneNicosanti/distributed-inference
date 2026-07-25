@@ -8,7 +8,7 @@ import pytest
 from distributed_inference.adapters.outbound.model_artifact.materializer.local_sub_model_materializer import (
     LocalSubModelMaterializer,
 )
-from distributed_inference.adapters.outbound.model_artifact.store.local_sub_model_artifact_store import (
+from distributed_inference.adapters.outbound.model_artifact.store.local.local_sub_model_artifact_store import (
     LocalSubModelArtifactStore,
 )
 from distributed_inference.application.model_artifact.contracts.materializer.sub_model_materializer import (
@@ -98,7 +98,9 @@ def test_materializer_returns_local_artifact_path(
         BytesIO(b"content"),
     )
 
-    expected_path, _ = artifact_store._build_sub_model_file_path(sub_model_id)
+    expected_path, _ = artifact_store._build_bundle_root_path_and_lock_file(
+        sub_model_id
+    )
 
     with materializer.materialize_sub_model(sub_model_id) as materialized_path:
         assert materialized_path == expected_path
@@ -114,7 +116,9 @@ def test_local_materialization_does_not_copy_artifact(
         BytesIO(b"content"),
     )
 
-    expected_path, _ = artifact_store._build_sub_model_file_path(sub_model_id)
+    expected_path, _ = artifact_store._build_bundle_root_path_and_lock_file(
+        sub_model_id
+    )
 
     with materializer.materialize_sub_model(sub_model_id) as materialized_path:
         assert materialized_path.samefile(expected_path)

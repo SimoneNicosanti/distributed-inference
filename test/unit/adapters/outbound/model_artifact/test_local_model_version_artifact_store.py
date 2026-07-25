@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from distributed_inference.adapters.outbound.model_artifact.store.local_model_version_artifact_store import (
+from distributed_inference.adapters.outbound.model_artifact.store.local.local_model_version_artifact_store import (
     LocalModelVersionArtifactStore,
 )
 from distributed_inference.application.model_artifact.contracts.store.model_version_artifact_store import (
@@ -65,7 +65,7 @@ def test_build_model_version_file_path_uses_expected_layout(
     store: LocalModelVersionArtifactStore,
     model_version_id: ModelVersionId,
 ) -> None:
-    file_path, lock_path = store._build_model_version_file_path(model_version_id)
+    file_path, lock_path = store._build_bundle_root_path_and_lock_file(model_version_id)
 
     model_id = model_version_id.model_id
 
@@ -85,7 +85,7 @@ def test_put_creates_parent_directories_and_artifact_file(
     store: LocalModelVersionArtifactStore,
     model_version_id: ModelVersionId,
 ) -> None:
-    file_path, _ = store._build_model_version_file_path(model_version_id)
+    file_path, _ = store._build_bundle_root_path_and_lock_file(model_version_id)
 
     assert not file_path.parent.exists()
 
@@ -102,7 +102,7 @@ def test_put_creates_lock_file(
     store: LocalModelVersionArtifactStore,
     model_version_id: ModelVersionId,
 ) -> None:
-    _, lock_path = store._build_model_version_file_path(model_version_id)
+    _, lock_path = store._build_bundle_root_path_and_lock_file(model_version_id)
 
     assert not lock_path.exists()
 
@@ -127,7 +127,7 @@ def test_put_overwrites_existing_artifact(
         BytesIO(b"second-content"),
     )
 
-    file_path, _ = store._build_model_version_file_path(model_version_id)
+    file_path, _ = store._build_bundle_root_path_and_lock_file(model_version_id)
 
     assert file_path.read_bytes() == b"second-content"
 
@@ -141,9 +141,9 @@ def test_get_model_version_path_returns_artifact_path(
         BytesIO(b"content"),
     )
 
-    expected_path, _ = store._build_model_version_file_path(model_version_id)
+    expected_path, _ = store._build_bundle_root_path_and_lock_file(model_version_id)
 
-    with store.get_model_version_path(model_version_id) as path:
+    with store.get_model_version_bundle_path(model_version_id) as path:
         assert path == expected_path
         assert path.read_bytes() == b"content"
 
@@ -152,7 +152,7 @@ def test_existence_check_creates_lock_file(
     store: LocalModelVersionArtifactStore,
     model_version_id: ModelVersionId,
 ) -> None:
-    _, lock_path = store._build_model_version_file_path(model_version_id)
+    _, lock_path = store._build_bundle_root_path_and_lock_file(model_version_id)
 
     assert not lock_path.exists()
 

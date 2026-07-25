@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from distributed_inference.adapters.outbound.model_artifact.store.local_sub_model_artifact_store import (
+from distributed_inference.adapters.outbound.model_artifact.store.local.local_sub_model_artifact_store import (
     LocalSubModelArtifactStore,
 )
 from distributed_inference.application.model_artifact.contracts.store.sub_model_artifact_store import (
@@ -113,7 +113,7 @@ def test_build_submodel_file_path_uses_expected_layout(
     store: LocalSubModelArtifactStore,
     sub_model_id: SubModelId,
 ) -> None:
-    file_path, lock_path = store._build_sub_model_file_path(sub_model_id)
+    file_path, lock_path = store._build_bundle_root_path_and_lock_file(sub_model_id)
 
     model_version_id = sub_model_id.model_version_id
     model_id = model_version_id.model_id
@@ -142,7 +142,7 @@ def test_put_creates_parent_directories_and_artifact_file(
     store: LocalSubModelArtifactStore,
     sub_model_id: SubModelId,
 ) -> None:
-    file_path, _ = store._build_sub_model_file_path(sub_model_id)
+    file_path, _ = store._build_bundle_root_path_and_lock_file(sub_model_id)
 
     assert not file_path.parent.exists()
 
@@ -159,7 +159,7 @@ def test_put_creates_lock_file(
     store: LocalSubModelArtifactStore,
     sub_model_id: SubModelId,
 ) -> None:
-    _, lock_path = store._build_sub_model_file_path(sub_model_id)
+    _, lock_path = store._build_bundle_root_path_and_lock_file(sub_model_id)
 
     assert not lock_path.exists()
 
@@ -184,7 +184,7 @@ def test_put_overwrites_existing_artifact(
         BytesIO(b"second-content"),
     )
 
-    file_path, _ = store._build_sub_model_file_path(sub_model_id)
+    file_path, _ = store._build_bundle_root_path_and_lock_file(sub_model_id)
 
     assert file_path.read_bytes() == b"second-content"
 
@@ -198,7 +198,7 @@ def test_get_submodel_path_returns_artifact_path(
         BytesIO(b"content"),
     )
 
-    expected_path, _ = store._build_sub_model_file_path(sub_model_id)
+    expected_path, _ = store._build_bundle_root_path_and_lock_file(sub_model_id)
 
     with store.get_sub_model_path(sub_model_id) as path:
         assert path == expected_path
@@ -218,8 +218,8 @@ def test_different_layer_sets_produce_different_paths(
         layers=("layer_2",),
     )
 
-    first_path, _ = store._build_sub_model_file_path(first_id)
-    second_path, _ = store._build_sub_model_file_path(second_id)
+    first_path, _ = store._build_bundle_root_path_and_lock_file(first_id)
+    second_path, _ = store._build_bundle_root_path_and_lock_file(second_id)
 
     assert first_path != second_path
 
@@ -228,7 +228,7 @@ def test_existence_check_creates_lock_file(
     store: LocalSubModelArtifactStore,
     sub_model_id: SubModelId,
 ) -> None:
-    _, lock_path = store._build_sub_model_file_path(sub_model_id)
+    _, lock_path = store._build_bundle_root_path_and_lock_file(sub_model_id)
 
     assert not lock_path.exists()
 

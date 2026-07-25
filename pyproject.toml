@@ -76,11 +76,13 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [tool.mypy]
-python_version = ">=3.14"
+python_version = "3.14"
 
-files = ["src", "services", "jobs", "tests"]
+files = ["src", "test"]
 
 mypy_path = "src"
+
+sqlite_cache = false
 
 strict = true
 warn_unused_configs = true

@@ -43,8 +43,8 @@
         "trunk.io",
         "codeium.codeium",
         "vincent-templier.vscode-netron",
-        "ms-python.python",
-        "charliermarsh.ruff"
+        "charliermarsh.ruff",
+        "seelog.python-init-generator"
       ],
 
       "settings": {
@@ -54,6 +54,10 @@
 
         "python.analysis.indexing": true,
         "python.analysis.autoImportCompletions": true,
+
+         "pythonInitGenerator.ignoreDirectories": [
+              "__pycache__",
+          ],
 
 
         "[python]": {

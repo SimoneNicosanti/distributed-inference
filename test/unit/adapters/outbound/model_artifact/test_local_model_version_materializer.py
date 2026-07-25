@@ -8,7 +8,7 @@ import pytest
 from distributed_inference.adapters.outbound.model_artifact.materializer.local_model_version_materializer import (
     LocalModelVersionMaterializer,
 )
-from distributed_inference.adapters.outbound.model_artifact.store.local_model_version_artifact_store import (
+from distributed_inference.adapters.outbound.model_artifact.store.local.local_model_version_artifact_store import (
     LocalModelVersionArtifactStore,
 )
 from distributed_inference.application.model_artifact.contracts.materializer.model_version_materializer import (
@@ -89,7 +89,9 @@ def test_materializer_returns_local_artifact_path(
         BytesIO(b"content"),
     )
 
-    expected_path, _ = artifact_store._build_model_version_file_path(model_version_id)
+    expected_path, _ = artifact_store._build_bundle_root_path_and_lock_file(
+        model_version_id
+    )
 
     with materializer.materialize_model_version(model_version_id) as materialized_path:
         assert materialized_path == expected_path
@@ -105,7 +107,9 @@ def test_local_materialization_does_not_copy_artifact(
         BytesIO(b"content"),
     )
 
-    expected_path, _ = artifact_store._build_model_version_file_path(model_version_id)
+    expected_path, _ = artifact_store._build_bundle_root_path_and_lock_file(
+        model_version_id
+    )
 
     with materializer.materialize_model_version(model_version_id) as materialized_path:
         assert materialized_path.samefile(expected_path)
