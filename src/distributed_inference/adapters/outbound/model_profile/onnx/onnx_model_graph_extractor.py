@@ -1,5 +1,4 @@
 import copy
-from pathlib import Path
 from typing import cast, override
 
 import numpy as np
@@ -7,6 +6,9 @@ import onnx
 import onnx_tool
 import sympy
 
+from distributed_inference.application.model_artifact.domain.artifact_bundle import (
+    ArtifactConcretePaths,
+)
 from distributed_inference.application.model_profile.contracts.model_graph_extractor import (
     ModelGraphExtractor,
 )
@@ -25,25 +27,28 @@ from distributed_inference.domain.model_graph_info import (
 class OnnxGraphExtractor(ModelGraphExtractor):
     def __init__(
         self,
-    ):
+    ) -> None:
         pass
 
     @override
     def extract_model_graph(
         self,
-        path: Path,
+        paths: ArtifactConcretePaths,
         model_info: ModelInfo,
         profile_flops: bool,
         profile_tensors: bool,
     ) -> ModelGraph:
 
-        model_proto = onnx.load(path.as_posix())
+        assert paths.entrypoint_path is not None
+        path = paths.entrypoint_path
+
+        model_proto = onnx.load_model(path.as_posix())  # type: ignore
 
         inferred_model = OnnxGraphExtractor.__infer_model_shape(model_proto)
         model_graph: ModelGraph = ModelGraph(model_info=model_info)
 
         try:
-            onnx.checker.check_model(inferred_model, full_check=True)
+            onnx.checker.check_model(inferred_model, full_check=True)  # type: ignore
             # model_proto = infer_shapes(inferred_model)
 
             OnnxGraphExtractor.__init_model_graph(
@@ -293,7 +298,7 @@ class OnnxGraphExtractor(ModelGraphExtractor):
             layer_info = LayerInfo(
                 name=node.name,
                 type=node.op_type,
-                flops=FlopsInfo(flops={}),  # type: ignore
+                flops=FlopsInfo(flops={}),
                 weights_size=weights_size,
                 inputs=input_names,
                 outputs=output_names,
@@ -340,7 +345,7 @@ class OnnxGraphExtractor(ModelGraphExtractor):
                 )
                 tool_inputs[input.name] = np.zeros(shape, dtype=dtype)
 
-            tool_graph = tool_model.graph
+            tool_graph: onnx_tool.Graph = tool_model.graph
             tool_graph.shape_infer(tool_inputs)
 
             for tensor in all_tensors:
@@ -488,7 +493,7 @@ class OnnxGraphExtractor(ModelGraphExtractor):
             total_entries = int(np.prod(shape))
             return total_entries * dtype.itemsize
 
-        elif isinstance(tensor, onnx.TensorProto):
+        else:
             array = onnx.numpy_helper.to_array(tensor)
             return int(array.nbytes)
 

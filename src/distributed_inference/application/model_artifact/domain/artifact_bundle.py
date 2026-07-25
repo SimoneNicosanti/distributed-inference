@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict
 class ArtifactBundle(BaseModel):
     model_config = ConfigDict(frozen=True)
 
+    MANIFEST_FILE_NAME = "manifest.json"
+
     manifest: ArtifactManifest
     artifact_files: Tuple[ArtifactFile, ...]
 
@@ -33,8 +35,8 @@ class ArtifactManifest(BaseModel):
 
 
 ## This is the path of the bundle root and of entrypoint as in the system
-class MaterializedArtifact(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class ArtifactConcretePaths(BaseModel):
+    model_config = ConfigDict(frozen=False)
 
     root_path: Path
-    entrypoint_path: Path
+    entrypoint_path: Path | None = None

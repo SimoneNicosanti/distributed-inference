@@ -79,12 +79,21 @@ explicit = true
 python_version = "3.14"
 
 files = ["src", "test"]
-
 mypy_path = "src"
+
+namespace_packages = true
+explicit_package_bases = true
 
 sqlite_cache = false
 
 strict = true
+
+enable_error_code = ["explicit-override"]
+
+# Evita che import interni non risolti diventino silenziosamente Any,
+# facendo perdere i controlli sulle firme e sugli override.
+disallow_any_unimported = true
+
 warn_unused_configs = true
 warn_unreachable = true
 disallow_any_generics = true
@@ -105,6 +114,8 @@ module = [
   "networkx.*",
   "onnxsim.*",
   "onnxslim.*",
+  "onnx.*",
+  "sympy.*",
 ]
 ignore_missing_imports = true
 

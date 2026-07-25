@@ -1,7 +1,10 @@
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
-from typing import BinaryIO, Iterable
+from typing import Iterable
 
+from distributed_inference.application.model_artifact.domain.artifact_bundle import (
+    ArtifactBundle,
+)
 from distributed_inference.domain.identifiers import (
     ModelId,
     ModelVersionId,
@@ -24,11 +27,11 @@ class ModelManager(ABC):
     ) -> ModelId: ...
 
     @abstractmethod
-    def upload_model_version(
+    def put_model_version(
         self,
         model_id: ModelId,
         model_info: ModelInfo,
-        binary_io: BinaryIO,
+        bundle: ArtifactBundle,
     ) -> ModelVersionId: ...
 
     @abstractmethod
@@ -39,10 +42,10 @@ class ModelManager(ABC):
     ) -> SubModelId: ...
 
     @abstractmethod
-    def download_sub_model(
+    def get_sub_model(
         self,
         sub_model_id: SubModelId,
-    ) -> AbstractContextManager[BinaryIO]: ...
+    ) -> AbstractContextManager[ArtifactBundle]: ...
 
     @abstractmethod
     def get_model_graph(self, model_version_id: ModelVersionId) -> ModelGraph: ...

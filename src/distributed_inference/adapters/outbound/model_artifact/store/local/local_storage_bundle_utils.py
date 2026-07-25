@@ -6,12 +6,10 @@ from pathlib import Path
 
 from distributed_inference.application.model_artifact.domain.artifact_bundle import (
     ArtifactBundle,
+    ArtifactConcretePaths,
     ArtifactFile,
     ArtifactManifest,
-    MaterializedArtifact,
 )
-
-MANIFEST_FILE_NAME = "manifest.json"
 
 
 def put_bundle(
@@ -28,7 +26,7 @@ def put_bundle(
                 with file_path.open("wb") as bundle_file:
                     shutil.copyfileobj(artifact_file.content, bundle_file)
 
-            manifest_path = bundle_root_path.joinpath(MANIFEST_FILE_NAME)
+            manifest_path = bundle_root_path.joinpath(ArtifactBundle.MANIFEST_FILE_NAME)
             with manifest_path.open("w+") as manifest_file:
                 manifest_file.write(bundle.manifest.model_dump_json())
 
@@ -41,7 +39,7 @@ def get_bundle(bundle_root_path: Path, lock_path: Path) -> Generator[ArtifactBun
     with lock_path.open("a") as lock_file:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)
         try:
-            manifest_path = bundle_root_path.joinpath(MANIFEST_FILE_NAME)
+            manifest_path = bundle_root_path.joinpath(ArtifactBundle.MANIFEST_FILE_NAME)
             manifest = ArtifactManifest.model_validate_json(
                 manifest_path.read_text(encoding="utf-8")
             )
@@ -70,7 +68,7 @@ def get_bundle(bundle_root_path: Path, lock_path: Path) -> Generator[ArtifactBun
 def check_bundle(bundle_root_path: Path, lock_path: Path) -> bool:
     with lock_path.open("a") as lock_file:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)
-        manifest_path = bundle_root_path.joinpath(MANIFEST_FILE_NAME)
+        manifest_path = bundle_root_path.joinpath(ArtifactBundle.MANIFEST_FILE_NAME)
         try:
             return bundle_root_path.exists() and manifest_path.exists()
         finally:
@@ -80,16 +78,16 @@ def check_bundle(bundle_root_path: Path, lock_path: Path) -> bool:
 @contextmanager
 def get_bundle_materialized_artifact(
     bundle_root_path: Path, lock_path: Path
-) -> Generator[MaterializedArtifact]:
+) -> Generator[ArtifactConcretePaths]:
     with lock_path.open("a") as lock_file:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)
         try:
-            manifest_path = bundle_root_path.joinpath(MANIFEST_FILE_NAME)
+            manifest_path = bundle_root_path.joinpath(ArtifactBundle.MANIFEST_FILE_NAME)
             manifest = ArtifactManifest.model_validate_json(
                 manifest_path.read_text(encoding="utf-8")
             )
 
-            materialized_artifact = MaterializedArtifact(
+            materialized_artifact = ArtifactConcretePaths(
                 root_path=bundle_root_path,
                 entrypoint_path=bundle_root_path.joinpath(
                     *manifest.rel_entrypoint_path.parts

@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
-from pathlib import Path
 
+from distributed_inference.application.model_artifact.domain.artifact_bundle import (
+    ArtifactConcretePaths,
+)
 from distributed_inference.domain.model_graph_info import ModelGraph, ModelInfo
 
 
@@ -8,6 +10,6 @@ class ModelProfiler(ABC):
     @abstractmethod
     def profile_model(
         self,
-        model_path: Path,
+        artifact_concrete_paths: ArtifactConcretePaths,
         model_info: ModelInfo,
     ) -> ModelGraph: ...

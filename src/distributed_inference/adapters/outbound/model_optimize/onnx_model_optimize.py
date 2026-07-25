@@ -6,6 +6,9 @@ import onnxruntime.transformers.optimizer as ort_transformers_opt
 from onnxruntime.transformers.fusion_options import FusionOptions
 from typing_extensions import override
 
+from distributed_inference.application.model_artifact.domain.artifact_bundle import (
+    ArtifactConcretePaths,
+)
 from distributed_inference.application.model_optimize.contracts.model_optimizer import (
     ModelOptimizer,
     OptimizationLevel,
@@ -20,8 +23,8 @@ class OnnxModelOptimizer(ModelOptimizer):
     @override
     def optimize_model(
         self,
-        input_path: Path,
-        output_path: Path,
+        input_paths: ArtifactConcretePaths,
+        output_paths: ArtifactConcretePaths,
         model_info: ModelInfo,
         opt_level: OptimizationLevel,
     ) -> None:
@@ -29,12 +32,17 @@ class OnnxModelOptimizer(ModelOptimizer):
         Optimize the model using generic ORT optimizations or the
         Transformer Optimizer, depending on the requested level and model type.
         """
+        assert input_paths.entrypoint_path is not None
+        input_entrypoint_path = input_paths.entrypoint_path.resolve(strict=True)
+        output_entrypoint_path = output_paths.root_path.resolve().joinpath(
+            f"opt_level_{opt_level}.onnx"
+        )
 
         match opt_level:
             case OptimizationLevel.BASIC | OptimizationLevel.NONE:
                 self._optimize_with_ort_standard(
-                    input_path=input_path,
-                    output_path=output_path,
+                    input_path=input_entrypoint_path,
+                    output_path=output_entrypoint_path,
                     model_info=model_info,
                     opt_level=opt_level,
                 )
@@ -43,16 +51,16 @@ class OnnxModelOptimizer(ModelOptimizer):
                 match model_info.type:
                     case ModelType.CNN:
                         self._optimize_with_ort_standard(
-                            input_path=input_path,
-                            output_path=output_path,
+                            input_path=input_entrypoint_path,
+                            output_path=output_entrypoint_path,
                             model_info=model_info,
                             opt_level=opt_level,
                         )
 
                     case ModelType.VIT | ModelType.BERT:
                         self._optimize_with_ort_transformer(
-                            input_path=input_path,
-                            output_path=output_path,
+                            input_path=input_entrypoint_path,
+                            output_path=output_entrypoint_path,
                             model_info=model_info,
                             opt_level=opt_level,
                         )
@@ -70,7 +78,7 @@ class OnnxModelOptimizer(ModelOptimizer):
             case _:
                 raise ValueError(f"Unsupported optimization level: {opt_level}")
 
-        if not output_path.is_file():
+        if not output_entrypoint_path.is_file():
             raise RuntimeError("ONNX Runtime did not produce the optimized model")
 
     def _optimize_with_ort_standard(

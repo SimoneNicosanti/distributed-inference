@@ -1,8 +1,7 @@
 import tempfile
-from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import BinaryIO, Iterable, override
+from typing import Iterable, override
 
 from distributed_inference.application.model_artifact.contracts.materializer.model_version_materializer import (
     ModelVersionMaterializer,
@@ -12,6 +11,13 @@ from distributed_inference.application.model_artifact.contracts.store.model_vers
 )
 from distributed_inference.application.model_artifact.contracts.store.sub_model_artifact_store import (
     SubModelArtifactStore,
+)
+from distributed_inference.application.model_artifact.domain import (
+    artifact_bundle_builder,
+)
+from distributed_inference.application.model_artifact.domain.artifact_bundle import (
+    ArtifactBundle,
+    ArtifactConcretePaths,
 )
 from distributed_inference.application.model_manager.contracts.model_manager import (
     ModelManager,
@@ -64,23 +70,22 @@ class DefaultModelManager(ModelManager):
     @override
     def register_model(self, owner_id: UserId, model_name: str) -> ModelId:
         return self._model_metadata_store.register_model(owner_id, model_name)
-        pass
 
     @override
-    def upload_model_version(
-        self, model_id: ModelId, model_info: ModelInfo, binary_io: BinaryIO
+    def put_model_version(
+        self, model_id: ModelId, model_info: ModelInfo, bundle: ArtifactBundle
     ) -> ModelVersionId:
         model_version_id = self._model_metadata_store.register_model_version(
             model_id, model_info
         )
-        self._model_version_artifact_store.put_model_version(
-            model_version_id, binary_io
-        )
+        self._model_version_artifact_store.put_model_version(model_version_id, bundle)
 
         with self._model_version_materializer.materialize_model_version(
             model_version_id
-        ) as model_path:
-            model_graph = self._model_profiler.profile_model(model_path, model_info)
+        ) as artifact_concrete_paths:
+            model_graph = self._model_profiler.profile_model(
+                artifact_concrete_paths, model_info
+            )
             self._model_metadata_store.register_model_version_graph(
                 model_version_id, model_graph
             )
@@ -88,31 +93,40 @@ class DefaultModelManager(ModelManager):
 
     @override
     def generate_sub_model(
-        self, version_id: ModelVersionId, layers: Iterable[LayerKey]
+        self, model_version_id: ModelVersionId, layers: Iterable[LayerKey]
     ) -> SubModelId:
 
-        model_graph = self._model_metadata_store.get_model_graph(version_id)
-        sub_model_id = self._model_metadata_store.register_sub_model(version_id, layers)
+        model_graph = self._model_metadata_store.get_model_graph(model_version_id)
+        sub_model_id = self._model_metadata_store.register_sub_model(
+            model_version_id, layers
+        )
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            split_model_path = Path(tmp_dir) / "split_model.onnx"
+            split_artifact_paths = ArtifactConcretePaths(
+                root_path=Path(tmp_dir), entrypoint_path=None
+            )
+
             with self._model_version_materializer.materialize_model_version(
-                version_id
-            ) as model_path:
+                model_version_id
+            ) as model_paths:
                 self._model_splitter.split_model(
-                    model_graph, layers, model_path, split_model_path
+                    model_graph, layers, model_paths, split_artifact_paths
                 )
 
-            with split_model_path.open("rb") as binary_io:
-                self._sub_model_artifact_store.put_sub_model(sub_model_id, binary_io)
+            with artifact_bundle_builder.build_artifact_bundle_from_bundle_paths(
+                split_artifact_paths
+            ) as artifact_bundle:
+                self._sub_model_artifact_store.put_sub_model(
+                    sub_model_id, artifact_bundle
+                )
 
         return sub_model_id
 
     @override
-    @contextmanager
-    def download_sub_model(self, submodel_id: SubModelId) -> Generator[BinaryIO]:
-        with self._sub_model_artifact_store.get_sub_model(submodel_id) as binary_io:
-            yield binary_io
+    def get_sub_model(
+        self, sub_model_id: SubModelId
+    ) -> AbstractContextManager[ArtifactBundle]:
+        return self._sub_model_artifact_store.get_sub_model(sub_model_id)
 
     @override
     def get_model_graph(self, model_version_id: ModelVersionId) -> ModelGraph:
@@ -123,5 +137,5 @@ class DefaultModelManager(ModelManager):
         return True
 
     @override
-    def check_sub_model_existence(self, submodel_id: SubModelId) -> bool:
+    def check_sub_model_existence(self, sub_model_id: SubModelId) -> bool:
         return True

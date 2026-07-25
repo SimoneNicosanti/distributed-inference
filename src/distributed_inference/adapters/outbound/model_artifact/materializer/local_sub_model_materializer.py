@@ -8,7 +8,7 @@ from distributed_inference.application.model_artifact.contracts.materializer.sub
     SubModelMaterializer,
 )
 from distributed_inference.application.model_artifact.domain.artifact_bundle import (
-    MaterializedArtifact,
+    ArtifactConcretePaths,
 )
 from distributed_inference.domain.identifiers import SubModelId
 
@@ -25,5 +25,5 @@ class LocalSubModelMaterializer(SubModelMaterializer):
     def materialize_sub_model(
         self,
         sub_model_id: SubModelId,
-    ) -> AbstractContextManager[MaterializedArtifact]:
+    ) -> AbstractContextManager[ArtifactConcretePaths]:
         return self._local_sub_model_artifact_store.get_sub_model_path(sub_model_id)

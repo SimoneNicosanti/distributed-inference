@@ -10,7 +10,7 @@ from distributed_inference.application.model_artifact.contracts.store.sub_model_
 )
 from distributed_inference.application.model_artifact.domain.artifact_bundle import (
     ArtifactBundle,
-    MaterializedArtifact,
+    ArtifactConcretePaths,
 )
 from distributed_inference.domain.identifiers import (
     SubModelId,
@@ -58,7 +58,7 @@ class LocalSubModelArtifactStore(SubModelArtifactStore):
 
     def get_sub_model_path(
         self, sub_model_id: SubModelId
-    ) -> AbstractContextManager[MaterializedArtifact]:
+    ) -> AbstractContextManager[ArtifactConcretePaths]:
         bundle_root_path, lock_path = self._build_bundle_root_path_and_lock_file(
             sub_model_id
         )

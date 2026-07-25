@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from io import BytesIO
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 import pytest
@@ -8,11 +8,54 @@ import pytest
 from distributed_inference.application.model_artifact.contracts.store.model_version_artifact_store import (
     ModelVersionArtifactStore,
 )
+from distributed_inference.application.model_artifact.domain.artifact_bundle import (
+    ArtifactBundle,
+    ArtifactFile,
+    ArtifactManifest,
+)
 from distributed_inference.domain.identifiers import (
     ModelId,
     ModelVersionId,
     UserId,
 )
+
+
+def build_test_bundle(
+    *,
+    model_content: bytes = b"onnx-model",
+    weights_content: bytes = b"external-weights",
+) -> ArtifactBundle:
+    model_path = PurePosixPath("model.onnx")
+    weights_path = PurePosixPath("weights/model.data")
+
+    return ArtifactBundle(
+        manifest=ArtifactManifest(
+            rel_entrypoint_path=model_path,
+            rel_file_paths=(
+                model_path,
+                weights_path,
+            ),
+        ),
+        artifact_files=(
+            ArtifactFile(
+                rel_path=model_path,
+                content=BytesIO(model_content),
+            ),
+            ArtifactFile(
+                rel_path=weights_path,
+                content=BytesIO(weights_content),
+            ),
+        ),
+    )
+
+
+def read_bundle_content(
+    bundle: ArtifactBundle,
+) -> dict[PurePosixPath, bytes]:
+    return {
+        artifact_file.rel_path: artifact_file.content.read()
+        for artifact_file in bundle.artifact_files
+    }
 
 
 class ModelVersionArtifactStoreContract(ABC):
@@ -32,9 +75,8 @@ class ModelVersionArtifactStoreContract(ABC):
 
     @pytest.fixture
     def model_version_id(self) -> ModelVersionId:
-        owner_id = UserId(user_id=uuid4())
         model_id = ModelId(
-            user_id=owner_id,
+            user_id=UserId(user_id=uuid4()),
             model_name="resnet50",
         )
 
@@ -50,47 +92,130 @@ class ModelVersionArtifactStoreContract(ABC):
     ) -> None:
         assert not store.check_model_version_existance(model_version_id)
 
-    def test_put_model_version_makes_artifact_exist(
+    def test_put_model_version_makes_bundle_exist(
         self,
         store: ModelVersionArtifactStore,
         model_version_id: ModelVersionId,
     ) -> None:
         store.put_model_version(
             model_version_id,
-            BytesIO(b"onnx-model-content"),
+            build_test_bundle(),
         )
 
         assert store.check_model_version_existance(model_version_id)
 
-    def test_get_model_version_returns_stored_content(
+    def test_get_model_version_preserves_manifest(
         self,
         store: ModelVersionArtifactStore,
         model_version_id: ModelVersionId,
     ) -> None:
-        expected = b"onnx-model-content"
+        input_bundle = build_test_bundle()
 
         store.put_model_version(
             model_version_id,
-            BytesIO(expected),
+            input_bundle,
         )
 
-        with store.get_model_version(model_version_id) as stream:
-            assert stream.read() == expected
+        with store.get_model_version(model_version_id) as result:
+            assert result.manifest == input_bundle.manifest
 
-    def test_get_model_version_closes_stream_after_context(
+    def test_get_model_version_returns_all_file_contents(
         self,
         store: ModelVersionArtifactStore,
         model_version_id: ModelVersionId,
     ) -> None:
         store.put_model_version(
             model_version_id,
-            BytesIO(b"content"),
+            build_test_bundle(
+                model_content=b"model-content",
+                weights_content=b"weights-content",
+            ),
         )
 
-        with store.get_model_version(model_version_id) as stream:
-            assert not stream.closed
+        with store.get_model_version(model_version_id) as result:
+            contents = read_bundle_content(result)
 
-        assert stream.closed
+        assert contents == {
+            PurePosixPath("model.onnx"): b"model-content",
+            PurePosixPath("weights/model.data"): b"weights-content",
+        }
+
+    def test_nested_relative_paths_are_preserved(
+        self,
+        store: ModelVersionArtifactStore,
+        model_version_id: ModelVersionId,
+    ) -> None:
+        bundle = ArtifactBundle(
+            manifest=ArtifactManifest(
+                rel_entrypoint_path=PurePosixPath("onnx/model.onnx"),
+                rel_file_paths=(
+                    PurePosixPath("onnx/model.onnx"),
+                    PurePosixPath("onnx/weights/part_0.data"),
+                    PurePosixPath("onnx/weights/part_1.data"),
+                ),
+            ),
+            artifact_files=(
+                ArtifactFile(
+                    rel_path=PurePosixPath("onnx/model.onnx"),
+                    content=BytesIO(b"model"),
+                ),
+                ArtifactFile(
+                    rel_path=PurePosixPath("onnx/weights/part_0.data"),
+                    content=BytesIO(b"part-zero"),
+                ),
+                ArtifactFile(
+                    rel_path=PurePosixPath("onnx/weights/part_1.data"),
+                    content=BytesIO(b"part-one"),
+                ),
+            ),
+        )
+
+        store.put_model_version(
+            model_version_id,
+            bundle,
+        )
+
+        with store.get_model_version(model_version_id) as result:
+            contents = read_bundle_content(result)
+
+        assert contents == {
+            PurePosixPath("onnx/model.onnx"): b"model",
+            PurePosixPath("onnx/weights/part_0.data"): b"part-zero",
+            PurePosixPath("onnx/weights/part_1.data"): b"part-one",
+        }
+
+    def test_get_model_version_keeps_streams_open_inside_context(
+        self,
+        store: ModelVersionArtifactStore,
+        model_version_id: ModelVersionId,
+    ) -> None:
+        store.put_model_version(
+            model_version_id,
+            build_test_bundle(),
+        )
+
+        with store.get_model_version(model_version_id) as result:
+            assert all(
+                not artifact_file.content.closed
+                for artifact_file in result.artifact_files
+            )
+
+    def test_get_model_version_closes_streams_after_context(
+        self,
+        store: ModelVersionArtifactStore,
+        model_version_id: ModelVersionId,
+    ) -> None:
+        store.put_model_version(
+            model_version_id,
+            build_test_bundle(),
+        )
+
+        with store.get_model_version(model_version_id) as result:
+            streams = tuple(
+                artifact_file.content for artifact_file in result.artifact_files
+            )
+
+        assert all(stream.closed for stream in streams)
 
     def test_get_missing_model_version_raises(
         self,
@@ -113,15 +238,56 @@ class ModelVersionArtifactStoreContract(ABC):
 
         store.put_model_version(
             model_version_id,
-            BytesIO(b"version-one"),
+            build_test_bundle(
+                model_content=b"version-one",
+                weights_content=b"weights-one",
+            ),
         )
         store.put_model_version(
             second_version_id,
-            BytesIO(b"version-two"),
+            build_test_bundle(
+                model_content=b"version-two",
+                weights_content=b"weights-two",
+            ),
         )
 
         with store.get_model_version(model_version_id) as first:
-            assert first.read() == b"version-one"
+            first_contents = read_bundle_content(first)
 
         with store.get_model_version(second_version_id) as second:
-            assert second.read() == b"version-two"
+            second_contents = read_bundle_content(second)
+
+        assert first_contents[PurePosixPath("model.onnx")] == (b"version-one")
+        assert second_contents[PurePosixPath("model.onnx")] == (b"version-two")
+
+    def test_different_models_are_independent(
+        self,
+        store: ModelVersionArtifactStore,
+        model_version_id: ModelVersionId,
+    ) -> None:
+        second_model_id = ModelId(
+            user_id=model_version_id.model_id.user_id,
+            model_name="vit",
+        )
+        second_version_id = ModelVersionId(
+            model_id=second_model_id,
+            version_number=1,
+        )
+
+        store.put_model_version(
+            model_version_id,
+            build_test_bundle(model_content=b"resnet"),
+        )
+        store.put_model_version(
+            second_version_id,
+            build_test_bundle(model_content=b"vit"),
+        )
+
+        with store.get_model_version(model_version_id) as first:
+            first_contents = read_bundle_content(first)
+
+        with store.get_model_version(second_version_id) as second:
+            second_contents = read_bundle_content(second)
+
+        assert first_contents[PurePosixPath("model.onnx")] == b"resnet"
+        assert second_contents[PurePosixPath("model.onnx")] == b"vit"

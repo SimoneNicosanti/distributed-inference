@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from typing import Iterator
 
 from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
@@ -18,6 +18,9 @@ from distributed_inference.application.model_manager.contracts.model_manager imp
 )
 from distributed_inference.domain.identifiers import ModelId
 from distributed_inference.domain.model_graph_info import ModelInfo
+from src.distributed_inference.adapters.inbound.model_manager.http import (
+    compression_utils,
+)
 
 
 def build_model_manager_router(
@@ -50,16 +53,20 @@ def build_model_manager_router(
     def upload_model_version(
         model_id_json: str = Form(),
         model_info_json: str = Form(),
-        artifact: UploadFile = File(),
+        model_entrypoint: str = Form(),
+        bundle_zip: UploadFile = File(),
     ) -> UploadModelVersionResponse:
         model_id = ModelId.model_validate_json(model_id_json)
         model_info = ModelInfo.model_validate_json(model_info_json)
 
-        model_version_id = model_manager.upload_model_version(
-            model_id=model_id,
-            model_info=model_info,
-            binary_io=artifact.file,
-        )
+        with compression_utils.uncompress_artifact_bundle(
+            bundle_zip, model_entrypoint
+        ) as artifact_bundle:
+            model_version_id = model_manager.put_model_version(
+                model_id=model_id,
+                model_info=model_info,
+                bundle=artifact_bundle,
+            )
 
         return UploadModelVersionResponse(
             model_version_id=model_version_id,
@@ -86,14 +93,18 @@ def build_model_manager_router(
         request: DownloadSubModelRequest,
     ) -> StreamingResponse:
         def stream_artifact() -> Iterator[bytes]:
-            with model_manager.download_sub_model(request.sub_model_id) as binary_io:
-                while chunk := binary_io.read(1024 * 1024):
-                    yield chunk
+            with model_manager.get_sub_model(request.sub_model_id) as sub_model_bundle:
+                with compression_utils.compress_artifact_bundle(
+                    sub_model_bundle
+                ) as zip_file_path:
+                    with open(zip_file_path, "rb") as binary_io:
+                        while chunk := binary_io.read(1024 * 1024):
+                            yield chunk
 
         return StreamingResponse(
             stream_artifact(),
             media_type="application/octet-stream",
-            headers={"Content-Disposition": ('attachment; filename="sub_model.onnx"')},
+            headers={"Content-Disposition": ('attachment; filename="artifact.zip"')},
         )
 
     @router.get("/model-versions/graph", response_model=GetModelGraphResponse)

@@ -26,5 +26,5 @@ class ModelVersionArtifactStore(ABC):
     @abstractmethod
     def check_model_version_existance(
         self,
-        artifact_id: ModelVersionId,
+        model_version_id: ModelVersionId,
     ) -> bool: ...

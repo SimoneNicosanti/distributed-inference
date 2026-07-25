@@ -1,8 +1,10 @@
-from pathlib import Path
 from typing import Iterable, override
 
 from onnx.utils import extract_model
 
+from distributed_inference.application.model_artifact.domain.artifact_bundle import (
+    ArtifactConcretePaths,
+)
 from distributed_inference.application.model_splitter.contracts.model_splitter import (
     ModelSplitter,
 )
@@ -15,17 +17,20 @@ class OnnxModelSplitter(ModelSplitter):
         self,
         model_graph: ModelGraph,
         layers: Iterable[LayerKey],
-        input_path: Path,
-        output_path: Path,
+        input_paths: ArtifactConcretePaths,
+        output_paths: ArtifactConcretePaths,
     ) -> None:
 
         if not layers:
             raise ValueError("The component cannot be empty")
 
-        input_path = input_path.resolve(strict=True)
-        output_path = output_path.resolve()
+        assert input_paths.entrypoint_path is not None
+        input_model_path = input_paths.entrypoint_path.resolve(strict=True)
+        output_model_path = output_paths.root_path.resolve().joinpath(
+            "split_model.onnx"
+        )
 
-        if input_path == output_path:
+        if input_model_path == output_model_path:
             raise ValueError("Input and output paths must be different")
 
         component_inputs, component_outputs = (
@@ -41,13 +46,15 @@ class OnnxModelSplitter(ModelSplitter):
         if not output_names:
             raise ValueError("The extracted component has no outputs")
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_model_path.parent.mkdir(parents=True, exist_ok=True)
 
         extract_model(
-            input_path=input_path,
-            output_path=output_path,
+            input_path=input_model_path,
+            output_path=output_model_path,
             input_names=input_names,
             output_names=output_names,
             check_model=True,
             infer_shapes=True,
         )
+
+        output_paths.entrypoint_path = output_model_path

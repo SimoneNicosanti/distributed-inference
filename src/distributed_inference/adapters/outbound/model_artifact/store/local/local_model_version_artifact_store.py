@@ -10,7 +10,7 @@ from distributed_inference.application.model_artifact.contracts.store.model_vers
 )
 from distributed_inference.application.model_artifact.domain.artifact_bundle import (
     ArtifactBundle,
-    MaterializedArtifact,
+    ArtifactConcretePaths,
 )
 from distributed_inference.domain.identifiers import (
     ModelVersionId,
@@ -65,7 +65,7 @@ class LocalModelVersionArtifactStore(ModelVersionArtifactStore):
 
     def get_model_version_bundle_path(
         self, model_version_id: ModelVersionId
-    ) -> AbstractContextManager[MaterializedArtifact]:
+    ) -> AbstractContextManager[ArtifactConcretePaths]:
         bundle_root_path, lock_path = self._build_bundle_root_path_and_lock_file(
             model_version_id
         )

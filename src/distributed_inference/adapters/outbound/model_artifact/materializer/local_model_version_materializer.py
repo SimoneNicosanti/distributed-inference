@@ -8,7 +8,7 @@ from distributed_inference.application.model_artifact.contracts.materializer.mod
     ModelVersionMaterializer,
 )
 from distributed_inference.application.model_artifact.domain.artifact_bundle import (
-    MaterializedArtifact,
+    ArtifactConcretePaths,
 )
 from distributed_inference.domain.identifiers import ModelVersionId
 
@@ -25,7 +25,7 @@ class LocalModelVersionMaterializer(ModelVersionMaterializer):
     def materialize_model_version(
         self,
         model_version_id: ModelVersionId,
-    ) -> AbstractContextManager[MaterializedArtifact]:
+    ) -> AbstractContextManager[ArtifactConcretePaths]:
         return self._local_model_version_artifact_store.get_model_version_bundle_path(
             model_version_id
         )

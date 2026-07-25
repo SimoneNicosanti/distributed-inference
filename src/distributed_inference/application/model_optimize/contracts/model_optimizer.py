@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from pathlib import Path
 
+from distributed_inference.application.model_artifact.domain.artifact_bundle import (
+    ArtifactConcretePaths,
+)
 from distributed_inference.domain.model_graph_info import ModelInfo
 
 
@@ -15,8 +17,8 @@ class ModelOptimizer(ABC):
     @abstractmethod
     def optimize_model(
         self,
-        input_path: Path,
-        output_path: Path,
+        input_paths: ArtifactConcretePaths,
+        output_paths: ArtifactConcretePaths,
         model_info: ModelInfo,
-        optimization_level: OptimizationLevel,
+        opt_level: OptimizationLevel,
     ) -> None: ...

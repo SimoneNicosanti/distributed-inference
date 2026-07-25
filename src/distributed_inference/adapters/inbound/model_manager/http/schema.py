@@ -24,7 +24,7 @@ class UploadModelVersionResponse(BaseModel):
 
 class GenerateSubModelRequest(BaseModel):
     model_version_id: ModelVersionId
-    layers: list
+    layers: list[str]
 
 
 class GenerateSubModelResponse(BaseModel):

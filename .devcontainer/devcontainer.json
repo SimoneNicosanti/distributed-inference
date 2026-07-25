@@ -5,7 +5,6 @@
     "dockerfile": "./DevEnv.dockerfile",
     "context": "."
   },
-
   // Declaring and mounting volumes for local development
   // Also adding uv cache for not reinstalling uv on every run
   "workspaceFolder": "/workspace/distributed-inference",
@@ -13,26 +12,21 @@
     "source=${localWorkspaceFolder},target=/workspace/distributed-inference,type=bind",
     "source=distributed-inference-uv-cache,target=/root/.cache/uv,type=volume"
   ],
-
   // Installing trunk.io inside the devcontainer for project wide formatting
   "features": {
     "ghcr.io/trunk-io/devcontainer-feature/trunk": "latest"
   },
-
   // Running post create script for installing dependencies inside the devcontainer
   "postCreateCommand": ".devcontainer/post-create.sh",
-
   // Declaring remote user as the non root one
   "remoteUser": "vscode",
   "containerUser": "vscode",
   "updateRemoteUserUID": true,
-
   // Declaring as remote env the one created by the post create script
   "remoteEnv": {
     "PATH": "${containerWorkspaceFolder}/.venv/bin:${containerEnv:PATH}",
     "VIRTUAL_ENV": "${containerWorkspaceFolder}/.venv"
   },
-
   "customizations": {
     "vscode": {
       // Declaring the extensions to be installed inside the remote env
@@ -46,20 +40,27 @@
         "charliermarsh.ruff",
         "seelog.python-init-generator"
       ],
-
       "settings": {
         "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
-
         "editor.formatOnSave": true,
-
         "python.analysis.indexing": true,
         "python.analysis.autoImportCompletions": true,
-
-         "pythonInitGenerator.ignoreDirectories": [
-              "__pycache__",
-          ],
-
-
+        "python.analysis.typeCheckingMode": "basic",
+        "python.analysis.diagnosticSeverityOverrides": {
+          "reportImplicitOverride": "error",
+          "reportIncompatibleMethodOverride": "error"
+        },
+        "mypy-type-checker.importStrategy": "fromEnvironment",
+        "mypy-type-checker.path": [
+          "${containerWorkspaceFolder}/.venv/bin/mypy"
+        ],
+        "mypy-type-checker.args": [
+          "--config-file",
+          "${containerWorkspaceFolder}/pyproject.toml"
+        ],
+        "pythonInitGenerator.ignoreDirectories": [
+          "__pycache__",
+        ],
         "[python]": {
           "editor.defaultFormatter": "trunk.io",
           "editor.formatOnSave": true,
@@ -68,37 +69,22 @@
             "source.organizeImports.ruff": "explicit"
           }
         },
-
         "[toml]": {
           "editor.defaultFormatter": "trunk.io",
           "editor.formatOnSave": true
         },
-
         "[yaml]": {
           "editor.defaultFormatter": "trunk.io",
           "editor.formatOnSave": true
         },
-
         "[markdown]": {
           "editor.defaultFormatter": "trunk.io",
           "editor.formatOnSave": true
         },
-
         "[shellscript]": {
           "editor.defaultFormatter": "trunk.io",
           "editor.formatOnSave": true
         },
-
-        "python.analysis.typeCheckingMode": "basic",
-
-        "mypy-type-checker.importStrategy": "fromEnvironment",
-        "mypy-type-checker.path": [
-          "${containerWorkspaceFolder}/.venv/bin/mypy"
-        ],
-        "mypy-type-checker.args": [
-          "--config-file",
-          "${containerWorkspaceFolder}/pyproject.toml"
-        ]
       }
     }
   }
