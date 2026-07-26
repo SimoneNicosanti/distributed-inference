@@ -18,44 +18,10 @@ from distributed_inference.domain.identifiers import (
     ModelVersionId,
     UserId,
 )
-
-
-def build_test_bundle(
-    *,
-    model_content: bytes = b"onnx-model",
-    weights_content: bytes = b"external-weights",
-) -> ArtifactBundle:
-    model_path = PurePosixPath("model.onnx")
-    weights_path = PurePosixPath("weights/model.data")
-
-    return ArtifactBundle(
-        manifest=ArtifactManifest(
-            rel_entrypoint_path=model_path,
-            rel_file_paths=(
-                model_path,
-                weights_path,
-            ),
-        ),
-        artifact_files=(
-            ArtifactFile(
-                rel_path=model_path,
-                content=BytesIO(model_content),
-            ),
-            ArtifactFile(
-                rel_path=weights_path,
-                content=BytesIO(weights_content),
-            ),
-        ),
-    )
-
-
-def read_bundle_content(
-    bundle: ArtifactBundle,
-) -> dict[PurePosixPath, bytes]:
-    return {
-        artifact_file.rel_path: artifact_file.content.read()
-        for artifact_file in bundle.artifact_files
-    }
+from test.support.artifact_bundle_test_utils import (
+    build_test_bundle,
+    read_bundle_content,
+)
 
 
 class ModelVersionArtifactStoreContract(ABC):
@@ -90,7 +56,7 @@ class ModelVersionArtifactStoreContract(ABC):
         store: ModelVersionArtifactStore,
         model_version_id: ModelVersionId,
     ) -> None:
-        assert not store.check_model_version_existance(model_version_id)
+        assert not store.check_model_version_existence(model_version_id)
 
     def test_put_model_version_makes_bundle_exist(
         self,
@@ -102,7 +68,7 @@ class ModelVersionArtifactStoreContract(ABC):
             build_test_bundle(),
         )
 
-        assert store.check_model_version_existance(model_version_id)
+        assert store.check_model_version_existence(model_version_id)
 
     def test_get_model_version_preserves_manifest(
         self,

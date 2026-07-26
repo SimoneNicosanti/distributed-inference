@@ -76,9 +76,10 @@ class LocalSubModelArtifactStore(SubModelArtifactStore):
         layers_hash = self._hash_layers(sub_model_id.layers)
 
         bundle_root_path = self.sub_models_dir.joinpath(
-            str(model_id.user_id),
+            str(model_id.user_id.user_id),
             model_id.model_name,
             str(sub_model_id.model_version_id.version_number),
+            layers_hash,
         )
 
         lock_path = self.lock_dir.joinpath(
@@ -94,7 +95,7 @@ class LocalSubModelArtifactStore(SubModelArtifactStore):
         return md5(payload.encode("utf-8")).hexdigest()
 
     @override
-    def check_sub_model_existance(self, sub_model_id: SubModelId) -> bool:
+    def check_sub_model_existence(self, sub_model_id: SubModelId) -> bool:
         bundle_root_path, lock_path = self._build_bundle_root_path_and_lock_file(
             sub_model_id
         )

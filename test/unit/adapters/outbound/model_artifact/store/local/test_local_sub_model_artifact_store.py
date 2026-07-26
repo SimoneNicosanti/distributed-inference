@@ -1,34 +1,19 @@
-from io import BytesIO
 from pathlib import Path
-from typing import override
-from uuid import uuid4
 
 import pytest
 
 from distributed_inference.adapters.outbound.model_artifact.store.local.local_sub_model_artifact_store import (
     LocalSubModelArtifactStore,
 )
-from distributed_inference.application.model_artifact.contracts.store.sub_model_artifact_store import (
-    SubModelArtifactStore,
+from distributed_inference.application.model_artifact.domain.artifact_bundle import (
+    MANIFEST_FILE_NAME,
 )
-from distributed_inference.domain.identifiers import (
-    ModelId,
-    ModelVersionId,
-    SubModelId,
-    UserId,
-)
+from distributed_inference.domain.identifiers import SubModelId
 from test.contracts.sub_model_artifact_store_contract import (
-    SubModelArtifactStoreContract,
+    build_layers,
+    build_sub_model_id,
 )
-
-
-class TestLocalSubModelArtifactStoreContract(SubModelArtifactStoreContract):
-    @override
-    def build_store(
-        self,
-        base_path: Path,
-    ) -> SubModelArtifactStore:
-        return LocalSubModelArtifactStore(base_path)
+from test.support.artifact_bundle_test_utils import build_test_bundle
 
 
 @pytest.fixture
@@ -39,192 +24,141 @@ def store(
 
 
 @pytest.fixture
-def model_version_id() -> ModelVersionId:
-    owner_id = UserId(user_id=uuid4())
-    model_id = ModelId(
-        user_id=owner_id,
-        model_name="resnet50",
-    )
-
-    return ModelVersionId(
-        model_id=model_id,
-        version_number=3,
+def sub_model_id() -> SubModelId:
+    return build_sub_model_id(
+        layers=build_layers("layer_1", "layer_2"),
     )
 
 
-@pytest.fixture
-def sub_model_id(
-    model_version_id: ModelVersionId,
-) -> SubModelId:
-    return SubModelId(
-        model_version_id=model_version_id,
-        layers=(
-            "layer_1",
-            "layer_2",
-        ),
-    )
-
-
-def test_constructor_creates_required_directories(
+def test_constructor_creates_storage_directories(
     tmp_path: Path,
 ) -> None:
     store = LocalSubModelArtifactStore(tmp_path)
 
     assert store.base_path == tmp_path
+    assert store.sub_models_dir == tmp_path / "sub_models"
+    assert store.lock_dir == tmp_path / "sub_models" / ".lock"
+
+    assert store.base_path.is_dir()
     assert store.sub_models_dir.is_dir()
     assert store.lock_dir.is_dir()
 
 
-def test_hash_layers_is_deterministic(
-    store: LocalSubModelArtifactStore,
-) -> None:
-    layers = (
-        "layer_1",
-        "layer_2",
-    )
-
-    first = store._hash_layers(layers)
-    second = store._hash_layers(layers)
-
-    assert first == second
-    assert len(first) == 32
-
-
-def test_hash_layers_depends_on_layer_order(
-    store: LocalSubModelArtifactStore,
-) -> None:
-    first = store._hash_layers(
-        (
-            "layer_1",
-            "layer_2",
-        )
-    )
-    second = store._hash_layers(
-        (
-            "layer_2",
-            "layer_1",
-        )
-    )
-
-    assert first != second
-
-
-def test_build_submodel_file_path_uses_expected_layout(
+def test_bundle_root_is_specific_to_layer_set(
     store: LocalSubModelArtifactStore,
     sub_model_id: SubModelId,
 ) -> None:
-    file_path, lock_path = store._build_bundle_root_path_and_lock_file(sub_model_id)
+    root_path, _ = store._build_bundle_root_path_and_lock_file(sub_model_id)
 
-    model_version_id = sub_model_id.model_version_id
-    model_id = model_version_id.model_id
+    model_id = sub_model_id.model_version_id.model_id
+    expected_parent = (
+        store.sub_models_dir
+        / str(model_id.user_id.user_id)
+        / model_id.model_name
+        / str(sub_model_id.model_version_id.version_number)
+        / store._hash_layers(sub_model_id.layers)
+    )
+
+    assert root_path == expected_parent
+    assert root_path.name == store._hash_layers(sub_model_id.layers)
+
+
+def test_different_layer_sets_have_different_bundle_roots(
+    store: LocalSubModelArtifactStore,
+    sub_model_id: SubModelId,
+) -> None:
+    second_sub_model_id = SubModelId(
+        model_version_id=sub_model_id.model_version_id,
+        layers=build_layers("layer_3", "layer_4"),
+    )
+
+    first_root, _ = store._build_bundle_root_path_and_lock_file(sub_model_id)
+    second_root, _ = store._build_bundle_root_path_and_lock_file(second_sub_model_id)
+
+    assert first_root != second_root
+
+
+def test_lock_path_is_specific_to_layer_set(
+    store: LocalSubModelArtifactStore,
+    sub_model_id: SubModelId,
+) -> None:
+    _, lock_path = store._build_bundle_root_path_and_lock_file(sub_model_id)
+
+    model_id = sub_model_id.model_version_id.model_id
     layers_hash = store._hash_layers(sub_model_id.layers)
 
-    assert file_path == (
-        store.sub_models_dir
-        / str(model_id.user_id)
-        / model_id.model_name
-        / str(model_version_id.version_number)
-        / f"layers_{layers_hash}.onnx"
+    assert lock_path.parent == store.lock_dir
+    assert lock_path.suffix == ".lock"
+    assert str(model_id.user_id.user_id) in lock_path.name
+    assert model_id.model_name in lock_path.name
+    assert str(sub_model_id.model_version_id.version_number) in (lock_path.name)
+    assert layers_hash in lock_path.name
+
+
+def test_layers_hash_is_deterministic(
+    store: LocalSubModelArtifactStore,
+) -> None:
+    layers = build_layers("layer_1", "layer_2")
+
+    assert store._hash_layers(layers) == store._hash_layers(layers)
+
+
+def test_layer_order_does_not_change_bundle_root(
+    store: LocalSubModelArtifactStore,
+) -> None:
+    first = build_sub_model_id(
+        layers=build_layers("layer_1", "layer_2"),
+    )
+    second = SubModelId(
+        model_version_id=first.model_version_id,
+        layers=build_layers("layer_2", "layer_1"),
     )
 
-    assert lock_path == (
-        store.lock_dir
-        / (
-            f"{model_id.user_id}_"
-            f"{model_id.model_name}_"
-            f"{model_version_id.version_number}_"
-            f"{layers_hash}.lock"
-        )
-    )
+    first_root, _ = store._build_bundle_root_path_and_lock_file(first)
+    second_root, _ = store._build_bundle_root_path_and_lock_file(second)
+
+    assert first_root == second_root
 
 
-def test_put_creates_parent_directories_and_artifact_file(
+def test_put_bundle_creates_all_bundle_files(
     store: LocalSubModelArtifactStore,
     sub_model_id: SubModelId,
 ) -> None:
-    file_path, _ = store._build_bundle_root_path_and_lock_file(sub_model_id)
-
-    assert not file_path.parent.exists()
+    bundle_root_path, _ = store._build_bundle_root_path_and_lock_file(sub_model_id)
 
     store.put_sub_model(
         sub_model_id,
-        BytesIO(b"content"),
+        build_test_bundle(
+            model_content=b"sub-model-content",
+            weights_content=b"sub-model-weights",
+        ),
     )
 
-    assert file_path.is_file()
-    assert file_path.read_bytes() == b"content"
+    assert (bundle_root_path / "model.onnx").read_bytes() == b"sub-model-content"
+
+    assert (
+        bundle_root_path / "weights" / "model.data"
+    ).read_bytes() == b"sub-model-weights"
 
 
-def test_put_creates_lock_file(
+def test_put_bundle_creates_manifest(
     store: LocalSubModelArtifactStore,
     sub_model_id: SubModelId,
 ) -> None:
-    _, lock_path = store._build_bundle_root_path_and_lock_file(sub_model_id)
-
-    assert not lock_path.exists()
+    bundle_root_path, _ = store._build_bundle_root_path_and_lock_file(sub_model_id)
 
     store.put_sub_model(
         sub_model_id,
-        BytesIO(b"content"),
+        build_test_bundle(),
     )
 
-    assert lock_path.is_file()
+    manifest_path = bundle_root_path / MANIFEST_FILE_NAME
+
+    assert manifest_path.is_file()
+    assert manifest_path.read_text(encoding="utf-8")
 
 
-def test_put_overwrites_existing_artifact(
-    store: LocalSubModelArtifactStore,
-    sub_model_id: SubModelId,
-) -> None:
-    store.put_sub_model(
-        sub_model_id,
-        BytesIO(b"first-content"),
-    )
-    store.put_sub_model(
-        sub_model_id,
-        BytesIO(b"second-content"),
-    )
-
-    file_path, _ = store._build_bundle_root_path_and_lock_file(sub_model_id)
-
-    assert file_path.read_bytes() == b"second-content"
-
-
-def test_get_submodel_path_returns_artifact_path(
-    store: LocalSubModelArtifactStore,
-    sub_model_id: SubModelId,
-) -> None:
-    store.put_sub_model(
-        sub_model_id,
-        BytesIO(b"content"),
-    )
-
-    expected_path, _ = store._build_bundle_root_path_and_lock_file(sub_model_id)
-
-    with store.get_sub_model_path(sub_model_id) as path:
-        assert path == expected_path
-        assert path.read_bytes() == b"content"
-
-
-def test_different_layer_sets_produce_different_paths(
-    store: LocalSubModelArtifactStore,
-    model_version_id: ModelVersionId,
-) -> None:
-    first_id = SubModelId(
-        model_version_id=model_version_id,
-        layers=("layer_1",),
-    )
-    second_id = SubModelId(
-        model_version_id=model_version_id,
-        layers=("layer_2",),
-    )
-
-    first_path, _ = store._build_bundle_root_path_and_lock_file(first_id)
-    second_path, _ = store._build_bundle_root_path_and_lock_file(second_id)
-
-    assert first_path != second_path
-
-
-def test_existence_check_creates_lock_file(
+def test_check_existence_creates_lock_file(
     store: LocalSubModelArtifactStore,
     sub_model_id: SubModelId,
 ) -> None:
@@ -232,6 +166,24 @@ def test_existence_check_creates_lock_file(
 
     assert not lock_path.exists()
 
-    assert not store.check_sub_model_existance(sub_model_id)
+    assert not store.check_sub_model_existence(sub_model_id)
 
     assert lock_path.is_file()
+
+
+def test_materialized_bundle_contains_root_and_entrypoint(
+    store: LocalSubModelArtifactStore,
+    sub_model_id: SubModelId,
+) -> None:
+    store.put_sub_model(
+        sub_model_id,
+        build_test_bundle(model_content=b"sub-model"),
+    )
+
+    bundle_root_path, _ = store._build_bundle_root_path_and_lock_file(sub_model_id)
+    expected_entrypoint = bundle_root_path / "model.onnx"
+
+    with store.get_sub_model_path(sub_model_id) as concrete_paths:
+        assert concrete_paths.root_path == bundle_root_path
+        assert concrete_paths.entrypoint_path == expected_entrypoint
+        assert expected_entrypoint.read_bytes() == b"sub-model"

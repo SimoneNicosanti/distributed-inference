@@ -54,7 +54,7 @@ class LocalModelVersionArtifactStore(ModelVersionArtifactStore):
         return local_storage_bundle_utils.get_bundle(bundle_root_path, lock_path)
 
     @override
-    def check_model_version_existance(
+    def check_model_version_existence(
         self,
         model_version_id: ModelVersionId,
     ) -> bool:
@@ -80,7 +80,9 @@ class LocalModelVersionArtifactStore(ModelVersionArtifactStore):
         model_id = model_version_id.model_id
 
         root_path = self.model_versions_dir.joinpath(
-            str(model_id.user_id), model_id.model_name
+            str(model_id.user_id.user_id),
+            model_id.model_name,
+            str(model_version_id.version_number),
         )
         lock_path = self.lock_dir.joinpath(
             f"{model_id.user_id}_{model_id.model_name}_{model_version_id.version_number}.lock"

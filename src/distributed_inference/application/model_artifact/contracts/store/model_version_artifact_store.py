@@ -24,7 +24,7 @@ class ModelVersionArtifactStore(ABC):
     ) -> AbstractContextManager[ArtifactBundle]: ...
 
     @abstractmethod
-    def check_model_version_existance(
+    def check_model_version_existence(
         self,
         model_version_id: ModelVersionId,
     ) -> bool: ...

@@ -1,0 +1,2 @@
+class InferenceRequest:
+    pass

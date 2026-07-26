@@ -1,10 +1,11 @@
-from typing import Any, Tuple
+from typing import Iterable, Self, Tuple
 from uuid import UUID
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     field_validator,
+    model_validator,
 )
 
 from distributed_inference.domain.model_graph_info import LayerKey
@@ -32,11 +33,47 @@ class FlowId(BaseModel):
     pass
 
 
+class RequestId(BaseModel):
+    model_config = ConfigDict(frozen=True, validate_assignment=True)
+
+    request_idx: UUID
+    flow_id: FlowId
+    sub_model_id: SubModelId
+
+    @model_validator(mode="after")
+    def validate_request_id(self) -> Self:
+
+        if self.flow_id.user_id != self.sub_model_id.model_version_id.model_id.user_id:
+            raise ValueError(
+                f"Flow {self.flow_id} is not owned by user {self.sub_model_id.model_version_id.model_id.user_id}"
+            )
+
+        if self.request_idx is None:
+            self.request_idx = UUID(int=0)
+
+        return self
+
+    pass
+
+
 class ModelId(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     user_id: UserId
     model_name: str
+
+    @field_validator("model_name", mode="before")
+    @classmethod
+    def validate_model_name(cls, model_name: str) -> str:
+        if model_name.find("/") != -1:
+            raise ValueError("Model name cannot contain '/'")
+        if model_name.find("\\") != -1:
+            raise ValueError("Model name cannot contain '\\'")
+        if model_name.find("..") != -1:
+            raise ValueError("Model name cannot contain '..'")
+
+        return model_name
+
     pass
 
 
@@ -55,12 +92,21 @@ class SubModelId(BaseModel):
     layers: Tuple[LayerKey, ...]
     pass
 
-    @field_validator("layers", mode="before")
+    @field_validator("layers")
     @classmethod
-    def sort_layers(cls, value: Any) -> tuple[LayerKey, ...]:
-        layers = tuple(value)
+    def validate_layers(
+        cls,
+        layers: tuple[LayerKey, ...],
+    ) -> tuple[LayerKey, ...]:
+        if not layers:
+            raise ValueError("SubModelId layers must not be empty")
 
         if len(layers) != len(set(layers)):
             raise ValueError("SubModelId layers must not contain duplicates")
 
         return tuple(sorted(layers))
+
+    @classmethod
+    def check_valid_layers_format(cls, layers: Iterable[LayerKey]) -> None:
+        if isinstance(layers, (str, bytes)):
+            raise ValueError("Layers must contain layer names")

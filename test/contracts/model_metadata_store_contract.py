@@ -1,6 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import cast
-from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
@@ -9,15 +7,17 @@ from distributed_inference.application.model_metadata_store.contracts.model_meta
     ModelMetadataStore,
 )
 from distributed_inference.domain.identifiers import (
-    LayerKey,
     ModelId,
     ModelVersionId,
     SubModelId,
     UserId,
 )
 from distributed_inference.domain.model_graph_info import (
+    LayerKey,
     ModelGraph,
     ModelInfo,
+    ModelType,
+    TaskType,
 )
 
 
@@ -49,10 +49,11 @@ class ModelMetadataStoreContract(ABC):
 
     @pytest.fixture
     def model_info(self) -> ModelInfo:
-        # Questi test non verificano la validazione di ModelInfo.
-        return ModelInfo.model_construct(
-            name="test-model",
+        return ModelInfo(
+            name="resnet50",
             accuracy=0.9,
+            task=TaskType.CLASSIFICATION,
+            type=ModelType.CNN,
             dynamic_shapes={},
             sequence_sizes=[1],
             num_heads=0,
@@ -60,10 +61,8 @@ class ModelMetadataStoreContract(ABC):
         )
 
     @pytest.fixture
-    def model_graph(self) -> ModelGraph:
-        # Per backend che serializzano i dati, questa fixture
-        # potrà essere sovrascritta usando un ModelGraph reale.
-        return cast(ModelGraph, Mock(spec=ModelGraph))
+    def model_graph(self, model_info: ModelInfo) -> ModelGraph:
+        return ModelGraph(model_info=model_info)
 
     @pytest.fixture
     def layers(self) -> tuple[LayerKey, ...]:

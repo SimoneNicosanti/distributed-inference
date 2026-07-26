@@ -1,5 +1,5 @@
 // .devcontainer/devcontainer.json
-{
+{ 
   "name": "distributed-inference-container",
   "build": {
     "dockerfile": "./DevEnv.dockerfile",
@@ -10,7 +10,8 @@
   "workspaceFolder": "/workspace/distributed-inference",
   "mounts": [
     "source=${localWorkspaceFolder},target=/workspace/distributed-inference,type=bind",
-    "source=distributed-inference-uv-cache,target=/root/.cache/uv,type=volume"
+    "source=distributed-inference-uv-cache,target=/root/.cache/uv,type=volume",
+    "source=${localEnv:HOME}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached"
   ],
   // Installing trunk.io inside the devcontainer for project wide formatting
   "features": {
@@ -38,14 +39,21 @@
         "codeium.codeium",
         "vincent-templier.vscode-netron",
         "charliermarsh.ruff",
-        "seelog.python-init-generator"
+        "seelog.python-init-generator",
+        "openai.chatgpt",
+        "gruntfuggly.todo-tree"
       ],
       "settings": {
+        "workbench.editor.revealIfOpen": true,
+
         "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
         "editor.formatOnSave": true,
         "python.analysis.indexing": true,
         "python.analysis.autoImportCompletions": true,
         "python.analysis.typeCheckingMode": "basic",
+        "python.analysis.extraPaths": [
+          "${workspaceFolder}/src"
+        ],
         "python.analysis.diagnosticSeverityOverrides": {
           "reportImplicitOverride": "error",
           "reportIncompatibleMethodOverride": "error"

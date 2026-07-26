@@ -39,7 +39,10 @@ class OnnxGraphExtractor(ModelGraphExtractor):
         profile_tensors: bool,
     ) -> ModelGraph:
 
-        assert paths.entrypoint_path is not None
+        if paths.entrypoint_path is None:
+            raise ValueError(
+                "Entrypoint path must be set when extracting the model graph"
+            )
         path = paths.entrypoint_path
 
         model_proto = onnx.load_model(path.as_posix())  # type: ignore

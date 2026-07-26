@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
@@ -17,11 +16,37 @@ from distributed_inference.domain.identifiers import (
     SubModelId,
     UserId,
 )
+from test.support.artifact_bundle_test_utils import (
+    build_test_bundle,
+)
+from test.support.materializer_test_utils import (
+    extract_root_and_entrypoint,
+)
+
+
+def build_sub_model_id() -> SubModelId:
+    model_id = ModelId(
+        user_id=UserId(user_id=uuid4()),
+        model_name="resnet50",
+    )
+
+    model_version_id = ModelVersionId(
+        model_id=model_id,
+        version_number=1,
+    )
+
+    return SubModelId(
+        model_version_id=model_version_id,
+        layers=(
+            "layer_1",
+            "layer_2",
+        ),
+    )
 
 
 class SubModelMaterializerContract(ABC):
     @abstractmethod
-    def build_backend(
+    def build_dependencies(
         self,
         base_path: Path,
     ) -> tuple[
@@ -31,132 +56,90 @@ class SubModelMaterializerContract(ABC):
         raise NotImplementedError
 
     @pytest.fixture
-    def backend(
+    def dependencies(
         self,
         tmp_path: Path,
     ) -> tuple[
         SubModelMaterializer,
         SubModelArtifactStore,
     ]:
-        return self.build_backend(tmp_path)
+        return self.build_dependencies(tmp_path)
 
     @pytest.fixture
-    def model_version_id(self) -> ModelVersionId:
-        owner_id = UserId(user_id=uuid4())
+    def sub_model_id(self) -> SubModelId:
+        return build_sub_model_id()
 
-        model_id = ModelId(
-            user_id=owner_id,
-            model_name="resnet50",
-        )
-
-        return ModelVersionId(
-            model_id=model_id,
-            version_number=1,
-        )
-
-    @pytest.fixture
-    def sub_model_id(
+    def test_materialize_missing_sub_model_raises(
         self,
-        model_version_id: ModelVersionId,
-    ) -> SubModelId:
-        return SubModelId(
-            model_version_id=model_version_id,
-            layers=(
-                "layer_1",
-                "layer_2",
-            ),
-        )
-
-    def test_materialized_submodel_exists(
-        self,
-        backend: tuple[
+        dependencies: tuple[
             SubModelMaterializer,
             SubModelArtifactStore,
         ],
         sub_model_id: SubModelId,
     ) -> None:
-        materializer, artifact_store = backend
+        materializer, _ = dependencies
 
-        artifact_store.put_sub_model(
-            sub_model_id,
-            BytesIO(b"submodel-content"),
-        )
+        with pytest.raises(FileNotFoundError):
+            with materializer.materialize_sub_model(sub_model_id):
+                pass
 
-        with materializer.materialize_sub_model(sub_model_id) as sub_model_path:
-            assert sub_model_path.exists()
-            assert sub_model_path.is_file()
-
-    def test_materialized_submodel_contains_stored_content(
+    def test_materialize_returns_root_and_entrypoint(
         self,
-        backend: tuple[
+        dependencies: tuple[
             SubModelMaterializer,
             SubModelArtifactStore,
         ],
         sub_model_id: SubModelId,
     ) -> None:
-        materializer, artifact_store = backend
-        expected = b"onnx-submodel-content"
+        materializer, store = dependencies
 
-        artifact_store.put_sub_model(
-            sub_model_id,
-            BytesIO(expected),
+        bundle = build_test_bundle(
+            model_content=b"sub-model-content",
+            weights_content=b"sub-model-weights",
         )
 
-        with materializer.materialize_sub_model(sub_model_id) as sub_model_path:
-            assert sub_model_path.read_bytes() == expected
+        store.put_sub_model(
+            sub_model_id,
+            bundle,
+        )
 
-    def test_submodel_can_be_materialized_multiple_times(
+        with materializer.materialize_sub_model(sub_model_id) as concrete_paths:
+            root_path, entrypoint_path = extract_root_and_entrypoint(concrete_paths)
+
+            expected_entrypoint = root_path.joinpath(
+                *bundle.manifest.rel_entrypoint_path.parts
+            )
+
+            assert root_path.is_dir()
+            assert entrypoint_path.is_file()
+            assert entrypoint_path == expected_entrypoint
+            assert entrypoint_path.is_relative_to(root_path)
+
+    def test_materialized_root_contains_all_artifact_files(
         self,
-        backend: tuple[
+        dependencies: tuple[
             SubModelMaterializer,
             SubModelArtifactStore,
         ],
         sub_model_id: SubModelId,
     ) -> None:
-        materializer, artifact_store = backend
-        expected = b"submodel-content"
+        materializer, store = dependencies
 
-        artifact_store.put_sub_model(
+        bundle = build_test_bundle(
+            model_content=b"sub-model-content",
+            weights_content=b"sub-model-weights",
+        )
+
+        store.put_sub_model(
             sub_model_id,
-            BytesIO(expected),
+            bundle,
         )
 
-        with materializer.materialize_sub_model(sub_model_id) as first_path:
-            assert first_path.read_bytes() == expected
+        with materializer.materialize_sub_model(sub_model_id) as concrete_paths:
+            root_path, _ = extract_root_and_entrypoint(concrete_paths)
 
-        with materializer.materialize_sub_model(sub_model_id) as second_path:
-            assert second_path.read_bytes() == expected
+            model_path = root_path / "model.onnx"
+            weights_path = root_path / "weights" / "model.data"
 
-    def test_different_submodels_materialize_different_contents(
-        self,
-        backend: tuple[
-            SubModelMaterializer,
-            SubModelArtifactStore,
-        ],
-        model_version_id: ModelVersionId,
-    ) -> None:
-        materializer, artifact_store = backend
-
-        first_id = SubModelId(
-            model_version_id=model_version_id,
-            layers=("layer_1",),
-        )
-        second_id = SubModelId(
-            model_version_id=model_version_id,
-            layers=("layer_2",),
-        )
-
-        artifact_store.put_sub_model(
-            first_id,
-            BytesIO(b"first-submodel"),
-        )
-        artifact_store.put_sub_model(
-            second_id,
-            BytesIO(b"second-submodel"),
-        )
-
-        with materializer.materialize_sub_model(first_id) as first_path:
-            assert first_path.read_bytes() == b"first-submodel"
-
-        with materializer.materialize_sub_model(second_id) as second_path:
-            assert second_path.read_bytes() == b"second-submodel"
+            assert model_path.read_bytes() == b"sub-model-content"
+            assert weights_path.read_bytes() == b"sub-model-weights"

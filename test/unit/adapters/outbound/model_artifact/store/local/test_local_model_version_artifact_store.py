@@ -3,23 +3,18 @@ from uuid import uuid4
 
 import pytest
 
-from src.distributed_inference.adapters.outbound.model_artifact.store.local import (
+from distributed_inference.adapters.outbound.model_artifact.store.local import (
     local_storage_bundle_utils,
 )
-from src.distributed_inference.adapters.outbound.model_artifact.store.local.local_model_version_artifact_store import (
+from distributed_inference.adapters.outbound.model_artifact.store.local.local_model_version_artifact_store import (
     LocalModelVersionArtifactStore,
 )
-from src.distributed_inference.application.model_artifact.domain.artifact_bundle import (
-    ArtifactConcretePaths,
-)
-from src.distributed_inference.domain.identifiers import (
+from distributed_inference.domain.identifiers import (
     ModelId,
     ModelVersionId,
     UserId,
 )
-from test.contracts.model_version_artifact_store_contract import (
-    build_test_bundle,
-)
+from test.support.artifact_bundle_test_utils import build_test_bundle
 
 
 @pytest.fixture
@@ -40,16 +35,6 @@ def model_version_id() -> ModelVersionId:
         model_id=model_id,
         version_number=3,
     )
-
-
-def extract_concrete_paths(
-    concrete_paths: ArtifactConcretePaths,
-) -> set[Path]:
-    """
-    Evita di dipendere dai nomi esatti dei due attributi
-    di ArtifactConcretePaths.
-    """
-    return {value for value in vars(concrete_paths).values() if isinstance(value, Path)}
 
 
 def test_constructor_creates_storage_directories(
@@ -74,7 +59,7 @@ def test_bundle_root_is_specific_to_model_version(
 
     expected_parent = (
         store.model_versions_dir
-        / str(model_version_id.model_id.user_id)
+        / str(model_version_id.model_id.user_id.user_id)
         / model_version_id.model_id.model_name
     )
 
@@ -172,7 +157,7 @@ def test_check_existence_creates_lock_file(
 
     assert not lock_path.exists()
 
-    assert not store.check_model_version_existance(model_version_id)
+    assert not store.check_model_version_existence(model_version_id)
 
     assert lock_path.is_file()
 
@@ -192,10 +177,8 @@ def test_materialized_bundle_contains_local_root_and_entrypoint(
     expected_entrypoint = bundle_root_path / "model.onnx"
 
     with store.get_model_version_bundle_path(model_version_id) as concrete_paths:
-        path_values = extract_concrete_paths(concrete_paths)
-
-        assert bundle_root_path in path_values
-        assert expected_entrypoint in path_values
+        assert concrete_paths.root_path == bundle_root_path
+        assert concrete_paths.entrypoint_path == expected_entrypoint
         assert expected_entrypoint.read_bytes() == b"model-content"
 
 

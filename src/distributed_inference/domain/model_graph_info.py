@@ -142,6 +142,8 @@ class ModelGraph(BaseModel):
         frozen=False,
     )
 
+    ## TODO: Add graph sanity checks!!
+
     model_info: ModelInfo
     _tensors_map: Mapping[str, TensorInfo] = PrivateAttr(default_factory=dict)
 
@@ -305,6 +307,9 @@ class ModelGraph(BaseModel):
 
         if not nx.is_directed_acyclic_graph(self._graph):  # type: ignore
             raise ValueError("The graph must be a DAG.")
+
+    def is_dag(self) -> bool:
+        return nx.is_directed_acyclic_graph(self._graph)
 
     def _create_contracted_edges(
         self,

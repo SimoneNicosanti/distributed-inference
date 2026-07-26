@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import pytest
 from pydantic import BaseModel
 
+from distributed_inference.application.model_artifact.domain.artifact_bundle import (
+    ArtifactConcretePaths,
+)
 from distributed_inference.application.model_profile.contracts.model_graph_extractor import (
     ModelGraphExtractor,
 )
@@ -73,7 +75,7 @@ class ModelGraphExtractorContract:
         raise NotImplementedError
 
     @pytest.fixture
-    def representative_model_path(self) -> Path:
+    def representative_model_paths(self) -> ArtifactConcretePaths:
         raise NotImplementedError
 
     @pytest.fixture
@@ -91,12 +93,12 @@ class ModelGraphExtractorContract:
     def test_extract_model_graph_preserves_metadata_and_topology(
         self,
         extractor: ModelGraphExtractor,
-        representative_model_path: Path,
+        representative_model_paths: ArtifactConcretePaths,
         model_info: ModelInfo,
         extracted_graph_expectation: ExtractedGraphExpectation,
     ) -> None:
         graph = extractor.extract_model_graph(
-            representative_model_path,
+            representative_model_paths,
             model_info,
             profile_flops=False,
             profile_tensors=False,
@@ -114,18 +116,18 @@ class ModelGraphExtractorContract:
     def test_extract_model_graph_honours_flops_profiling_flag(
         self,
         extractor: ModelGraphExtractor,
-        representative_model_path: Path,
+        representative_model_paths: ArtifactConcretePaths,
         model_info: ModelInfo,
         extracted_graph_expectation: ExtractedGraphExpectation,
     ) -> None:
         unprofiled_graph = extractor.extract_model_graph(
-            representative_model_path,
+            representative_model_paths,
             model_info,
             profile_flops=False,
             profile_tensors=False,
         )
         profiled_graph = extractor.extract_model_graph(
-            representative_model_path,
+            representative_model_paths,
             model_info,
             profile_flops=True,
             profile_tensors=False,
@@ -149,18 +151,18 @@ class ModelGraphExtractorContract:
     def test_extract_model_graph_honours_tensor_profiling_flag(
         self,
         extractor: ModelGraphExtractor,
-        representative_model_path: Path,
+        representative_model_paths: ArtifactConcretePaths,
         model_info: ModelInfo,
         extracted_graph_expectation: ExtractedGraphExpectation,
     ) -> None:
         unprofiled_graph = extractor.extract_model_graph(
-            representative_model_path,
+            representative_model_paths,
             model_info,
             profile_flops=False,
             profile_tensors=False,
         )
         profiled_graph = extractor.extract_model_graph(
-            representative_model_path,
+            representative_model_paths,
             model_info,
             profile_flops=False,
             profile_tensors=True,

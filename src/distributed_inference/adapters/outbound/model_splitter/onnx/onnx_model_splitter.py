@@ -24,7 +24,8 @@ class OnnxModelSplitter(ModelSplitter):
         if not layers:
             raise ValueError("The component cannot be empty")
 
-        assert input_paths.entrypoint_path is not None
+        if input_paths.entrypoint_path is None:
+            raise ValueError("Entrypoint path must be set when splitting model")
         input_model_path = input_paths.entrypoint_path.resolve(strict=True)
         output_model_path = output_paths.root_path.resolve().joinpath(
             "split_model.onnx"

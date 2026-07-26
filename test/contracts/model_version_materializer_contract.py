@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
@@ -16,11 +15,17 @@ from distributed_inference.domain.identifiers import (
     ModelVersionId,
     UserId,
 )
+from test.support.artifact_bundle_test_utils import (
+    build_test_bundle,
+)
+from test.support.materializer_test_utils import (
+    extract_root_and_entrypoint,
+)
 
 
 class ModelVersionMaterializerContract(ABC):
     @abstractmethod
-    def build_backend(
+    def build_dependencies(
         self,
         base_path: Path,
     ) -> tuple[
@@ -30,115 +35,96 @@ class ModelVersionMaterializerContract(ABC):
         raise NotImplementedError
 
     @pytest.fixture
-    def backend(
+    def dependencies(
         self,
         tmp_path: Path,
     ) -> tuple[
         ModelVersionMaterializer,
         ModelVersionArtifactStore,
     ]:
-        return self.build_backend(tmp_path)
+        return self.build_dependencies(tmp_path)
 
     @pytest.fixture
     def model_version_id(self) -> ModelVersionId:
-        owner_id = UserId(user_id=uuid4())
-
-        model_id = ModelId(
-            user_id=owner_id,
-            model_name="resnet50",
-        )
-
         return ModelVersionId(
-            model_id=model_id,
+            model_id=ModelId(
+                user_id=UserId(user_id=uuid4()),
+                model_name="resnet50",
+            ),
             version_number=1,
         )
 
-    def test_materialized_model_version_exists(
+    def test_materialize_missing_model_version_raises(
         self,
-        backend: tuple[
+        dependencies: tuple[
             ModelVersionMaterializer,
             ModelVersionArtifactStore,
         ],
         model_version_id: ModelVersionId,
     ) -> None:
-        materializer, artifact_store = backend
+        materializer, _ = dependencies
 
-        artifact_store.put_model_version(
-            model_version_id,
-            BytesIO(b"model-content"),
-        )
+        with pytest.raises(FileNotFoundError):
+            with materializer.materialize_model_version(model_version_id):
+                pass
 
-        with materializer.materialize_model_version(model_version_id) as model_path:
-            assert model_path.exists()
-            assert model_path.is_file()
-
-    def test_materialized_model_version_contains_stored_content(
+    def test_materialize_returns_root_and_entrypoint(
         self,
-        backend: tuple[
+        dependencies: tuple[
             ModelVersionMaterializer,
             ModelVersionArtifactStore,
         ],
         model_version_id: ModelVersionId,
     ) -> None:
-        materializer, artifact_store = backend
-        expected = b"onnx-model-content"
+        materializer, store = dependencies
 
-        artifact_store.put_model_version(
-            model_version_id,
-            BytesIO(expected),
+        bundle = build_test_bundle(
+            model_content=b"model-content",
+            weights_content=b"weights-content",
         )
 
-        with materializer.materialize_model_version(model_version_id) as model_path:
-            assert model_path.read_bytes() == expected
+        store.put_model_version(
+            model_version_id,
+            bundle,
+        )
 
-    def test_model_version_can_be_materialized_multiple_times(
+        with materializer.materialize_model_version(model_version_id) as concrete_paths:
+            root_path, entrypoint_path = extract_root_and_entrypoint(concrete_paths)
+
+            expected_entrypoint = root_path.joinpath(
+                *bundle.manifest.rel_entrypoint_path.parts
+            )
+
+            assert root_path.is_dir()
+            assert entrypoint_path.is_file()
+            assert entrypoint_path == expected_entrypoint
+            assert entrypoint_path.is_relative_to(root_path)
+
+    def test_materialized_root_contains_all_artifact_files(
         self,
-        backend: tuple[
+        dependencies: tuple[
             ModelVersionMaterializer,
             ModelVersionArtifactStore,
         ],
         model_version_id: ModelVersionId,
     ) -> None:
-        materializer, artifact_store = backend
-        expected = b"model-content"
+        materializer, store = dependencies
 
-        artifact_store.put_model_version(
+        bundle = build_test_bundle(
+            model_content=b"model-content",
+            weights_content=b"weights-content",
+        )
+
+        store.put_model_version(
             model_version_id,
-            BytesIO(expected),
+            bundle,
         )
 
-        with materializer.materialize_model_version(model_version_id) as first_path:
-            assert first_path.read_bytes() == expected
+        with materializer.materialize_model_version(model_version_id) as concrete_paths:
+            root_path, _ = extract_root_and_entrypoint(concrete_paths)
 
-        with materializer.materialize_model_version(model_version_id) as second_path:
-            assert second_path.read_bytes() == expected
+            model_path = root_path / "model.onnx"
+            weights_path = root_path / "weights" / "model.data"
 
-    def test_different_versions_materialize_different_contents(
-        self,
-        backend: tuple[
-            ModelVersionMaterializer,
-            ModelVersionArtifactStore,
-        ],
-        model_version_id: ModelVersionId,
-    ) -> None:
-        materializer, artifact_store = backend
-
-        second_version_id = ModelVersionId(
-            model_id=model_version_id.model_id,
-            version_number=2,
-        )
-
-        artifact_store.put_model_version(
-            model_version_id,
-            BytesIO(b"version-one"),
-        )
-        artifact_store.put_model_version(
-            second_version_id,
-            BytesIO(b"version-two"),
-        )
-
-        with materializer.materialize_model_version(model_version_id) as first_path:
-            assert first_path.read_bytes() == b"version-one"
-
-        with materializer.materialize_model_version(second_version_id) as second_path:
-            assert second_path.read_bytes() == b"version-two"
+            assert model_path.read_bytes() == b"model-content"
+            assert weights_path.read_bytes() == b"weights-content"

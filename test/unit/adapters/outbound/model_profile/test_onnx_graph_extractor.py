@@ -12,6 +12,9 @@ from onnx import TensorProto, helper, numpy_helper
 from distributed_inference.adapters.outbound.model_profile.onnx.onnx_model_graph_extractor import (
     OnnxGraphExtractor,
 )
+from distributed_inference.application.model_artifact.domain.artifact_bundle import (
+    ArtifactConcretePaths,
+)
 from distributed_inference.domain.model_graph_info import (
     INPUT_LAYER_NAME,
     OUTPUT_LAYER_NAME,
@@ -21,6 +24,8 @@ from distributed_inference.domain.model_graph_info import (
     LayerInfo,
     ModelGraph,
     ModelInfo,
+    ModelType,
+    TaskType,
     TensorInfo,
 )
 from test.contracts.model_graph_extractor_contract import (
@@ -35,18 +40,20 @@ def _model_info(
     dynamic_shapes: dict[str, DynamicShapeType] | None = None,
     sequence_sizes: list[int] | None = None,
 ) -> ModelInfo:
-    # model_construct keeps this fixture focused on fields consumed by the
-    # extractor and avoids coupling these adapter tests to unrelated metadata.
-    return ModelInfo.model_construct(
+    return ModelInfo(
         name="test-model",
         accuracy=1.0,
-        task="classification",
-        type="bert",
+        task=TaskType.CLASSIFICATION,
+        type=ModelType.BERT,
         dynamic_shapes=dynamic_shapes or {},
         sequence_sizes=sequence_sizes or [1],
         num_heads=1,
         hidden_size=4,
     )
+
+
+def _artifact_paths(path: Path) -> ArtifactConcretePaths:
+    return ArtifactConcretePaths(root_path=path.parent, entrypoint_path=path)
 
 
 def _flops(values: dict[int, float] | None = None) -> FlopsInfo:
@@ -267,10 +274,10 @@ class TestOnnxGraphExtractorContract(ModelGraphExtractorContract):
         return OnnxGraphExtractor()
 
     @pytest.fixture
-    def representative_model_path(self, tmp_path: Path) -> Path:
+    def representative_model_paths(self, tmp_path: Path) -> ArtifactConcretePaths:
         path = tmp_path / "representative.onnx"
         _write_representative_model(path)
-        return path
+        return _artifact_paths(path)
 
     @pytest.fixture
     def model_info(self) -> ModelInfo:
@@ -317,7 +324,7 @@ class TestOnnxGraphExtractor:
         weight = _write_representative_model(path)
 
         graph = OnnxGraphExtractor().extract_model_graph(
-            path,
+            _artifact_paths(path),
             _model_info(
                 dynamic_shapes={
                     "batch_size": DynamicShapeType.BATCH,
@@ -366,7 +373,7 @@ class TestOnnxGraphExtractor:
         onnx.save(model, path)
 
         graph = OnnxGraphExtractor().extract_model_graph(
-            path,
+            _artifact_paths(path),
             _model_info(),
             profile_flops=False,
             profile_tensors=False,
@@ -419,7 +426,7 @@ class TestOnnxGraphExtractor:
         onnx.save(model, path)
 
         graph = OnnxGraphExtractor().extract_model_graph(
-            path,
+            _artifact_paths(path),
             _model_info(),
             profile_flops=False,
             profile_tensors=False,
@@ -435,7 +442,7 @@ class TestOnnxGraphExtractor:
     ) -> None:
         model = _make_model(nodes=[], inputs=[], outputs=[])
 
-        monkeypatch.setattr(onnx, "load", lambda _: model)
+        monkeypatch.setattr(onnx, "load_model", lambda _: model)
         monkeypatch.setattr(
             OnnxGraphExtractor,
             "_OnnxGraphExtractor__infer_model_shape",
@@ -446,10 +453,12 @@ class TestOnnxGraphExtractor:
             raise onnx.checker.ValidationError("broken graph")
 
         monkeypatch.setattr(onnx.checker, "check_model", raise_validation_error)
+        ignored_path = tmp_path / "ignored.onnx"
+        ignored_path.write_bytes(b"ignored")
 
         with pytest.raises(Exception, match=r"Invalid ONNX model: broken graph"):
             OnnxGraphExtractor().extract_model_graph(
-                tmp_path / "ignored.onnx",
+                _artifact_paths(ignored_path),
                 _model_info(),
                 profile_flops=False,
                 profile_tensors=False,

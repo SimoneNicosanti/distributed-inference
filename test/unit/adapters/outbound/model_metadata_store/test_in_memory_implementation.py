@@ -2,14 +2,18 @@ from uuid import uuid4
 
 import pytest
 
-# Adatta soltanto questo import al percorso reale.
 from distributed_inference.adapters.outbound.model_metadata_store.in_memory import (
     InMemoryModelMetadataStore,
 )
 from distributed_inference.domain.identifiers import (
     UserId,
 )
-from distributed_inference.domain.model_graph_info import ModelInfo
+from distributed_inference.domain.model_graph_info import (
+    ModelGraph,
+    ModelInfo,
+    ModelType,
+    TaskType,
+)
 
 
 @pytest.fixture
@@ -24,9 +28,11 @@ def owner_id() -> UserId:
 
 @pytest.fixture
 def model_info() -> ModelInfo:
-    return ModelInfo.model_construct(
-        name="test-model",
+    return ModelInfo(
+        name="resnet50",
         accuracy=0.9,
+        task=TaskType.CLASSIFICATION,
+        type=ModelType.CNN,
         dynamic_shapes={},
         sequence_sizes=[1],
         num_heads=0,
@@ -152,3 +158,18 @@ def test_version_existence_checks_parent_model_dictionary(
 
     assert version_id in store._model_version_metadata
     assert not store.check_model_version_existence(version_id)
+
+
+def test_register_graph_rejects_incompatible_model_info(
+    store: InMemoryModelMetadataStore,
+    owner_id: UserId,
+    model_info: ModelInfo,
+) -> None:
+    model_id = store.register_model(owner_id, "resnet50")
+    version_id = store.register_model_version(model_id, model_info)
+    incompatible_graph = ModelGraph(
+        model_info=model_info.model_copy(update={"name": "different-model"})
+    )
+
+    with pytest.raises(ValueError, match="has model info"):
+        store.register_model_version_graph(version_id, incompatible_graph)

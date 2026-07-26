@@ -45,7 +45,7 @@ from distributed_inference.domain.model_graph_info import (
 
 
 class DefaultModelManager(ModelManager):
-    pass
+    ## TODO: We should dd rollback logick with rollback library
 
     def __init__(
         self,
@@ -96,7 +96,15 @@ class DefaultModelManager(ModelManager):
         self, model_version_id: ModelVersionId, layers: Iterable[LayerKey]
     ) -> SubModelId:
 
+        SubModelId.check_valid_layers_format(layers)
+
+        layers = tuple(layers)
         model_graph = self._model_metadata_store.get_model_graph(model_version_id)
+        if model_graph is None:
+            raise ValueError(
+                f"Model graph for model version {model_version_id} still not ready"
+            )
+
         sub_model_id = self._model_metadata_store.register_sub_model(
             model_version_id, layers
         )
@@ -130,12 +138,31 @@ class DefaultModelManager(ModelManager):
 
     @override
     def get_model_graph(self, model_version_id: ModelVersionId) -> ModelGraph:
-        return self._model_metadata_store.get_model_graph(model_version_id)
+        model_graph = self._model_metadata_store.get_model_graph(model_version_id)
+        if model_graph is None:
+            raise ValueError(
+                f"Model graph for model version {model_version_id} still not ready"
+            )
+        return model_graph
 
     @override
     def check_model_version_existence(self, model_version_id: ModelVersionId) -> bool:
-        return True
+        exists_metadata = self._model_metadata_store.check_model_version_existence(
+            model_version_id
+        )
+        exists_artifact = (
+            self._model_version_artifact_store.check_model_version_existence(
+                model_version_id
+            )
+        )
+        return exists_metadata and exists_artifact
 
     @override
     def check_sub_model_existence(self, sub_model_id: SubModelId) -> bool:
-        return True
+        exists_metadata = self._model_metadata_store.check_sub_model_existence(
+            sub_model_id
+        )
+        exists_artifact = self._sub_model_artifact_store.check_sub_model_existence(
+            sub_model_id
+        )
+        return exists_metadata and exists_artifact

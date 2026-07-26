@@ -24,7 +24,7 @@ class SubModelArtifactStore(ABC):
     ) -> AbstractContextManager[ArtifactBundle]: ...
 
     @abstractmethod
-    def check_sub_model_existance(
+    def check_sub_model_existence(
         self,
-        artifact_id: SubModelId,
+        sub_model_id: SubModelId,
     ) -> bool: ...

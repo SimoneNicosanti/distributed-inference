@@ -103,6 +103,9 @@ class InMemoryModelMetadataStore(ModelMetadataStore):
         model_version_id: ModelVersionId,
         layers: Iterable[LayerKey],
     ) -> SubModelId:
+
+        SubModelId.check_valid_layers_format(layers)
+        layers = tuple(layers)
         sub_model_id = SubModelId(
             model_version_id=model_version_id,
             layers=tuple(layers),

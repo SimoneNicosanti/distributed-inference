@@ -2,7 +2,6 @@ from typing import override
 
 import pytest
 
-# Adatta soltanto questo import al percorso reale.
 from distributed_inference.adapters.outbound.model_metadata_store.in_memory import (
     InMemoryModelMetadataStore,
 )

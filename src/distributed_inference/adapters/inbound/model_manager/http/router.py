@@ -3,6 +3,9 @@ from typing import Iterator
 from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
 
+from distributed_inference.adapters.inbound.model_manager.http import (
+    compression_utils,
+)
 from distributed_inference.adapters.inbound.model_manager.http.schema import (
     DownloadSubModelRequest,
     GenerateSubModelRequest,
@@ -18,9 +21,6 @@ from distributed_inference.application.model_manager.contracts.model_manager imp
 )
 from distributed_inference.domain.identifiers import ModelId
 from distributed_inference.domain.model_graph_info import ModelInfo
-from src.distributed_inference.adapters.inbound.model_manager.http import (
-    compression_utils,
-)
 
 
 def build_model_manager_router(
@@ -34,7 +34,7 @@ def build_model_manager_router(
 
     @router.post(
         "/models",
-        response_model=ModelId,
+        response_model=RegisterModelResponse,
     )
     def register_model(
         request: RegisterModelRequest,
@@ -53,14 +53,13 @@ def build_model_manager_router(
     def upload_model_version(
         model_id_json: str = Form(),
         model_info_json: str = Form(),
-        model_entrypoint: str = Form(),
         bundle_zip: UploadFile = File(),
     ) -> UploadModelVersionResponse:
         model_id = ModelId.model_validate_json(model_id_json)
         model_info = ModelInfo.model_validate_json(model_info_json)
 
-        with compression_utils.uncompress_artifact_bundle(
-            bundle_zip, model_entrypoint
+        with compression_utils.decompress_artifact_bundle(
+            bundle_zip,
         ) as artifact_bundle:
             model_version_id = model_manager.put_model_version(
                 model_id=model_id,
