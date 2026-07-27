@@ -8,6 +8,8 @@ from distributed_inference.application.inference.domain.inference_response impor
 )
 
 
+## This is the inference worker for a single sub-model
+## It handles only one inference
 class InferenceWorker(ABC):
     @abstractmethod
     def run_inference_request(self, request: InferenceRequest) -> InferenceResponse: ...

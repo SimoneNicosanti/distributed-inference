@@ -93,6 +93,7 @@
           "editor.defaultFormatter": "trunk.io",
           "editor.formatOnSave": true
         },
+        "todo-tree.ripgrep.ripgrep": "/usr/bin/rg"
       }
     }
   }

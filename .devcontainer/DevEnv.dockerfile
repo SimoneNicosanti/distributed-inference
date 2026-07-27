@@ -21,6 +21,7 @@ RUN apt-get update \
         iputils-ping \
         graphviz \
         libgl1 \
+        ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
 USER vscode

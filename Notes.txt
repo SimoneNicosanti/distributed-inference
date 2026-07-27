@@ -1,1 +1,27 @@
 Evaluate Rollback library for managing consistent states https://github.com/lexsca/rollback
+
+Gestione registry e service discovery Consul: endpoint diretti, health check e uniformità tra Compose e Kubernetes.
+
+
+
+Test Prompt:
+YOU ARE ALLOWED TO READ THE CONTENT OF THE src DIRECTORY, BUT YOU ARE NOT ALLOWED TO WRITE ANYTHING INSIDE THE src DIRECTORY.
+
+YOU ARE ALLOWED TO READ AND WRITE IN THE test DIRECTORY.
+
+YOU ARE NOT ALLOWED TO COMMIT ANYTHING.
+
+YOU ARE NOT ALLOWED TO RUN TESTS.
+
+I want you to write tests and modify the current tests in the test directory. If you find a test, check if its implementation is aligned with the current implementation; if it is then evaluate it and if you do not find it appropriate change it; otherwise, align it with the current implementation.
+
+In writing tests, try to align with the directory structure inside the src directory. 
+
+In writing tests, you can skip the control_plane directory for now.
+
+Consider that this is just a prototype, not a production code.
+When you are done, I want you to tell me possible breaks in the execution flows.
+
+I want the tests to be of middle complexity: do not overengineer them, they just need to check for the core functionalities and possible breaks.
+
+If you find a test that has not been committed yet, you are allowed to change it; in doing so, consider what I told you about checking if the test is appropriate or not.
