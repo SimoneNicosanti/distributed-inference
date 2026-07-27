@@ -1,0 +1,2 @@
+class RouteInstruction:
+    pass

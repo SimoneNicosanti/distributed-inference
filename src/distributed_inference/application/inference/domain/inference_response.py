@@ -1,2 +1,0 @@
-class InferenceResponse:
-    pass

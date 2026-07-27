@@ -1,15 +1,19 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
-from distributed_inference.application.inference.domain.inference_request import (
-    InferenceRequest,
-)
-from distributed_inference.application.inference.domain.inference_response import (
-    InferenceResponse,
+from distributed_inference.application.inference.domain.inference_run import (
+    InferenceInput,
+    InferenceOutput,
 )
 
 
 ## This is the inference worker for a single sub-model
-## It handles only one inference
 class InferenceWorker(ABC):
     @abstractmethod
-    def run_inference_request(self, request: InferenceRequest) -> InferenceResponse: ...
+    async def process_inference_input(
+        self, inference_input: InferenceInput
+    ) -> InferenceOutput: ...
+
+    ## close method can be useful for cleaning up resources
+    @abstractmethod
+    async def close(self) -> None: ...
