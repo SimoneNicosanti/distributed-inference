@@ -18,6 +18,19 @@ from distributed_inference.domain.model_graph_info import LayerKey
 # - Then we have the artifacts as stored in the model store.
 
 
+class ServerId(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    server_id: UUID
+
+
+class ServiceId(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    server_id: ServerId
+    service_id: UUID
+
+
 class UserId(BaseModel):
     model_config = ConfigDict(frozen=True)
 

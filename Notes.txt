@@ -1,8 +1,5 @@
 Evaluate Rollback library for managing consistent states https://github.com/lexsca/rollback
 
-Gestione registry e service discovery Consul: endpoint diretti, health check e uniformità tra Compose e Kubernetes.
-
-
 
 Test Prompt:
 YOU ARE ALLOWED TO READ THE CONTENT OF THE src DIRECTORY, BUT YOU ARE NOT ALLOWED TO WRITE ANYTHING INSIDE THE src DIRECTORY.

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 
-## This is the interface that the control plane uses to manage the lifecycle of the inference worker
+## This is the interface that the deployment coordinator uses to manage the lifecycle of the inference service
 class InferenceLifecycleManager(ABC):
     @abstractmethod
     async def load(self) -> None: ...

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import StrEnum, auto
+from enum import IntEnum, StrEnum, auto
 from typing import AsyncContextManager
 
 
@@ -13,11 +13,18 @@ class NodeActivityType(StrEnum):
     MODEL_MIGRATE = auto()
 
 
+class NodeActivityPriority(IntEnum):
+    LOW = 0
+    LOW_MEDIUM = 10
+    MEDIUM = 20
+    MEDIUM_HIGH = 30
+    HIGH = 40
+
+
 @dataclass
 class NodeActivityRequest:
     type: NodeActivityType
-    priority: int
-    pass
+    priority: NodeActivityPriority
 
 
 ## Syncronous context acquisition
