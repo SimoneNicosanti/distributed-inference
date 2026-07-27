@@ -1,5 +1,6 @@
 from typing import List, override
 
+import pydantic
 from redis import asyncio as redis_asyncio
 
 from distributed_inference.adapters.outbound.directory.redis import (
@@ -36,19 +37,24 @@ class RedisServiceResolver(ServiceResolver):
             server_id
         )
 
-        matched_keys = [
+        ## NOTE: This is not atomic. Deletion between the two calls might happen
+        matched_keys: list[str] = [
             key async for key in self._redis.scan_iter(match=redis_key_pattern)
         ]
         if not matched_keys:
             return []
-        results = await self._redis.mget(matched_keys)
+        unique_matched_keys = set(matched_keys)
+        results = await self._redis.mget(unique_matched_keys)
 
         service_instances: List[ServiceInstance] = []
         for result in results:
             if result is None:
-                raise KeyError(f"Service {matched_keys} not found")
+                continue
 
-            service_instance = ServiceInstance.model_validate_json(result)
+            try:
+                service_instance = ServiceInstance.model_validate_json(result)
+            except pydantic.ValidationError:
+                continue
             service_instances.append(service_instance)
 
         return service_instances
