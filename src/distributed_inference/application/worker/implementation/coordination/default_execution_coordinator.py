@@ -12,11 +12,15 @@ from distributed_inference.application.worker.contracts.execution.forwarding.inf
 from distributed_inference.application.worker.contracts.execution.forwarding.inference_response_router import (
     InferenceResponseRouter,
 )
-from distributed_inference.application.worker.contracts.execution.inference.inference_coordinator import (
-    InferenceCoordinator,
+from distributed_inference.application.worker.contracts.execution.forwarding.route_instruction import (
+    RouteInstruction,
+)
+from distributed_inference.application.worker.contracts.execution.inference.inference_worker_coordinator import (
+    InferenceWorkerCoordinator,
 )
 from distributed_inference.application.worker.domain.inference_flow import (
     InferenceMessage,
+    InferenceResponse,
 )
 
 
@@ -24,7 +28,7 @@ class DefaultExecutionCoordinator(ExecutionCoordinator):
     def __init__(
         self,
         inference_message_gatherer: InferenceMessageGatherer,
-        inference_coordinator: InferenceCoordinator,
+        inference_coordinator: InferenceWorkerCoordinator,
         inference_response_router: InferenceResponseRouter,
         inference_message_forwarder: InferenceMessageForwarder,
     ):
@@ -45,7 +49,7 @@ class DefaultExecutionCoordinator(ExecutionCoordinator):
         )
         if inference_request is None:
             ## Inference request could not be gathered
-            ## Waiting
+            ## We need to wait for other inference messages to come
             return None
 
         inference_response = (
@@ -62,8 +66,17 @@ class DefaultExecutionCoordinator(ExecutionCoordinator):
 
         for route_instruction in route_instructions:
             ## TODO: Build inference message for the next server
+            next_inference_message = self.__build_next_inference_message(
+                inference_response, route_instruction
+            )
             self._inference_message_forwarder.forward_inference_message(
-                inference_message, route_instruction
+                next_inference_message, route_instruction
             )
 
         return None
+
+    @classmethod
+    def __build_next_inference_message(
+        cls, inference_response: InferenceResponse, route_instruction: RouteInstruction
+    ) -> InferenceMessage:
+        raise NotImplementedError

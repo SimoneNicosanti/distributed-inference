@@ -1,63 +1,66 @@
+import asyncio
 import time
+from asyncio import Future
 from collections import deque
 from dataclasses import dataclass
-from typing import Any, override
+from typing import Any, Tuple, override
 
-import aiorwlock
-
-from distributed_inference.application.worker.contracts.execution.scheduling.inference_request_scheduler import (
-    InferenceRequestScheduler,
+from distributed_inference.application.scheduling.contracts.request_scheduler import (
+    RequestScheduler,
 )
 from distributed_inference.application.worker.domain.inference_flow import (
     InferenceRequest,
 )
+from distributed_inference.domain.plan import ServiceInferencePlan
 
 
-class PriorityInferenceRequestScheduler(InferenceRequestScheduler):
-    @dataclass(frozen=True)
-    class _QueueInferenceRequest(InferenceRequestScheduler._QueueInferenceRequest):
+class PriorityInferenceRequestScheduler(RequestScheduler):
+    @dataclass
+    class _QueueInferenceRequest(RequestScheduler._QueueRequest):
         priority: int
 
-    def __init__(self, priorities: int, plan: Any) -> None:
-        self._lock = aiorwlock.RWLock()
+    def __init__(self, priorities: int, plan: ServiceInferencePlan) -> None:
+        self._condition = asyncio.Condition()
         self._plan = plan
         self._priority_queues: list[
             deque[PriorityInferenceRequestScheduler._QueueInferenceRequest]
         ] = [deque() for _ in range(priorities)]
 
     @override
-    async def enqueue(self, inference_request: InferenceRequest) -> None:
-        ## TODO: decide request priority based on plan
-        request_priority = 0
+    async def enqueue(self, request: InferenceRequest, future: Future[Any]) -> None:
+        request_priority = 0  ## TODO: decide request priority based on plan
+        queue_inference_request = self._QueueInferenceRequest(
+            request=request,
+            future=future,
+            enqueue_timestamp=time.monotonic_ns(),
+            priority=request_priority,
+        )
 
-        async with self._lock.writer_lock:
-            queue_inference_request = self._QueueInferenceRequest(
-                inference_request=inference_request,
-                enqueue_timestamp=time.monotonic_ns(),
-                priority=request_priority,
-            )
+        async with self._condition:  ## Takes the lock on the condition
+            self._priority_queues[request_priority].append(queue_inference_request)
 
-            self._priority_queues[request_priority].appendleft(queue_inference_request)
+            ## Notifies that the condition state has changed
+            ## If the coroutines where waiting for different conditions, notify all might have been better
+            self._condition.notify(n=1)
 
     @override
-    async def dequeue(self) -> InferenceRequest | None:
-        async with self._lock.writer_lock:
+    async def dequeue(self) -> Tuple[InferenceRequest, Future[Any]]:
+        async with self._condition:  ## Takes the lock on the condition
+            ## Waits until the condition state has changed
+            ## In the meantime, the lock is released
+            ## Once the condition state has changed, the lock is reacquired
+            ## We declare the type of event we are waiting for
+            await self._condition.wait_for(lambda: any(self._priority_queues))
             for priority_queue in self._priority_queues:
                 if len(priority_queue) > 0:
-                    next_queue_inference_request = priority_queue.pop()
-                    return next_queue_inference_request.inference_request
-        return None
+                    next_queue_inference_request = priority_queue.popleft()
+                    inference_request = next_queue_inference_request.request
+                    future = next_queue_inference_request.future
+                    return inference_request, future
+
+        raise RuntimeError("Unreachable non empty queue")
 
     @override
     async def length(self) -> int:
-        total_len = 0
-        async with self._lock.reader_lock:
-            for priority_queue in self._priority_queues:
-                total_len += len(priority_queue)
-        return total_len
-
-    async def length_from_priority(self, priority: int) -> int:
-        if priority >= len(self._priority_queues):
-            raise ValueError(f"Priority {priority} does not exist")
-        async with self._lock.reader_lock:
-            return len(self._priority_queues[priority])
+        async with self._condition:
+            return sum(len(queue) for queue in self._priority_queues)

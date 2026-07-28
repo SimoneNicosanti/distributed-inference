@@ -26,7 +26,14 @@ class InMemoryInferencePlanStore(InferencePlanStore):
             if service_inference_plan.plan_version in self._inference_plan_by_version:
                 raise ValueError("Inference plan already exists")
 
-            self._latest_inference_plan = service_inference_plan
+            if self._latest_inference_plan is None:
+                self._latest_inference_plan = service_inference_plan
+            else:
+                if (
+                    service_inference_plan.plan_version
+                    > self._latest_inference_plan.plan_version
+                ):
+                    self._latest_inference_plan = service_inference_plan
 
             self._inference_plan_by_version[service_inference_plan.plan_version] = (
                 service_inference_plan

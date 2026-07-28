@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Any
 
 from distributed_inference.application.worker.domain.inference_flow import (
     InferenceMessage,

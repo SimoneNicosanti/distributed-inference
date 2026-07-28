@@ -1,14 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import Any
 
 from distributed_inference.application.worker.contracts.execution.inference.inference_worker import (
     InferenceWorker,
 )
 
 
+class InferenceWorkerDeploymentOptions:
+    pass
+
+
 class InferenceWorkerFactory(ABC):
     @abstractmethod
-    async def create(
+    async def create_inference_worker(
         self,
-        deployment: Any,
+        deployment: InferenceWorkerDeploymentOptions,
     ) -> InferenceWorker: ...

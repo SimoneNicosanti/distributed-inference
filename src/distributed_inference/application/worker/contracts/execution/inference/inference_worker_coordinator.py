@@ -7,7 +7,7 @@ from distributed_inference.application.worker.domain.inference_flow import (
 
 
 ## This is the inference coordinator for a pool of inference workers
-class InferenceCoordinator(ABC):
+class InferenceWorkerCoordinator(ABC):
     @abstractmethod
     async def process_inference_request(
         self, inference_request: InferenceRequest

@@ -1,9 +1,13 @@
 from pydantic import BaseModel, ConfigDict
 
+from distributed_inference.domain.plan import InferencePlanVersion
+
 
 ## This is the input of the sub-model once everything for the sub-model has been gathered from predecessors
 class InferenceRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
+
+    inference_plan_version: InferencePlanVersion
     pass
 
 

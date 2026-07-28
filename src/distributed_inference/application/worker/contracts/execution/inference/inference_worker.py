@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any
 
-from distributed_inference.application.inference.domain.inference_run import (
+from distributed_inference.application.worker.domain.inference_run import (
     InferenceInput,
     InferenceOutput,
 )
