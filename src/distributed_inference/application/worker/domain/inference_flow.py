@@ -17,3 +17,8 @@ class InferenceResponse(BaseModel):
 class InferenceMessage(BaseModel):
     model_config = ConfigDict(frozen=True)
     pass
+
+
+class InferenceMessageAck(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    pass

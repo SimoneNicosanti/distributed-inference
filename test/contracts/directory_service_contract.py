@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Literal
 from uuid import uuid4
 
 import pytest
@@ -18,11 +19,18 @@ from distributed_inference.application.directory.domain.service_registration imp
 )
 from distributed_inference.domain.identifiers import ServerId, ServiceId
 from distributed_inference.domain.service_instance import (
-    ServiceEndpoint,
+    HostServiceEndpoint,
     ServiceInstance,
     ServiceProtocol,
     ServiceType,
+    UriServiceEndpoint,
 )
+
+type HostServiceProtocol = Literal[
+    ServiceProtocol.HTTP,
+    ServiceProtocol.GRPC,
+    ServiceProtocol.ARROW,
+]
 
 
 @dataclass(frozen=True)
@@ -41,7 +49,7 @@ def build_service_instance(
     *,
     service_type: ServiceType = ServiceType.MODEL_MANAGER,
     port: int = 8000,
-    protocol: ServiceProtocol = ServiceProtocol.HTTP,
+    protocol: HostServiceProtocol = ServiceProtocol.HTTP,
 ) -> ServiceInstance:
     return ServiceInstance(
         service_id=ServiceId(
@@ -49,10 +57,31 @@ def build_service_instance(
             service_id=uuid4(),
         ),
         service_type=service_type,
-        service_endpoint=ServiceEndpoint(
+        service_endpoint=HostServiceEndpoint(
             host="model-manager",
             port=port,
             protocol=protocol,
+        ),
+    )
+
+
+def build_uri_service_instance(
+    server_id: ServerId,
+    *,
+    service_type: ServiceType = ServiceType.INFERENCE_SERVICE,
+    port: int = 9090,
+) -> ServiceInstance:
+    return ServiceInstance(
+        service_id=ServiceId(
+            server_id=server_id,
+            service_id=uuid4(),
+        ),
+        service_type=service_type,
+        service_endpoint=UriServiceEndpoint(
+            host="model-manager",
+            port=port,
+            protocol=ServiceProtocol.PYRO,
+            object_identifier="distributed-inference.service",
         ),
     )
 
@@ -108,6 +137,7 @@ class DirectoryServiceContract:
                 port=8002,
                 protocol=ServiceProtocol.GRPC,
             ),
+            build_uri_service_instance(server_id),
         }
         foreign_service = build_service_instance(foreign_server_id, port=9000)
 

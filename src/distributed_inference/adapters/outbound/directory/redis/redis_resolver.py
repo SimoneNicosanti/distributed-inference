@@ -50,7 +50,6 @@ class RedisServiceResolver(ServiceResolver):
         for result in results:
             if result is None:
                 continue
-
             try:
                 service_instance = ServiceInstance.model_validate_json(result)
             except pydantic.ValidationError:

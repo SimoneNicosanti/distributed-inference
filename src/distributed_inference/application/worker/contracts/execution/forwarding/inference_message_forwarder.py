@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 
-from distributed_inference.application.inference.contracts.execution.forwarding.route_instruction import (
+from distributed_inference.application.worker.contracts.execution.forwarding.route_instruction import (
     RouteInstruction,
 )
-from distributed_inference.application.inference.domain.inference_flow import (
+from distributed_inference.application.worker.domain.inference_flow import (
     InferenceMessage,
 )
 
 
-class InferenceForwarder(ABC):
+class InferenceMessageForwarder(ABC):
     @abstractmethod
     def forward_inference_message(
         self, inference_message: InferenceMessage, route_instruction: RouteInstruction

@@ -1,6 +1,8 @@
+from abc import ABC, abstractmethod
 from enum import StrEnum, auto
+from typing import Annotated, Literal, override
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from distributed_inference.domain.identifiers import ServiceId
 
@@ -8,15 +10,17 @@ from distributed_inference.domain.identifiers import ServiceId
 class ServiceProtocol(StrEnum):
     GRPC = auto()
     HTTP = auto()
+    PYRO = auto()
+    ARROW = auto()
     ...
 
 
-class ServiceEndpoint(BaseModel):
+class ServiceEndpoint(BaseModel, ABC):
     ## TODO: Add validation for host and port
     model_config = ConfigDict(frozen=True)
 
     host: str
-    port: int
+    port: Annotated[int, Field(ge=1024, le=65535)]
     protocol: ServiceProtocol
 
     @field_validator("host")
@@ -46,19 +50,53 @@ class ServiceEndpoint(BaseModel):
                 return False
 
         if not is_valid_hostname(host) and not is_valid_ip_addr(host):
-            raise ValueError("Invalid host")
+            raise ValueError(f"Invalid host {host}")
 
         return host
 
-    @field_validator("port")
-    @classmethod
-    def validate_port(cls, port: int) -> int:
+    @abstractmethod
+    def get_endpoint_string(self) -> str: ...
 
-        ## Allowing only not reserved ports
-        if not 1024 <= port <= 65535:
-            raise ValueError("Invalid port")
 
-        return port
+class HostServiceEndpoint(ServiceEndpoint):
+    model_config = ConfigDict(frozen=True)
+    kind: Literal["host_port"] = "host_port"
+
+    protocol: Literal[
+        ServiceProtocol.HTTP,
+        ServiceProtocol.GRPC,
+        ServiceProtocol.ARROW,
+    ]
+
+    @override
+    def get_endpoint_string(self) -> str:
+        match self.protocol:
+            case ServiceProtocol.HTTP:
+                return f"http://{self.host}:{self.port}"
+            case ServiceProtocol.GRPC:
+                return f"{self.host}:{self.port}"
+            case ServiceProtocol.ARROW:
+                return f"grpc://{self.host}:{self.port}"
+
+
+class UriServiceEndpoint(ServiceEndpoint):
+    model_config = ConfigDict(frozen=True)
+    kind: Literal["uri"] = "uri"
+
+    protocol: Literal[ServiceProtocol.PYRO]
+    object_identifier: Annotated[str, Field(min_length=1)]
+
+    @override
+    def get_endpoint_string(self) -> str:
+        match self.protocol:
+            case ServiceProtocol.PYRO:
+                return f"PYRO:{self.object_identifier}@{self.host}:{self.port}"
+
+
+ServiceEndpointType = Annotated[
+    HostServiceEndpoint | UriServiceEndpoint,
+    Field(discriminator="kind"),
+]
 
 
 class ServiceType(StrEnum):
@@ -73,4 +111,4 @@ class ServiceInstance(BaseModel):
     service_id: ServiceId
     service_type: ServiceType
 
-    service_endpoint: ServiceEndpoint
+    service_endpoint: ServiceEndpointType

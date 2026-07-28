@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from distributed_inference.application.inference.domain.inference_flow import (
+from distributed_inference.application.worker.domain.inference_flow import (
     InferenceRequest,
     InferenceResponse,
 )

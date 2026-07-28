@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from distributed_inference.application.inference.domain.inference_flow import (
+from distributed_inference.application.worker.domain.inference_flow import (
     InferenceMessage,
 )
 
@@ -18,4 +18,4 @@ class ExecutionCoordinator(ABC):
     @abstractmethod
     async def process_inference_message(
         self, inference_message: InferenceMessage
-    ) -> Any: ...
+    ) -> None: ...
