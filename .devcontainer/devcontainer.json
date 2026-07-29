@@ -43,6 +43,7 @@
         "openai.chatgpt",
         "gruntfuggly.todo-tree"
       ],
+
       "settings": {
         "workbench.editor.revealIfOpen": true,
 
