@@ -11,6 +11,9 @@ from distributed_inference.application.worker.domain.inference_flow import (
 
 
 class InferenceRequestScheduler(RequestScheduler, ABC):
+    class QueueInferenceRequest(RequestScheduler.QueueRequest):
+        pass
+
     @abstractmethod
     @override
     async def enqueue(self, request: InferenceRequest, future: Future[Any]) -> None: ...

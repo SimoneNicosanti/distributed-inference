@@ -6,10 +6,10 @@ from typing import Any, Tuple
 
 class RequestScheduler(ABC):
     @dataclass
-    class _QueueRequest:
+    class QueueRequest:
         request: Any
         future: Future[Any]
-        enqueue_timestamp: float
+        timestamp: float
 
     @abstractmethod
     async def enqueue(self, request: Any, future: Future[Any]) -> None: ...

@@ -5,6 +5,7 @@ from distributed_inference.application.lifecycle.contracts.async_lifecycle impor
     AsyncLifecycle,
 )
 from distributed_inference.application.worker.contracts.activity.activity_request import (
+    ActivityGrant,
     ActivityRequest,
     ActivityType,
 )
@@ -24,6 +25,7 @@ from distributed_inference.application.worker.contracts.execution.inference.infe
     InferenceWorkerCoordinator,
 )
 from distributed_inference.application.worker.contracts.resource.resource_type import (
+    LockRequirement,
     ResourceType,
 )
 from distributed_inference.application.worker.domain.inference_flow import (
@@ -81,29 +83,38 @@ class DefaultInferenceWorkerCoordinator(
                 inference_response_future,
             ) = await self._inference_request_scheduler.dequeue()
 
-            await self._wait_for_run_permission()
+            activity_grant = await self._get_activity_grant()
 
-            inference_response = await self._actual_process_inference_request(
-                inference_request
-            )
+            async with activity_grant:
+                inference_response = await self._actual_process_inference_request(
+                    inference_request
+                )
 
             inference_response_future.set_result(inference_response)
-
-        raise NotImplementedError
 
     @override
     async def stop(self) -> None:
         raise NotImplementedError
 
-    async def _wait_for_run_permission(self) -> None:
-        can_run_future = asyncio.get_running_loop().create_future()
-
-        activity_request = ActivityRequest(
-            type=ActivityType.INFERENCE_EXECUTION,
-            resource_type=ResourceType.COMPUTE,
+    async def _get_activity_grant(self) -> ActivityGrant:
+        activity_grant_future: asyncio.Future[ActivityGrant] = (
+            asyncio.get_running_loop().create_future()
         )
-        await self._node_activity_scheduler.enqueue(activity_request, can_run_future)
-        await can_run_future
+
+        activity_request = self._build_activity_request()
+        await self._node_activity_scheduler.enqueue(
+            activity_request, activity_grant_future
+        )
+        activity_grant: ActivityGrant = await activity_grant_future
+
+        return activity_grant
+
+    def _build_activity_request(self) -> ActivityRequest:
+        activity_request = ActivityRequest(
+            activity_type=ActivityType.INFERENCE_EXECUTION,
+            resource_lock={ResourceType.COMPUTE: LockRequirement(1, False)},
+        )
+        return activity_request
 
     async def _actual_process_inference_request(
         self, inference_request: InferenceRequest

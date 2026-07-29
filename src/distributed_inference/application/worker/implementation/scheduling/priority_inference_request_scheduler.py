@@ -8,31 +8,24 @@ from typing import Any, Tuple, override
 from distributed_inference.application.scheduling.contracts.request_scheduler import (
     RequestScheduler,
 )
+from distributed_inference.application.worker.contracts.execution.inference.inference_request_scheduler import (
+    InferenceRequestScheduler,
+)
 from distributed_inference.application.worker.domain.inference_flow import (
     InferenceRequest,
 )
 from distributed_inference.domain.plan import ServiceInferencePlan
 
 
-class PriorityInferenceRequestScheduler(RequestScheduler):
+class PriorityInferenceRequestScheduler(InferenceRequestScheduler):
     @dataclass
-    class _QueueInferenceRequest(RequestScheduler._QueueRequest):
-        priority: int
-
-    def __init__(self, priorities: int, plan: ServiceInferencePlan) -> None:
-        self._condition = asyncio.Condition()
-        self._plan = plan
-        self._priority_queues: list[
-            deque[PriorityInferenceRequestScheduler._QueueInferenceRequest]
-        ] = [deque() for _ in range(priorities)]
-
     @override
     async def enqueue(self, request: InferenceRequest, future: Future[Any]) -> None:
         request_priority = 0  ## TODO: decide request priority based on plan
-        queue_inference_request = self._QueueInferenceRequest(
+        queue_inference_request = self.QueueInferenceRequest(
             request=request,
             future=future,
-            enqueue_timestamp=time.monotonic_ns(),
+            timestamp=time.monotonic_ns(),
             priority=request_priority,
         )
 

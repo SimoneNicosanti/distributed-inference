@@ -1,13 +1,19 @@
 from abc import ABC, abstractmethod
 
 from distributed_inference.application.worker.contracts.resource.resource_type import (
-    ResourceType,
+    ResourceLease,
+    ResourceLeaseId,
+    ResourceLock,
 )
 
 
 class ResourceManager(ABC):
     @abstractmethod
-    def try_allocate_resources(self, resources: dict[ResourceType, int]) -> None: ...
+    async def acquire_resource_lease(
+        self, resource_lock: ResourceLock
+    ) -> ResourceLease: ...
 
     @abstractmethod
-    def release_resources(self, resources: dict[ResourceType, int]) -> None: ...
+    async def release_resource_lease(
+        self, resource_lease_id: ResourceLeaseId
+    ) -> None: ...
