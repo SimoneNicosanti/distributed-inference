@@ -112,7 +112,7 @@ class DefaultInferenceWorkerCoordinator(
     def _build_activity_request(self) -> ActivityRequest:
         activity_request = ActivityRequest(
             activity_type=ActivityType.INFERENCE_EXECUTION,
-            resource_lock={ResourceType.COMPUTE: LockRequirement(1, False)},
+            resource_lock={ResourceType.COMPUTE: LockRequirement(1, True)},
         )
         return activity_request
 
