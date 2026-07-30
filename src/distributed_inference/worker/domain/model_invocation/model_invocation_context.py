@@ -12,6 +12,8 @@ from pydantic import BaseModel, ConfigDict, Field
 #     inference_request_id: InferenceRequestId
 #     inference_run_id: UUID = Field(default_factory=uuid4)
 
+type ModelInvocationId = UUID
+
 
 ## This is the context id for model invocation.
 ## The user can call for a model invocation multiple times;
@@ -19,4 +21,4 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelInvocationContext(BaseModel):
     model_config = ConfigDict(frozen=True)
     # inference_run_context: InferenceRunContext
-    model_invocation_id: UUID = Field(default_factory=uuid4)
+    model_invocation_id: ModelInvocationId = Field(default_factory=uuid4)

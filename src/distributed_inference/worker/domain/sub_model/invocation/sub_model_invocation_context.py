@@ -9,6 +9,11 @@ from distributed_inference.worker.domain.model_pass.model_pass_context import (
 )
 
 
+class SubModelInvocationId(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    id: UUID = Field(default_factory=uuid4)
+
+
 ## A model pass is made up of multiple sub-model invocations
 ## The context of a sub-model invocation is the identified by
 ## - The model pass it belongs to
@@ -18,4 +23,6 @@ class SubModelInvocationContext(BaseModel):
     model_config = ConfigDict(frozen=True)
     model_pass_context: ModelPassContext
     sub_model_deployment_id: SubModelDeploymentId
-    sub_model_invocation_id: UUID = Field(default_factory=uuid4)
+    sub_model_invocation_id: SubModelInvocationId = Field(
+        default_factory=SubModelInvocationId
+    )

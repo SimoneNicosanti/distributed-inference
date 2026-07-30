@@ -8,6 +8,8 @@ from distributed_inference.worker.domain.model_invocation.model_invocation_conte
     ModelInvocationContext,
 )
 
+type ModelPassId = UUID
+
 
 class ModelPassType(StrEnum):
     FORWARD = auto()
@@ -22,4 +24,4 @@ class ModelPassContext(BaseModel):
 
     plan_version: InferencePlanVersion
     model_pass_type: ModelPassType
-    model_pass_id: UUID = Field(default_factory=uuid4)
+    model_pass_id: ModelPassId = Field(default_factory=uuid4)

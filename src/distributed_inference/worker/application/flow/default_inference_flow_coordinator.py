@@ -1,10 +1,12 @@
-import asyncio
 from typing import override
 
-from distributed_inference.worker.application.forwarding.contracts.sub_model_invocation_message_gatherer import (
+from distributed_inference.worker.application.flow.contracts.sub_model_invocation_completition_registry import (
+    SubModelInvocationCompletitionRegistry,
+)
+from distributed_inference.worker.application.forwarding.contracts.gathering.sub_model_invocation_message_gatherer import (
     SubModelInvocationMessageGatherer,
 )
-from distributed_inference.worker.application.forwarding.contracts.sub_model_invocation_response_router import (
+from distributed_inference.worker.application.forwarding.contracts.routing.sub_model_invocation_response_router import (
     SubModelInvocationResponseRouter,
 )
 from distributed_inference.worker.application.ports.inbound.inference_flow_coordinator import (
@@ -19,7 +21,6 @@ from distributed_inference.worker.application.sub_model_execution.contracts.sub_
 from distributed_inference.worker.domain.sub_model.invocation.sub_model_invocation_message import (
     SubModelInvocationAck,
     SubModelInvocationMessage,
-    SubModelInvocationMessageContext,
 )
 from distributed_inference.worker.domain.sub_model.invocation.sub_model_invocation_request_response import (
     SubModelInvocationResponse,
@@ -36,6 +37,7 @@ class DefaultInferenceFlowCoordinator(InferenceFlowCoordinator):
         sub_model_execution_coordinator: SubModelExecutionCoordinator,
         sub_model_invocation_response_router: SubModelInvocationResponseRouter,
         sub_model_invocation_message_forwarder: SubModelInvocationMessageForwarder,
+        completition_registry: SubModelInvocationCompletitionRegistry,
     ):
         self._sub_model_invocation_message_gatherer = (
             sub_model_invocation_message_gatherer
@@ -47,32 +49,31 @@ class DefaultInferenceFlowCoordinator(InferenceFlowCoordinator):
         self._sub_model_invocation_message_forwarder = (
             sub_model_invocation_message_forwarder
         )
-        self._sub_model_waiting_conditions: dict[
-            SubModelInvocationMessageContext, asyncio.Event
-        ] = {}
+        self._completition_registry = completition_registry
 
     @override
     async def process_sub_model_invocation_message(
         self, sub_model_invocation_message: SubModelInvocationMessage
     ) -> SubModelInvocationAck:
 
-        sub_model_inference_message_ctx = sub_model_invocation_message.context
-        if sub_model_inference_message_ctx not in self._sub_model_waiting_conditions:
-            self._sub_model_waiting_conditions[sub_model_inference_message_ctx] = (
-                asyncio.Event()
-            )
-
-        sub_model_inference_request = await self._sub_model_invocation_message_gatherer.gather_sub_model_invocation_message(
+        (
+            sub_model_inference_request,
+            sub_model_invocation_id,
+        ) = await self._sub_model_invocation_message_gatherer.gather_sub_model_invocation_message(
             sub_model_invocation_message
         )
         if sub_model_inference_request is None:
             ## Inference request could not be gathered
             ## We need to wait for other inference messages to come
             ## We wait to inference completition event to return a positive ack to the sender
-            await self._sub_model_waiting_conditions[
-                sub_model_inference_message_ctx
-            ].wait()
-            return SubModelInvocationAck(context=sub_model_inference_message_ctx)
+
+            ## TODO: We should manage the error here
+            await (
+                self._completition_registry.wait_for_sub_model_invocation_completition(
+                    sub_model_invocation_id
+                )
+            )
+            return SubModelInvocationAck(context=sub_model_invocation_message.context)
 
         sub_model_inference_response = await self._sub_model_execution_coordinator.process_sub_model_invocation_request(
             sub_model_inference_request
@@ -91,11 +92,13 @@ class DefaultInferenceFlowCoordinator(InferenceFlowCoordinator):
                 next_inference_message, route_instruction
             )
 
-        ## We set the completition event so the other senders can return their ack
-        self._sub_model_waiting_conditions[sub_model_inference_message_ctx].set()
+        ## We register the completition event on the registry
+        await self._completition_registry.register_sub_model_invocation_success(
+            sub_model_invocation_id
+        )
 
         ## We return the ack of the coroutine that has materially done the execution
-        return SubModelInvocationAck(context=sub_model_inference_message_ctx)
+        return SubModelInvocationAck(context=sub_model_invocation_message.context)
 
     @classmethod
     def __build_next_sub_model_invocation_message(

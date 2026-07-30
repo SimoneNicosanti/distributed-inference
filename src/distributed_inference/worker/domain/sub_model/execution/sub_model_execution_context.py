@@ -8,8 +8,10 @@ from distributed_inference.worker.domain.sub_model.invocation.sub_model_invocati
     SubModelInvocationContext,
 )
 
+type SubModelExecutionId = UUID
+
 
 class SubModelExecutionContext(BaseModel):
     model_config = ConfigDict(frozen=True)
     sub_model_invocation_context: SubModelInvocationContext
-    sub_model_execution_id: UUID = Field(default_factory=uuid4)
+    sub_model_execution_id: SubModelExecutionId = Field(default_factory=uuid4)
