@@ -5,14 +5,14 @@ from asyncio import Future
 from dataclasses import dataclass
 from typing import Any, Tuple, override
 
-from distributed_inference.activity_manager.domain.activity_request import (
-    ActivityRequest,
-)
-from distributed_inference.activity_manager.application.scheduling.contracts.activity_request_priority_assigner import (
-    ActivityRequestPriorityAssigner,
-)
 from distributed_inference.activity_manager.application.scheduling.contracts.activity_request_scheduler import (
     ActivityRequestScheduler,
+)
+from distributed_inference.activity_manager.application.scheduling.contracts.activity_request_static_priority_assigner import (
+    ActivityRequestStaticPriorityAssigner,
+)
+from distributed_inference.activity_manager.domain.activity_request import (
+    ActivityRequest,
 )
 from distributed_inference.building_blocks.scheduling.request_scheduler import (
     RequestScheduler,
@@ -37,7 +37,9 @@ class DefaultActivityRequestScheduler(ActivityRequestScheduler):
                 other.sequence,
             )
 
-    def __init__(self, priority_assigner: ActivityRequestPriorityAssigner) -> None:
+    def __init__(
+        self, priority_assigner: ActivityRequestStaticPriorityAssigner
+    ) -> None:
         super().__init__()
         self._sequence = itertools.count()
         self._priority_queue: asyncio.PriorityQueue[

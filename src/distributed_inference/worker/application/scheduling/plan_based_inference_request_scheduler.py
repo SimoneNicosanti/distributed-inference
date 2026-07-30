@@ -12,18 +12,18 @@ from distributed_inference.domain.plan import InferencePlanVersion, ServiceInfer
 from distributed_inference.worker.application.deployment.contracts.inference_plan_preparer import (
     InferencePlanPreparer,
 )
-from distributed_inference.worker.application.scheduling.contracts.inference_request_priority_assigner import (
-    InferenceRequestPriorityAssigner,
-)
 from distributed_inference.worker.application.scheduling.contracts.inference_request_scheduler import (
     InferenceRequestScheduler,
+)
+from distributed_inference.worker.application.scheduling.contracts.inference_request_static_priority_assigner import (
+    InferenceRequestStaticPriorityAssigner,
 )
 from distributed_inference.worker.domain.inference_flow import (
     InferenceRequest,
 )
 
 
-class PlanAwareInferenceRequestScheduler(
+class PlanBasedInferenceRequestScheduler(
     InferenceRequestScheduler, InferencePlanPreparer
 ):
     @dataclass
@@ -34,7 +34,7 @@ class PlanAwareInferenceRequestScheduler(
 
         def __lt__(self, other: Any) -> bool:
             if not isinstance(
-                other, PlanAwareInferenceRequestScheduler.QueueInferenceRequest
+                other, PlanBasedInferenceRequestScheduler.QueueInferenceRequest
             ):
                 return NotImplemented
 
@@ -54,13 +54,13 @@ class PlanAwareInferenceRequestScheduler(
         self._lock = asyncio.Lock()
 
         self._priority_queue: asyncio.PriorityQueue[
-            PlanAwareInferenceRequestScheduler.QueueInferenceRequest
+            PlanBasedInferenceRequestScheduler.QueueInferenceRequest
         ] = asyncio.PriorityQueue()
 
         self._sequence = itertools.count()
 
         self._priority_assigners: dict[
-            InferencePlanVersion, InferenceRequestPriorityAssigner
+            InferencePlanVersion, InferenceRequestStaticPriorityAssigner
         ] = {}
 
     @override
@@ -71,7 +71,7 @@ class PlanAwareInferenceRequestScheduler(
             priority_assigner = self._priority_assigners.get(plan_version, None)
             if priority_assigner is None:
                 raise ValueError(f"Plan version {plan_version} does not exist")
-            per_plan_priority = priority_assigner.compute_priority(request)
+            per_plan_priority = priority_assigner.assign_priority(request)
 
             queue_request = self.QueueInferenceRequest(
                 request=request,

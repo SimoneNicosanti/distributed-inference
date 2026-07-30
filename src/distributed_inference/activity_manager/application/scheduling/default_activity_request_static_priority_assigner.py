@@ -1,8 +1,8 @@
 import time
 from typing import override
 
-from distributed_inference.activity_manager.application.scheduling.contracts.activity_request_priority_assigner import (
-    ActivityRequestPriorityAssigner,
+from distributed_inference.activity_manager.application.scheduling.contracts.activity_request_static_priority_assigner import (
+    ActivityRequestStaticPriorityAssigner,
 )
 from distributed_inference.activity_manager.domain.activity_request import (
     ActivityRequest,
@@ -10,16 +10,16 @@ from distributed_inference.activity_manager.domain.activity_request import (
 )
 
 
-class DefaultActivityRequestPriorityAssigner(ActivityRequestPriorityAssigner):
+class DefaultActivityRequestStaticPriorityAssigner(
+    ActivityRequestStaticPriorityAssigner
+):
     def __init__(self, time_slot_length: int):
         self._time_slot_length = time_slot_length
         self._initial_time = time.monotonic_ns()
 
     @override
-    def compute_priority_for_activity_request(
-        self, activity_request: ActivityRequest
-    ) -> int:
-        match activity_request.activity_type:
+    def assign_priority(self, request: ActivityRequest) -> int:
+        match request.activity_type:
             case ActivityType.INFERENCE_EXECUTION:
                 base_priority = 0
             case ActivityType.INFERENCE_FORWARDING:
