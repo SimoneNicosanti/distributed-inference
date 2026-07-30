@@ -21,6 +21,11 @@ class ResourceRequirement(BaseModel):
 
     @model_validator(mode="after")
     def validate_request(self) -> Self:
+        import math
+
+        if not math.isfinite(self.quantity):
+            raise ValueError("Resource quantity must be finite")
+
         if self.exclusive:
             if self.quantity != 0:
                 raise ValueError(

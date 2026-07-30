@@ -14,7 +14,7 @@ from distributed_inference.activity_manager.domain.resource_type import (
 )
 
 
-class DefaultResourceManager(ResourceManager):
+class LocalResourceManager(ResourceManager):
     def __init__(self, resource_availability: ResourceAvailability) -> None:
         super().__init__()
         self._condition = asyncio.Condition()
@@ -99,7 +99,11 @@ class DefaultResourceManager(ResourceManager):
                 )
 
     def _validate_all_resources(self, all_resources: ResourceAvailability) -> None:
+        import math
+
         for resource_type, quantity in all_resources.items():
+            if not math.isfinite(quantity):
+                raise ValueError("Resource quantity must be finite")
             if quantity < 0:
                 raise ValueError(
                     f"Resource type {resource_type} has negative quantity {quantity}"

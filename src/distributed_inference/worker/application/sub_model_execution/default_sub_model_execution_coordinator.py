@@ -22,15 +22,15 @@ from distributed_inference.worker.application.deployment.contracts.service_infer
 from distributed_inference.worker.application.ports.outbound.service_inference_plan_store import (
     ServiceInferencePlanStore,
 )
-from distributed_inference.worker.application.scheduling.contracts.sub_model_inference_request_scheduler import (
-    SubModelInferenceRequestScheduler,
+from distributed_inference.worker.application.scheduling.contracts.sub_model_invocation_request_scheduler import (
+    SubModelInvocationRequestScheduler,
 )
 from distributed_inference.worker.application.sub_model_execution.contracts.sub_model_execution_coordinator import (
     SubModelExecutionCoordinator,
 )
-from distributed_inference.worker.domain.sub_model_inference_request_response import (
-    SubModelInferenceRequest,
-    SubModelInferenceResponse,
+from distributed_inference.worker.domain.sub_model.invocation.sub_model_invocation_request_response import (
+    SubModelInvocationRequest,
+    SubModelInvocationResponse,
 )
 
 
@@ -41,7 +41,7 @@ class DefaultSubModelExecutionCoordinator(
         self,
         inference_plan_store: ServiceInferencePlanStore,
         activity_manager: ActivityManager,
-        sub_model_inference_request_scheduler: SubModelInferenceRequestScheduler,
+        sub_model_inference_request_scheduler: SubModelInvocationRequestScheduler,
     ) -> None:
         self._inference_plan_store = inference_plan_store
         self._activity_manager = activity_manager
@@ -59,22 +59,22 @@ class DefaultSubModelExecutionCoordinator(
         raise NotImplementedError
 
     @override
-    async def process_sub_model_inference_request(
-        self, sub_model_inference_request: SubModelInferenceRequest
-    ) -> SubModelInferenceResponse:
+    async def process_sub_model_invocation_request(
+        self, sub_model_invocation_request: SubModelInvocationRequest
+    ) -> SubModelInvocationResponse:
 
         ## Here we can only enqueue the request
         ## The request will then be extracted in the loop of the coordinator
         ## and sent to the worker to be processed
-        future: asyncio.Future[SubModelInferenceResponse] = (
+        future: asyncio.Future[SubModelInvocationResponse] = (
             asyncio.get_running_loop().create_future()
         )
 
         await self._sub_model_inference_request_scheduler.enqueue(
-            sub_model_inference_request, future
+            sub_model_invocation_request, future
         )
 
-        inference_response: SubModelInferenceResponse = await future
+        inference_response: SubModelInvocationResponse = await future
 
         return inference_response
 
@@ -111,6 +111,6 @@ class DefaultSubModelExecutionCoordinator(
         return activity_request
 
     async def _actual_process_inference_request(
-        self, inference_request: SubModelInferenceRequest
-    ) -> SubModelInferenceResponse:
+        self, inference_request: SubModelInvocationRequest
+    ) -> SubModelInvocationResponse:
         raise NotImplementedError

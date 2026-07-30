@@ -12,22 +12,22 @@ from distributed_inference.domain.plan import InferencePlanVersion, ServiceInfer
 from distributed_inference.worker.application.deployment.contracts.service_inference_plan_preparer import (
     ServiceInferencePlanPreparer,
 )
-from distributed_inference.worker.application.scheduling.contracts.sub_model_inference_request_scheduler import (
-    SubModelInferenceRequestScheduler,
+from distributed_inference.worker.application.scheduling.contracts.sub_model_invocation_request_scheduler import (
+    SubModelInvocationRequestScheduler,
 )
-from distributed_inference.worker.application.scheduling.contracts.sub_model_inference_request_static_priority_assigner import (
-    SubModelInferenceRequestStaticPriorityAssigner,
+from distributed_inference.worker.application.scheduling.contracts.sub_model_invocation_request_static_priority_assigner import (
+    SubModelInvocationRequestStaticPriorityAssigner,
 )
-from distributed_inference.worker.domain.sub_model_inference_request_response import (
-    SubModelInferenceRequest,
+from distributed_inference.worker.domain.sub_model.invocation.sub_model_invocation_request_response import (
+    SubModelInvocationRequest,
 )
 
 
-class PlanBasedSubModelInferenceRequestScheduler(
-    SubModelInferenceRequestScheduler, ServiceInferencePlanPreparer
+class PlanBasedSubModelInvocationRequestScheduler(
+    SubModelInvocationRequestScheduler, ServiceInferencePlanPreparer
 ):
     @dataclass
-    class QueueSubModelInferenceRequest(RequestScheduler.QueueRequest):
+    class QueueSubModelInvocationRequest(RequestScheduler.QueueRequest):
         plan_version: InferencePlanVersion
         per_plan_priority: int
         sequence: int
@@ -35,7 +35,7 @@ class PlanBasedSubModelInferenceRequestScheduler(
         def __lt__(self, other: Any) -> bool:
             if not isinstance(
                 other,
-                PlanBasedSubModelInferenceRequestScheduler.QueueSubModelInferenceRequest,
+                PlanBasedSubModelInvocationRequestScheduler.QueueSubModelInvocationRequest,
             ):
                 return NotImplemented
 
@@ -55,20 +55,20 @@ class PlanBasedSubModelInferenceRequestScheduler(
         self._lock = asyncio.Lock()
 
         self._priority_queue: asyncio.PriorityQueue[
-            PlanBasedSubModelInferenceRequestScheduler.QueueSubModelInferenceRequest
+            PlanBasedSubModelInvocationRequestScheduler.QueueSubModelInvocationRequest
         ] = asyncio.PriorityQueue()
 
         self._sequence = itertools.count()
 
         self._priority_assigners: dict[
-            InferencePlanVersion, SubModelInferenceRequestStaticPriorityAssigner
+            InferencePlanVersion, SubModelInvocationRequestStaticPriorityAssigner
         ] = {}
 
     @override
     async def enqueue(
-        self, request: SubModelInferenceRequest, future: Future[Any]
+        self, request: SubModelInvocationRequest, future: Future[Any]
     ) -> None:
-        plan_version = request.inference_plan_version
+        plan_version = request.get_plan_version()
 
         async with self._lock:
             priority_assigner = self._priority_assigners.get(plan_version, None)
@@ -76,7 +76,7 @@ class PlanBasedSubModelInferenceRequestScheduler(
                 raise ValueError(f"Plan version {plan_version} does not exist")
             per_plan_priority = priority_assigner.assign_priority(request)
 
-            queue_request = self.QueueSubModelInferenceRequest(
+            queue_request = self.QueueSubModelInvocationRequest(
                 request=request,
                 future=future,
                 timestamp=time.monotonic_ns(),
@@ -89,7 +89,7 @@ class PlanBasedSubModelInferenceRequestScheduler(
             self._priority_queue.put_nowait(queue_request)
 
     @override
-    async def dequeue(self) -> tuple[SubModelInferenceRequest, Future[Any]]:
+    async def dequeue(self) -> tuple[SubModelInvocationRequest, Future[Any]]:
         queue_request = await self._priority_queue.get()
         return queue_request.request, queue_request.future
 

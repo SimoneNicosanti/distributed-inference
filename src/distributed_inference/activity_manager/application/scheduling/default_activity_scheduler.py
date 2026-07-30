@@ -50,9 +50,7 @@ class DefaultActivityRequestScheduler(ActivityRequestScheduler):
     @override
     async def enqueue(self, request: ActivityRequest, future: Future[Any]) -> None:
 
-        priority = self._priority_assigner.compute_priority_for_activity_request(
-            request
-        )
+        priority = self._priority_assigner.assign_priority(request)
         enqueue_request = self.QueueActivityRequest(
             request=request,
             future=future,

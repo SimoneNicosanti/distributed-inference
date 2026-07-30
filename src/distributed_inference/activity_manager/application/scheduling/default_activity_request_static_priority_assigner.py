@@ -14,6 +14,8 @@ class DefaultActivityRequestStaticPriorityAssigner(
     ActivityRequestStaticPriorityAssigner
 ):
     def __init__(self, time_slot_length: int):
+        if time_slot_length <= 0:
+            raise ValueError("Time slot length must be greater than 0")
         self._time_slot_length = time_slot_length
         self._initial_time = time.monotonic_ns()
 

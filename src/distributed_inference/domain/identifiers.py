@@ -98,6 +98,14 @@ class ModelVersionId(BaseModel):
     pass
 
 
+class SubModelDeploymentId(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    sub_model_id: SubModelId
+    service_id: ServiceId
+    replica_id: int
+
+
 class SubModelId(BaseModel):
     model_config = ConfigDict(frozen=True)
 

@@ -7,6 +7,9 @@ from distributed_inference.activity_manager.application.ports.inbound.activity_m
 from distributed_inference.activity_manager.application.ports.outbound.resource_manager import (
     ResourceManager,
 )
+from distributed_inference.activity_manager.application.scheduling.contracts.activity_request_scheduler import (
+    ActivityRequestScheduler,
+)
 from distributed_inference.activity_manager.domain.activity_request import (
     ActivityGrant,
     ActivityGrantId,
@@ -16,12 +19,12 @@ from distributed_inference.activity_manager.domain.activity_request import (
 from distributed_inference.activity_manager.domain.resource_type import (
     ResourceLease,
 )
-from distributed_inference.activity_manager.application.scheduling.contracts.activity_request_scheduler import (
-    ActivityRequestScheduler,
-)
 from distributed_inference.building_blocks.lifecycle.async_lifecycle import (
     AsyncLifecycle,
 )
+
+## TODO: Errors on the activity manager side can lead to caller break
+## we can use future.exception() set to return an exception to the caller
 
 
 class DefaultActivityManager(AsyncLifecycle, ActivityManager):
@@ -54,13 +57,15 @@ class DefaultActivityManager(AsyncLifecycle, ActivityManager):
     @override
     async def release_activity_grant(self, activity_grant_id: ActivityGrantId) -> None:
 
-        resource_lease = self._pending_activity_grants.pop(activity_grant_id, None)
+        resource_lease = self._pending_activity_grants.get(activity_grant_id, None)
         if resource_lease is None:
             return
 
         await self._resource_manager.release_resource_lease(
             resource_lease.resource_lease_id
         )
+
+        self._pending_activity_grants.pop(activity_grant_id, None)
 
     @override
     async def renew_activity_grant(
@@ -72,6 +77,9 @@ class DefaultActivityManager(AsyncLifecycle, ActivityManager):
     async def start(self) -> None:
         while True:
             activity_request, future = await self._request_scheduler.dequeue()
+            if future.cancelled():
+                ## We need this just to check that the future has not been cancelled
+                continue
 
             resource_lease = await self._resource_manager.acquire_resource_lease(
                 activity_request.activity_resources
@@ -79,7 +87,11 @@ class DefaultActivityManager(AsyncLifecycle, ActivityManager):
             activity_grant_id = ActivityGrantId()
             self._pending_activity_grants[activity_grant_id] = resource_lease
             activity_grant = ActivityGrantInfo(activity_grant_id=activity_grant_id)
-            future.set_result(activity_grant)
+
+            if not future.cancelled():
+                future.set_result(activity_grant)
+            else:
+                await self.release_activity_grant(activity_grant_id)
 
     @override
     async def stop(self) -> None:

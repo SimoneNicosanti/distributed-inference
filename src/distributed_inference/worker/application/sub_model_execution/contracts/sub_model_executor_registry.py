@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+from distributed_inference.domain.identifiers import SubModelDeploymentId
 from distributed_inference.worker.application.ports.outbound.sub_model_executor import (
     SubModelExecutor,
 )
@@ -15,5 +16,5 @@ class SubModelExecutorRegistry(ABC):
     ## TODO: WE NEED TO USE A SUB-MODEL-DEPLOYMENT-ID IN ORDER TO MANAGER MULTIPLE REPLICAS OF THE SAME SUB-MODEL
     @abstractmethod
     async def get_sub_model_executor(
-        self, sub_model_executor_id: str
+        self, sub_model_deployment_id: SubModelDeploymentId
     ) -> SubModelExecutor: ...

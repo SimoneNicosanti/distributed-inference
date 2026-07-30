@@ -6,9 +6,9 @@ import onnxruntime as ort
 from distributed_inference.worker.application.ports.outbound.sub_model_executor import (
     SubModelExecutor,
 )
-from distributed_inference.worker.domain.sub_model_inference_input_output import (
-    SubModelInferenceInput,
-    SubModelInferenceOutput,
+from distributed_inference.worker.domain.sub_model.execution.sub_model_execution_input_output import (
+    SubModelExecutionInput,
+    SubModelExecutionOutput,
 )
 
 
@@ -25,8 +25,8 @@ class OnnxSubModelExecutor(SubModelExecutor):
 
     @override
     async def process_sub_model_inference_input(
-        self, sub_model_inference_input: SubModelInferenceInput
-    ) -> SubModelInferenceOutput:
+        self, sub_model_execution_input: SubModelExecutionInput
+    ) -> SubModelExecutionOutput:
 
         ## Three ways to run inference
         ## Using a thread in the same process
