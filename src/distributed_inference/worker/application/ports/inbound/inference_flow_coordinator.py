@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from distributed_inference.worker.domain.inference_flow import (
-    InferenceMessage,
+from distributed_inference.worker.domain.sub_model_inference_message import (
+    SubModelInferenceMessage,
 )
 
 
@@ -13,8 +13,8 @@ from distributed_inference.worker.domain.inference_flow import (
 ## 6. Wait for response to arrive
 ## 7. Call result routing
 ## 8. Forward result
-class ExecutionCoordinator(ABC):
+class InferenceFlowCoordinator(ABC):
     @abstractmethod
-    async def process_inference_message(
-        self, inference_message: InferenceMessage
+    async def process_sub_model_inference_message(
+        self, sub_model_inference_message: SubModelInferenceMessage
     ) -> None: ...

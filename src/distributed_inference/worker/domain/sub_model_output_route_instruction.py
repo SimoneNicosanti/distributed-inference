@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 
 
-class RouteInstruction(BaseModel):
+class SubModelOutputRouteInstruction(BaseModel):
     model_config = ConfigDict(frozen=True)
     pass

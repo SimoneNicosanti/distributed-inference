@@ -3,12 +3,12 @@ from typing import override
 import aiorwlock
 
 from distributed_inference.domain.plan import InferencePlanVersion, ServiceInferencePlan
-from distributed_inference.worker.application.ports.outbound.inference_plan_store import (
-    InferencePlanStore,
+from distributed_inference.worker.application.ports.outbound.service_inference_plan_store import (
+    ServiceInferencePlanStore,
 )
 
 
-class InMemoryInferencePlanStore(InferencePlanStore):
+class InMemoryServiceInferencePlanStore(ServiceInferencePlanStore):
     def __init__(self) -> None:
         self._lock = aiorwlock.RWLock()
         self._latest_inference_plan: ServiceInferencePlan | None = None
@@ -18,7 +18,7 @@ class InMemoryInferencePlanStore(InferencePlanStore):
         ] = {}
 
     @override
-    async def put_inference_plan(
+    async def put_service_inference_plan(
         self, service_inference_plan: ServiceInferencePlan
     ) -> None:
 
@@ -40,24 +40,26 @@ class InMemoryInferencePlanStore(InferencePlanStore):
             )
 
     @override
-    async def get_inference_plan_by_version(
+    async def get_service_inference_plan_by_version(
         self, version: InferencePlanVersion
     ) -> ServiceInferencePlan | None:
         async with self._lock.reader_lock:
             return self._inference_plan_by_version.get(version, None)
 
     @override
-    async def get_latest_inference_plan(self) -> ServiceInferencePlan | None:
+    async def get_latest_service_inference_plan(self) -> ServiceInferencePlan | None:
         async with self._lock.reader_lock:
             return self._latest_inference_plan
 
     @override
-    async def get_active_inference_plan(self) -> ServiceInferencePlan | None:
+    async def get_active_service_inference_plan(self) -> ServiceInferencePlan | None:
         async with self._lock.reader_lock:
             return self._active_inference_plan
 
     @override
-    async def activate_inference_plan(self, version: InferencePlanVersion) -> None:
+    async def activate_service_inference_plan(
+        self, version: InferencePlanVersion
+    ) -> None:
         async with self._lock.writer_lock:
             if version not in self._inference_plan_by_version:
                 raise ValueError("Inference plan does not exist")

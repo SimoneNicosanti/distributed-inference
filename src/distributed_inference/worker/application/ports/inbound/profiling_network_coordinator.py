@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 
-class NetworkProfilingCoordinator(ABC):
+class ProfilingNetworkCoordinator(ABC):
     @abstractmethod
     def profile_whole_network(self) -> None: ...
 

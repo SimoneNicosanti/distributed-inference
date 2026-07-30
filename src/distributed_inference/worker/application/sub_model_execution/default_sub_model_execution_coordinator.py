@@ -16,39 +16,41 @@ from distributed_inference.building_blocks.lifecycle.async_lifecycle import (
     AsyncLifecycle,
 )
 from distributed_inference.domain.plan import ServiceInferencePlan
-from distributed_inference.worker.application.deployment.contracts.inference_plan_preparer import (
-    InferencePlanPreparer,
+from distributed_inference.worker.application.deployment.contracts.service_inference_plan_preparer import (
+    ServiceInferencePlanPreparer,
 )
-from distributed_inference.worker.application.inference.contracts.inference_worker_coordinator import (
-    InferenceWorkerCoordinator,
+from distributed_inference.worker.application.ports.outbound.service_inference_plan_store import (
+    ServiceInferencePlanStore,
 )
-from distributed_inference.worker.application.ports.outbound.inference_plan_store import (
-    InferencePlanStore,
+from distributed_inference.worker.application.scheduling.contracts.sub_model_inference_request_scheduler import (
+    SubModelInferenceRequestScheduler,
 )
-from distributed_inference.worker.application.scheduling.contracts.inference_request_scheduler import (
-    InferenceRequestScheduler,
+from distributed_inference.worker.application.sub_model_execution.contracts.sub_model_execution_coordinator import (
+    SubModelExecutionCoordinator,
 )
-from distributed_inference.worker.domain.inference_flow import (
-    InferenceRequest,
-    InferenceResponse,
+from distributed_inference.worker.domain.sub_model_inference_request_response import (
+    SubModelInferenceRequest,
+    SubModelInferenceResponse,
 )
 
 
-class DefaultInferenceWorkerCoordinator(
-    InferenceWorkerCoordinator, InferencePlanPreparer, AsyncLifecycle
+class DefaultSubModelExecutionCoordinator(
+    SubModelExecutionCoordinator, ServiceInferencePlanPreparer, AsyncLifecycle
 ):
     def __init__(
         self,
-        inference_plan_store: InferencePlanStore,
+        inference_plan_store: ServiceInferencePlanStore,
         activity_manager: ActivityManager,
-        inference_request_scheduler: InferenceRequestScheduler,
+        sub_model_inference_request_scheduler: SubModelInferenceRequestScheduler,
     ) -> None:
         self._inference_plan_store = inference_plan_store
         self._activity_manager = activity_manager
-        self._inference_request_scheduler = inference_request_scheduler
+        self._sub_model_inference_request_scheduler = (
+            sub_model_inference_request_scheduler
+        )
 
     @override
-    async def prepare_inference_plan(
+    async def prepare_service_inference_plan(
         self, service_inference_plan: ServiceInferencePlan
     ) -> None:
         ## 1. Create workers based on new plan
@@ -57,20 +59,22 @@ class DefaultInferenceWorkerCoordinator(
         raise NotImplementedError
 
     @override
-    async def process_inference_request(
-        self, inference_request: InferenceRequest
-    ) -> InferenceResponse:
+    async def process_sub_model_inference_request(
+        self, sub_model_inference_request: SubModelInferenceRequest
+    ) -> SubModelInferenceResponse:
 
         ## Here we can only enqueue the request
         ## The request will then be extracted in the loop of the coordinator
         ## and sent to the worker to be processed
-        future: asyncio.Future[InferenceResponse] = (
+        future: asyncio.Future[SubModelInferenceResponse] = (
             asyncio.get_running_loop().create_future()
         )
 
-        await self._inference_request_scheduler.enqueue(inference_request, future)
+        await self._sub_model_inference_request_scheduler.enqueue(
+            sub_model_inference_request, future
+        )
 
-        inference_response: InferenceResponse = await future
+        inference_response: SubModelInferenceResponse = await future
 
         return inference_response
 
@@ -80,7 +84,7 @@ class DefaultInferenceWorkerCoordinator(
             (
                 inference_request,
                 inference_response_future,
-            ) = await self._inference_request_scheduler.dequeue()
+            ) = await self._sub_model_inference_request_scheduler.dequeue()
 
             activity_grant = await self._activity_manager.request_activity_grant(
                 self._build_activity_request()
@@ -107,6 +111,6 @@ class DefaultInferenceWorkerCoordinator(
         return activity_request
 
     async def _actual_process_inference_request(
-        self, inference_request: InferenceRequest
-    ) -> InferenceResponse:
+        self, inference_request: SubModelInferenceRequest
+    ) -> SubModelInferenceResponse:
         raise NotImplementedError

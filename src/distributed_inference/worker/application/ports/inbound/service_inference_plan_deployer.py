@@ -3,9 +3,9 @@ from abc import ABC, abstractmethod
 from distributed_inference.domain.plan import ServiceInferencePlan
 
 
-class DeploymentCoordinator(ABC):
+class ServiceInferencePlanDeployer(ABC):
     @abstractmethod
-    async def deploy_plan(
+    async def deploy_service_inference_plan(
         self,
-        service_plan: ServiceInferencePlan,
+        service_inference_plan: ServiceInferencePlan,
     ) -> None: ...

@@ -9,32 +9,33 @@ from distributed_inference.building_blocks.scheduling.request_scheduler import (
     RequestScheduler,
 )
 from distributed_inference.domain.plan import InferencePlanVersion, ServiceInferencePlan
-from distributed_inference.worker.application.deployment.contracts.inference_plan_preparer import (
-    InferencePlanPreparer,
+from distributed_inference.worker.application.deployment.contracts.service_inference_plan_preparer import (
+    ServiceInferencePlanPreparer,
 )
-from distributed_inference.worker.application.scheduling.contracts.inference_request_scheduler import (
-    InferenceRequestScheduler,
+from distributed_inference.worker.application.scheduling.contracts.sub_model_inference_request_scheduler import (
+    SubModelInferenceRequestScheduler,
 )
-from distributed_inference.worker.application.scheduling.contracts.inference_request_static_priority_assigner import (
-    InferenceRequestStaticPriorityAssigner,
+from distributed_inference.worker.application.scheduling.contracts.sub_model_inference_request_static_priority_assigner import (
+    SubModelInferenceRequestStaticPriorityAssigner,
 )
-from distributed_inference.worker.domain.inference_flow import (
-    InferenceRequest,
+from distributed_inference.worker.domain.sub_model_inference_request_response import (
+    SubModelInferenceRequest,
 )
 
 
-class PlanBasedInferenceRequestScheduler(
-    InferenceRequestScheduler, InferencePlanPreparer
+class PlanBasedSubModelInferenceRequestScheduler(
+    SubModelInferenceRequestScheduler, ServiceInferencePlanPreparer
 ):
     @dataclass
-    class QueueInferenceRequest(RequestScheduler.QueueRequest):
+    class QueueSubModelInferenceRequest(RequestScheduler.QueueRequest):
         plan_version: InferencePlanVersion
         per_plan_priority: int
         sequence: int
 
         def __lt__(self, other: Any) -> bool:
             if not isinstance(
-                other, PlanBasedInferenceRequestScheduler.QueueInferenceRequest
+                other,
+                PlanBasedSubModelInferenceRequestScheduler.QueueSubModelInferenceRequest,
             ):
                 return NotImplemented
 
@@ -54,17 +55,19 @@ class PlanBasedInferenceRequestScheduler(
         self._lock = asyncio.Lock()
 
         self._priority_queue: asyncio.PriorityQueue[
-            PlanBasedInferenceRequestScheduler.QueueInferenceRequest
+            PlanBasedSubModelInferenceRequestScheduler.QueueSubModelInferenceRequest
         ] = asyncio.PriorityQueue()
 
         self._sequence = itertools.count()
 
         self._priority_assigners: dict[
-            InferencePlanVersion, InferenceRequestStaticPriorityAssigner
+            InferencePlanVersion, SubModelInferenceRequestStaticPriorityAssigner
         ] = {}
 
     @override
-    async def enqueue(self, request: InferenceRequest, future: Future[Any]) -> None:
+    async def enqueue(
+        self, request: SubModelInferenceRequest, future: Future[Any]
+    ) -> None:
         plan_version = request.inference_plan_version
 
         async with self._lock:
@@ -73,7 +76,7 @@ class PlanBasedInferenceRequestScheduler(
                 raise ValueError(f"Plan version {plan_version} does not exist")
             per_plan_priority = priority_assigner.assign_priority(request)
 
-            queue_request = self.QueueInferenceRequest(
+            queue_request = self.QueueSubModelInferenceRequest(
                 request=request,
                 future=future,
                 timestamp=time.monotonic_ns(),
@@ -86,7 +89,7 @@ class PlanBasedInferenceRequestScheduler(
             self._priority_queue.put_nowait(queue_request)
 
     @override
-    async def dequeue(self) -> tuple[InferenceRequest, Future[Any]]:
+    async def dequeue(self) -> tuple[SubModelInferenceRequest, Future[Any]]:
         queue_request = await self._priority_queue.get()
         return queue_request.request, queue_request.future
 
@@ -95,7 +98,7 @@ class PlanBasedInferenceRequestScheduler(
         return self._priority_queue.qsize()
 
     @override
-    async def prepare_inference_plan(
+    async def prepare_service_inference_plan(
         self, service_inference_plan: ServiceInferencePlan
     ) -> None:
         async with self._lock:

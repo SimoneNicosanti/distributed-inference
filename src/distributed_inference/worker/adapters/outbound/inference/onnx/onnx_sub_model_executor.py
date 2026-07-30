@@ -3,16 +3,16 @@ from typing import override
 
 import onnxruntime as ort
 
-from distributed_inference.worker.application.ports.outbound.inference_worker import (
-    InferenceWorker,
+from distributed_inference.worker.application.ports.outbound.sub_model_executor import (
+    SubModelExecutor,
 )
-from distributed_inference.worker.domain.inference_run import (
-    InferenceInput,
-    InferenceOutput,
+from distributed_inference.worker.domain.sub_model_inference_input_output import (
+    SubModelInferenceInput,
+    SubModelInferenceOutput,
 )
 
 
-class OnnxInferenceWorker(InferenceWorker):
+class OnnxSubModelExecutor(SubModelExecutor):
     def __init__(self, inference_session: ort.InferenceSession) -> None:
         ## Build session to be reused across requests
         self.inference_session: ort.InferenceSession = inference_session
@@ -24,9 +24,9 @@ class OnnxInferenceWorker(InferenceWorker):
         pass
 
     @override
-    async def process_inference_input(
-        self, inference_input: InferenceInput
-    ) -> InferenceOutput:
+    async def process_sub_model_inference_input(
+        self, sub_model_inference_input: SubModelInferenceInput
+    ) -> SubModelInferenceOutput:
 
         ## Three ways to run inference
         ## Using a thread in the same process

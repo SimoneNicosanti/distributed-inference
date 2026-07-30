@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 
 ## This is the interface that the deployment coordinator uses to manage the lifecycle of the inference service
-class InferenceLifecycleManager(ABC):
+class InferenceServiceLifecycleManager(ABC):
     @abstractmethod
     async def load(self) -> None: ...
 
