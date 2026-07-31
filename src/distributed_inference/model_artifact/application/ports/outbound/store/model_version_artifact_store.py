@@ -11,7 +11,7 @@ from distributed_inference.model_artifact.domain.artifact_bundle import (
 
 class ModelVersionArtifactStore(ABC):
     @abstractmethod
-    def put_model_version(
+    async def put_model_version(
         self,
         model_version_id: ModelVersionId,
         bundle: ArtifactBundle,
@@ -24,7 +24,7 @@ class ModelVersionArtifactStore(ABC):
     ) -> AbstractContextManager[ArtifactBundle]: ...
 
     @abstractmethod
-    def check_model_version_existence(
+    async def check_model_version_existence(
         self,
         model_version_id: ModelVersionId,
     ) -> bool: ...

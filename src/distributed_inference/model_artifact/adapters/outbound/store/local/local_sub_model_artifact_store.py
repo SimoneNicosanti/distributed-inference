@@ -33,7 +33,7 @@ class LocalSubModelArtifactStore(SubModelArtifactStore):
         self.lock_dir.mkdir(parents=True, exist_ok=True)
 
     @override
-    def put_sub_model(
+    async def put_sub_model(
         self,
         sub_model_id: SubModelId,
         bundle: ArtifactBundle,
@@ -42,7 +42,7 @@ class LocalSubModelArtifactStore(SubModelArtifactStore):
             sub_model_id
         )
 
-        local_storage_bundle_utils.put_bundle(bundle, bundle_root_path, lock_path)
+        await local_storage_bundle_utils.put_bundle(bundle, bundle_root_path, lock_path)
 
     @override
     def get_sub_model(
@@ -95,8 +95,10 @@ class LocalSubModelArtifactStore(SubModelArtifactStore):
         return md5(payload.encode("utf-8")).hexdigest()
 
     @override
-    def check_sub_model_existence(self, sub_model_id: SubModelId) -> bool:
+    async def check_sub_model_existence(self, sub_model_id: SubModelId) -> bool:
         bundle_root_path, lock_path = self._build_bundle_root_path_and_lock_file(
             sub_model_id
         )
-        return local_storage_bundle_utils.check_bundle(bundle_root_path, lock_path)
+        return await local_storage_bundle_utils.check_bundle(
+            bundle_root_path, lock_path
+        )

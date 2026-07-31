@@ -16,52 +16,52 @@ from distributed_inference.domain.model_graph_info import (
 
 class ModelMetadataStore(ABC):
     @abstractmethod
-    def register_model(
+    async def register_model(
         self,
         owner_id: UserId,
         model_name: str,
     ) -> ModelId: ...
 
     @abstractmethod
-    def register_model_version(
+    async def register_model_version(
         self,
         model_id: ModelId,
         model_info: ModelInfo,
     ) -> ModelVersionId: ...
 
     @abstractmethod
-    def register_model_version_graph(
+    async def register_model_version_graph(
         self,
         model_version_id: ModelVersionId,
         model_graph: ModelGraph,
     ) -> None: ...
 
     @abstractmethod
-    def register_sub_model(
+    async def register_sub_model(
         self,
         model_version_id: ModelVersionId,
         layers: Iterable[LayerKey],
     ) -> SubModelId: ...
 
     @abstractmethod
-    def get_model_graph(
+    async def get_model_graph(
         self, model_version_id: ModelVersionId
     ) -> ModelGraph | None: ...
 
     @abstractmethod
-    def get_model_info(self, model_version_id: ModelVersionId) -> ModelInfo: ...
+    async def get_model_info(self, model_version_id: ModelVersionId) -> ModelInfo: ...
 
     @abstractmethod
-    def check_model_existence(self, model_id: ModelId) -> bool: ...
+    async def check_model_existence(self, model_id: ModelId) -> bool: ...
 
     @abstractmethod
-    def check_model_version_existence(
+    async def check_model_version_existence(
         self,
         model_version_id: ModelVersionId,
     ) -> bool: ...
 
     @abstractmethod
-    def check_sub_model_existence(
+    async def check_sub_model_existence(
         self,
         sub_model_id: SubModelId,
     ) -> bool: ...

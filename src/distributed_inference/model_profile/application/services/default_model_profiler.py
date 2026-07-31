@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import override
@@ -31,12 +32,22 @@ class DefaultModelProfiler(ModelProfiler):
         pass
 
     @override
-    def profile_model(
+    async def profile_model(
         self,
         artifact_concrete_paths: ArtifactConcretePaths,
         model_info: ModelInfo,
     ) -> ModelGraph:
+        ## The whole profiling can be CPU bound, so we wrap it into
+        ## a thread in order not to block the coroutine execution
+        return await asyncio.to_thread(
+            self._profile_model_sync, artifact_concrete_paths, model_info
+        )
 
+    def _profile_model_sync(
+        self,
+        artifact_concrete_paths: ArtifactConcretePaths,
+        model_info: ModelInfo,
+    ) -> ModelGraph:
         with TemporaryDirectory() as tmp_path:
             basic_concrete_paths = ArtifactConcretePaths(root_path=Path(tmp_path))
             self._model_optimizer.optimize_model(

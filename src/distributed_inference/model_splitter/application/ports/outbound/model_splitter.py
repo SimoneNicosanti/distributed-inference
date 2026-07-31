@@ -9,7 +9,7 @@ from distributed_inference.model_artifact.domain.artifact_bundle import (
 
 class ModelSplitter(ABC):
     @abstractmethod
-    def split_model(
+    async def split_model(
         self,
         model_graph: ModelGraph,
         layers: Iterable[LayerKey],

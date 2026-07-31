@@ -29,7 +29,7 @@ class LocalModelVersionArtifactStore(ModelVersionArtifactStore):
         self.lock_dir.mkdir(parents=True, exist_ok=True)
 
     @override
-    def put_model_version(
+    async def put_model_version(
         self,
         model_version_id: ModelVersionId,
         bundle: ArtifactBundle,
@@ -38,8 +38,9 @@ class LocalModelVersionArtifactStore(ModelVersionArtifactStore):
             model_version_id
         )
 
-        local_storage_bundle_utils.put_bundle(bundle, bundle_root_path, lock_file_path)
-        pass
+        await local_storage_bundle_utils.put_bundle(
+            bundle, bundle_root_path, lock_file_path
+        )
 
     @override
     def get_model_version(
@@ -54,14 +55,16 @@ class LocalModelVersionArtifactStore(ModelVersionArtifactStore):
         return local_storage_bundle_utils.get_bundle(bundle_root_path, lock_path)
 
     @override
-    def check_model_version_existence(
+    async def check_model_version_existence(
         self,
         model_version_id: ModelVersionId,
     ) -> bool:
         bundle_root_path, lock_path = self._build_bundle_root_path_and_lock_file(
             model_version_id
         )
-        return local_storage_bundle_utils.check_bundle(bundle_root_path, lock_path)
+        return await local_storage_bundle_utils.check_bundle(
+            bundle_root_path, lock_path
+        )
 
     def get_model_version_bundle_path(
         self, model_version_id: ModelVersionId

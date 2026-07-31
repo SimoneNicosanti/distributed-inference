@@ -1,3 +1,4 @@
+import asyncio
 import fcntl
 import shutil
 from collections.abc import Generator
@@ -14,8 +15,18 @@ from distributed_inference.model_artifact.domain.artifact_bundle import (
     ArtifactManifest,
 )
 
+## TODO: Try to better handle the async management of local artifact store
 
-def put_bundle(
+
+async def put_bundle(
+    bundle: ArtifactBundle, bundle_root_path: Path, lock_file_path: Path
+) -> None:
+    return await asyncio.to_thread(
+        _put_bund_sync, bundle, bundle_root_path, lock_file_path
+    )
+
+
+def _put_bund_sync(
     bundle: ArtifactBundle, bundle_root_path: Path, lock_file_path: Path
 ) -> None:
     with lock_file_path.open("a") as lock_file:
@@ -58,7 +69,11 @@ def get_bundle(bundle_root_path: Path, lock_path: Path) -> Generator[ArtifactBun
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
-def check_bundle(bundle_root_path: Path, lock_path: Path) -> bool:
+async def check_bundle(bundle_root_path: Path, lock_path: Path) -> bool:
+    return await asyncio.to_thread(_check_bundle_sync, bundle_root_path, lock_path)
+
+
+def _check_bundle_sync(bundle_root_path: Path, lock_path: Path) -> bool:
     with lock_path.open("a") as lock_file:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)
         manifest_path = bundle_root_path.joinpath(MANIFEST_FILE_NAME)

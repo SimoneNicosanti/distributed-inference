@@ -9,7 +9,7 @@ from onnx_tool.utils import NODE_REGISTRY
 
 @NODE_REGISTRY.register()  # type: ignore
 class DynamicQuantizeLinearNode(onnx_tool.Node):
-    def shape_infer(self, intensors: List[Tensor], outtensors: List[Tensor]) -> None:
+    def shape_infer(self, intensors: List[Tensor], outtensors: List[Tensor]) -> None:  # type: ignore
         input_shape = intensors[0].get_shape()
 
         # y: tensore quantizzato, stessa shape dell'input
@@ -40,7 +40,7 @@ class MultiHeadAttentionNode(Node):
         if not hasattr(self, "num_heads"):
             raise ValueError(f"num_heads mancante nel nodo {self.name}")
 
-    def shape_infer(
+    def shape_infer(  # type: ignore
         self,
         intensors: list[Tensor],
         outtensors: list[Tensor],

@@ -6,6 +6,7 @@ from distributed_inference.model_artifact.domain.artifact_bundle import (
 )
 
 
+## NOTE: For now, we keep these calls synchronous since they are compute intensive
 class ModelGraphExtractor(ABC):
     @abstractmethod
     def extract_model_graph(

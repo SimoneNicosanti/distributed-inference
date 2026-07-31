@@ -8,7 +8,7 @@ from distributed_inference.model_artifact.domain.artifact_bundle import (
 
 class ModelProfiler(ABC):
     @abstractmethod
-    def profile_model(
+    async def profile_model(
         self,
         artifact_concrete_paths: ArtifactConcretePaths,
         model_info: ModelInfo,

@@ -1,3 +1,5 @@
+import asyncio
+from pathlib import Path
 from typing import Iterable, override
 
 from distributed_inference.domain.model_graph_info import LayerKey, ModelGraph
@@ -12,7 +14,7 @@ from onnx.utils import extract_model
 
 class OnnxModelSplitter(ModelSplitter):
     @override
-    def split_model(
+    async def split_model(
         self,
         model_graph: ModelGraph,
         layers: Iterable[LayerKey],
@@ -33,6 +35,7 @@ class OnnxModelSplitter(ModelSplitter):
         if input_model_path == output_model_path:
             raise ValueError("Input and output paths must be different")
 
+        ## TODO: Might this extraction become long? In that case, we should run it in a to_thread
         component_inputs, component_outputs = (
             model_graph.extract_incoming_outgoing_tensors_of_sub_model(set(layers))
         )
@@ -48,6 +51,23 @@ class OnnxModelSplitter(ModelSplitter):
 
         output_model_path.parent.mkdir(parents=True, exist_ok=True)
 
+        await asyncio.to_thread(
+            self.__extract_model_sync,
+            input_model_path,
+            output_model_path,
+            input_names,
+            output_names,
+        )
+
+        output_paths.entrypoint_path = output_model_path
+
+    def __extract_model_sync(
+        self,
+        input_model_path: Path,
+        output_model_path: Path,
+        input_names: list[str],
+        output_names: list[str],
+    ) -> None:
         extract_model(
             input_path=input_model_path,
             output_path=output_model_path,
@@ -56,5 +76,3 @@ class OnnxModelSplitter(ModelSplitter):
             check_model=True,
             infer_shapes=True,
         )
-
-        output_paths.entrypoint_path = output_model_path

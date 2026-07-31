@@ -11,7 +11,7 @@ from distributed_inference.model_artifact.domain.artifact_bundle import (
 
 class SubModelArtifactStore(ABC):
     @abstractmethod
-    def put_sub_model(
+    async def put_sub_model(
         self,
         sub_model_id: SubModelId,
         bundle: ArtifactBundle,
@@ -24,7 +24,7 @@ class SubModelArtifactStore(ABC):
     ) -> AbstractContextManager[ArtifactBundle]: ...
 
     @abstractmethod
-    def check_sub_model_existence(
+    async def check_sub_model_existence(
         self,
         sub_model_id: SubModelId,
     ) -> bool: ...
