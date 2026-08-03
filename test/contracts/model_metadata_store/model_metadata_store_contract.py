@@ -71,19 +71,21 @@ class ModelMetadataStoreContract(ABC):
             "layer_2",
         )
 
-    def test_registered_model_exists(
+    @pytest.mark.asyncio
+    async def test_registered_model_exists(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
     ) -> None:
-        model_id = store.register_model(
+        model_id = await store.register_model(
             owner_id=owner_id,
             model_name="resnet50",
         )
 
-        assert store.check_model_existence(model_id)
+        assert await store.check_model_existence(model_id)
 
-    def test_unregistered_model_does_not_exist(
+    @pytest.mark.asyncio
+    async def test_unregistered_model_does_not_exist(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
@@ -93,65 +95,69 @@ class ModelMetadataStoreContract(ABC):
             model_name="missing",
         )
 
-        assert not store.check_model_existence(model_id)
+        assert not await store.check_model_existence(model_id)
 
-    def test_registering_same_model_twice_raises(
+    @pytest.mark.asyncio
+    async def test_registering_same_model_twice_raises(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
     ) -> None:
-        store.register_model(owner_id, "resnet50")
+        await store.register_model(owner_id, "resnet50")
 
         with pytest.raises(ValueError, match="already exists"):
-            store.register_model(owner_id, "resnet50")
+            await store.register_model(owner_id, "resnet50")
 
-    def test_same_model_name_is_allowed_for_different_owners(
+    @pytest.mark.asyncio
+    async def test_same_model_name_is_allowed_for_different_owners(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
         second_owner_id: UserId,
     ) -> None:
-        first_model_id = store.register_model(
+        first_model_id = await store.register_model(
             owner_id,
             "resnet50",
         )
-        second_model_id = store.register_model(
+        second_model_id = await store.register_model(
             second_owner_id,
             "resnet50",
         )
 
         assert first_model_id != second_model_id
-        assert store.check_model_existence(first_model_id)
-        assert store.check_model_existence(second_model_id)
+        assert await store.check_model_existence(first_model_id)
+        assert await store.check_model_existence(second_model_id)
 
-    def test_first_model_version_has_number_one(
+    @pytest.mark.asyncio
+    async def test_first_model_version_has_number_one(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
         model_info: ModelInfo,
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
+        model_id = await store.register_model(owner_id, "resnet50")
 
-        version_id = store.register_model_version(
+        version_id = await store.register_model_version(
             model_id=model_id,
             model_info=model_info,
         )
 
         assert version_id.model_id == model_id
         assert version_id.version_number == 1
-        assert store.check_model_version_existence(version_id)
+        assert await store.check_model_version_existence(version_id)
 
-    def test_model_version_numbers_increment(
+    @pytest.mark.asyncio
+    async def test_model_version_numbers_increment(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
         model_info: ModelInfo,
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
+        model_id = await store.register_model(owner_id, "resnet50")
 
-        first = store.register_model_version(model_id, model_info)
-        second = store.register_model_version(model_id, model_info)
-        third = store.register_model_version(model_id, model_info)
+        first = await store.register_model_version(model_id, model_info)
+        second = await store.register_model_version(model_id, model_info)
+        third = await store.register_model_version(model_id, model_info)
 
         assert first.version_number == 1
         assert second.version_number == 2
@@ -160,30 +166,31 @@ class ModelMetadataStoreContract(ABC):
         assert first != second
         assert second != third
 
-        assert store.check_model_version_existence(first)
-        assert store.check_model_version_existence(second)
-        assert store.check_model_version_existence(third)
+        assert await store.check_model_version_existence(first)
+        assert await store.check_model_version_existence(second)
+        assert await store.check_model_version_existence(third)
 
-    def test_version_numbers_are_independent_for_each_model(
+    @pytest.mark.asyncio
+    async def test_version_numbers_are_independent_for_each_model(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
         model_info: ModelInfo,
     ) -> None:
-        first_model_id = store.register_model(
+        first_model_id = await store.register_model(
             owner_id,
             "resnet50",
         )
-        second_model_id = store.register_model(
+        second_model_id = await store.register_model(
             owner_id,
             "vit",
         )
 
-        first_version = store.register_model_version(
+        first_version = await store.register_model_version(
             first_model_id,
             model_info,
         )
-        second_version = store.register_model_version(
+        second_version = await store.register_model_version(
             second_model_id,
             model_info,
         )
@@ -191,7 +198,8 @@ class ModelMetadataStoreContract(ABC):
         assert first_version.version_number == 1
         assert second_version.version_number == 1
 
-    def test_registering_version_for_missing_model_raises(
+    @pytest.mark.asyncio
+    async def test_registering_version_for_missing_model_raises(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
@@ -203,45 +211,48 @@ class ModelMetadataStoreContract(ABC):
         )
 
         with pytest.raises(ValueError, match="does not exist"):
-            store.register_model_version(
+            await store.register_model_version(
                 model_id=missing_model_id,
                 model_info=model_info,
             )
 
-    def test_unregistered_model_version_does_not_exist(
+    @pytest.mark.asyncio
+    async def test_unregistered_model_version_does_not_exist(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
+        model_id = await store.register_model(owner_id, "resnet50")
 
         missing_version_id = ModelVersionId(
             model_id=model_id,
             version_number=999,
         )
 
-        assert not store.check_model_version_existence(missing_version_id)
+        assert not await store.check_model_version_existence(missing_version_id)
 
-    def test_get_model_info_returns_registered_info(
+    @pytest.mark.asyncio
+    async def test_get_model_info_returns_registered_info(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
         model_info: ModelInfo,
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
-        version_id = store.register_model_version(
+        model_id = await store.register_model(owner_id, "resnet50")
+        version_id = await store.register_model_version(
             model_id,
             model_info,
         )
 
-        assert store.get_model_info(version_id) == model_info
+        assert await store.get_model_info(version_id) == model_info
 
-    def test_get_model_info_for_missing_version_raises(
+    @pytest.mark.asyncio
+    async def test_get_model_info_for_missing_version_raises(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
+        model_id = await store.register_model(owner_id, "resnet50")
 
         missing_version_id = ModelVersionId(
             model_id=model_id,
@@ -249,49 +260,52 @@ class ModelMetadataStoreContract(ABC):
         )
 
         with pytest.raises(ValueError, match="Model version"):
-            store.get_model_info(missing_version_id)
+            await store.get_model_info(missing_version_id)
 
-    def test_model_graph_is_initially_none(
+    @pytest.mark.asyncio
+    async def test_model_graph_is_initially_none(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
         model_info: ModelInfo,
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
-        version_id = store.register_model_version(
+        model_id = await store.register_model(owner_id, "resnet50")
+        version_id = await store.register_model_version(
             model_id,
             model_info,
         )
 
-        assert store.get_model_graph(version_id) is None
+        assert await store.get_model_graph(version_id) is None
 
-    def test_register_and_get_model_graph(
+    @pytest.mark.asyncio
+    async def test_register_and_get_model_graph(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
         model_info: ModelInfo,
         model_graph: ModelGraph,
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
-        version_id = store.register_model_version(
+        model_id = await store.register_model(owner_id, "resnet50")
+        version_id = await store.register_model_version(
             model_id,
             model_info,
         )
 
-        store.register_model_version_graph(
+        await store.register_model_version_graph(
             model_version_id=version_id,
             model_graph=model_graph,
         )
 
-        assert store.get_model_graph(version_id) == model_graph
+        assert await store.get_model_graph(version_id) == model_graph
 
-    def test_registering_graph_for_missing_version_raises(
+    @pytest.mark.asyncio
+    async def test_registering_graph_for_missing_version_raises(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
         model_graph: ModelGraph,
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
+        model_id = await store.register_model(owner_id, "resnet50")
 
         missing_version_id = ModelVersionId(
             model_id=model_id,
@@ -299,17 +313,18 @@ class ModelMetadataStoreContract(ABC):
         )
 
         with pytest.raises(ValueError, match="Model version"):
-            store.register_model_version_graph(
+            await store.register_model_version_graph(
                 model_version_id=missing_version_id,
                 model_graph=model_graph,
             )
 
-    def test_get_graph_for_missing_version_raises(
+    @pytest.mark.asyncio
+    async def test_get_graph_for_missing_version_raises(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
+        model_id = await store.register_model(owner_id, "resnet50")
 
         missing_version_id = ModelVersionId(
             model_id=model_id,
@@ -317,81 +332,85 @@ class ModelMetadataStoreContract(ABC):
         )
 
         with pytest.raises(ValueError, match="Model version"):
-            store.get_model_graph(missing_version_id)
+            await store.get_model_graph(missing_version_id)
 
-    def test_registered_submodel_exists(
+    @pytest.mark.asyncio
+    async def test_registered_submodel_exists(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
         model_info: ModelInfo,
         layers: tuple[LayerKey, ...],
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
-        version_id = store.register_model_version(
+        model_id = await store.register_model(owner_id, "resnet50")
+        version_id = await store.register_model_version(
             model_id,
             model_info,
         )
 
-        sub_model_id = store.register_sub_model(
+        sub_model_id = await store.register_sub_model(
             model_version_id=version_id,
             layers=layers,
         )
 
         assert sub_model_id.model_version_id == version_id
         assert sub_model_id.layers == layers
-        assert store.check_sub_model_existence(sub_model_id)
+        assert await store.check_sub_model_existence(sub_model_id)
 
-    def test_submodel_registration_is_idempotent(
+    @pytest.mark.asyncio
+    async def test_submodel_registration_is_idempotent(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
         model_info: ModelInfo,
         layers: tuple[LayerKey, ...],
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
-        version_id = store.register_model_version(
+        model_id = await store.register_model(owner_id, "resnet50")
+        version_id = await store.register_model_version(
             model_id,
             model_info,
         )
 
-        first = store.register_sub_model(version_id, layers)
-        second = store.register_sub_model(version_id, layers)
+        first = await store.register_sub_model(version_id, layers)
+        second = await store.register_sub_model(version_id, layers)
 
         assert first == second
-        assert store.check_sub_model_existence(first)
+        assert await store.check_sub_model_existence(first)
 
-    def test_different_layers_produce_different_submodels(
+    @pytest.mark.asyncio
+    async def test_different_layers_produce_different_submodels(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
         model_info: ModelInfo,
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
-        version_id = store.register_model_version(
+        model_id = await store.register_model(owner_id, "resnet50")
+        version_id = await store.register_model_version(
             model_id,
             model_info,
         )
 
-        first = store.register_sub_model(
+        first = await store.register_sub_model(
             version_id,
             ("layer_1",),
         )
-        second = store.register_sub_model(
+        second = await store.register_sub_model(
             version_id,
             ("layer_2",),
         )
 
         assert first != second
-        assert store.check_sub_model_existence(first)
-        assert store.check_sub_model_existence(second)
+        assert await store.check_sub_model_existence(first)
+        assert await store.check_sub_model_existence(second)
 
-    def test_registering_submodel_for_missing_version_raises(
+    @pytest.mark.asyncio
+    async def test_registering_submodel_for_missing_version_raises(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
         layers: tuple[LayerKey, ...],
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
+        model_id = await store.register_model(owner_id, "resnet50")
 
         missing_version_id = ModelVersionId(
             model_id=model_id,
@@ -399,20 +418,21 @@ class ModelMetadataStoreContract(ABC):
         )
 
         with pytest.raises(ValueError, match="Model version"):
-            store.register_sub_model(
+            await store.register_sub_model(
                 model_version_id=missing_version_id,
                 layers=layers,
             )
 
-    def test_unregistered_submodel_does_not_exist(
+    @pytest.mark.asyncio
+    async def test_unregistered_submodel_does_not_exist(
         self,
         store: ModelMetadataStore,
         owner_id: UserId,
         model_info: ModelInfo,
         layers: tuple[LayerKey, ...],
     ) -> None:
-        model_id = store.register_model(owner_id, "resnet50")
-        version_id = store.register_model_version(
+        model_id = await store.register_model(owner_id, "resnet50")
+        version_id = await store.register_model_version(
             model_id,
             model_info,
         )
@@ -422,4 +442,4 @@ class ModelMetadataStoreContract(ABC):
             layers=layers,
         )
 
-        assert not store.check_sub_model_existence(sub_model_id)
+        assert not await store.check_sub_model_existence(sub_model_id)

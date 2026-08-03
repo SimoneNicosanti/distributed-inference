@@ -8,7 +8,11 @@ import numpy as np
 import onnx
 import pytest
 from onnx import TensorProto, helper, numpy_helper
+from typing_extensions import override
 
+from distributed_inference.artifact_processing.artifact_workspace import (
+    ArtifactWorkspace,
+)
 from distributed_inference.domain.model_graph_info import (
     INPUT_LAYER_NAME,
     OUTPUT_LAYER_NAME,
@@ -21,9 +25,6 @@ from distributed_inference.domain.model_graph_info import (
     ModelType,
     TaskType,
     TensorInfo,
-)
-from distributed_inference.model_materializer.domain.materialized_artifact import (
-    MaterializedArtifact,
 )
 from distributed_inference.model_profile.adapters.outbound.onnx.onnx_model_graph_extractor import (
     OnnxGraphExtractor,
@@ -52,8 +53,8 @@ def _model_info(
     )
 
 
-def _artifact_paths(path: Path) -> MaterializedArtifact:
-    return MaterializedArtifact(root_path=path.parent, entrypoint_path=path)
+def _artifact_paths(path: Path) -> ArtifactWorkspace:
+    return ArtifactWorkspace(root_path=path.parent, entrypoint_path=path)
 
 
 def _flops(values: dict[int, float] | None = None) -> FlopsInfo:
@@ -270,16 +271,19 @@ def _build_aggregation_case(model_info: ModelInfo) -> AggregationCase:
 
 class TestOnnxGraphExtractorContract(ModelGraphExtractorContract):
     @pytest.fixture
+    @override
     def extractor(self) -> OnnxGraphExtractor:
         return OnnxGraphExtractor()
 
     @pytest.fixture
-    def representative_model_paths(self, tmp_path: Path) -> MaterializedArtifact:
+    @override
+    def representative_model_paths(self, tmp_path: Path) -> ArtifactWorkspace:
         path = tmp_path / "representative.onnx"
         _write_representative_model(path)
         return _artifact_paths(path)
 
     @pytest.fixture
+    @override
     def model_info(self) -> ModelInfo:
         return _model_info(
             dynamic_shapes={
@@ -290,6 +294,7 @@ class TestOnnxGraphExtractorContract(ModelGraphExtractorContract):
         )
 
     @pytest.fixture
+    @override
     def extracted_graph_expectation(self) -> ExtractedGraphExpectation:
         return ExtractedGraphExpectation(
             layers=frozenset(
@@ -311,6 +316,7 @@ class TestOnnxGraphExtractorContract(ModelGraphExtractorContract):
         )
 
     @pytest.fixture
+    @override
     def aggregation_case(self, model_info: ModelInfo) -> AggregationCase:
         return _build_aggregation_case(model_info)
 

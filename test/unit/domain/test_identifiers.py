@@ -4,8 +4,10 @@ import pytest
 from pydantic import ValidationError
 
 from distributed_inference.domain.identifiers import (
+    FlowId,
     ModelId,
     ModelVersionId,
+    RequestId,
     SubModelId,
     UserId,
 )
@@ -27,7 +29,7 @@ def test_sub_model_id_canonicalizes_layer_order() -> None:
     )
     second = SubModelId(
         model_version_id=model_version_id,
-        layers=["encoder.1", "encoder.2", "encoder.0"],
+        layers=("encoder.1", "encoder.2", "encoder.0"),
     )
 
     assert first.layers == ("encoder.0", "encoder.1", "encoder.2")
@@ -68,3 +70,24 @@ def test_sub_model_id_rejects_empty_layers() -> None:
 def test_sub_model_id_rejects_string_layer_collection() -> None:
     with pytest.raises(ValueError, match="Layers must contain layer names"):
         SubModelId.check_valid_layers_format("encoder.0")
+
+
+@pytest.mark.unit
+def test_request_id_requires_explicit_request_index() -> None:
+    model_version_id = _model_version_id()
+    flow_id = FlowId(
+        user_id=model_version_id.model_id.user_id,
+        flow_id=uuid4(),
+    )
+    sub_model_id = SubModelId(
+        model_version_id=model_version_id,
+        layers=("encoder.0",),
+    )
+
+    with pytest.raises(ValidationError, match="request_idx"):
+        RequestId.model_validate(
+            {
+                "flow_id": flow_id,
+                "sub_model_id": sub_model_id,
+            }
+        )

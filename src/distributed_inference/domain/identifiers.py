@@ -61,9 +61,6 @@ class RequestId(BaseModel):
                 f"Flow {self.flow_id} is not owned by user {self.sub_model_id.model_version_id.model_id.user_id}"
             )
 
-        if self.request_idx is None:
-            self.request_idx = UUID(int=0)
-
         return self
 
     pass

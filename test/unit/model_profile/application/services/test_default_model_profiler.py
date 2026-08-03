@@ -9,9 +9,6 @@ from distributed_inference.domain.model_graph_info import (
     ModelType,
     TaskType,
 )
-from distributed_inference.model_materializer.domain.materialized_artifact import (
-    MaterializedArtifact,
-)
 from distributed_inference.model_optimize.application.ports.outbound.model_optimizer import (
     ModelOptimizer,
 )
@@ -23,6 +20,9 @@ from distributed_inference.model_profile.application.ports.outbound.model_graph_
 )
 from distributed_inference.model_profile.application.services.default_model_profiler import (
     DefaultModelProfiler,
+)
+from test.support.artifact_materializer.materialized_artifact_test_utils import (
+    build_test_materialized_artifact,
 )
 
 
@@ -37,7 +37,8 @@ def _model_info() -> ModelInfo:
 
 
 @pytest.mark.unit
-def test_profile_model_runs_both_optimization_levels_then_aggregates(
+@pytest.mark.asyncio
+async def test_profile_model_runs_both_optimization_levels_then_aggregates(
     tmp_path: Path,
 ) -> None:
     optimizer = MagicMock(spec=ModelOptimizer)
@@ -49,13 +50,12 @@ def test_profile_model_runs_both_optimization_levels_then_aggregates(
     extractor.aggregate_model_graphs.return_value = aggregated_graph
     profiler = DefaultModelProfiler(optimizer, extractor)
     (tmp_path / "model.onnx").write_bytes(b"model")
-    source_paths = MaterializedArtifact(
-        root_path=tmp_path,
-        entrypoint_path=tmp_path / "model.onnx",
+    source_paths = build_test_materialized_artifact(
+        tmp_path / "model.onnx", root_path=tmp_path
     )
     model_info = _model_info()
 
-    result = profiler.profile_model(source_paths, model_info)
+    result = await profiler.profile_model(source_paths, model_info)
 
     assert result is aggregated_graph
     assert optimizer.optimize_model.call_count == 2

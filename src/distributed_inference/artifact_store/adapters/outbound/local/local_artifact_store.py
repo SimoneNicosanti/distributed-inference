@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -132,9 +133,10 @@ class LocalArtifactStore(ArtifactStore):
 
         return artifact_base_path
 
-    ## We should use a different hash, like md5
-    def __hash_artifact_key(self, key: ArtifactKey) -> int:
-        return hash(key)
+    ## TODO: We should use a different hash, like md5
+    def __hash_artifact_key(self, key: ArtifactKey) -> str:
+        md5_hash = hashlib.md5(key.model_dump_json().encode("utf-8")).hexdigest()
+        return md5_hash
 
     async def _build_entrypoint_path(self, aritifact_key: ArtifactKey) -> Path:
         key_hash = await asyncio.to_thread(self.__hash_artifact_key, aritifact_key)

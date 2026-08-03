@@ -3,19 +3,22 @@ from unittest.mock import patch
 
 import pytest
 
+from distributed_inference.artifact_processing.artifact_workspace import (
+    ArtifactWorkspace,
+)
 from distributed_inference.domain.model_graph_info import (
     ModelInfo,
     ModelType,
     TaskType,
-)
-from distributed_inference.model_materializer.domain.materialized_artifact import (
-    MaterializedArtifact,
 )
 from distributed_inference.model_optimize.adapters.outbound.onnx_model_optimizer import (
     OnnxModelOptimizer,
 )
 from distributed_inference.model_optimize.domain.optimization_level import (
     OptimizationLevel,
+)
+from test.support.artifact_materializer.materialized_artifact_test_utils import (
+    build_test_materialized_artifact,
 )
 
 
@@ -57,7 +60,7 @@ def test_optimize_model_dispatches_to_expected_backend(
     output_root.mkdir()
     optimizer = OnnxModelOptimizer()
 
-    def create_output(*, output_path, **_kwargs) -> None:
+    def create_output(*, output_path: Path, **_kwargs: object) -> None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(b"optimized")
 
@@ -74,11 +77,8 @@ def test_optimize_model_dispatches_to_expected_backend(
         ) as transformer,
     ):
         optimizer.optimize_model(
-            MaterializedArtifact(
-                root_path=tmp_path,
-                entrypoint_path=input_model,
-            ),
-            MaterializedArtifact(root_path=output_root),
+            build_test_materialized_artifact(input_model, root_path=tmp_path),
+            ArtifactWorkspace(root_path=output_root),
             _model_info(model_type),
             level,
         )

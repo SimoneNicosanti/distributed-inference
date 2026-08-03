@@ -26,6 +26,16 @@ class MaterializedArtifact(BaseModel):
         if not self.entrypoint_path.is_file():
             raise ValueError(f"Entrypoint path is not a file: {self.entrypoint_path}")
 
+        if not self.entrypoint_path.is_relative_to(self.root_path):
+            raise ValueError("Entrypoint path must be contained inside the bundle root")
+
+        if self.entrypoint_path != self.root_path.joinpath(
+            self.manifest.entrypoint_ppp
+        ):
+            raise ValueError(
+                "Entrypoint path does not match the manifest entrypoint path"
+            )
+
         resolved_root = self.root_path.resolve(strict=True)
         resolved_entrypoint = self.entrypoint_path.resolve(strict=True)
 

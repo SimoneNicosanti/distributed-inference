@@ -1,37 +1,39 @@
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from distributed_inference.domain.model_graph_info import ModelGraph
-from distributed_inference.model_materializer.domain.materialized_artifact import (
-    MaterializedArtifact,
+from distributed_inference.artifact_processing.artifact_workspace import (
+    ArtifactWorkspace,
 )
+from distributed_inference.domain.model_graph_info import ModelGraph
 from distributed_inference.model_splitter.adapters.outbound.onnx.onnx_model_splitter import (
     OnnxModelSplitter,
+)
+from test.support.artifact_materializer.materialized_artifact_test_utils import (
+    build_test_materialized_artifact,
 )
 
 
 @pytest.mark.unit
-def test_split_model_extracts_boundary_tensors_and_sets_output_entrypoint(
-    tmp_path,
+@pytest.mark.asyncio
+async def test_split_model_extracts_boundary_tensors_and_sets_output_entrypoint(
+    tmp_path: Path,
 ) -> None:
     input_model = tmp_path / "input" / "model.onnx"
     input_model.parent.mkdir()
     input_model.write_bytes(b"model")
     output_root = tmp_path / "output"
     output_root.mkdir()
-    input_paths = MaterializedArtifact(
-        root_path=input_model.parent,
-        entrypoint_path=input_model,
-    )
-    output_paths = MaterializedArtifact(root_path=output_root)
+    input_paths = build_test_materialized_artifact(input_model)
+    output_paths = ArtifactWorkspace(root_path=output_root)
     model_graph = MagicMock(spec=ModelGraph)
     model_graph.extract_incoming_outgoing_tensors_of_sub_model.return_value = (
         {"input_ids", "attention_mask"},
         {"logits"},
     )
 
-    def create_output(*, output_path, **_kwargs) -> None:
+    def create_output(*, output_path: Path, **_kwargs: object) -> None:
         output_path.write_bytes(b"split-model")
 
     with patch(
@@ -39,7 +41,7 @@ def test_split_model_extracts_boundary_tensors_and_sets_output_entrypoint(
         "onnx_model_splitter.extract_model",
         side_effect=create_output,
     ) as extract_model:
-        OnnxModelSplitter().split_model(
+        await OnnxModelSplitter().split_model(
             model_graph,
             ["encoder.1", "encoder.2", "encoder.1"],
             input_paths,
@@ -60,13 +62,14 @@ def test_split_model_extracts_boundary_tensors_and_sets_output_entrypoint(
 
 
 @pytest.mark.unit
-def test_split_model_rejects_empty_components_before_touching_paths(tmp_path) -> None:
+@pytest.mark.asyncio
+async def test_split_model_rejects_empty_components_before_touching_paths(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="cannot be empty"):
-        OnnxModelSplitter().split_model(
+        await OnnxModelSplitter().split_model(
             MagicMock(spec=ModelGraph),
             [],
-            MaterializedArtifact(root_path=tmp_path),
-            MaterializedArtifact(root_path=tmp_path),
+            MagicMock(),
+            ArtifactWorkspace(root_path=tmp_path),
         )
 
 
@@ -78,9 +81,10 @@ def test_split_model_rejects_empty_components_before_touching_paths(tmp_path) ->
         (({"input"}, set()), "no outputs"),
     ],
 )
-def test_split_model_rejects_components_without_complete_boundaries(
-    tmp_path,
-    boundaries,
+@pytest.mark.asyncio
+async def test_split_model_rejects_components_without_complete_boundaries(
+    tmp_path: Path,
+    boundaries: tuple[set[str], set[str]],
     message: str,
 ) -> None:
     input_model = tmp_path / "model.onnx"
@@ -91,12 +95,9 @@ def test_split_model_rejects_components_without_complete_boundaries(
     graph.extract_incoming_outgoing_tensors_of_sub_model.return_value = boundaries
 
     with pytest.raises(ValueError, match=message):
-        OnnxModelSplitter().split_model(
+        await OnnxModelSplitter().split_model(
             graph,
             ["layer"],
-            MaterializedArtifact(
-                root_path=tmp_path,
-                entrypoint_path=input_model,
-            ),
-            MaterializedArtifact(root_path=output_root),
+            build_test_materialized_artifact(input_model, root_path=tmp_path),
+            ArtifactWorkspace(root_path=output_root),
         )

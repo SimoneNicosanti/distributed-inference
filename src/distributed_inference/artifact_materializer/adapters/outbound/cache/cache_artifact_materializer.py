@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator, override
@@ -141,5 +142,6 @@ class CachedArtifactMaterializer(ArtifactMaterializer):
         entrypoint_ppp = manifest.entrypoint_ppp
         return root_path.joinpath(*entrypoint_ppp.parts)
 
-    def __hash_artifact_key(self, key: ArtifactKey) -> int:
-        return hash(key)
+    def __hash_artifact_key(self, key: ArtifactKey) -> str:
+        md5_hash = hashlib.md5(key.model_dump_json().encode("utf-8")).hexdigest()
+        return md5_hash

@@ -1,51 +1,44 @@
 from io import BytesIO
 from pathlib import Path, PurePosixPath
+from typing import cast
 from zipfile import ZipFile
 
 import pytest
 from fastapi import UploadFile
 
-from distributed_inference.model_artifact.domain.artifact_bundle import (
+from distributed_inference.artifact_store.adapters.outbound.local.local_readable_artifact_bundle import (
+    LocalReadableArtifactBundle,
+)
+from distributed_inference.artifact_store.domain.artifact_manifest import (
     MANIFEST_FILE_NAME,
-    ArtifactBundle,
-    ArtifactFile,
+    ArtifactFileInfo,
     ArtifactManifest,
 )
 from distributed_inference.model_manager.adapters.inbound.http.compression_utils import (
     compress_artifact_bundle,
     decompress_artifact_bundle,
 )
-
-
-def _bundle() -> ArtifactBundle:
-    return ArtifactBundle(
-        manifest=ArtifactManifest(
-            rel_entrypoint_path=PurePosixPath("model/model.onnx"),
-            rel_file_paths=(
-                PurePosixPath("model/model.onnx"),
-                PurePosixPath("config.json"),
-            ),
-        ),
-        artifact_files=(
-            ArtifactFile(
-                rel_path=PurePosixPath("model/model.onnx"),
-                content=BytesIO(b"onnx-content"),
-            ),
-            ArtifactFile(
-                rel_path=PurePosixPath("config.json"),
-                content=BytesIO(b'{"version": 1}'),
-            ),
-        ),
-    )
+from test.support.artifact_store.artifact_bundle_test_utils import (
+    build_test_bundle,
+    read_bundle_content,
+)
 
 
 @pytest.mark.unit
-def test_compress_bundle_writes_manifest_and_artifact_files() -> None:
-    bundle = _bundle()
-    for artifact in bundle.artifact_files:
-        artifact.content.seek(3)
+@pytest.mark.asyncio
+async def test_compress_bundle_writes_manifest_and_artifact_files(
+    tmp_path: Path,
+) -> None:
+    bundle = build_test_bundle(
+        tmp_path / "input",
+        files={
+            PurePosixPath("model/model.onnx"): b"onnx-content",
+            PurePosixPath("config.json"): b'{"version": 1}',
+        },
+        entrypoint=PurePosixPath("model/model.onnx"),
+    )
 
-    with compress_artifact_bundle(bundle) as zip_path:
+    async with compress_artifact_bundle(bundle) as zip_path:
         assert zip_path.is_file()
         with ZipFile(zip_path) as archive:
             assert set(archive.namelist()) == {
@@ -64,11 +57,15 @@ def test_compress_bundle_writes_manifest_and_artifact_files() -> None:
 
 
 @pytest.mark.unit
-def test_uncompress_bundle_exposes_nested_files_for_context_lifetime() -> None:
+@pytest.mark.asyncio
+async def test_decompress_bundle_exposes_nested_files_for_context_lifetime() -> None:
     archive_bytes = BytesIO()
     manifest = ArtifactManifest(
-        rel_entrypoint_path=PurePosixPath("model/model.onnx"),
-        rel_file_paths=(PurePosixPath("model/model.onnx"), PurePosixPath("labels.txt")),
+        entrypoint_ppp=PurePosixPath("model/model.onnx"),
+        files_info=(
+            ArtifactFileInfo(file_ppp=PurePosixPath("model/model.onnx")),
+            ArtifactFileInfo(file_ppp=PurePosixPath("labels.txt")),
+        ),
     )
     with ZipFile(archive_bytes, "w") as archive:
         archive.writestr(MANIFEST_FILE_NAME, manifest.model_dump_json())
@@ -76,29 +73,23 @@ def test_uncompress_bundle_exposes_nested_files_for_context_lifetime() -> None:
         archive.writestr("labels.txt", b"cat\ndog\n")
     archive_bytes.seek(0)
     upload = UploadFile(filename="artifact.zip", file=archive_bytes)
-    extracted_root = None
-    streams = ()
 
-    with decompress_artifact_bundle(upload) as bundle:
-        streams = tuple(artifact.content for artifact in bundle.artifact_files)
-        extracted_root = Path(streams[0].name).parent.parent
+    async with decompress_artifact_bundle(upload) as readable:
+        bundle = cast(LocalReadableArtifactBundle, readable)
+        extracted_root = bundle.local_root_path
         assert bundle.manifest == manifest
-        assert {
-            artifact.rel_path: artifact.content.read()
-            for artifact in bundle.artifact_files
-        } == {
+        assert await read_bundle_content(bundle) == {
             PurePosixPath("model/model.onnx"): b"onnx-content",
             PurePosixPath("labels.txt"): b"cat\ndog\n",
         }
-        assert all(not stream.closed for stream in streams)
+        assert extracted_root.is_dir()
 
-    assert extracted_root is not None
-    assert all(stream.closed for stream in streams)
     assert not extracted_root.exists()
 
 
 @pytest.mark.unit
-def test_uncompress_bundle_requires_root_manifest() -> None:
+@pytest.mark.asyncio
+async def test_decompress_bundle_requires_root_manifest() -> None:
     archive_bytes = BytesIO()
     with ZipFile(archive_bytes, "w") as archive:
         archive.writestr("model.onnx", b"model")
@@ -106,5 +97,5 @@ def test_uncompress_bundle_requires_root_manifest() -> None:
     upload = UploadFile(filename="artifact.zip", file=archive_bytes)
 
     with pytest.raises(Exception, match="does not contain a manifest"):
-        with decompress_artifact_bundle(upload):
+        async with decompress_artifact_bundle(upload):
             pass

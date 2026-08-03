@@ -137,6 +137,7 @@ def create_raw_model_graph() -> RawModelGraph:
     return nx.DiGraph()
 
 
+## TODO: Implement serialization logic for this class
 class ModelGraph(BaseModel):
     model_config = ConfigDict(
         frozen=False,

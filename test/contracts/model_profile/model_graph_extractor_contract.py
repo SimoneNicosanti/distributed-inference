@@ -7,13 +7,13 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
+from distributed_inference.artifact_processing.artifact_workspace import (
+    ArtifactWorkspace,
+)
 from distributed_inference.domain.model_graph_info import (
     FlopsInfo,
     ModelGraph,
     ModelInfo,
-)
-from distributed_inference.model_materializer.domain.materialized_artifact import (
-    MaterializedArtifact,
 )
 from distributed_inference.model_profile.application.ports.outbound.model_graph_extractor import (
     ModelGraphExtractor,
@@ -75,7 +75,7 @@ class ModelGraphExtractorContract:
         raise NotImplementedError
 
     @pytest.fixture
-    def representative_model_paths(self) -> MaterializedArtifact:
+    def representative_model_paths(self) -> ArtifactWorkspace:
         raise NotImplementedError
 
     @pytest.fixture
@@ -93,7 +93,7 @@ class ModelGraphExtractorContract:
     def test_extract_model_graph_preserves_metadata_and_topology(
         self,
         extractor: ModelGraphExtractor,
-        representative_model_paths: MaterializedArtifact,
+        representative_model_paths: ArtifactWorkspace,
         model_info: ModelInfo,
         extracted_graph_expectation: ExtractedGraphExpectation,
     ) -> None:
@@ -116,7 +116,7 @@ class ModelGraphExtractorContract:
     def test_extract_model_graph_honours_flops_profiling_flag(
         self,
         extractor: ModelGraphExtractor,
-        representative_model_paths: MaterializedArtifact,
+        representative_model_paths: ArtifactWorkspace,
         model_info: ModelInfo,
         extracted_graph_expectation: ExtractedGraphExpectation,
     ) -> None:
@@ -151,7 +151,7 @@ class ModelGraphExtractorContract:
     def test_extract_model_graph_honours_tensor_profiling_flag(
         self,
         extractor: ModelGraphExtractor,
-        representative_model_paths: MaterializedArtifact,
+        representative_model_paths: ArtifactWorkspace,
         model_info: ModelInfo,
         extracted_graph_expectation: ExtractedGraphExpectation,
     ) -> None:
