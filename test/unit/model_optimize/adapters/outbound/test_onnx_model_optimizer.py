@@ -8,8 +8,8 @@ from distributed_inference.domain.model_graph_info import (
     ModelType,
     TaskType,
 )
-from distributed_inference.model_artifact.domain.artifact_bundle import (
-    ArtifactConcretePaths,
+from distributed_inference.model_materializer.domain.materialized_artifact import (
+    MaterializedArtifact,
 )
 from distributed_inference.model_optimize.adapters.outbound.onnx_model_optimizer import (
     OnnxModelOptimizer,
@@ -74,11 +74,11 @@ def test_optimize_model_dispatches_to_expected_backend(
         ) as transformer,
     ):
         optimizer.optimize_model(
-            ArtifactConcretePaths(
+            MaterializedArtifact(
                 root_path=tmp_path,
                 entrypoint_path=input_model,
             ),
-            ArtifactConcretePaths(root_path=output_root),
+            MaterializedArtifact(root_path=output_root),
             _model_info(model_type),
             level,
         )

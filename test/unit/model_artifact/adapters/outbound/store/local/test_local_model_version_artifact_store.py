@@ -8,10 +8,10 @@ from distributed_inference.domain.identifiers import (
     ModelVersionId,
     UserId,
 )
-from distributed_inference.model_artifact.adapters.outbound.store.local import (
+from distributed_inference.model_artifact.adapters.outbound.local import (
     local_storage_bundle_utils,
 )
-from distributed_inference.model_artifact.adapters.outbound.store.local.local_model_version_artifact_store import (
+from distributed_inference.model_artifact.adapters.outbound.local.local_model_version_artifact_store import (
     LocalModelVersionArtifactStore,
 )
 from test.support.model_artifact.artifact_bundle_test_utils import build_test_bundle

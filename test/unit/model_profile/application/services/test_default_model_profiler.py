@@ -9,8 +9,8 @@ from distributed_inference.domain.model_graph_info import (
     ModelType,
     TaskType,
 )
-from distributed_inference.model_artifact.domain.artifact_bundle import (
-    ArtifactConcretePaths,
+from distributed_inference.model_materializer.domain.materialized_artifact import (
+    MaterializedArtifact,
 )
 from distributed_inference.model_optimize.application.ports.outbound.model_optimizer import (
     ModelOptimizer,
@@ -49,7 +49,7 @@ def test_profile_model_runs_both_optimization_levels_then_aggregates(
     extractor.aggregate_model_graphs.return_value = aggregated_graph
     profiler = DefaultModelProfiler(optimizer, extractor)
     (tmp_path / "model.onnx").write_bytes(b"model")
-    source_paths = ArtifactConcretePaths(
+    source_paths = MaterializedArtifact(
         root_path=tmp_path,
         entrypoint_path=tmp_path / "model.onnx",
     )

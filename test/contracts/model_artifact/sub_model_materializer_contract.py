@@ -10,10 +10,10 @@ from distributed_inference.domain.identifiers import (
     SubModelId,
     UserId,
 )
-from distributed_inference.model_artifact.application.ports.outbound.materializer.sub_model_materializer import (
+from distributed_inference.model_materializer.application.ports.outbound.sub_model_materializer import (
     SubModelMaterializer,
 )
-from distributed_inference.model_artifact.application.ports.outbound.store.sub_model_artifact_store import (
+from distributed_inference.model_artifact.application.ports.outbound.sub_model_artifact_store import (
     SubModelArtifactStore,
 )
 from test.support.model_artifact.artifact_bundle_test_utils import (

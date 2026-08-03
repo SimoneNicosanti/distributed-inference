@@ -1,10 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import Iterable
 
-from distributed_inference.domain.model_graph_info import LayerKey, ModelGraph
-from distributed_inference.model_artifact.domain.artifact_bundle import (
-    ArtifactConcretePaths,
+from distributed_inference.artifact_materializer.domain.materialized_artifact import (
+    MaterializedArtifact,
 )
+from distributed_inference.artifact_processing.artifact_workspace import (
+    ArtifactWorkspace,
+)
+from distributed_inference.domain.model_graph_info import LayerKey, ModelGraph
 
 
 class ModelSplitter(ABC):
@@ -13,6 +16,6 @@ class ModelSplitter(ABC):
         self,
         model_graph: ModelGraph,
         layers: Iterable[LayerKey],
-        input_paths: ArtifactConcretePaths,
-        output_paths: ArtifactConcretePaths,
+        input_paths: MaterializedArtifact,
+        output_paths: ArtifactWorkspace,
     ) -> None: ...

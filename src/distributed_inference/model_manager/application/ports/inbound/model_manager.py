@@ -1,7 +1,10 @@
 from abc import ABC, abstractmethod
-from contextlib import AbstractContextManager
+from contextlib import AbstractAsyncContextManager
 from typing import Iterable
 
+from distributed_inference.artifact_store.domain.readable_artifact_bundle import (
+    ReadableArtifactBundle,
+)
 from distributed_inference.domain.identifiers import (
     ModelId,
     ModelVersionId,
@@ -13,29 +16,26 @@ from distributed_inference.domain.model_graph_info import (
     ModelGraph,
     ModelInfo,
 )
-from distributed_inference.model_artifact.domain.artifact_bundle import (
-    ArtifactBundle,
-)
 
 
 class ModelManager(ABC):
     @abstractmethod
-    def register_model(
+    async def register_model(
         self,
         owner_id: UserId,
         model_name: str,
     ) -> ModelId: ...
 
     @abstractmethod
-    def put_model_version(
+    async def put_model_version(
         self,
         model_id: ModelId,
         model_info: ModelInfo,
-        bundle: ArtifactBundle,
+        bundle: ReadableArtifactBundle,
     ) -> ModelVersionId: ...
 
     @abstractmethod
-    def generate_sub_model(
+    async def generate_sub_model(
         self,
         model_version_id: ModelVersionId,
         layers: Iterable[LayerKey],
@@ -45,19 +45,19 @@ class ModelManager(ABC):
     def get_sub_model(
         self,
         sub_model_id: SubModelId,
-    ) -> AbstractContextManager[ArtifactBundle]: ...
+    ) -> AbstractAsyncContextManager[ReadableArtifactBundle]: ...
 
     @abstractmethod
-    def get_model_graph(self, model_version_id: ModelVersionId) -> ModelGraph: ...
+    async def get_model_graph(self, model_version_id: ModelVersionId) -> ModelGraph: ...
 
     @abstractmethod
-    def check_model_version_existence(
+    async def check_model_version_existence(
         self,
         model_version_id: ModelVersionId,
     ) -> bool: ...
 
     @abstractmethod
-    def check_sub_model_existence(
+    async def check_sub_model_existence(
         self,
         sub_model_id: SubModelId,
     ) -> bool: ...

@@ -10,7 +10,7 @@ from distributed_inference.domain.identifiers import (
     ModelVersionId,
     UserId,
 )
-from distributed_inference.model_artifact.application.ports.outbound.store.model_version_artifact_store import (
+from distributed_inference.model_artifact.application.ports.outbound.model_version_artifact_store import (
     ModelVersionArtifactStore,
 )
 from distributed_inference.model_artifact.domain.artifact_bundle import (

@@ -22,8 +22,8 @@ from distributed_inference.domain.model_graph_info import (
     TaskType,
     TensorInfo,
 )
-from distributed_inference.model_artifact.domain.artifact_bundle import (
-    ArtifactConcretePaths,
+from distributed_inference.model_materializer.domain.materialized_artifact import (
+    MaterializedArtifact,
 )
 from distributed_inference.model_profile.adapters.outbound.onnx.onnx_model_graph_extractor import (
     OnnxGraphExtractor,
@@ -52,8 +52,8 @@ def _model_info(
     )
 
 
-def _artifact_paths(path: Path) -> ArtifactConcretePaths:
-    return ArtifactConcretePaths(root_path=path.parent, entrypoint_path=path)
+def _artifact_paths(path: Path) -> MaterializedArtifact:
+    return MaterializedArtifact(root_path=path.parent, entrypoint_path=path)
 
 
 def _flops(values: dict[int, float] | None = None) -> FlopsInfo:
@@ -274,7 +274,7 @@ class TestOnnxGraphExtractorContract(ModelGraphExtractorContract):
         return OnnxGraphExtractor()
 
     @pytest.fixture
-    def representative_model_paths(self, tmp_path: Path) -> ArtifactConcretePaths:
+    def representative_model_paths(self, tmp_path: Path) -> MaterializedArtifact:
         path = tmp_path / "representative.onnx"
         _write_representative_model(path)
         return _artifact_paths(path)

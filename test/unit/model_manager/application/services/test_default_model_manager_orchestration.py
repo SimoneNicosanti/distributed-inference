@@ -18,23 +18,25 @@ from distributed_inference.domain.model_graph_info import (
     ModelType,
     TaskType,
 )
-from distributed_inference.model_artifact.application.ports.outbound.materializer.model_version_materializer import (
-    ModelVersionMaterializer,
-)
-from distributed_inference.model_artifact.application.ports.outbound.store.model_version_artifact_store import (
+from distributed_inference.model_artifact.application.ports.outbound.model_version_artifact_store import (
     ModelVersionArtifactStore,
 )
-from distributed_inference.model_artifact.application.ports.outbound.store.sub_model_artifact_store import (
+from distributed_inference.model_artifact.application.ports.outbound.sub_model_artifact_store import (
     SubModelArtifactStore,
 )
 from distributed_inference.model_artifact.domain.artifact_bundle import (
     ArtifactBundle,
-    ArtifactConcretePaths,
     ArtifactFile,
     ArtifactManifest,
 )
 from distributed_inference.model_manager.application.services.default_model_manager import (
     DefaultModelManager,
+)
+from distributed_inference.model_materializer.application.ports.outbound.model_version_materializer import (
+    ModelVersionMaterializer,
+)
+from distributed_inference.model_materializer.domain.materialized_artifact import (
+    MaterializedArtifact,
 )
 from distributed_inference.model_metadata_store.application.ports.outbound.model_metadata_store import (
     ModelMetadataStore,
@@ -104,7 +106,7 @@ def test_put_model_version_stores_profiles_and_registers_graph(tmp_path: Path) -
     model_info = _model_info()
     bundle = _bundle()
     (tmp_path / "model.onnx").write_bytes(b"model")
-    paths = ArtifactConcretePaths(
+    paths = MaterializedArtifact(
         root_path=tmp_path,
         entrypoint_path=tmp_path / "model.onnx",
     )
@@ -141,7 +143,7 @@ def test_generate_sub_model_splits_and_stores_component(tmp_path: Path) -> None:
     layers = ["encoder.0", "encoder.1"]
     graph = MagicMock(spec=ModelGraph)
     (tmp_path / "model.onnx").write_bytes(b"model")
-    model_paths = ArtifactConcretePaths(
+    model_paths = MaterializedArtifact(
         root_path=tmp_path,
         entrypoint_path=tmp_path / "model.onnx",
     )

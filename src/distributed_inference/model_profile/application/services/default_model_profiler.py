@@ -3,10 +3,13 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import override
 
-from distributed_inference.domain.model_graph_info import ModelGraph, ModelInfo
-from distributed_inference.model_artifact.domain.artifact_bundle import (
-    ArtifactConcretePaths,
+from distributed_inference.artifact_materializer.domain.materialized_artifact import (
+    MaterializedArtifact,
 )
+from distributed_inference.artifact_processing.artifact_workspace import (
+    ArtifactWorkspace,
+)
+from distributed_inference.domain.model_graph_info import ModelGraph, ModelInfo
 from distributed_inference.model_optimize.application.ports.outbound.model_optimizer import (
     ModelOptimizer,
 )
@@ -34,7 +37,7 @@ class DefaultModelProfiler(ModelProfiler):
     @override
     async def profile_model(
         self,
-        artifact_concrete_paths: ArtifactConcretePaths,
+        artifact_concrete_paths: MaterializedArtifact,
         model_info: ModelInfo,
     ) -> ModelGraph:
         ## The whole profiling can be CPU bound, so we wrap it into
@@ -45,11 +48,11 @@ class DefaultModelProfiler(ModelProfiler):
 
     def _profile_model_sync(
         self,
-        artifact_concrete_paths: ArtifactConcretePaths,
+        artifact_concrete_paths: MaterializedArtifact,
         model_info: ModelInfo,
     ) -> ModelGraph:
         with TemporaryDirectory() as tmp_path:
-            basic_concrete_paths = ArtifactConcretePaths(root_path=Path(tmp_path))
+            basic_concrete_paths = ArtifactWorkspace(root_path=Path(tmp_path))
             self._model_optimizer.optimize_model(
                 artifact_concrete_paths,
                 basic_concrete_paths,
@@ -64,7 +67,7 @@ class DefaultModelProfiler(ModelProfiler):
                 profile_tensors=True,
             )
 
-            ext_concrete_paths = ArtifactConcretePaths(root_path=Path(tmp_path))
+            ext_concrete_paths = ArtifactWorkspace(root_path=Path(tmp_path))
             self._model_optimizer.optimize_model(
                 artifact_concrete_paths,
                 ext_concrete_paths,

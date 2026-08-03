@@ -1,5 +1,6 @@
-from typing import Iterator
+from collections.abc import AsyncIterator
 
+import aiofiles
 from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
 
@@ -22,6 +23,8 @@ from distributed_inference.model_manager.application.ports.inbound.model_manager
     ModelManager,
 )
 
+CHUNK_SIZE = 1024 * 1024
+
 
 def build_model_manager_router(
     model_manager: ModelManager,
@@ -36,10 +39,10 @@ def build_model_manager_router(
         "/models",
         response_model=RegisterModelResponse,
     )
-    def register_model(
+    async def register_model(
         request: RegisterModelRequest,
     ) -> RegisterModelResponse:
-        model_id = model_manager.register_model(
+        model_id = await model_manager.register_model(
             owner_id=request.owner_id,
             model_name=request.model_name,
         )
@@ -50,7 +53,7 @@ def build_model_manager_router(
         "/model-versions",
         response_model=UploadModelVersionResponse,
     )
-    def upload_model_version(
+    async def upload_model_version(
         model_id_json: str = Form(),
         model_info_json: str = Form(),
         bundle_zip: UploadFile = File(),
@@ -58,10 +61,10 @@ def build_model_manager_router(
         model_id = ModelId.model_validate_json(model_id_json)
         model_info = ModelInfo.model_validate_json(model_info_json)
 
-        with compression_utils.decompress_artifact_bundle(
+        async with compression_utils.decompress_artifact_bundle(
             bundle_zip,
         ) as artifact_bundle:
-            model_version_id = model_manager.put_model_version(
+            model_version_id = await model_manager.put_model_version(
                 model_id=model_id,
                 model_info=model_info,
                 bundle=artifact_bundle,
@@ -75,10 +78,10 @@ def build_model_manager_router(
         "/sub-models",
         response_model=GenerateSubModelResponse,
     )
-    def generate_sub_model(
+    async def generate_sub_model(
         request: GenerateSubModelRequest,
     ) -> GenerateSubModelResponse:
-        sub_model_id = model_manager.generate_sub_model(
+        sub_model_id = await model_manager.generate_sub_model(
             model_version_id=request.model_version_id,
             layers=request.layers,
         )
@@ -88,16 +91,18 @@ def build_model_manager_router(
         )
 
     @router.post("/sub-models/download")
-    def download_sub_model(
+    async def download_sub_model(
         request: DownloadSubModelRequest,
     ) -> StreamingResponse:
-        def stream_artifact() -> Iterator[bytes]:
-            with model_manager.get_sub_model(request.sub_model_id) as sub_model_bundle:
-                with compression_utils.compress_artifact_bundle(
+        async def stream_artifact() -> AsyncIterator[bytes]:
+            async with model_manager.get_sub_model(
+                request.sub_model_id
+            ) as sub_model_bundle:
+                async with compression_utils.compress_artifact_bundle(
                     sub_model_bundle
                 ) as zip_file_path:
-                    with open(zip_file_path, "rb") as binary_io:
-                        while chunk := binary_io.read(1024 * 1024):
+                    async with aiofiles.open(zip_file_path, "rb") as zip_file:
+                        while chunk := await zip_file.read(CHUNK_SIZE):
                             yield chunk
 
         return StreamingResponse(
@@ -107,10 +112,10 @@ def build_model_manager_router(
         )
 
     @router.get("/model-versions/graph", response_model=GetModelGraphResponse)
-    def get_model_graph(
+    async def get_model_graph(
         request: GetModelGraphRequest,
     ) -> GetModelGraphResponse:
-        model_graph = model_manager.get_model_graph(request.model_version_id)
+        model_graph = await model_manager.get_model_graph(request.model_version_id)
 
         return GetModelGraphResponse(model_graph=model_graph)
 

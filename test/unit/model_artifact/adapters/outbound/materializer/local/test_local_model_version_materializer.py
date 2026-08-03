@@ -8,14 +8,14 @@ from distributed_inference.domain.identifiers import (
     ModelVersionId,
     UserId,
 )
-from distributed_inference.model_artifact.adapters.outbound.materializer.local.local_model_version_materializer import (
-    LocalModelVersionMaterializer,
-)
-from distributed_inference.model_artifact.adapters.outbound.store.local.local_model_version_artifact_store import (
+from distributed_inference.model_artifact.adapters.outbound.local.local_model_version_artifact_store import (
     LocalModelVersionArtifactStore,
 )
-from distributed_inference.model_artifact.domain.artifact_bundle import (
-    ArtifactConcretePaths,
+from distributed_inference.model_materializer.adapters.outbound.local.local_model_version_materializer import (
+    LocalModelVersionMaterializer,
+)
+from distributed_inference.model_materializer.domain.materialized_artifact import (
+    MaterializedArtifact,
 )
 
 
@@ -55,7 +55,7 @@ def test_materialize_model_version_delegates_to_store() -> None:
     )
 
     expected_context_manager = cast(
-        AbstractContextManager[ArtifactConcretePaths],
+        AbstractContextManager[MaterializedArtifact],
         MagicMock(),
     )
 

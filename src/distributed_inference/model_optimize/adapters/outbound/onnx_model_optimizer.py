@@ -7,12 +7,15 @@ import onnxruntime.transformers.optimizer as ort_transformers_opt
 from onnxruntime.transformers.fusion_options import FusionOptions
 from typing_extensions import override
 
+from distributed_inference.artifact_materializer.domain.materialized_artifact import (
+    MaterializedArtifact,
+)
+from distributed_inference.artifact_processing.artifact_workspace import (
+    ArtifactWorkspace,
+)
 from distributed_inference.domain.model_graph_info import (
     ModelInfo,
     ModelType,
-)
-from distributed_inference.model_artifact.domain.artifact_bundle import (
-    ArtifactConcretePaths,
 )
 from distributed_inference.model_optimize.application.ports.outbound.model_optimizer import (
     ModelOptimizer,
@@ -26,8 +29,8 @@ class OnnxModelOptimizer(ModelOptimizer):
     @override
     def optimize_model(
         self,
-        input_paths: ArtifactConcretePaths,
-        output_paths: ArtifactConcretePaths,
+        input_paths: MaterializedArtifact,
+        output_paths: ArtifactWorkspace,
         model_info: ModelInfo,
         opt_level: OptimizationLevel,
     ) -> None:

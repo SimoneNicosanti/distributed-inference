@@ -6,6 +6,9 @@ import onnx_tool
 import sympy
 
 import onnx
+from distributed_inference.artifact_processing.artifact_workspace import (
+    ArtifactWorkspace,
+)
 from distributed_inference.domain import model_graph_info
 from distributed_inference.domain.model_graph_info import (
     DynamicShapeType,
@@ -15,9 +18,6 @@ from distributed_inference.domain.model_graph_info import (
     ModelGraph,
     ModelInfo,
     TensorInfo,
-)
-from distributed_inference.model_artifact.domain.artifact_bundle import (
-    ArtifactConcretePaths,
 )
 from distributed_inference.model_profile.application.ports.outbound.model_graph_extractor import (
     ModelGraphExtractor,
@@ -33,7 +33,7 @@ class OnnxGraphExtractor(ModelGraphExtractor):
     @override
     def extract_model_graph(
         self,
-        paths: ArtifactConcretePaths,
+        paths: ArtifactWorkspace,
         model_info: ModelInfo,
         profile_flops: bool,
         profile_tensors: bool,

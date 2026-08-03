@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.14"
 
 dependencies = [
+  "aiofiles>=25.1.0",
   "aiorwlock>=1.5.1",
   "fakeredis>=2.37.0",
   "fastapi>=0.139.2",
@@ -17,6 +18,7 @@ dependencies = [
   "readerwriterlock>=1.0.9",
   "redis>=8.0.1",
   "structlog>=24.0",
+  "types-aiofiles>=25.1.0.20260518",
 ]
 
 [dependency-groups]

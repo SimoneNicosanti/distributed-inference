@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from distributed_inference.domain.model_graph_info import ModelGraph
-from distributed_inference.model_artifact.domain.artifact_bundle import (
-    ArtifactConcretePaths,
+from distributed_inference.model_materializer.domain.materialized_artifact import (
+    MaterializedArtifact,
 )
 from distributed_inference.model_splitter.adapters.outbound.onnx.onnx_model_splitter import (
     OnnxModelSplitter,
@@ -20,11 +20,11 @@ def test_split_model_extracts_boundary_tensors_and_sets_output_entrypoint(
     input_model.write_bytes(b"model")
     output_root = tmp_path / "output"
     output_root.mkdir()
-    input_paths = ArtifactConcretePaths(
+    input_paths = MaterializedArtifact(
         root_path=input_model.parent,
         entrypoint_path=input_model,
     )
-    output_paths = ArtifactConcretePaths(root_path=output_root)
+    output_paths = MaterializedArtifact(root_path=output_root)
     model_graph = MagicMock(spec=ModelGraph)
     model_graph.extract_incoming_outgoing_tensors_of_sub_model.return_value = (
         {"input_ids", "attention_mask"},
@@ -65,8 +65,8 @@ def test_split_model_rejects_empty_components_before_touching_paths(tmp_path) ->
         OnnxModelSplitter().split_model(
             MagicMock(spec=ModelGraph),
             [],
-            ArtifactConcretePaths(root_path=tmp_path),
-            ArtifactConcretePaths(root_path=tmp_path),
+            MaterializedArtifact(root_path=tmp_path),
+            MaterializedArtifact(root_path=tmp_path),
         )
 
 
@@ -94,9 +94,9 @@ def test_split_model_rejects_components_without_complete_boundaries(
         OnnxModelSplitter().split_model(
             graph,
             ["layer"],
-            ArtifactConcretePaths(
+            MaterializedArtifact(
                 root_path=tmp_path,
                 entrypoint_path=input_model,
             ),
-            ArtifactConcretePaths(root_path=output_root),
+            MaterializedArtifact(root_path=output_root),
         )

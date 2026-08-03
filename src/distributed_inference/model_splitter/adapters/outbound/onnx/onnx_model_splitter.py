@@ -2,10 +2,17 @@ import asyncio
 from pathlib import Path
 from typing import Iterable, override
 
-from distributed_inference.domain.model_graph_info import LayerKey, ModelGraph
-from distributed_inference.model_artifact.domain.artifact_bundle import (
-    ArtifactConcretePaths,
+import aiofiles
+import aiofiles.os
+import aiofiles.ospath
+
+from distributed_inference.artifact_materializer.domain.materialized_artifact import (
+    MaterializedArtifact,
 )
+from distributed_inference.artifact_processing.artifact_workspace import (
+    ArtifactWorkspace,
+)
+from distributed_inference.domain.model_graph_info import LayerKey, ModelGraph
 from distributed_inference.model_splitter.application.ports.outbound.model_splitter import (
     ModelSplitter,
 )
@@ -18,8 +25,8 @@ class OnnxModelSplitter(ModelSplitter):
         self,
         model_graph: ModelGraph,
         layers: Iterable[LayerKey],
-        input_paths: ArtifactConcretePaths,
-        output_paths: ArtifactConcretePaths,
+        input_paths: MaterializedArtifact,
+        output_paths: ArtifactWorkspace,
     ) -> None:
 
         if not layers:
@@ -27,6 +34,7 @@ class OnnxModelSplitter(ModelSplitter):
 
         if input_paths.entrypoint_path is None:
             raise ValueError("Entrypoint path must be set when splitting model")
+
         input_model_path = input_paths.entrypoint_path.resolve(strict=True)
         output_model_path = output_paths.root_path.resolve().joinpath(
             "split_model.onnx"
@@ -49,7 +57,7 @@ class OnnxModelSplitter(ModelSplitter):
         if not output_names:
             raise ValueError("The extracted component has no outputs")
 
-        output_model_path.parent.mkdir(parents=True, exist_ok=True)
+        await aiofiles.os.makedirs(output_model_path.parent, exist_ok=True)
 
         await asyncio.to_thread(
             self.__extract_model_sync,

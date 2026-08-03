@@ -9,10 +9,10 @@ from distributed_inference.domain.identifiers import (
     ModelVersionId,
     UserId,
 )
-from distributed_inference.model_artifact.application.ports.outbound.materializer.model_version_materializer import (
+from distributed_inference.model_materializer.application.ports.outbound.model_version_materializer import (
     ModelVersionMaterializer,
 )
-from distributed_inference.model_artifact.application.ports.outbound.store.model_version_artifact_store import (
+from distributed_inference.model_artifact.application.ports.outbound.model_version_artifact_store import (
     ModelVersionArtifactStore,
 )
 from test.support.model_artifact.artifact_bundle_test_utils import (

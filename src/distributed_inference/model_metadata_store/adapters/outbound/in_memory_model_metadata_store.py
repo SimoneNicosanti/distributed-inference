@@ -23,7 +23,7 @@ from distributed_inference.model_metadata_store.domain.model_metadata import (
 
 class InMemoryModelMetadataStore(ModelMetadataStore):
     ## In this case, we need no lock: since there is no await in the methods
-    ## No coroutine can interleave the execution, so the axcess will always be safe
+    ## No coroutine can interleave the execution, so the access will always be safe
     def __init__(self) -> None:
         self._model_metadata: dict[ModelId, ModelMetadata] = {}
         self._model_version_metadata: dict[ModelVersionId, ModelVersionMetadata] = {}

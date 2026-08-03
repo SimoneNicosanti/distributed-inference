@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from distributed_inference.domain.identifiers import SubModelId
-from distributed_inference.model_artifact.adapters.outbound.store.local.local_sub_model_artifact_store import (
+from distributed_inference.model_artifact.adapters.outbound.local.local_sub_model_artifact_store import (
     LocalSubModelArtifactStore,
 )
 from distributed_inference.model_artifact.domain.artifact_bundle import (

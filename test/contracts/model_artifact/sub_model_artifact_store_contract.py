@@ -12,7 +12,7 @@ from distributed_inference.domain.identifiers import (
     UserId,
 )
 from distributed_inference.domain.model_graph_info import LayerKey
-from distributed_inference.model_artifact.application.ports.outbound.store.sub_model_artifact_store import (
+from distributed_inference.model_artifact.application.ports.outbound.sub_model_artifact_store import (
     SubModelArtifactStore,
 )
 from distributed_inference.model_artifact.domain.artifact_bundle import (
