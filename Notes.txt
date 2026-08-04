@@ -1,5 +1,8 @@
 Evaluate Rollback library for managing consistent states https://github.com/lexsca/rollback
 
+Evaluate torch.fx https://docs.pytorch.org/docs/2.13/fx.html for different engine split.
+This can also offer optimization apis https://github.com/pytorch/pytorch/blob/40cbf342d3c000712da92cfafeaca651b3e0bd3e/torch/fx/experimental/optimization.py#L50
+It looks like this API actually existed back at the dissertation times, but I could not find it 🤐
 
 Test Prompt:
 YOU ARE ALLOWED TO READ THE CONTENT OF THE src DIRECTORY, BUT YOU ARE NOT ALLOWED TO WRITE ANYTHING INSIDE THE src DIRECTORY.

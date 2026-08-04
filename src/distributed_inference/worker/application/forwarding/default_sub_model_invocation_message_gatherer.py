@@ -76,9 +76,13 @@ class DefaultSubModelInvocationMessageGatherer(
             sub_model_invocation_request = self._build_sub_model_invocation_request(
                 all_sub_model_invocation_messages, service_inference_plan
             )
+            self._clear_all_by_gathering_key(gather_key)
             return sub_model_invocation_request, sub_model_invocation_id
         else:
             return None, sub_model_invocation_id
+
+    def _clear_all_by_gathering_key(self, gather_key: GatherKey) -> None:
+        self._gathering_key_to_ids.pop(gather_key)
 
     def _check_arrived_all(
         self,

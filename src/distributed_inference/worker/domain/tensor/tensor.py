@@ -10,17 +10,20 @@ class Tensor(BaseModel):
         arbitrary_types_allowed=True,
     )
 
-    tensor: np.ndarray
+    value: np.ndarray
     name: str
     shape: tuple[int, ...]
     dtype: np.dtype
 
+    def get_value(self) -> np.ndarray:
+        return self.value
+
     @model_serializer(mode="plain")
     def serialize(self) -> dict[str, Any]:
-        array = np.ascontiguousarray(self.tensor)
+        array = np.ascontiguousarray(self.value)
 
         return {
-            "tensor": array.tobytes(),
+            "value": array.tobytes(),
             "name": self.name,
             "shape": array.shape,
             # Unlike dtype.name, dtype.str preserves byte order.
@@ -29,22 +32,22 @@ class Tensor(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def deserialize(cls, value: Any) -> Any:
-        if not isinstance(value, dict):
-            return value
+    def deserialize(cls, des_whole: Any) -> Any:
+        if not isinstance(des_whole, dict):
+            return des_whole
 
-        raw_tensor = value.get("tensor")
-        if not isinstance(raw_tensor, (bytes, bytearray, memoryview)):
-            return value
+        raw_value = des_whole.get("value")
+        if not isinstance(raw_value, (bytes, bytearray, memoryview)):
+            return des_whole
 
-        shape = tuple(value["shape"])
-        dtype = np.dtype(value["dtype"])
+        shape = tuple(des_whole["shape"])
+        dtype = np.dtype(des_whole["dtype"])
 
-        tensor = np.frombuffer(raw_tensor, dtype=dtype).reshape(shape).copy()
+        value = np.frombuffer(raw_value, dtype=dtype).reshape(shape).copy()
 
         return {
-            **value,
-            "tensor": tensor,
+            **des_whole,
+            "value": value,
             "shape": shape,
             "dtype": dtype,
         }
@@ -53,3 +56,6 @@ class Tensor(BaseModel):
 class TensorBundle(BaseModel):
     model_config = ConfigDict(frozen=True)
     bundle: dict[str, Tensor]
+
+    def get_tensor_by_name(self, name: str) -> Tensor | None:
+        return self.bundle.get(name, None)

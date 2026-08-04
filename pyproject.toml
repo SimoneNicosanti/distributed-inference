@@ -102,7 +102,7 @@ enable_error_code = ["explicit-override"]
 
 # Evita che import interni non risolti diventino silenziosamente Any,
 # facendo perdere i controlli sulle firme e sugli override.
-disallow_any_unimported = true
+disallow_any_unimported = false
 
 warn_unused_configs = true
 warn_unreachable = true

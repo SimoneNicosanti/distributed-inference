@@ -28,6 +28,16 @@ from distributed_inference.worker.application.scheduling.contracts.sub_model_inv
 from distributed_inference.worker.application.sub_model_execution.contracts.sub_model_execution_coordinator import (
     SubModelExecutionCoordinator,
 )
+from distributed_inference.worker.application.sub_model_execution.contracts.sub_model_executor_registry import (
+    SubModelExecutorRegistry,
+)
+from distributed_inference.worker.domain.sub_model.execution.sub_model_execution_context import (
+    SubModelExecutionContext,
+)
+from distributed_inference.worker.domain.sub_model.execution.sub_model_execution_input_output import (
+    SubModelExecutionInput,
+    SubModelExecutionOutput,
+)
 from distributed_inference.worker.domain.sub_model.invocation.sub_model_invocation_request_response import (
     SubModelInvocationRequest,
     SubModelInvocationResponse,
@@ -42,12 +52,14 @@ class DefaultSubModelExecutionCoordinator(
         inference_plan_store: ServiceInferencePlanStore,
         activity_manager: ActivityManager,
         sub_model_inference_request_scheduler: SubModelInvocationRequestScheduler,
+        sub_model_executor_registry: SubModelExecutorRegistry,
     ) -> None:
         self._inference_plan_store = inference_plan_store
         self._activity_manager = activity_manager
         self._sub_model_inference_request_scheduler = (
             sub_model_inference_request_scheduler
         )
+        self._sub_model_executor_registry = sub_model_executor_registry
 
     @override
     async def prepare_service_inference_plan(
@@ -66,15 +78,15 @@ class DefaultSubModelExecutionCoordinator(
         ## Here we can only enqueue the request
         ## The request will then be extracted in the loop of the coordinator
         ## and sent to the worker to be processed
-        future: asyncio.Future[SubModelInvocationResponse] = (
+        inference_response_future: asyncio.Future[SubModelInvocationResponse] = (
             asyncio.get_running_loop().create_future()
         )
 
         await self._sub_model_inference_request_scheduler.enqueue(
-            sub_model_invocation_request, future
+            sub_model_invocation_request, inference_response_future
         )
 
-        inference_response: SubModelInvocationResponse = await future
+        inference_response: SubModelInvocationResponse = await inference_response_future
 
         return inference_response
 
@@ -111,6 +123,60 @@ class DefaultSubModelExecutionCoordinator(
         return activity_request
 
     async def _actual_process_inference_request(
-        self, inference_request: SubModelInvocationRequest
+        self, invocation_request: SubModelInvocationRequest
     ) -> SubModelInvocationResponse:
-        raise NotImplementedError
+
+        sub_model_deployment_id = invocation_request.context.sub_model_deployment_id
+        sub_model_executor = (
+            await self._sub_model_executor_registry.get_sub_model_executor(
+                sub_model_deployment_id
+            )
+        )
+
+        sub_model_execution_input = self._build_sub_model_execution_input(
+            invocation_request
+        )
+
+        sub_model_execution_output = (
+            await sub_model_executor.process_sub_model_inference_input(
+                sub_model_execution_input
+            )
+        )
+
+        sub_model_invocation_response = self._build_sub_model_execution_response(
+            invocation_request, sub_model_execution_output
+        )
+
+        return sub_model_invocation_response
+
+    def _build_sub_model_execution_response(
+        self,
+        invocation_request: SubModelInvocationRequest,
+        sub_model_execution_output: SubModelExecutionOutput,
+    ) -> SubModelInvocationResponse:
+        sub_model_invocation_response = SubModelInvocationResponse(
+            context=invocation_request.context,
+            payload=sub_model_execution_output.payload,
+        )
+
+        ## TODO: Build the set of all tensors available after execution by
+        ## merging the invocation payload with the tensors produced by the executor.
+        ## Routing will select the tensors sent to each successor.
+
+        return sub_model_invocation_response
+
+    def _build_sub_model_execution_input(
+        self, invocation_request: SubModelInvocationRequest
+    ) -> SubModelExecutionInput:
+        sub_model_execution_context = SubModelExecutionContext(
+            sub_model_invocation_context=invocation_request.context
+        )
+
+        ## TODO: Filter the invocation_request payload based on the plan!
+        # We should pass to the executor only what it really needs to run the sub model inference
+
+        sub_model_execution_input = SubModelExecutionInput(
+            sub_model_execution_context=sub_model_execution_context,
+            payload=invocation_request.payload,
+        )
+        return sub_model_execution_input
