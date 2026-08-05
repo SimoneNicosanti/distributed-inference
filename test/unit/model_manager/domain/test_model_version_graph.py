@@ -5,23 +5,13 @@ from distributed_inference.model_manager.domain.model_version_graph import (
     EdgeInfo,
     FlopsInfo,
     LayerInfo,
-    ModelInfo,
-    ModelType,
     ModelVersionGraph,
-    TaskType,
+    ShapePoint,
     TensorInfo,
 )
 
-
-def _model_info() -> ModelInfo:
-    return ModelInfo(
-        name="test-model",
-        accuracy=0.9,
-        task=TaskType.CLASSIFICATION,
-        type=ModelType.CNN,
-        dynamic_shapes={},
-        sequence_sizes=[1, 8],
-    )
+BATCH_1 = ShapePoint(dims=(("batch_size", 1),))
+BATCH_8 = ShapePoint(dims=(("batch_size", 8),))
 
 
 def _layer(
@@ -37,7 +27,7 @@ def _layer(
     return LayerInfo(
         name=name,
         type="TestOp",
-        flops=FlopsInfo(flops={1: flops[0], 8: flops[1]}),
+        flops=FlopsInfo(flops={BATCH_1: flops[0], BATCH_8: flops[1]}),
         weights_size=weights_size,
         inputs=inputs,
         outputs=outputs,
@@ -49,7 +39,7 @@ def _layer(
 
 
 def _linear_graph() -> ModelVersionGraph:
-    graph = ModelVersionGraph(model_info=_model_info())
+    graph = ModelVersionGraph(shape_points=[BATCH_1, BATCH_8])
     for layer in (
         _layer(
             "input",
@@ -85,13 +75,13 @@ def _linear_graph() -> ModelVersionGraph:
         {
             "input_tensor": TensorInfo(
                 name="input_tensor",
-                shapes={1: [1, 3], 8: [8, 3]},
-                sizes={1: 12.0, 8: 96.0},
+                shapes={BATCH_1: [1, 3], BATCH_8: [8, 3]},
+                sizes={BATCH_1: 12.0, BATCH_8: 96.0},
             ),
             "output_tensor": TensorInfo(
                 name="output_tensor",
-                shapes={1: [1, 4], 8: [8, 4]},
-                sizes={1: 16.0, 8: 128.0},
+                shapes={BATCH_1: [1, 4], BATCH_8: [8, 4]},
+                sizes={BATCH_1: 16.0, BATCH_8: 128.0},
             ),
         }
     )
@@ -99,35 +89,66 @@ def _linear_graph() -> ModelVersionGraph:
 
 
 @pytest.mark.unit
-def test_flops_addition_combines_matching_sequence_lengths() -> None:
-    total = FlopsInfo(flops={1: 10.0, 8: 80.0}) + FlopsInfo(flops={1: 5.0, 8: 40.0})
+def test_flops_addition_combines_matching_shape_points() -> None:
+    total = FlopsInfo(flops={BATCH_1: 10.0, BATCH_8: 80.0}) + FlopsInfo(
+        flops={BATCH_1: 5.0, BATCH_8: 40.0}
+    )
 
-    assert total.flops == {1: 15.0, 8: 120.0}
+    assert total.flops == {BATCH_1: 15.0, BATCH_8: 120.0}
 
-    with pytest.raises(ValueError, match="same sequence lengths"):
-        FlopsInfo(flops={1: 10.0}) + FlopsInfo(flops={8: 80.0})
+    with pytest.raises(ValueError, match="same shape points"):
+        FlopsInfo(flops={BATCH_1: 10.0}) + FlopsInfo(flops={BATCH_8: 80.0})
 
 
 @pytest.mark.unit
-def test_graph_queries_report_reachability_boundaries_and_default_costs() -> None:
+def test_flops_addition_treats_an_empty_operand_as_neutral() -> None:
+    populated = FlopsInfo(flops={BATCH_1: 10.0})
+
+    assert FlopsInfo() + populated == populated
+    assert populated + FlopsInfo() == populated
+
+
+@pytest.mark.unit
+def test_graph_queries_report_reachability_and_boundaries() -> None:
     graph = _linear_graph()
 
+    assert graph.is_dag()
     assert graph.has_path("input", "output")
-    assert list(graph.get_reachable_from_layer("first")) == [
+    assert set(graph.get_reachable_from_layer("first")) == {
         "first",
         "second",
         "output",
-    ]
+    }
     assert graph.get_in_out_layer_degree("first") == (1, 1)
     assert graph.find_tensor_producer("hidden") == "first"
     assert graph.find_tensor_consumer_set("hidden") == {"second"}
-    assert graph.get_default_sizes_for_tensors_set({"input_tensor"}) == {
-        "input_tensor": 12.0
-    }
-    assert graph.get_default_flops_for_layer_set({"second"}) == {"second": 20.0}
+    assert graph.get_topological_sort() == ["input", "first", "second", "output"]
     assert graph.extract_incoming_outgoing_tensors_of_sub_model(
         {"first", "second"}
     ) == ({"input_tensor"}, {"output_tensor"})
+
+
+@pytest.mark.unit
+def test_sub_model_boundaries_include_model_input_and_output_tensors() -> None:
+    graph = _linear_graph()
+
+    incoming, outgoing = graph.extract_incoming_outgoing_tensors_of_sub_model(
+        {"input", "first"}
+    )
+
+    assert incoming == {"input_tensor"}
+    assert outgoing == {"hidden"}
+
+
+@pytest.mark.unit
+def test_tensors_map_round_trips_the_registered_tensor_info() -> None:
+    graph = _linear_graph()
+
+    tensors_map = graph.get_tensors_map()
+
+    assert set(tensors_map) == {"input_tensor", "output_tensor"}
+    assert tensors_map["input_tensor"].sizes[BATCH_8] == 96.0
+    assert tensors_map["output_tensor"].shapes[BATCH_1] == [1, 4]
 
 
 @pytest.mark.unit
@@ -138,7 +159,8 @@ def test_contracting_an_internal_edge_rewires_graph_and_combines_metadata() -> N
 
     aggregated = graph.get_layer_info("first∘second")
     assert aggregated.type == AGGREGATED_LAYER_TYPE
-    assert aggregated.flops == FlopsInfo(flops={1: 30.0, 8: 240.0})
+    assert aggregated.is_aggregated
+    assert aggregated.flops == FlopsInfo(flops={BATCH_1: 30.0, BATCH_8: 240.0})
     assert aggregated.weights_size == 5.0
     assert aggregated.inputs == {"input_tensor"}
     assert aggregated.outputs == {"output_tensor"}
@@ -161,6 +183,7 @@ def test_edge_with_an_alternative_path_is_not_contractible() -> None:
 
     assert not graph.is_edge_contractible(("first", "output"))
     assert not graph.is_edge_contractible(("input", "first"))
+    assert not graph.is_edge_contractible(("input", "output"))
 
     with pytest.raises(ValueError, match="cannot be contracted"):
         graph.contract_edge_layers(("input", "first"))

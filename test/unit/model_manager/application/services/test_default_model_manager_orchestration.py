@@ -2,7 +2,6 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from uuid import uuid4
 
 import pytest
 
@@ -19,19 +18,8 @@ from distributed_inference.artifact_store.domain.artifact_key import (
     ModelVersionArtifactKey,
     SubModelArtifactKey,
 )
-from distributed_inference.domain.identifiers import (
-    UserId,
-)
 from distributed_inference.model_manager.application.services.default_model_manager import (
     DefaultModelManager,
-)
-from distributed_inference.model_manager.domain.model import ModelId
-from distributed_inference.model_manager.domain.model_version import ModelVersionId
-from distributed_inference.model_manager.domain.model_version_graph import (
-    ModelInfo,
-    ModelType,
-    ModelVersionGraph,
-    TaskType,
 )
 from distributed_inference.model_manager.domain.sub_model import SubModelId
 from distributed_inference.model_metadata_store.application.ports.outbound.model_metadata_store import (
@@ -47,29 +35,12 @@ from test.support.artifact_materializer.materialized_artifact_test_utils import 
     build_test_materialized_artifact,
 )
 from test.support.artifact_store.artifact_bundle_test_utils import build_test_bundle
-
-
-def _ids() -> tuple[ModelId, ModelVersionId, SubModelId]:
-    model_id = ModelId(
-        owner_id=UserId(id=uuid4()),
-        model_name="vision-model",
-    )
-    version_id = ModelVersionId(model_id=model_id, version_tag=1)
-    sub_model_id = SubModelId(
-        model_version_id=version_id,
-        layers=("encoder.0", "encoder.1"),
-    )
-    return model_id, version_id, sub_model_id
-
-
-def _model_info() -> ModelInfo:
-    return ModelInfo(
-        name="vision-model",
-        accuracy=0.9,
-        task=TaskType.CLASSIFICATION,
-        type=ModelType.VIT,
-        dynamic_shapes={},
-    )
+from test.support.model_manager.model_domain_test_utils import (
+    build_model,
+    build_model_version,
+    build_model_version_id,
+    build_profiled_model_version,
+)
 
 
 @asynccontextmanager
@@ -96,7 +67,21 @@ def _manager(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_put_model_version_stores_profiles_and_registers_graph(
+async def test_register_model_delegates_to_the_metadata_store() -> None:
+    metadata_store = MagicMock(spec=ModelMetadataStore)
+    manager = _manager(metadata_store=metadata_store)
+    model = build_model()
+    metadata_store.register_model.return_value = model.model_id
+
+    result = await manager.register_model(model)
+
+    assert result == model.model_id
+    metadata_store.register_model.assert_awaited_once_with(model)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_upload_model_version_stores_artifact_then_registers_the_profile(
     tmp_path: Path,
 ) -> None:
     profiler = MagicMock(spec=ModelProfiler)
@@ -109,22 +94,26 @@ async def test_put_model_version_stores_profiles_and_registers_graph(
         metadata_store=metadata_store,
         materializer=materializer,
     )
-    model_id, version_id, _ = _ids()
-    model_info = _model_info()
+    model = build_model()
+    model_version = build_model_version(
+        model_version_id=build_model_version_id(model_id=model.model_id)
+    )
+    version_id = model_version.model_version_id
+    profiled_model_version = build_profiled_model_version(model_version=model_version)
     bundle = build_test_bundle(tmp_path / "input")
     entrypoint = tmp_path / "materialized" / "model.onnx"
     entrypoint.parent.mkdir()
     entrypoint.write_bytes(b"model")
     materialized = build_test_materialized_artifact(entrypoint)
-    graph = MagicMock(spec=ModelVersionGraph)
     metadata_store.register_model_version.return_value = version_id
+    metadata_store.get_model.return_value = model
     materializer.materialize_artifact.return_value = _async_context(materialized)
-    profiler.profile_model.return_value = graph
+    profiler.profile_model_version.return_value = profiled_model_version
 
-    result = await manager.upload_model_version(model_id, model_info, bundle)
+    result = await manager.upload_model_version(model_version, bundle)
 
     assert result == version_id
-    metadata_store.register_model_version.assert_awaited_once_with(model_id, model_info)
+    metadata_store.register_model_version.assert_awaited_once_with(model_version)
     artifact_store.put_artifact.assert_awaited_once_with(
         ModelVersionArtifactKey(id=version_id),
         bundle,
@@ -132,15 +121,19 @@ async def test_put_model_version_stores_profiles_and_registers_graph(
     materializer.materialize_artifact.assert_called_once_with(
         ModelVersionArtifactKey(id=version_id)
     )
-    profiler.profile_model.assert_awaited_once_with(materialized, model_info)
-    metadata_store.register_model_version_graph.assert_awaited_once_with(
-        version_id, graph
+    profiler.profile_model_version.assert_awaited_once_with(
+        materialized,
+        model.model_info,
+        model_version,
+    )
+    metadata_store.register_profiled_model_version.assert_awaited_once_with(
+        profiled_model_version
     )
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_generate_sub_model_splits_and_stores_component(
+async def test_generate_sub_model_splits_the_model_and_stores_the_sub_model(
     tmp_path: Path,
 ) -> None:
     artifact_store = MagicMock(spec=ArtifactStore)
@@ -153,16 +146,21 @@ async def test_generate_sub_model_splits_and_stores_component(
         materializer=materializer,
         splitter=splitter,
     )
-    _, version_id, sub_model_id = _ids()
-    layers = ["encoder.0", "encoder.1"]
-    graph = MagicMock(spec=ModelVersionGraph)
+    model_version = build_model_version()
+    version_id = model_version.model_version_id
+    profiled_model_version = build_profiled_model_version(model_version=model_version)
+    layers = ["encoder.1", "encoder.0"]
+    expected_sub_model_id = SubModelId(
+        model_version_id=version_id,
+        layers=tuple(layers),
+    )
     input_entrypoint = tmp_path / "input" / "model.onnx"
     input_entrypoint.parent.mkdir()
     input_entrypoint.write_bytes(b"model")
     materialized = build_test_materialized_artifact(input_entrypoint)
     split_bundle = build_test_bundle(tmp_path / "split-result")
-    metadata_store.get_model_graph.return_value = graph
-    metadata_store.register_sub_model.return_value = sub_model_id
+    metadata_store.get_profiled_model_version.return_value = profiled_model_version
+    metadata_store.register_sub_model.return_value = expected_sub_model_id
     materializer.materialize_artifact.return_value = _async_context(materialized)
 
     with patch(
@@ -173,25 +171,25 @@ async def test_generate_sub_model_splits_and_stores_component(
     ) as build_bundle:
         result = await manager.generate_sub_model(version_id, layers)
 
-    assert result == sub_model_id
-    normalized_layers = tuple(layers)
-    metadata_store.register_sub_model.assert_awaited_once_with(
-        version_id, normalized_layers
+    assert result.sub_model_id == expected_sub_model_id
+    metadata_store.register_sub_model.assert_awaited_once()
+    assert (
+        metadata_store.register_sub_model.call_args.args[0].sub_model_id
+        == expected_sub_model_id
     )
     materializer.materialize_artifact.assert_called_once_with(
         ModelVersionArtifactKey(id=version_id)
     )
-    split_output = splitter.split_model.call_args.args[3]
+    splitter.split_model.assert_awaited_once()
+    split_call_args = splitter.split_model.call_args.args
+    assert split_call_args[0] is profiled_model_version.model_version_graph
+    assert split_call_args[1] == tuple(layers)
+    assert split_call_args[2] is materialized
+    split_output = split_call_args[3]
     assert isinstance(split_output, ArtifactWorkspace)
-    splitter.split_model.assert_awaited_once_with(
-        graph,
-        normalized_layers,
-        materialized,
-        split_output,
-    )
     build_bundle.assert_called_once_with(split_output)
     artifact_store.put_artifact.assert_awaited_once_with(
-        SubModelArtifactKey(id=sub_model_id),
+        SubModelArtifactKey(id=expected_sub_model_id),
         split_bundle,
     )
 
@@ -201,66 +199,60 @@ async def test_generate_sub_model_splits_and_stores_component(
 async def test_generate_sub_model_rejects_string_layers_before_dependencies() -> None:
     metadata_store = MagicMock(spec=ModelMetadataStore)
     manager = _manager(metadata_store=metadata_store)
-    _, version_id, _ = _ids()
 
     with pytest.raises(ValueError, match="Layers must contain layer names"):
-        await manager.generate_sub_model(version_id, "encoder.0")
+        await manager.generate_sub_model(build_model_version_id(), "encoder.0")
 
-    metadata_store.get_model_graph.assert_not_awaited()
+    metadata_store.get_profiled_model_version.assert_not_awaited()
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_generate_sub_model_requires_ready_graph() -> None:
+async def test_generate_sub_model_requires_a_profiled_model_version() -> None:
     metadata_store = MagicMock(spec=ModelMetadataStore)
-    metadata_store.get_model_graph.return_value = None
+    metadata_store.get_profiled_model_version.return_value = None
     manager = _manager(metadata_store=metadata_store)
-    _, version_id, _ = _ids()
 
     with pytest.raises(ValueError, match="still not ready"):
-        await manager.generate_sub_model(version_id, ["encoder.0"])
+        await manager.generate_sub_model(build_model_version_id(), ["encoder.0"])
 
     metadata_store.register_sub_model.assert_not_awaited()
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("metadata_exists", "artifact_exists", "expected"),
-    [
-        (True, True, True),
-        (True, False, False),
-        (False, True, False),
-    ],
-)
-async def test_model_version_existence_requires_metadata_and_artifact(
-    metadata_exists: bool,
-    artifact_exists: bool,
-    expected: bool,
-) -> None:
-    artifact_store = MagicMock(spec=ArtifactStore)
+async def test_get_profiled_model_version_requires_a_profiled_model_version() -> None:
     metadata_store = MagicMock(spec=ModelMetadataStore)
-    manager = _manager(
-        artifact_store=artifact_store,
-        metadata_store=metadata_store,
-    )
-    _, version_id, _ = _ids()
-    metadata_store.check_model_version_existence.return_value = metadata_exists
-    artifact_store.check_artifact_existence.return_value = artifact_exists
+    metadata_store.get_profiled_model_version.return_value = None
+    manager = _manager(metadata_store=metadata_store)
 
-    result = await manager.check_model_version_existence(version_id)
-
-    assert result is expected
-    artifact_store.check_artifact_existence.assert_awaited_once_with(
-        ModelVersionArtifactKey(id=version_id)
-    )
+    with pytest.raises(ValueError, match="still not ready"):
+        await manager.get_profiled_model_version(build_model_version_id())
 
 
 @pytest.mark.unit
-def test_get_sub_model_opens_sub_model_artifact() -> None:
+@pytest.mark.asyncio
+async def test_get_profiled_model_version_returns_the_stored_profile() -> None:
+    metadata_store = MagicMock(spec=ModelMetadataStore)
+    manager = _manager(metadata_store=metadata_store)
+    profiled_model_version = build_profiled_model_version()
+    version_id = profiled_model_version.model_version_id
+    metadata_store.get_profiled_model_version.return_value = profiled_model_version
+
+    result = await manager.get_profiled_model_version(version_id)
+
+    assert result is profiled_model_version
+    metadata_store.get_profiled_model_version.assert_awaited_once_with(version_id)
+
+
+@pytest.mark.unit
+def test_download_sub_model_opens_the_sub_model_artifact() -> None:
     artifact_store = MagicMock(spec=ArtifactStore)
     manager = _manager(artifact_store=artifact_store)
-    _, _, sub_model_id = _ids()
+    sub_model_id = SubModelId(
+        model_version_id=build_model_version_id(),
+        layers=("encoder.0", "encoder.1"),
+    )
     expected_context = MagicMock()
     artifact_store.open_artifact.return_value = expected_context
 

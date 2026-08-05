@@ -37,7 +37,7 @@ async def test_materializer_delegates_paths_to_local_store(tmp_path: Path) -> No
                 owner_id=UserId(id=uuid4()),
                 model_name="resnet50",
             ),
-            version_tag=1,
+            version_tag="v1",
         )
     )
     root_path = tmp_path / "bundle"

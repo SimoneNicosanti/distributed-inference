@@ -10,9 +10,9 @@ from pydantic import BaseModel
 from distributed_inference.artifact_processing.artifact_workspace import (
     ArtifactWorkspace,
 )
+from distributed_inference.model_manager.domain.model_version import ModelVersionInfo
 from distributed_inference.model_manager.domain.model_version_graph import (
     FlopsInfo,
-    ModelInfo,
     ModelVersionGraph,
 )
 from distributed_inference.model_profiler.application.ports.outbound.model_graph_extractor import (
@@ -40,10 +40,12 @@ class AggregationCase:
 
 def _normalise(value: Any) -> Any:
     if isinstance(value, BaseModel):
-        return _normalise(value.model_dump(mode="python"))
+        return {
+            name: _normalise(getattr(value, name)) for name in type(value).model_fields
+        }
     if isinstance(value, Mapping):
-        return {key: _normalise(item) for key, item in value.items()}
-    if isinstance(value, set):
+        return {_normalise_key(key): _normalise(item) for key, item in value.items()}
+    if isinstance(value, (set, frozenset)):
         return sorted(_normalise(item) for item in value)
     if isinstance(value, tuple):
         return tuple(_normalise(item) for item in value)
@@ -52,9 +54,19 @@ def _normalise(value: Any) -> Any:
     return value
 
 
+def _normalise_key(value: Any) -> Any:
+    normalised = _normalise(value)
+    try:
+        hash(normalised)
+    except TypeError:
+        ## Structured keys (e.g. shape points) are compared by their repr.
+        return repr(normalised)
+    return normalised
+
+
 def _graph_snapshot(graph: ModelVersionGraph) -> dict[str, Any]:
     return {
-        "model_info": _normalise(graph.model_info),
+        "shape_points": _normalise(graph.shape_points),
         "layers": {
             name: _normalise(layer_info)
             for name, layer_info in graph.get_all_layers().items()
@@ -79,7 +91,7 @@ class ModelGraphExtractorContract:
         raise NotImplementedError
 
     @pytest.fixture
-    def model_info(self) -> ModelInfo:
+    def model_version_info(self) -> ModelVersionInfo:
         raise NotImplementedError
 
     @pytest.fixture
@@ -90,21 +102,23 @@ class ModelGraphExtractorContract:
     def aggregation_case(self) -> AggregationCase:
         raise NotImplementedError
 
-    def test_extract_model_graph_preserves_metadata_and_topology(
+    def test_extract_model_graph_preserves_shape_points_and_topology(
         self,
         extractor: ModelGraphExtractor,
         representative_model_paths: ArtifactWorkspace,
-        model_info: ModelInfo,
+        model_version_info: ModelVersionInfo,
         extracted_graph_expectation: ExtractedGraphExpectation,
     ) -> None:
         graph = extractor.extract_model_graph(
             representative_model_paths,
-            model_info,
+            model_version_info,
             profile_flops=False,
             profile_tensors=False,
         )
 
-        assert graph.model_info == model_info
+        assert graph.shape_points == ModelGraphExtractor.compute_shape_points(
+            model_version_info
+        )
         assert frozenset(graph.get_all_layers()) == extracted_graph_expectation.layers
 
         actual_edges = {
@@ -117,18 +131,21 @@ class ModelGraphExtractorContract:
         self,
         extractor: ModelGraphExtractor,
         representative_model_paths: ArtifactWorkspace,
-        model_info: ModelInfo,
+        model_version_info: ModelVersionInfo,
         extracted_graph_expectation: ExtractedGraphExpectation,
     ) -> None:
+        expected_shape_points = set(
+            ModelGraphExtractor.compute_shape_points(model_version_info)
+        )
         unprofiled_graph = extractor.extract_model_graph(
             representative_model_paths,
-            model_info,
+            model_version_info,
             profile_flops=False,
             profile_tensors=False,
         )
         profiled_graph = extractor.extract_model_graph(
             representative_model_paths,
-            model_info,
+            model_version_info,
             profile_flops=True,
             profile_tensors=False,
         )
@@ -137,7 +154,7 @@ class ModelGraphExtractorContract:
             assert unprofiled_graph.get_layer_info(layer_name).flops.flops == {}
 
             profiled_flops = profiled_graph.get_layer_info(layer_name).flops.flops
-            assert set(profiled_flops) == set(model_info.sequence_sizes)
+            assert set(profiled_flops) == expected_shape_points
             assert all(value >= 0 for value in profiled_flops.values())
 
         for layer_name in extracted_graph_expectation.positive_flop_layers:
@@ -152,18 +169,21 @@ class ModelGraphExtractorContract:
         self,
         extractor: ModelGraphExtractor,
         representative_model_paths: ArtifactWorkspace,
-        model_info: ModelInfo,
+        model_version_info: ModelVersionInfo,
         extracted_graph_expectation: ExtractedGraphExpectation,
     ) -> None:
+        expected_shape_points = set(
+            ModelGraphExtractor.compute_shape_points(model_version_info)
+        )
         unprofiled_graph = extractor.extract_model_graph(
             representative_model_paths,
-            model_info,
+            model_version_info,
             profile_flops=False,
             profile_tensors=False,
         )
         profiled_graph = extractor.extract_model_graph(
             representative_model_paths,
-            model_info,
+            model_version_info,
             profile_flops=False,
             profile_tensors=True,
         )
@@ -174,8 +194,8 @@ class ModelGraphExtractorContract:
         assert frozenset(tensors_map) == extracted_graph_expectation.tensor_names
 
         for tensor_info in tensors_map.values():
-            assert set(tensor_info.shapes) == set(model_info.sequence_sizes)
-            assert set(tensor_info.sizes) == set(model_info.sequence_sizes)
+            assert set(tensor_info.shapes) == expected_shape_points
+            assert set(tensor_info.sizes) == expected_shape_points
             assert all(size > 0 for size in tensor_info.sizes.values())
 
     def test_aggregate_model_graphs_combines_metadata_without_mutating_inputs(
@@ -202,7 +222,7 @@ class ModelGraphExtractorContract:
         assert set(aggregated.get_all_edges()) == set(
             aggregation_case.level_2_graph.get_all_edges()
         )
-        assert aggregated.model_info == aggregation_case.level_2_graph.model_info
+        assert aggregated.shape_points == aggregation_case.level_2_graph.shape_points
 
         assert (
             aggregated.get_layer_info(aggregation_case.unchanged_layer).flops

@@ -13,43 +13,67 @@ from typing_extensions import override
 from distributed_inference.artifact_processing.artifact_workspace import (
     ArtifactWorkspace,
 )
-from distributed_inference.model_manager.domain.model_version import ShapeType
+from distributed_inference.model_manager.domain.model_version import (
+    DynamicShapeInfo,
+    ModelVersionInfo,
+    ShapeType,
+    StaticShapeInfo,
+)
 from distributed_inference.model_manager.domain.model_version_graph import (
     INPUT_LAYER_NAME,
     OUTPUT_LAYER_NAME,
     EdgeInfo,
     FlopsInfo,
     LayerInfo,
-    ModelInfo,
-    ModelType,
     ModelVersionGraph,
-    TaskType,
+    ShapePoint,
     TensorInfo,
 )
 from distributed_inference.model_profiler.adapters.outbound.onnx.onnx_model_graph_extractor import (
     OnnxGraphExtractor,
 )
-from test.contracts.model_profile.model_graph_extractor_contract import (
+from distributed_inference.model_profiler.application.ports.outbound.model_graph_extractor import (
+    ModelGraphExtractor,
+)
+from test.contracts.model_profiler.model_graph_extractor_contract import (
     AggregationCase,
     ExtractedGraphExpectation,
     ModelGraphExtractorContract,
 )
+from test.support.model_manager.model_domain_test_utils import (
+    build_model_version_info,
+)
+
+SEQUENCE_1 = ShapePoint(dims=(("batch_size", 1), ("sequence_size", 1)))
+SEQUENCE_4 = ShapePoint(dims=(("batch_size", 1), ("sequence_size", 4)))
 
 
-def _model_info(
+def _static_model_version_info() -> ModelVersionInfo:
+    return build_model_version_info(
+        static_shapes=[
+            StaticShapeInfo(type=ShapeType.BATCH, name="batch_size", value=1),
+        ],
+        dynamic_shapes=[],
+    )
+
+
+def _dynamic_model_version_info(
     *,
-    dynamic_shapes: dict[str, ShapeType] | None = None,
-    sequence_sizes: list[int] | None = None,
-) -> ModelInfo:
-    return ModelInfo(
-        name="test-model",
-        accuracy=1.0,
-        task=TaskType.CLASSIFICATION,
-        type=ModelType.BERT,
-        dynamic_shapes=dynamic_shapes or {},
-        sequence_sizes=sequence_sizes or [1],
-        num_heads=1,
-        hidden_size=4,
+    max_sequence_size: int = 4,
+) -> ModelVersionInfo:
+    return build_model_version_info(
+        static_shapes=[
+            StaticShapeInfo(type=ShapeType.BATCH, name="batch_size", value=1),
+        ],
+        dynamic_shapes=[
+            DynamicShapeInfo(
+                type=ShapeType.SEQUENCE,
+                name="sequence_size",
+                min_value=1,
+                max_value=max_sequence_size,
+                step_size=max_sequence_size - 1,
+            ),
+        ],
     )
 
 
@@ -57,7 +81,7 @@ def _artifact_paths(path: Path) -> ArtifactWorkspace:
     return ArtifactWorkspace(root_path=path.parent, entrypoint_path=path)
 
 
-def _flops(values: dict[int, float] | None = None) -> FlopsInfo:
+def _flops(values: dict[ShapePoint, float] | None = None) -> FlopsInfo:
     return FlopsInfo(flops=values or {})
 
 
@@ -66,7 +90,7 @@ def _layer(
     *,
     inputs: Iterable[str] = (),
     outputs: Iterable[str] = (),
-    flops: dict[int, float] | None = None,
+    flops: dict[ShapePoint, float] | None = None,
     is_input: bool = False,
     is_output: bool = False,
 ) -> LayerInfo:
@@ -158,39 +182,32 @@ def _write_representative_model(path: Path) -> np.ndarray:
     return weight
 
 
-def _build_aggregation_case(model_info: ModelInfo) -> AggregationCase:
-    level_1 = ModelVersionGraph(model_info=model_info)
+def _build_aggregation_case(shape_points: list[ShapePoint]) -> AggregationCase:
+    zero_flops = {shape_point: 0.0 for shape_point in shape_points}
+
+    def scaled(base: float) -> dict[ShapePoint, float]:
+        return {
+            shape_point: base * (index + 1)
+            for index, shape_point in enumerate(shape_points)
+        }
+
+    level_1 = ModelVersionGraph(shape_points=shape_points)
     for layer in (
         _layer(
             INPUT_LAYER_NAME,
             inputs={"input"},
             outputs={"input"},
-            flops={1: 0, 4: 0},
+            flops=zero_flops,
             is_input=True,
         ),
-        _layer(
-            "a",
-            inputs={"input"},
-            outputs={"a_out"},
-            flops={1: 10, 4: 40},
-        ),
-        _layer(
-            "b",
-            inputs={"a_out"},
-            outputs={"b_out"},
-            flops={1: 20, 4: 80},
-        ),
-        _layer(
-            "c",
-            inputs={"b_out"},
-            outputs={"output"},
-            flops={1: 30, 4: 120},
-        ),
+        _layer("a", inputs={"input"}, outputs={"a_out"}, flops=scaled(10)),
+        _layer("b", inputs={"a_out"}, outputs={"b_out"}, flops=scaled(20)),
+        _layer("c", inputs={"b_out"}, outputs={"output"}, flops=scaled(30)),
         _layer(
             OUTPUT_LAYER_NAME,
             inputs={"output"},
             outputs={"output"},
-            flops={1: 0, 4: 0},
+            flops=zero_flops,
             is_output=True,
         ),
     ):
@@ -203,54 +220,31 @@ def _build_aggregation_case(model_info: ModelInfo) -> AggregationCase:
 
     level_1.set_tensors_map(
         {
-            "input": TensorInfo(
-                name="input",
-                shapes={1: [1, 1, 4], 4: [1, 4, 4]},
-                sizes={1: 16, 4: 64},
-            ),
-            "a_out": TensorInfo(
-                name="a_out",
-                shapes={1: [1, 1, 4], 4: [1, 4, 4]},
-                sizes={1: 16, 4: 64},
-            ),
-            "b_out": TensorInfo(
-                name="b_out",
-                shapes={1: [1, 1, 4], 4: [1, 4, 4]},
-                sizes={1: 16, 4: 64},
-            ),
-            "output": TensorInfo(
-                name="output",
-                shapes={1: [1, 1, 3], 4: [1, 4, 3]},
-                sizes={1: 12, 4: 48},
-            ),
+            name: TensorInfo(
+                name=name,
+                shapes={shape_point: [1, 4] for shape_point in shape_points},
+                sizes={shape_point: 16.0 for shape_point in shape_points},
+            )
+            for name in ("input", "a_out", "b_out", "output")
         }
     )
 
-    level_2 = ModelVersionGraph(model_info=model_info)
+    level_2 = ModelVersionGraph(shape_points=shape_points)
     for layer in (
         _layer(
             INPUT_LAYER_NAME,
             inputs={"input"},
             outputs={"input"},
-            flops={1: 0, 4: 0},
+            flops=zero_flops,
             is_input=True,
         ),
-        _layer(
-            "a",
-            inputs={"input"},
-            outputs={"a_out"},
-            flops={1: 0, 4: 0},
-        ),
-        _layer(
-            "fused_bc",
-            inputs={"a_out"},
-            outputs={"output"},
-        ),
+        _layer("a", inputs={"input"}, outputs={"a_out"}, flops=zero_flops),
+        _layer("fused_bc", inputs={"a_out"}, outputs={"output"}),
         _layer(
             OUTPUT_LAYER_NAME,
             inputs={"output"},
             outputs={"output"},
-            flops={1: 0, 4: 0},
+            flops=zero_flops,
             is_output=True,
         ),
     ):
@@ -284,14 +278,8 @@ class TestOnnxGraphExtractorContract(ModelGraphExtractorContract):
 
     @pytest.fixture
     @override
-    def model_info(self) -> ModelInfo:
-        return _model_info(
-            dynamic_shapes={
-                "batch_size": ShapeType.BATCH,
-                "sequence_size": ShapeType.SEQUENCE,
-            },
-            sequence_sizes=[1, 4],
-        )
+    def model_version_info(self) -> ModelVersionInfo:
+        return _dynamic_model_version_info()
 
     @pytest.fixture
     @override
@@ -317,8 +305,10 @@ class TestOnnxGraphExtractorContract(ModelGraphExtractorContract):
 
     @pytest.fixture
     @override
-    def aggregation_case(self, model_info: ModelInfo) -> AggregationCase:
-        return _build_aggregation_case(model_info)
+    def aggregation_case(self, model_version_info: ModelVersionInfo) -> AggregationCase:
+        return _build_aggregation_case(
+            ModelGraphExtractor.compute_shape_points(model_version_info)
+        )
 
 
 class TestOnnxGraphExtractor:
@@ -331,13 +321,7 @@ class TestOnnxGraphExtractor:
 
         graph = OnnxGraphExtractor().extract_model_graph(
             _artifact_paths(path),
-            _model_info(
-                dynamic_shapes={
-                    "batch_size": ShapeType.BATCH,
-                    "sequence_size": ShapeType.SEQUENCE,
-                },
-                sequence_sizes=[1],
-            ),
+            _dynamic_model_version_info(),
             profile_flops=False,
             profile_tensors=False,
         )
@@ -380,7 +364,7 @@ class TestOnnxGraphExtractor:
 
         graph = OnnxGraphExtractor().extract_model_graph(
             _artifact_paths(path),
-            _model_info(),
+            _static_model_version_info(),
             profile_flops=False,
             profile_tensors=False,
         )
@@ -433,13 +417,25 @@ class TestOnnxGraphExtractor:
 
         graph = OnnxGraphExtractor().extract_model_graph(
             _artifact_paths(path),
-            _model_info(),
+            _static_model_version_info(),
             profile_flops=False,
             profile_tensors=False,
         )
 
         assert graph.has_layer("live_relu")
         assert not graph.has_layer("dead_constant")
+
+    def test_requires_the_workspace_entrypoint_to_be_set(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        with pytest.raises(ValueError, match="Entrypoint path must be set"):
+            OnnxGraphExtractor().extract_model_graph(
+                ArtifactWorkspace(root_path=tmp_path),
+                _static_model_version_info(),
+                profile_flops=False,
+                profile_tensors=False,
+            )
 
     def test_wraps_onnx_validation_errors_with_adapter_context(
         self,
@@ -465,26 +461,26 @@ class TestOnnxGraphExtractor:
         with pytest.raises(Exception, match=r"Invalid ONNX model: broken graph"):
             OnnxGraphExtractor().extract_model_graph(
                 _artifact_paths(ignored_path),
-                _model_info(),
+                _static_model_version_info(),
                 profile_flops=False,
                 profile_tensors=False,
             )
 
     @pytest.mark.parametrize(
-        ("dimension", "bindings", "expected"),
+        ("dimension", "shape_point", "expected"),
         [
             (
                 helper.make_tensor_value_info(
                     "x", TensorProto.FLOAT, [7]
                 ).type.tensor_type.shape.dim[0],
-                {},
+                ShapePoint(dims=()),
                 7,
             ),
             (
                 helper.make_tensor_value_info(
                     "x", TensorProto.FLOAT, ["2 * sequence_size + 1"]
                 ).type.tensor_type.shape.dim[0],
-                {"sequence_size": 4},
+                ShapePoint(dims=(("sequence_size", 4),)),
                 9,
             ),
         ],
@@ -492,10 +488,10 @@ class TestOnnxGraphExtractor:
     def test_resolves_static_and_symbolic_dimensions(
         self,
         dimension: onnx.TensorShapeProto.Dimension,
-        bindings: dict[str, int],
+        shape_point: ShapePoint,
         expected: int,
     ) -> None:
-        assert OnnxGraphExtractor._resolve_dimension(dimension, bindings) == expected
+        assert OnnxGraphExtractor._resolve_dimension(dimension, shape_point) == expected
 
     def test_rejects_anonymous_dynamic_dimensions(self) -> None:
         dimension = onnx.TensorShapeProto.Dimension()
@@ -504,7 +500,7 @@ class TestOnnxGraphExtractor:
             ValueError,
             match="Anonymous dynamic dimension cannot be resolved",
         ):
-            OnnxGraphExtractor._resolve_dimension(dimension, {})
+            OnnxGraphExtractor._resolve_dimension(dimension, ShapePoint(dims=()))
 
     def test_rejects_unresolved_symbolic_dimensions(self) -> None:
         dimension = onnx.TensorShapeProto.Dimension(dim_param="unknown + 1")
@@ -513,7 +509,7 @@ class TestOnnxGraphExtractor:
             ValueError,
             match=r"Unresolved symbolic dimension: unknown \+ 1",
         ):
-            OnnxGraphExtractor._resolve_dimension(dimension, {})
+            OnnxGraphExtractor._resolve_dimension(dimension, ShapePoint(dims=()))
 
     def test_rejects_non_integer_symbolic_dimensions(self) -> None:
         dimension = onnx.TensorShapeProto.Dimension(dim_param="sequence_size / 2")
@@ -524,11 +520,11 @@ class TestOnnxGraphExtractor:
         ):
             OnnxGraphExtractor._resolve_dimension(
                 dimension,
-                {"sequence_size": 3},
+                ShapePoint(dims=(("sequence_size", 3),)),
             )
 
     def test_infers_a_branched_fused_group_from_its_boundary_tensors(self) -> None:
-        graph = ModelVersionGraph(model_info=_model_info())
+        graph = ModelVersionGraph(shape_points=[SEQUENCE_1])
         for layer in (
             _layer(
                 INPUT_LAYER_NAME,
@@ -561,7 +557,7 @@ class TestOnnxGraphExtractor:
     def test_returns_none_when_a_fused_output_has_no_basic_graph_producer(
         self,
     ) -> None:
-        graph = ModelVersionGraph(model_info=_model_info())
+        graph = ModelVersionGraph(shape_points=[SEQUENCE_1])
         graph.add_layer(_layer("node", inputs={"input"}, outputs={"known"}))
 
         fused = _layer(
@@ -575,7 +571,7 @@ class TestOnnxGraphExtractor:
     def test_excludes_input_layer_from_inferred_fused_group(
         self,
     ) -> None:
-        graph = ModelVersionGraph(model_info=_model_info())
+        graph = ModelVersionGraph(shape_points=[SEQUENCE_1])
         for layer in (
             _layer(
                 INPUT_LAYER_NAME,
@@ -602,7 +598,7 @@ class TestOnnxGraphExtractor:
     def test_detects_fusion_when_onnx_optimizer_reuses_an_existing_node_name(
         self,
     ) -> None:
-        case = _build_aggregation_case(_model_info(sequence_sizes=[1, 4]))
+        case = _build_aggregation_case([SEQUENCE_1, SEQUENCE_4])
         level_2 = case.level_2_graph
 
         fused = level_2.get_layer_info("fused_bc")
@@ -624,10 +620,10 @@ class TestOnnxGraphExtractor:
 
         restored = aggregated.get_layer_info("c")
         assert {layer.name for layer in restored.aggregated_layers} == {"b", "c"}
-        assert restored.flops == _flops({1: 50, 4: 200})
+        assert restored.flops == _flops({SEQUENCE_1: 50, SEQUENCE_4: 100})
 
     def test_leaves_unknown_fusions_unannotated(self) -> None:
-        case = _build_aggregation_case(_model_info(sequence_sizes=[1, 4]))
+        case = _build_aggregation_case([SEQUENCE_1, SEQUENCE_4])
         fused = case.level_2_graph.get_layer_info("fused_bc")
         fused.outputs = {"unknown_output"}
 

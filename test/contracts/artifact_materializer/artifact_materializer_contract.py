@@ -41,7 +41,7 @@ class ArtifactMaterializerContract(ABC):
                     owner_id=UserId(id=uuid4()),
                     model_name="resnet50",
                 ),
-                version_tag=1,
+                version_tag="v1",
             )
         )
         bundle = build_test_bundle(
@@ -75,7 +75,7 @@ class ArtifactMaterializerContract(ABC):
                     owner_id=UserId(id=uuid4()),
                     model_name="missing",
                 ),
-                version_tag=1,
+                version_tag="v1",
             )
         )
 

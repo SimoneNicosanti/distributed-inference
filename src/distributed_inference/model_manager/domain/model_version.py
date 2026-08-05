@@ -110,6 +110,20 @@ class StaticShapeInfo(ShapeInfo):
         return self
 
 
+class StateTensorKind(StrEnum):
+    SELF_ATTENTION = auto()
+    CROSS_ATTENTION = auto()
+
+
+class StateTensorInfo(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    input_name: str
+    output_name: str
+    kind: StateTensorKind
+
+    ## This will be usefult for handling LLMs state tensors couples
+
+
 class ModelVersionInfo(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -122,6 +136,7 @@ class ModelVersionInfo(BaseModel):
     dynamic_shapes: List[DynamicShapeInfo]
 
     architecture_info: ArchitectureInfo
+    state_tensors_info: List[StateTensorInfo]
 
     ## TODO: Add check for shapes: no shape can be declared twice in the same or different shape group
     ## TODO: Add check for coherence between model type and architecture info

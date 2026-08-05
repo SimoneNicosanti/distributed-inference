@@ -59,24 +59,24 @@ class OnnxGraphExtractor(ModelGraphExtractor):
             onnx.checker.check_model(inferred_model, full_check=True)  # type: ignore
             # model_proto = infer_shapes(inferred_model)
 
-            OnnxGraphExtractor.__init_model_graph(
+            OnnxGraphExtractor._init_model_graph(
                 inferred_model, model_graph, model_version_info
             )
-            OnnxGraphExtractor.__add_model_nodes(
+            OnnxGraphExtractor._add_model_nodes(
                 inferred_model, model_graph, model_version_info
             )
             if profile_flops:
-                OnnxGraphExtractor.__add_layers_flops(
+                OnnxGraphExtractor._add_layers_flops(
                     inferred_model, model_graph, model_version_info
                 )
-            OnnxGraphExtractor.__add_model_edges(
+            OnnxGraphExtractor._add_model_edges(
                 inferred_model, model_graph, model_version_info
             )
             if profile_tensors:
-                OnnxGraphExtractor.__add_tensors_info(
+                OnnxGraphExtractor._add_tensors_info(
                     inferred_model, model_graph, model_version_info
                 )
-            OnnxGraphExtractor.__clear_model_graph(model_graph)
+            OnnxGraphExtractor._clear_model_graph(model_graph)
 
         except onnx.checker.ValidationError as e:
             raise Exception("Invalid ONNX model: " + str(e))
@@ -221,10 +221,10 @@ class OnnxGraphExtractor(ModelGraphExtractor):
         return inferred_model
 
     @staticmethod
-    def __clear_model_graph(model_graph: ModelVersionGraph) -> None:
+    def _clear_model_graph(model_graph: ModelVersionGraph) -> None:
         # Removing all nodes that are not reachable from the input node
         # In some cases, there are nodes used to define the weights
-        # Or pre-processing operations on them (likq quantization)
+        # Or pre-processing operations on them (like quantization)
         reachable = model_graph.get_reachable_from_layer(
             model_version_graph.INPUT_LAYER_NAME
         ).keys()
@@ -233,10 +233,13 @@ class OnnxGraphExtractor(ModelGraphExtractor):
 
         unreachable = set(all_layers) - set(reachable)
 
+        if model_version_graph.OUTPUT_LAYER_NAME in unreachable:
+            raise Exception("The model output is unreachable")
+
         model_graph.remove_layers_from_iterable(unreachable)
 
     @staticmethod
-    def __init_model_graph(
+    def _init_model_graph(
         model_proto: onnx.ModelProto,
         model_graph: ModelVersionGraph,
         model_version_info: ModelVersionInfo,
@@ -283,7 +286,7 @@ class OnnxGraphExtractor(ModelGraphExtractor):
         model_graph.add_layer(layer_info=output_layer_info)
 
     @staticmethod
-    def __add_model_nodes(
+    def _add_model_nodes(
         model_proto: onnx.ModelProto,
         model_graph: ModelVersionGraph,
         model_version_info: ModelVersionInfo,
@@ -304,6 +307,9 @@ class OnnxGraphExtractor(ModelGraphExtractor):
                 )
             )
 
+            if node.name == "":
+                raise ValueError("Node name cannot be empty")
+
             layer_info = LayerInfo(
                 name=node.name,
                 type=node.op_type,
@@ -322,7 +328,7 @@ class OnnxGraphExtractor(ModelGraphExtractor):
         pass
 
     @staticmethod
-    def __add_tensors_info(
+    def _add_tensors_info(
         model_proto: onnx.ModelProto,
         model_graph: ModelVersionGraph,
         model_version_info: ModelVersionInfo,
@@ -370,7 +376,7 @@ class OnnxGraphExtractor(ModelGraphExtractor):
         pass
 
     @staticmethod
-    def __add_layers_flops(
+    def _add_layers_flops(
         model_proto: onnx.ModelProto,
         model_graph: ModelVersionGraph,
         model_version_info: ModelVersionInfo,
@@ -445,7 +451,7 @@ class OnnxGraphExtractor(ModelGraphExtractor):
         return input_names, output_names, weights_size
 
     @staticmethod
-    def __add_model_edges(
+    def _add_model_edges(
         model_proto: onnx.ModelProto,
         model_graph: ModelVersionGraph,
         model_version_info: ModelVersionInfo,

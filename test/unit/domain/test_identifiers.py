@@ -1,93 +1,33 @@
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
 
-from distributed_inference.domain.flow import FlowId
 from distributed_inference.domain.identifiers import (
-    RequestId,
+    SYSTEM_USER_ID,
+    ServerId,
+    ServiceId,
     UserId,
 )
-from distributed_inference.model_manager.domain.model import ModelId
-from distributed_inference.model_manager.domain.model_version import ModelVersionId
-from distributed_inference.model_manager.domain.sub_model import SubModelId
-
-
-def _model_version_id() -> ModelVersionId:
-    user_id = UserId(id=uuid4())
-    model_id = ModelId(owner_id=user_id, model_name="vision-model")
-    return ModelVersionId(model_id=model_id, version_tag=3)
 
 
 @pytest.mark.unit
-def test_sub_model_id_canonicalizes_layer_order() -> None:
-    model_version_id = _model_version_id()
+def test_identifiers_are_frozen_and_hashable() -> None:
+    server_id = ServerId(id=uuid4())
+    service_id = ServiceId(server_id=server_id, service_id=uuid4())
 
-    first = SubModelId(
-        model_version_id=model_version_id,
-        layers=("encoder.2", "encoder.0", "encoder.1"),
-    )
-    second = SubModelId(
-        model_version_id=model_version_id,
-        layers=("encoder.1", "encoder.2", "encoder.0"),
-    )
-
-    assert first.layers == ("encoder.0", "encoder.1", "encoder.2")
-    assert first == second
-    assert hash(first) == hash(second)
-
-
-@pytest.mark.unit
-def test_sub_model_id_rejects_duplicate_layers() -> None:
-    with pytest.raises(
-        ValidationError,
-        match="layers must not contain duplicates",
-    ):
-        SubModelId(
-            model_version_id=_model_version_id(),
-            layers=("encoder.0", "encoder.0"),
-        )
-
-
-@pytest.mark.unit
-def test_nested_identifiers_are_immutable() -> None:
-    model_version_id = _model_version_id()
+    assert {service_id, service_id.model_copy()} == {service_id}
 
     with pytest.raises(ValidationError):
-        model_version_id.version_tag = 4
+        service_id.server_id = ServerId(id=uuid4())
 
 
 @pytest.mark.unit
-def test_sub_model_id_rejects_empty_layers() -> None:
-    with pytest.raises(ValidationError, match="layers must not be empty"):
-        SubModelId(
-            model_version_id=_model_version_id(),
-            layers=(),
-        )
+def test_identifiers_generate_a_distinct_id_by_default() -> None:
+    assert UserId().id != UserId().id
+    assert ServerId().id != ServerId().id
 
 
 @pytest.mark.unit
-def test_sub_model_id_rejects_string_layer_collection() -> None:
-    with pytest.raises(ValueError, match="Layers must contain layer names"):
-        SubModelId.check_valid_layers_format("encoder.0")
-
-
-@pytest.mark.unit
-def test_request_id_requires_explicit_request_index() -> None:
-    model_version_id = _model_version_id()
-    flow_id = FlowId(
-        user_id=model_version_id.model_id.owner_id,
-        flow_id=uuid4(),
-    )
-    sub_model_id = SubModelId(
-        model_version_id=model_version_id,
-        layers=("encoder.0",),
-    )
-
-    with pytest.raises(ValidationError, match="request_idx"):
-        RequestId.model_validate(
-            {
-                "flow_id": flow_id,
-                "sub_model_id": sub_model_id,
-            }
-        )
+def test_system_user_id_is_a_stable_well_known_value() -> None:
+    assert SYSTEM_USER_ID == UserId(id=UUID("8db917c1-2494-4b25-a79c-12f97cb67942"))

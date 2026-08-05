@@ -1,16 +1,15 @@
-from uuid import uuid4
-
 import pytest
 
-from distributed_inference.domain.identifiers import UserId
-from distributed_inference.model_manager.domain.model_version_graph import (
-    ModelInfo,
-    ModelType,
-    ModelVersionGraph,
-    TaskType,
-)
 from distributed_inference.model_metadata_store.adapters.outbound.in_memory_model_metadata_store import (
     InMemoryModelMetadataStore,
+)
+from test.support.model_manager.model_domain_test_utils import (
+    build_model,
+    build_model_version,
+    build_model_version_id,
+    build_profiled_model_version,
+    build_sub_model,
+    build_sub_model_id,
 )
 
 
@@ -19,91 +18,51 @@ def store() -> InMemoryModelMetadataStore:
     return InMemoryModelMetadataStore()
 
 
-@pytest.fixture
-def owner_id() -> UserId:
-    return UserId(id=uuid4())
-
-
-@pytest.fixture
-def model_info() -> ModelInfo:
-    return ModelInfo(
-        name="resnet50",
-        accuracy=0.9,
-        task=TaskType.CLASSIFICATION,
-        type=ModelType.CNN,
-        dynamic_shapes={},
-        sequence_sizes=[1],
-        num_heads=0,
-        hidden_size=0,
-    )
-
-
 @pytest.mark.unit
 def test_internal_dictionaries_are_initially_empty(
     store: InMemoryModelMetadataStore,
 ) -> None:
     assert store._models == {}
     assert store._model_versions == {}
+    assert store._profiled_model_versions == {}
     assert store._sub_models == {}
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_register_model_stores_metadata_in_model_dictionary(
+async def test_registered_entities_are_stored_in_their_own_dictionary(
     store: InMemoryModelMetadataStore,
-    owner_id: UserId,
 ) -> None:
-    model_id = await store.register_model(owner_id, "resnet50")
-
-    metadata = store._models[model_id]
-    assert metadata.model_id == model_id
-    assert metadata.owner_id == owner_id
-    assert metadata.name == "resnet50"
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_register_version_stores_metadata_in_version_dictionary(
-    store: InMemoryModelMetadataStore,
-    owner_id: UserId,
-    model_info: ModelInfo,
-) -> None:
-    model_id = await store.register_model(owner_id, "resnet50")
-    version_id = await store.register_model_version(model_id, model_info)
-
-    metadata = store._model_versions[version_id]
-    assert metadata.model_id == model_id
-    assert metadata.model_version_id == version_id
-    assert metadata.version_number == 1
-    assert metadata.model_info == model_info
-    assert metadata.model_graph is None
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_register_submodel_stores_metadata_in_submodel_dictionary(
-    store: InMemoryModelMetadataStore,
-    owner_id: UserId,
-    model_info: ModelInfo,
-) -> None:
-    model_id = await store.register_model(owner_id, "resnet50")
-    version_id = await store.register_model_version(model_id, model_info)
-
-    sub_model_id = await store.register_sub_model(
-        model_version_id=version_id,
-        layers=("layer_1", "layer_2"),
+    model = build_model()
+    await store.register_model(model)
+    model_version = build_model_version(
+        model_version_id=build_model_version_id(model_id=model.model_id)
     )
+    await store.register_model_version(model_version)
+    profiled_model_version = build_profiled_model_version(model_version=model_version)
+    await store.register_profiled_model_version(profiled_model_version)
+    sub_model = build_sub_model(
+        sub_model_id=build_sub_model_id(model_version_id=model_version.model_version_id)
+    )
+    await store.register_sub_model(sub_model)
 
-    assert store._sub_models[sub_model_id].sub_model_id == sub_model_id
+    assert store._models[model.model_id] is model
+    assert store._model_versions[model_version.model_version_id] is model_version
+    assert (
+        store._profiled_model_versions[model_version.model_version_id]
+        is profiled_model_version
+    )
+    assert store._sub_models[sub_model.sub_model_id] is sub_model
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_store_instances_have_independent_state(owner_id: UserId) -> None:
+async def test_store_instances_have_independent_state() -> None:
     first_store = InMemoryModelMetadataStore()
     second_store = InMemoryModelMetadataStore()
+    model = build_model()
 
-    model_id = await first_store.register_model(owner_id, "resnet50")
+    model_id = await first_store.register_model(model)
 
     assert model_id in first_store._models
     assert model_id not in second_store._models
@@ -111,32 +70,40 @@ async def test_store_instances_have_independent_state(owner_id: UserId) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_version_existence_checks_parent_model_dictionary(
+async def test_profiled_model_version_registration_keeps_the_first_profile(
     store: InMemoryModelMetadataStore,
-    owner_id: UserId,
-    model_info: ModelInfo,
 ) -> None:
-    model_id = await store.register_model(owner_id, "resnet50")
-    version_id = await store.register_model_version(model_id, model_info)
+    model = build_model()
+    await store.register_model(model)
+    model_version = build_model_version(
+        model_version_id=build_model_version_id(model_id=model.model_id)
+    )
+    await store.register_model_version(model_version)
+    first_profile = build_profiled_model_version(model_version=model_version)
+    second_profile = build_profiled_model_version(model_version=model_version)
 
-    del store._models[model_id]
+    await store.register_profiled_model_version(first_profile)
+    await store.register_profiled_model_version(second_profile)
 
-    assert version_id in store._model_versions
-    assert not await store.check_model_version_existence(version_id)
+    assert (
+        store._profiled_model_versions[model_version.model_version_id] is first_profile
+    )
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_register_graph_rejects_incompatible_model_info(
+async def test_sub_model_registration_requires_a_profiled_model_version(
     store: InMemoryModelMetadataStore,
-    owner_id: UserId,
-    model_info: ModelInfo,
 ) -> None:
-    model_id = await store.register_model(owner_id, "resnet50")
-    version_id = await store.register_model_version(model_id, model_info)
-    incompatible_graph = ModelVersionGraph(
-        model_info=model_info.model_copy(update={"name": "different-model"})
+    model = build_model()
+    await store.register_model(model)
+    model_version = build_model_version(
+        model_version_id=build_model_version_id(model_id=model.model_id)
+    )
+    await store.register_model_version(model_version)
+    sub_model = build_sub_model(
+        sub_model_id=build_sub_model_id(model_version_id=model_version.model_version_id)
     )
 
-    with pytest.raises(ValueError, match="has model info"):
-        await store.register_profiled_model_version(version_id, incompatible_graph)
+    with pytest.raises(ValueError, match="Model version"):
+        await store.register_sub_model(sub_model)

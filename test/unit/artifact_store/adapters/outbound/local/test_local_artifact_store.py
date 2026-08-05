@@ -26,7 +26,7 @@ def _key() -> ModelVersionArtifactKey:
                 owner_id=UserId(id=uuid4()),
                 model_name="resnet50",
             ),
-            version_tag=3,
+            version_tag="v3",
         )
     )
 

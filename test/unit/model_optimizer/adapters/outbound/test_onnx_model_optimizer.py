@@ -6,10 +6,13 @@ import pytest
 from distributed_inference.artifact_processing.artifact_workspace import (
     ArtifactWorkspace,
 )
-from distributed_inference.model_manager.domain.model_version_graph import (
-    ModelInfo,
-    ModelType,
-    TaskType,
+from distributed_inference.model_manager.domain.model import ModelType
+from distributed_inference.model_manager.domain.model_version import (
+    ArchitectureInfo,
+    BERTArchitectureInfo,
+    CNNArchitectureInfo,
+    ModelVersionInfo,
+    VITArchitectureInfo,
 )
 from distributed_inference.model_optimizer.adapters.outbound.onnx_model_optimizer import (
     OnnxModelOptimizer,
@@ -20,18 +23,19 @@ from distributed_inference.model_optimizer.domain.optimization_level import (
 from test.support.artifact_materializer.materialized_artifact_test_utils import (
     build_test_materialized_artifact,
 )
+from test.support.model_manager.model_domain_test_utils import (
+    build_model_info,
+    build_model_version_info,
+)
 
 
-def _model_info(model_type: ModelType) -> ModelInfo:
-    return ModelInfo(
-        name="test-model",
-        accuracy=0.9,
-        task=TaskType.CLASSIFICATION,
-        type=model_type,
-        dynamic_shapes={},
-        num_heads=12,
-        hidden_size=768,
-    )
+def _model_version_info(model_type: ModelType) -> ModelVersionInfo:
+    architecture_info: dict[ModelType, ArchitectureInfo] = {
+        ModelType.CNN: CNNArchitectureInfo(),
+        ModelType.VIT: VITArchitectureInfo(num_heads=12, hidden_size=768),
+        ModelType.BERT: BERTArchitectureInfo(num_heads=12, hidden_size=768),
+    }
+    return build_model_version_info(architecture_info=architecture_info[model_type])
 
 
 @pytest.mark.unit
@@ -59,6 +63,7 @@ def test_optimize_model_dispatches_to_expected_backend(
     output_root = tmp_path / "optimized"
     output_root.mkdir()
     optimizer = OnnxModelOptimizer()
+    output_paths = ArtifactWorkspace(root_path=output_root)
 
     def create_output(*, output_path: Path, **_kwargs: object) -> None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -78,8 +83,9 @@ def test_optimize_model_dispatches_to_expected_backend(
     ):
         optimizer.optimize_model(
             build_test_materialized_artifact(input_model, root_path=tmp_path),
-            ArtifactWorkspace(root_path=output_root),
-            _model_info(model_type),
+            output_paths,
+            build_model_info(model_type=model_type),
+            _model_version_info(model_type),
             level,
         )
 
@@ -89,6 +95,7 @@ def test_optimize_model_dispatches_to_expected_backend(
     rejected.assert_not_called()
     assert selected.call_args.kwargs["opt_level"] is level
     assert selected.call_args.kwargs["output_path"].is_file()
+    assert output_paths.entrypoint_path == selected.call_args.kwargs["output_path"]
 
 
 @pytest.mark.unit

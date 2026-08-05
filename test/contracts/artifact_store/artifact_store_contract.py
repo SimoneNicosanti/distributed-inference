@@ -23,13 +23,13 @@ from test.support.artifact_store.artifact_bundle_test_utils import (
 )
 
 
-def _model_version_id(version_number: int = 1) -> ModelVersionId:
+def _model_version_id(version_tag: str = "v1") -> ModelVersionId:
     return ModelVersionId(
         model_id=ModelId(
             owner_id=UserId(id=uuid4()),
             model_name="resnet50",
         ),
-        version_tag=version_number,
+        version_tag=version_tag,
     )
 
 
