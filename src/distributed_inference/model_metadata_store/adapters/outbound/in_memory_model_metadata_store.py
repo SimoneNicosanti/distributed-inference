@@ -1,23 +1,14 @@
-from typing import Iterable, override
+from typing import override
 
-from distributed_inference.domain.identifiers import (
-    ModelId,
+from distributed_inference.model_manager.domain.model import Model, ModelId
+from distributed_inference.model_manager.domain.model_version import (
+    ModelVersion,
     ModelVersionId,
-    SubModelId,
-    UserId,
+    ProfiledModelVersion,
 )
-from distributed_inference.domain.model_graph_info import (
-    LayerKey,
-    ModelGraph,
-    ModelInfo,
-)
+from distributed_inference.model_manager.domain.sub_model import SubModel, SubModelId
 from distributed_inference.model_metadata_store.application.ports.outbound.model_metadata_store import (
     ModelMetadataStore,
-)
-from distributed_inference.model_metadata_store.domain.model_metadata import (
-    ModelMetadata,
-    ModelVersionMetadata,
-    SubModelMetadata,
 )
 
 
@@ -25,142 +16,124 @@ class InMemoryModelMetadataStore(ModelMetadataStore):
     ## In this case, we need no lock: since there is no await in the methods
     ## No coroutine can interleave the execution, so the access will always be safe
     def __init__(self) -> None:
-        self._model_metadata: dict[ModelId, ModelMetadata] = {}
-        self._model_version_metadata: dict[ModelVersionId, ModelVersionMetadata] = {}
-        self.sub_model_metadata: dict[SubModelId, SubModelMetadata] = {}
+        self._models: dict[ModelId, Model] = {}
+        self._model_versions: dict[ModelVersionId, ModelVersion] = {}
+        self._profiled_model_versions: dict[ModelVersionId, ProfiledModelVersion] = {}
+        self._sub_models: dict[SubModelId, SubModel] = {}
 
     @override
-    async def register_model(
-        self,
-        owner_id: UserId,
-        model_name: str,
-    ) -> ModelId:
+    async def register_model(self, model: Model) -> ModelId:
 
-        model_id = ModelId(user_id=owner_id, model_name=model_name)
-        model_metdata = ModelMetadata(
-            owner_id=owner_id,
-            model_id=model_id,
-            name=model_name,
-        )
-
-        if model_id in self._model_metadata.keys():
+        model_id = model.model_id
+        if model_id in self._models.keys():
             ## We do not allow registering the same model twice
             raise ValueError(f"Model {model_id} already exists")
-        self._model_metadata[model_id] = model_metdata
+        self._models[model_id] = model
 
         return model_id
 
     @override
+    async def get_model(self, model_id: ModelId) -> Model:
+        if model_id not in self._models.keys():
+            raise ValueError(f"Model {model_id} does not exist")
+        return self._models[model_id]
+
+    @override
+    async def check_model_existence(self, model_id: ModelId) -> bool:
+        return model_id in self._models.keys()
+
+    @override
     async def register_model_version(
         self,
-        model_id: ModelId,
-        model_info: ModelInfo,
+        model_version: ModelVersion,
     ) -> ModelVersionId:
 
-        if model_id not in self._model_metadata.keys():
+        model_id = model_version.model_id
+        if model_id not in self._models.keys():
             raise ValueError(f"Model {model_id} does not exist")
 
-        current_version_number = 0
-        for model_version_metadata in self._model_version_metadata.values():
-            if model_version_metadata.model_id == model_id:
-                current_version_number = max(
-                    current_version_number,
-                    model_version_metadata.version_number,
-                )
-
-        model_version_id = ModelVersionId(
-            model_id=model_id, version_number=current_version_number + 1
-        )
-
-        self._model_version_metadata[model_version_id] = ModelVersionMetadata(
-            model_id=model_id,
-            model_version_id=model_version_id,
-            version_number=current_version_number + 1,
-            model_info=model_info,
-        )
+        model_version_id = model_version.model_version_id
+        if model_version_id in self._model_versions.keys():
+            ## We do not allow registering the same model version twice
+            raise ValueError(f"Model version {model_version_id} already exists")
+        self._model_versions[model_version_id] = model_version
 
         return model_version_id
 
     @override
-    async def register_model_version_graph(
-        self,
-        model_version_id: ModelVersionId,
-        model_graph: ModelGraph,
-    ) -> None:
-
-        if model_version_id.model_id not in self._model_metadata.keys():
-            raise ValueError(f"Model {model_version_id.model_id} does not exist")
-        if model_version_id not in self._model_version_metadata.keys():
+    async def get_model_version(self, model_version_id: ModelVersionId) -> ModelVersion:
+        if model_version_id not in self._model_versions.keys():
             raise ValueError(f"Model version {model_version_id} does not exist")
-        self._model_version_metadata[model_version_id].model_graph = model_graph
-
-    @override
-    async def register_sub_model(
-        self,
-        model_version_id: ModelVersionId,
-        layers: Iterable[LayerKey],
-    ) -> SubModelId:
-
-        SubModelId.check_valid_layers_format(layers)
-        layers = tuple(layers)
-        sub_model_id = SubModelId(
-            model_version_id=model_version_id,
-            layers=tuple(layers),
-        )
-
-        sub_model_metdata = SubModelMetadata(
-            sub_model_id=sub_model_id,
-        )
-
-        if model_version_id not in self._model_version_metadata.keys():
-            raise ValueError(f"Model version {model_version_id} does not exist")
-        if model_version_id.model_id not in self._model_metadata.keys():
-            raise ValueError(f"Model {model_version_id.model_id} does not exist")
-
-        if sub_model_id in self.sub_model_metadata.keys():
-            ## Idempotence
-            return sub_model_id
-
-        self.sub_model_metadata[sub_model_id] = sub_model_metdata
-
-        return sub_model_id
-
-    @override
-    async def get_model_graph(
-        self, model_version_id: ModelVersionId
-    ) -> ModelGraph | None:
-
-        if model_version_id.model_id not in self._model_metadata.keys():
-            raise ValueError(f"Model {model_version_id.model_id} does not exist")
-        if model_version_id not in self._model_version_metadata.keys():
-            raise ValueError(f"Model version {model_version_id} does not exist")
-        return self._model_version_metadata[model_version_id].model_graph
-
-    @override
-    async def get_model_info(self, model_version_id: ModelVersionId) -> ModelInfo:
-        if model_version_id.model_id not in self._model_metadata.keys():
-            raise ValueError(f"Model {model_version_id.model_id} does not exist")
-        if model_version_id not in self._model_version_metadata.keys():
-            raise ValueError(f"Model version {model_version_id} does not exist")
-        return self._model_version_metadata[model_version_id].model_info
-
-    @override
-    async def check_model_existence(self, model_id: ModelId) -> bool:
-        return model_id in self._model_metadata.keys()
+        return self._model_versions[model_version_id]
 
     @override
     async def check_model_version_existence(
         self,
         model_version_id: ModelVersionId,
     ) -> bool:
-        return (
-            model_version_id in self._model_version_metadata.keys()
-            and model_version_id.model_id in self._model_metadata.keys()
-        )
+        return model_version_id in self._model_versions.keys()
+
+    @override
+    async def register_profiled_model_version(
+        self,
+        profiled_model_version: ProfiledModelVersion,
+    ) -> ModelVersionId:
+
+        model_version_id = profiled_model_version.model_version_id
+        if model_version_id not in self._model_versions.keys():
+            raise ValueError(f"Model version {model_version_id} does not exist")
+
+        if model_version_id in self._profiled_model_versions.keys():
+            ## Idempotence
+            return model_version_id
+
+        self._profiled_model_versions[model_version_id] = profiled_model_version
+
+        return model_version_id
+
+    @override
+    async def get_profiled_model_version(
+        self, model_version_id: ModelVersionId
+    ) -> ProfiledModelVersion | None:
+        if model_version_id not in self._profiled_model_versions.keys():
+            return None
+        return self._profiled_model_versions[model_version_id]
+
+    @override
+    async def check_profiled_model_version_existence(
+        self,
+        model_version_id: ModelVersionId,
+    ) -> bool:
+        return model_version_id in self._profiled_model_versions.keys()
+
+    @override
+    async def register_sub_model(
+        self,
+        sub_model: SubModel,
+    ) -> SubModelId:
+
+        sub_model_id = sub_model.sub_model_id
+        model_version_id = sub_model_id.model_version_id
+        if model_version_id not in self._profiled_model_versions.keys():
+            raise ValueError(f"Model version {model_version_id} does not exist")
+
+        if sub_model_id in self._sub_models.keys():
+            ## Idempotence
+            return sub_model_id
+
+        self._sub_models[sub_model_id] = sub_model
+
+        return sub_model_id
+
+    @override
+    async def get_sub_model(self, sub_model_id: SubModelId) -> SubModel:
+        if sub_model_id not in self._sub_models.keys():
+            raise ValueError(f"Sub model {sub_model_id} does not exist")
+        return self._sub_models[sub_model_id]
 
     @override
     async def check_sub_model_existence(
         self,
         sub_model_id: SubModelId,
     ) -> bool:
-        return sub_model_id in self.sub_model_metadata.keys()
+        return sub_model_id in self._sub_models.keys()

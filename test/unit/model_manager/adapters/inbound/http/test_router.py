@@ -19,15 +19,7 @@ from distributed_inference.artifact_store.domain.readable_artifact_bundle import
     ReadableArtifactBundle,
 )
 from distributed_inference.domain.identifiers import (
-    ModelId,
-    ModelVersionId,
-    SubModelId,
     UserId,
-)
-from distributed_inference.domain.model_graph_info import (
-    ModelInfo,
-    ModelType,
-    TaskType,
 )
 from distributed_inference.model_manager.adapters.inbound.http.router import (
     build_model_manager_router,
@@ -39,6 +31,14 @@ from distributed_inference.model_manager.adapters.inbound.http.schema import (
 from distributed_inference.model_manager.application.ports.inbound.model_manager import (
     ModelManager,
 )
+from distributed_inference.model_manager.domain.model import ModelId
+from distributed_inference.model_manager.domain.model_version import ModelVersionId
+from distributed_inference.model_manager.domain.model_version_graph import (
+    ModelInfo,
+    ModelType,
+    TaskType,
+)
+from distributed_inference.model_manager.domain.sub_model import SubModelId
 from test.support.artifact_store.artifact_bundle_test_utils import read_bundle_content
 
 
@@ -55,9 +55,9 @@ def _endpoint(router: APIRouter, path: str, method: str) -> Callable[..., Any]:
 
 
 def _ids() -> tuple[UserId, ModelId, ModelVersionId]:
-    user_id = UserId(user_id=uuid4())
-    model_id = ModelId(user_id=user_id, model_name="vision-model")
-    version_id = ModelVersionId(model_id=model_id, version_number=1)
+    user_id = UserId(id=uuid4())
+    model_id = ModelId(owner_id=user_id, model_name="vision-model")
+    version_id = ModelVersionId(model_id=model_id, version_tag=1)
     return user_id, model_id, version_id
 
 
@@ -84,12 +84,10 @@ async def test_register_and_generate_routes_delegate_typed_requests() -> None:
     manager.register_model.return_value = model_id
     manager.generate_sub_model.return_value = sub_model_id
 
-    register_response = await _endpoint(
-        router, "/model-manager/models", "POST"
-    )(RegisterModelRequest(owner_id=user_id, model_name="vision-model"))
-    generate_response = await _endpoint(
-        router, "/model-manager/sub-models", "POST"
-    )(
+    register_response = await _endpoint(router, "/model-manager/models", "POST")(
+        RegisterModelRequest(owner_id=user_id, model_name="vision-model")
+    )
+    generate_response = await _endpoint(router, "/model-manager/sub-models", "POST")(
         GenerateSubModelRequest(
             model_version_id=version_id,
             layers=["encoder.1", "encoder.0"],
@@ -139,9 +137,7 @@ async def test_upload_route_decompresses_bundle_before_delegating() -> None:
 
     manager.put_model_version.side_effect = put_model_version
 
-    response = await _endpoint(
-        router, "/model-manager/model-versions", "POST"
-    )(
+    response = await _endpoint(router, "/model-manager/model-versions", "POST")(
         model_id.model_dump_json(),
         model_info.model_dump_json(),
         upload,

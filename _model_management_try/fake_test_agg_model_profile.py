@@ -10,7 +10,6 @@ from distributed_inference.application.model_management.profiling.model_profile_
     profile_with_model_optimization,
 )
 
-
 def parse_args() -> Namespace:
     parser = ArgumentParser()
     parser.add_argument("--model", type=str, required=True)

@@ -6,7 +6,9 @@ import pytest
 from distributed_inference.artifact_processing.artifact_workspace import (
     ArtifactWorkspace,
 )
-from distributed_inference.domain.model_graph_info import ModelGraph
+from distributed_inference.model_manager.domain.model_version_graph import (
+    ModelVersionGraph,
+)
 from distributed_inference.model_splitter.adapters.outbound.onnx.onnx_model_splitter import (
     OnnxModelSplitter,
 )
@@ -27,7 +29,7 @@ async def test_split_model_extracts_boundary_tensors_and_sets_output_entrypoint(
     output_root.mkdir()
     input_paths = build_test_materialized_artifact(input_model)
     output_paths = ArtifactWorkspace(root_path=output_root)
-    model_graph = MagicMock(spec=ModelGraph)
+    model_graph = MagicMock(spec=ModelVersionGraph)
     model_graph.extract_incoming_outgoing_tensors_of_sub_model.return_value = (
         {"input_ids", "attention_mask"},
         {"logits"},
@@ -63,10 +65,12 @@ async def test_split_model_extracts_boundary_tensors_and_sets_output_entrypoint(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_split_model_rejects_empty_components_before_touching_paths(tmp_path: Path) -> None:
+async def test_split_model_rejects_empty_components_before_touching_paths(
+    tmp_path: Path,
+) -> None:
     with pytest.raises(ValueError, match="cannot be empty"):
         await OnnxModelSplitter().split_model(
-            MagicMock(spec=ModelGraph),
+            MagicMock(spec=ModelVersionGraph),
             [],
             MagicMock(),
             ArtifactWorkspace(root_path=tmp_path),
@@ -91,7 +95,7 @@ async def test_split_model_rejects_components_without_complete_boundaries(
     input_model.write_bytes(b"model")
     output_root = tmp_path / "output"
     output_root.mkdir()
-    graph = MagicMock(spec=ModelGraph)
+    graph = MagicMock(spec=ModelVersionGraph)
     graph.extract_incoming_outgoing_tensors_of_sub_model.return_value = boundaries
 
     with pytest.raises(ValueError, match=message):

@@ -5,9 +5,9 @@ from math import inf, isclose
 
 import networkx as nx
 
-from distributed_inference.domain.model_graph_info import (
+from distributed_inference.model_manager.domain.model_version_graph import (
     EdgeKey,
-    ModelGraph,
+    ModelVersionGraph,
 )
 
 
@@ -30,7 +30,7 @@ class ExtremeIdealCuts:
 
 
 def iter_ideal_cuts(
-    model_graph: ModelGraph,
+    model_graph: ModelVersionGraph,
     *,
     include_trivial: bool = False,
 ) -> Iterator[IdealCut]:
@@ -110,7 +110,7 @@ def iter_ideal_cuts(
 
 
 def find_extreme_ideal_cuts(
-    model_graph: ModelGraph,
+    model_graph: ModelVersionGraph,
     *,
     include_trivial: bool = False,
     relative_tolerance: float = 1e-12,

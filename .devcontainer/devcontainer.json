@@ -1,5 +1,5 @@
 // .devcontainer/devcontainer.json
-{ 
+{
   "name": "distributed-inference-container",
   "build": {
     "dockerfile": "./DevEnv.dockerfile",
@@ -10,12 +10,18 @@
   "workspaceFolder": "/workspace/distributed-inference",
   "mounts": [
     "source=${localWorkspaceFolder},target=/workspace/distributed-inference,type=bind",
-    "source=distributed-inference-uv-cache,target=/root/.cache/uv,type=volume",
-    "source=${localEnv:HOME}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached"
+    "source=uv-cache-${devcontainerId},target=/home/vscode/.cache/uv,type=volume",
+    "source=${localEnv:HOME}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached",
+    "source=claude-code-config-${devcontainerId},target=/home/vscode/.claude,type=volume"
   ],
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
+  },
   // Installing trunk.io inside the devcontainer for project wide formatting
   "features": {
-    "ghcr.io/trunk-io/devcontainer-feature/trunk": "latest"
+    "ghcr.io/trunk-io/devcontainer-feature/trunk": "latest",
+    "ghcr.io/devcontainers/features/node:2.1.0": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
   },
   // Running post create script for installing dependencies inside the devcontainer
   "postCreateCommand": ".devcontainer/post-create.sh",
@@ -40,7 +46,8 @@
         "vincent-templier.vscode-netron",
         "charliermarsh.ruff",
         "seelog.python-init-generator",
-        "openai.chatgpt",
+        // "openai.chatgpt",
+        "anthropic.claude-code",
         "gruntfuggly.todo-tree"
       ],
 
@@ -70,7 +77,7 @@
           "${containerWorkspaceFolder}/pyproject.toml"
         ],
         "pythonInitGenerator.ignoreDirectories": [
-          "__pycache__",
+          "__pycache__"
         ],
         "[python]": {
           "editor.defaultFormatter": "trunk.io",

@@ -3,20 +3,20 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from distributed_inference.domain.flow import FlowId
 from distributed_inference.domain.identifiers import (
-    FlowId,
-    ModelId,
-    ModelVersionId,
     RequestId,
-    SubModelId,
     UserId,
 )
+from distributed_inference.model_manager.domain.model import ModelId
+from distributed_inference.model_manager.domain.model_version import ModelVersionId
+from distributed_inference.model_manager.domain.sub_model import SubModelId
 
 
 def _model_version_id() -> ModelVersionId:
-    user_id = UserId(user_id=uuid4())
-    model_id = ModelId(user_id=user_id, model_name="vision-model")
-    return ModelVersionId(model_id=model_id, version_number=3)
+    user_id = UserId(id=uuid4())
+    model_id = ModelId(owner_id=user_id, model_name="vision-model")
+    return ModelVersionId(model_id=model_id, version_tag=3)
 
 
 @pytest.mark.unit
@@ -54,7 +54,7 @@ def test_nested_identifiers_are_immutable() -> None:
     model_version_id = _model_version_id()
 
     with pytest.raises(ValidationError):
-        model_version_id.version_number = 4
+        model_version_id.version_tag = 4
 
 
 @pytest.mark.unit
@@ -76,7 +76,7 @@ def test_sub_model_id_rejects_string_layer_collection() -> None:
 def test_request_id_requires_explicit_request_index() -> None:
     model_version_id = _model_version_id()
     flow_id = FlowId(
-        user_id=model_version_id.model_id.user_id,
+        user_id=model_version_id.model_id.owner_id,
         flow_id=uuid4(),
     )
     sub_model_id = SubModelId(

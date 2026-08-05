@@ -1,6 +1,8 @@
-from pydantic import BaseModel, ConfigDict
+from uuid import UUID, uuid4
 
-from distributed_inference.domain.model_graph_info import TaskType
+from pydantic import BaseModel, ConfigDict, Field
+
+from distributed_inference.domain.identifiers import UserId
 
 
 class FlowInfo(BaseModel):
@@ -13,10 +15,15 @@ class FlowInfo(BaseModel):
     response_req: float
     energy_req: float
 
-    task: TaskType
-
 
 class Flows(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     flows: list[FlowInfo]
+
+
+class FlowId(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    user_id: UserId
+    flow_id: UUID = Field(default_factory=uuid4)

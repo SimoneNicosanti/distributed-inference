@@ -5,16 +5,16 @@ import networkx as nx
 import onnx
 from onnx import TensorProto, helper
 
-from distributed_inference.domain.model_graph_info import (
+from distributed_inference.model_manager.domain.model_version_graph import (
     LayerKey,
-    ModelGraph,
+    ModelVersionGraph,
 )
 
 _VISUALIZATION_DOMAIN = "distributed_inference.visualization"
 
 
 def export_model_graph_to_dummy_onnx(
-    model_graph: ModelGraph,
+    model_graph: ModelVersionGraph,
     output_path: str | Path,
 ) -> onnx.ModelProto:
     """

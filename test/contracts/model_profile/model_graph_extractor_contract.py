@@ -10,12 +10,12 @@ from pydantic import BaseModel
 from distributed_inference.artifact_processing.artifact_workspace import (
     ArtifactWorkspace,
 )
-from distributed_inference.domain.model_graph_info import (
+from distributed_inference.model_manager.domain.model_version_graph import (
     FlopsInfo,
-    ModelGraph,
     ModelInfo,
+    ModelVersionGraph,
 )
-from distributed_inference.model_profile.application.ports.outbound.model_graph_extractor import (
+from distributed_inference.model_profiler.application.ports.outbound.model_graph_extractor import (
     ModelGraphExtractor,
 )
 
@@ -31,8 +31,8 @@ class ExtractedGraphExpectation:
 
 @dataclass(frozen=True)
 class AggregationCase:
-    level_1_graph: ModelGraph
-    level_2_graph: ModelGraph
+    level_1_graph: ModelVersionGraph
+    level_2_graph: ModelVersionGraph
     unchanged_layer: str
     fused_layer: str
     fused_members: frozenset[str]
@@ -52,7 +52,7 @@ def _normalise(value: Any) -> Any:
     return value
 
 
-def _graph_snapshot(graph: ModelGraph) -> dict[str, Any]:
+def _graph_snapshot(graph: ModelVersionGraph) -> dict[str, Any]:
     return {
         "model_info": _normalise(graph.model_info),
         "layers": {

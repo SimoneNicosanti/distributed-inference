@@ -46,7 +46,7 @@ async def test_server_registry_stores_id_under_expected_key(
         ServerRegistration(server_id=server_id)
     )
 
-    stored = await redis.get(f"discovery:servers:{server_id.server_id}")
+    stored = await redis.get(f"discovery:servers:{server_id.id}")
 
     assert stored is not None
     assert ServerId.model_validate_json(stored) == server_id
@@ -65,7 +65,7 @@ async def test_service_registry_stores_full_instance_under_expected_key(
     )
 
     stored = await redis.get(
-        f"discovery:services:{service_id.server_id.server_id}:{service_id.service_id}"
+        f"discovery:services:{service_id.server_id.id}:{service_id.service_id}"
     )
 
     assert stored is not None
@@ -79,7 +79,7 @@ async def test_resolver_rejects_corrupt_service_payload(
 ) -> None:
     service = build_service_instance(build_server_id())
     service_id = service.service_id
-    key = f"discovery:services:{service_id.server_id.server_id}:{service_id.service_id}"
+    key = f"discovery:services:{service_id.server_id.id}:{service_id.service_id}"
     await redis.set(key, b'{"invalid": "service"}')
 
     with pytest.raises(ValidationError):
@@ -132,9 +132,7 @@ async def test_resolve_by_server_skips_service_deleted_after_scan(
         )
 
     remaining_key = (
-        "discovery:services:"
-        f"{server_id.server_id}:"
-        f"{remaining_service.service_id.service_id}"
+        f"discovery:services:{server_id.id}:{remaining_service.service_id.service_id}"
     )
     remaining_payload = await redis.get(remaining_key)
     assert remaining_payload is not None

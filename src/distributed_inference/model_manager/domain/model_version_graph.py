@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from enum import Enum
 from typing import List, Self, Tuple, TypedDict, cast
 
 import networkx as nx
@@ -13,24 +12,20 @@ OUTPUT_LAYER_NAME = "OutputLayer"
 AGGREGATED_LAYER_TYPE = "AggregatedLayer"
 
 
-class TaskType(Enum):
-    CLASSIFICATION = "classification"
-    DETECTION = "detection"
-    SEGMENTATION = "segmentation"
+## This is a dynamic shape configuration for which the profiling is done
+## It wraps a tuple of tuple like:
+## ((batch_size, x), (sequence_size, y))
+## Multiple ShapePoints are the different configurations we are profiling
+class ShapePoint(BaseModel):
+    model_config = ConfigDict(frozen=True)
 
-    REGRESSION = "regression"
-
-
-class ModelType(Enum):
-    CNN = "cnn"
-    VIT = "vit"
-    BERT = "bert"
+    dims: Tuple[Tuple[str, int], ...]
 
 
 class FlopsInfo(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    flops: dict[int, float] = Field(default_factory=dict)
+    flops: dict[ShapePoint, float] = Field(default_factory=dict)
 
     def __add__(self, other: object) -> Self:
         if not isinstance(other, FlopsInfo):
@@ -43,12 +38,12 @@ class FlopsInfo(BaseModel):
             return type(self)(flops=dict(self.flops))
 
         if self.flops.keys() != other.flops.keys():
-            raise ValueError("FlopsInfo objects must have the same sequence lengths")
+            raise ValueError("FlopsInfo objects must have the same shape points")
 
         return type(self)(
             flops={
-                sequence_length: (value + other.flops[sequence_length])
-                for sequence_length, value in self.flops.items()
+                shape_point: (value + other.flops[shape_point])
+                for shape_point, value in self.flops.items()
             }
         )
 
@@ -58,22 +53,20 @@ class TensorInfo(BaseModel):
 
     name: str
 
-    shapes: dict[int, list[int]]  ## sequence length -> shape
-    sizes: dict[int, float]  ## sequence length -> size
+    shapes: dict[ShapePoint, list[int]]  ## ShapePoint -> shape
+    sizes: dict[ShapePoint, float]  ## ShapePoint -> size
 
 
 class LayerInfo(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     name: str
-
     type: str
 
     flops: FlopsInfo
     weights_size: float
 
     inputs: set[str] = Field(default_factory=set)
-
     outputs: set[str] = Field(default_factory=set)
 
     is_input: bool
@@ -90,30 +83,6 @@ class EdgeInfo(BaseModel):
     target: str
 
     tensors: set[str] = Field(default_factory=set)
-
-
-class DynamicShapeType(Enum):
-    BATCH = "batch"
-    SEQUENCE = "sequence"
-
-
-class ModelInfo(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    name: str
-
-    accuracy: float
-    task: TaskType
-
-    type: ModelType
-
-    dynamic_shapes: dict[str, DynamicShapeType]  ## Shape-name to shape type
-
-    batch_size: int = 1  ## Default to 1
-    sequence_sizes: List[int] = [1]  ## Default to 1 for no sequence
-
-    num_heads: int = 0
-    hidden_size: int = 0
 
 
 class LayerAttributes(TypedDict):
@@ -138,51 +107,25 @@ def create_raw_model_graph() -> RawModelGraph:
 
 
 ## TODO: Implement serialization logic for this class
-class ModelGraph(BaseModel):
+class ModelVersionGraph(BaseModel):
     model_config = ConfigDict(
         frozen=False,
     )
 
-    ## TODO: Add graph sanity checks!!
+    shape_points: List[ShapePoint]
 
-    model_info: ModelInfo
+    ## TODO: Add graph sanity checks!!
     _tensors_map: Mapping[str, TensorInfo] = PrivateAttr(default_factory=dict)
 
     _graph: RawModelGraph = PrivateAttr(
         default_factory=create_raw_model_graph,
     )
 
-    def set_model_info(self, model_info: ModelInfo) -> None:
-        self.model_info = model_info
-
-    def get_model_info(self) -> ModelInfo | None:
-        return self.model_info
-
     def set_tensors_map(self, tensors_map: Mapping[str, TensorInfo]) -> None:
         self._tensors_map = tensors_map
 
     def get_tensors_map(self) -> Mapping[str, TensorInfo]:
         return self._tensors_map
-
-    def get_default_sizes_for_tensors_set(
-        self, tensors_set: set[str]
-    ) -> dict[str, float]:
-        assert self.model_info is not None
-        min_size = min(self.model_info.sequence_sizes)
-
-        return {
-            tensor_name: self._tensors_map[tensor_name].sizes[min_size]
-            for tensor_name in tensors_set
-        }
-
-    def get_default_flops_for_layer_set(self, layer_set: set[str]) -> dict[str, float]:
-        assert self.model_info is not None
-        min_size = min(self.model_info.sequence_sizes)
-
-        return {
-            layer_name: self._graph.nodes[layer_name]["info"].flops.flops[min_size]
-            for layer_name in layer_set
-        }
 
     def add_layer(self, layer_info: LayerInfo) -> None:
         self._graph.add_node(layer_info.name, info=layer_info)
@@ -202,6 +145,7 @@ class ModelGraph(BaseModel):
     def get_all_layers(
         self,
     ) -> Mapping[LayerKey, LayerInfo]:
+
         return dict(
             cast(
                 Iterable[tuple[LayerKey, LayerInfo]],
@@ -310,7 +254,7 @@ class ModelGraph(BaseModel):
             raise ValueError("The graph must be a DAG.")
 
     def is_dag(self) -> bool:
-        return nx.is_directed_acyclic_graph(self._graph)
+        return nx.is_directed_acyclic_graph(self._graph)  # type: ignore
 
     def _create_contracted_edges(
         self,
@@ -478,27 +422,4 @@ class ModelGraph(BaseModel):
 
         return incoming, outgoing
 
-    def model_post_init(self, __context: object) -> None:
-        self._rebuild_graph()
-
-    def _rebuild_graph(self) -> None:
-        pass
-        # graph: RawModelGraph = nx.DiGraph()
-
-        # for layer in self.layers.values():
-        #     graph.add_node(layer.name)
-
-        # for edge in self.edges:
-        #     if edge.source not in graph:
-        #         raise ValueError(
-        #             f"Unknown source layer: {edge.source!r}"
-        #         )
-
-        #     if edge.target not in graph:
-        #         raise ValueError(
-        #             f"Unknown target layer: {edge.target!r}"
-        #         )
-
-        #     graph.add_edge(edge.source, edge.target)
-
-        # self._graph = graph
+    ## TODO: Add serialization and deserialization

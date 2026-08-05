@@ -12,10 +12,10 @@ from distributed_inference.artifact_store.domain.artifact_key import (
     ModelVersionArtifactKey,
 )
 from distributed_inference.domain.identifiers import (
-    ModelId,
-    ModelVersionId,
     UserId,
 )
+from distributed_inference.model_manager.domain.model import ModelId
+from distributed_inference.model_manager.domain.model_version import ModelVersionId
 from test.support.artifact_store.artifact_bundle_test_utils import build_test_bundle
 
 
@@ -23,10 +23,10 @@ def _key() -> ModelVersionArtifactKey:
     return ModelVersionArtifactKey(
         id=ModelVersionId(
             model_id=ModelId(
-                user_id=UserId(user_id=uuid4()),
+                owner_id=UserId(id=uuid4()),
                 model_name="resnet50",
             ),
-            version_number=3,
+            version_tag=3,
         )
     )
 
@@ -36,9 +36,7 @@ def test_constructor_creates_directory_for_each_artifact_kind(tmp_path: Path) ->
     store = LocalArtifactStore(tmp_path)
 
     assert store.base_path == tmp_path
-    assert all(
-        (tmp_path / "artifacts" / kind.value).is_dir() for kind in ArtifactKind
-    )
+    assert all((tmp_path / "artifacts" / kind.value).is_dir() for kind in ArtifactKind)
 
 
 @pytest.mark.unit
@@ -69,15 +67,11 @@ async def test_artifact_root_uses_deterministic_key_digest(
 ) -> None:
     store = LocalArtifactStore(tmp_path)
     key = _key()
-    expected_digest = hashlib.md5(
-        key.model_dump_json().encode("utf-8")
-    ).hexdigest()
+    expected_digest = hashlib.md5(key.model_dump_json().encode("utf-8")).hexdigest()
 
     artifact_root = await store._build_artifact_root_path(key)
 
-    assert artifact_root == (
-        tmp_path / "artifacts" / key.kind.value / expected_digest
-    )
+    assert artifact_root == (tmp_path / "artifacts" / key.kind.value / expected_digest)
 
 
 @pytest.mark.unit

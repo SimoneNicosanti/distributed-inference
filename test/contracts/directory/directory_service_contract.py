@@ -39,7 +39,7 @@ class DirectoryDependencies:
 
 
 def build_server_id() -> ServerId:
-    return ServerId(server_id=uuid4())
+    return ServerId(id=uuid4())
 
 
 def build_service_instance(

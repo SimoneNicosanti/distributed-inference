@@ -3,22 +3,22 @@ from unittest.mock import MagicMock, call
 
 import pytest
 
-from distributed_inference.domain.model_graph_info import (
-    ModelGraph,
+from distributed_inference.model_manager.domain.model_version_graph import (
     ModelInfo,
     ModelType,
+    ModelVersionGraph,
     TaskType,
 )
-from distributed_inference.model_optimize.application.ports.outbound.model_optimizer import (
+from distributed_inference.model_optimizer.application.ports.outbound.model_optimizer import (
     ModelOptimizer,
 )
-from distributed_inference.model_optimize.domain.optimization_level import (
+from distributed_inference.model_optimizer.domain.optimization_level import (
     OptimizationLevel,
 )
-from distributed_inference.model_profile.application.ports.outbound.model_graph_extractor import (
+from distributed_inference.model_profiler.application.ports.outbound.model_graph_extractor import (
     ModelGraphExtractor,
 )
-from distributed_inference.model_profile.application.services.default_model_profiler import (
+from distributed_inference.model_profiler.application.services.default_model_profiler import (
     DefaultModelProfiler,
 )
 from test.support.artifact_materializer.materialized_artifact_test_utils import (
@@ -43,9 +43,9 @@ async def test_profile_model_runs_both_optimization_levels_then_aggregates(
 ) -> None:
     optimizer = MagicMock(spec=ModelOptimizer)
     extractor = MagicMock(spec=ModelGraphExtractor)
-    basic_graph = MagicMock(spec=ModelGraph)
-    extended_graph = MagicMock(spec=ModelGraph)
-    aggregated_graph = MagicMock(spec=ModelGraph)
+    basic_graph = MagicMock(spec=ModelVersionGraph)
+    extended_graph = MagicMock(spec=ModelVersionGraph)
+    aggregated_graph = MagicMock(spec=ModelVersionGraph)
     extractor.extract_model_graph.side_effect = [basic_graph, extended_graph]
     extractor.aggregate_model_graphs.return_value = aggregated_graph
     profiler = DefaultModelProfiler(optimizer, extractor)
@@ -55,7 +55,7 @@ async def test_profile_model_runs_both_optimization_levels_then_aggregates(
     )
     model_info = _model_info()
 
-    result = await profiler.profile_model(source_paths, model_info)
+    result = await profiler.profile_model_version(source_paths, model_info)
 
     assert result is aggregated_graph
     assert optimizer.optimize_model.call_count == 2

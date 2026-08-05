@@ -5,32 +5,26 @@ from typing import Iterable
 from distributed_inference.artifact_store.domain.readable_artifact_bundle import (
     ReadableArtifactBundle,
 )
-from distributed_inference.domain.identifiers import (
-    ModelId,
+from distributed_inference.model_manager.domain.model import Model, ModelId
+from distributed_inference.model_manager.domain.model_version import (
+    ModelVersion,
     ModelVersionId,
-    SubModelId,
-    UserId,
+    ProfiledModelVersion,
 )
-from distributed_inference.domain.model_graph_info import (
+from distributed_inference.model_manager.domain.model_version_graph import (
     LayerKey,
-    ModelGraph,
-    ModelInfo,
 )
+from distributed_inference.model_manager.domain.sub_model import SubModel, SubModelId
 
 
 class ModelManager(ABC):
     @abstractmethod
-    async def register_model(
-        self,
-        owner_id: UserId,
-        model_name: str,
-    ) -> ModelId: ...
+    async def register_model(self, model: Model) -> ModelId: ...
 
     @abstractmethod
-    async def put_model_version(
+    async def upload_model_version(
         self,
-        model_id: ModelId,
-        model_info: ModelInfo,
+        model_version: ModelVersion,
         bundle: ReadableArtifactBundle,
     ) -> ModelVersionId: ...
 
@@ -39,25 +33,15 @@ class ModelManager(ABC):
         self,
         model_version_id: ModelVersionId,
         layers: Iterable[LayerKey],
-    ) -> SubModelId: ...
+    ) -> SubModel: ...
 
     @abstractmethod
-    def get_sub_model(
+    def download_sub_model(
         self,
         sub_model_id: SubModelId,
     ) -> AbstractAsyncContextManager[ReadableArtifactBundle]: ...
 
     @abstractmethod
-    async def get_model_graph(self, model_version_id: ModelVersionId) -> ModelGraph: ...
-
-    @abstractmethod
-    async def check_model_version_existence(
-        self,
-        model_version_id: ModelVersionId,
-    ) -> bool: ...
-
-    @abstractmethod
-    async def check_sub_model_existence(
-        self,
-        sub_model_id: SubModelId,
-    ) -> bool: ...
+    async def get_profiled_model_version(
+        self, model_version_id: ModelVersionId
+    ) -> ProfiledModelVersion: ...

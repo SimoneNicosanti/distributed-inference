@@ -12,7 +12,10 @@ from distributed_inference.artifact_materializer.domain.materialized_artifact im
 from distributed_inference.artifact_processing.artifact_workspace import (
     ArtifactWorkspace,
 )
-from distributed_inference.domain.model_graph_info import LayerKey, ModelGraph
+from distributed_inference.model_manager.domain.model_version_graph import (
+    LayerKey,
+    ModelVersionGraph,
+)
 from distributed_inference.model_splitter.application.ports.outbound.model_splitter import (
     ModelSplitter,
 )
@@ -23,7 +26,7 @@ class OnnxModelSplitter(ModelSplitter):
     @override
     async def split_model(
         self,
-        model_graph: ModelGraph,
+        model_graph: ModelVersionGraph,
         layers: Iterable[LayerKey],
         input_paths: MaterializedArtifact,
         output_paths: ArtifactWorkspace,

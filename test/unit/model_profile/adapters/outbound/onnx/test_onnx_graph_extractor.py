@@ -13,20 +13,20 @@ from typing_extensions import override
 from distributed_inference.artifact_processing.artifact_workspace import (
     ArtifactWorkspace,
 )
-from distributed_inference.domain.model_graph_info import (
+from distributed_inference.model_manager.domain.model_version import ShapeType
+from distributed_inference.model_manager.domain.model_version_graph import (
     INPUT_LAYER_NAME,
     OUTPUT_LAYER_NAME,
-    DynamicShapeType,
     EdgeInfo,
     FlopsInfo,
     LayerInfo,
-    ModelGraph,
     ModelInfo,
     ModelType,
+    ModelVersionGraph,
     TaskType,
     TensorInfo,
 )
-from distributed_inference.model_profile.adapters.outbound.onnx.onnx_model_graph_extractor import (
+from distributed_inference.model_profiler.adapters.outbound.onnx.onnx_model_graph_extractor import (
     OnnxGraphExtractor,
 )
 from test.contracts.model_profile.model_graph_extractor_contract import (
@@ -38,7 +38,7 @@ from test.contracts.model_profile.model_graph_extractor_contract import (
 
 def _model_info(
     *,
-    dynamic_shapes: dict[str, DynamicShapeType] | None = None,
+    dynamic_shapes: dict[str, ShapeType] | None = None,
     sequence_sizes: list[int] | None = None,
 ) -> ModelInfo:
     return ModelInfo(
@@ -85,7 +85,7 @@ def _layer(
 
 
 def _add_edge(
-    graph: ModelGraph,
+    graph: ModelVersionGraph,
     source: str,
     target: str,
     tensors: Iterable[str],
@@ -159,7 +159,7 @@ def _write_representative_model(path: Path) -> np.ndarray:
 
 
 def _build_aggregation_case(model_info: ModelInfo) -> AggregationCase:
-    level_1 = ModelGraph(model_info=model_info)
+    level_1 = ModelVersionGraph(model_info=model_info)
     for layer in (
         _layer(
             INPUT_LAYER_NAME,
@@ -226,7 +226,7 @@ def _build_aggregation_case(model_info: ModelInfo) -> AggregationCase:
         }
     )
 
-    level_2 = ModelGraph(model_info=model_info)
+    level_2 = ModelVersionGraph(model_info=model_info)
     for layer in (
         _layer(
             INPUT_LAYER_NAME,
@@ -287,8 +287,8 @@ class TestOnnxGraphExtractorContract(ModelGraphExtractorContract):
     def model_info(self) -> ModelInfo:
         return _model_info(
             dynamic_shapes={
-                "batch_size": DynamicShapeType.BATCH,
-                "sequence_size": DynamicShapeType.SEQUENCE,
+                "batch_size": ShapeType.BATCH,
+                "sequence_size": ShapeType.SEQUENCE,
             },
             sequence_sizes=[1, 4],
         )
@@ -333,8 +333,8 @@ class TestOnnxGraphExtractor:
             _artifact_paths(path),
             _model_info(
                 dynamic_shapes={
-                    "batch_size": DynamicShapeType.BATCH,
-                    "sequence_size": DynamicShapeType.SEQUENCE,
+                    "batch_size": ShapeType.BATCH,
+                    "sequence_size": ShapeType.SEQUENCE,
                 },
                 sequence_sizes=[1],
             ),
@@ -528,7 +528,7 @@ class TestOnnxGraphExtractor:
             )
 
     def test_infers_a_branched_fused_group_from_its_boundary_tensors(self) -> None:
-        graph = ModelGraph(model_info=_model_info())
+        graph = ModelVersionGraph(model_info=_model_info())
         for layer in (
             _layer(
                 INPUT_LAYER_NAME,
@@ -561,7 +561,7 @@ class TestOnnxGraphExtractor:
     def test_returns_none_when_a_fused_output_has_no_basic_graph_producer(
         self,
     ) -> None:
-        graph = ModelGraph(model_info=_model_info())
+        graph = ModelVersionGraph(model_info=_model_info())
         graph.add_layer(_layer("node", inputs={"input"}, outputs={"known"}))
 
         fused = _layer(
@@ -575,7 +575,7 @@ class TestOnnxGraphExtractor:
     def test_excludes_input_layer_from_inferred_fused_group(
         self,
     ) -> None:
-        graph = ModelGraph(model_info=_model_info())
+        graph = ModelVersionGraph(model_info=_model_info())
         for layer in (
             _layer(
                 INPUT_LAYER_NAME,

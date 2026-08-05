@@ -12,11 +12,11 @@ from distributed_inference.artifact_store.domain.artifact_key import (
     SubModelArtifactKey,
 )
 from distributed_inference.domain.identifiers import (
-    ModelId,
-    ModelVersionId,
-    SubModelId,
     UserId,
 )
+from distributed_inference.model_manager.domain.model import ModelId
+from distributed_inference.model_manager.domain.model_version import ModelVersionId
+from distributed_inference.model_manager.domain.sub_model import SubModelId
 from test.support.artifact_store.artifact_bundle_test_utils import (
     build_test_bundle,
     read_bundle_content,
@@ -26,10 +26,10 @@ from test.support.artifact_store.artifact_bundle_test_utils import (
 def _model_version_id(version_number: int = 1) -> ModelVersionId:
     return ModelVersionId(
         model_id=ModelId(
-            user_id=UserId(user_id=uuid4()),
+            owner_id=UserId(id=uuid4()),
             model_name="resnet50",
         ),
-        version_number=version_number,
+        version_tag=version_number,
     )
 
 

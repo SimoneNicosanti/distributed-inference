@@ -20,24 +20,24 @@ from distributed_inference.artifact_store.domain.artifact_key import (
     SubModelArtifactKey,
 )
 from distributed_inference.domain.identifiers import (
-    ModelId,
-    ModelVersionId,
-    SubModelId,
     UserId,
-)
-from distributed_inference.domain.model_graph_info import (
-    ModelGraph,
-    ModelInfo,
-    ModelType,
-    TaskType,
 )
 from distributed_inference.model_manager.application.services.default_model_manager import (
     DefaultModelManager,
 )
+from distributed_inference.model_manager.domain.model import ModelId
+from distributed_inference.model_manager.domain.model_version import ModelVersionId
+from distributed_inference.model_manager.domain.model_version_graph import (
+    ModelInfo,
+    ModelType,
+    ModelVersionGraph,
+    TaskType,
+)
+from distributed_inference.model_manager.domain.sub_model import SubModelId
 from distributed_inference.model_metadata_store.application.ports.outbound.model_metadata_store import (
     ModelMetadataStore,
 )
-from distributed_inference.model_profile.application.ports.inbound.model_profiler import (
+from distributed_inference.model_profiler.application.ports.inbound.model_profiler import (
     ModelProfiler,
 )
 from distributed_inference.model_splitter.application.ports.outbound.model_splitter import (
@@ -51,10 +51,10 @@ from test.support.artifact_store.artifact_bundle_test_utils import build_test_bu
 
 def _ids() -> tuple[ModelId, ModelVersionId, SubModelId]:
     model_id = ModelId(
-        user_id=UserId(user_id=uuid4()),
+        owner_id=UserId(id=uuid4()),
         model_name="vision-model",
     )
-    version_id = ModelVersionId(model_id=model_id, version_number=1)
+    version_id = ModelVersionId(model_id=model_id, version_tag=1)
     sub_model_id = SubModelId(
         model_version_id=version_id,
         layers=("encoder.0", "encoder.1"),
@@ -116,17 +116,15 @@ async def test_put_model_version_stores_profiles_and_registers_graph(
     entrypoint.parent.mkdir()
     entrypoint.write_bytes(b"model")
     materialized = build_test_materialized_artifact(entrypoint)
-    graph = MagicMock(spec=ModelGraph)
+    graph = MagicMock(spec=ModelVersionGraph)
     metadata_store.register_model_version.return_value = version_id
     materializer.materialize_artifact.return_value = _async_context(materialized)
     profiler.profile_model.return_value = graph
 
-    result = await manager.put_model_version(model_id, model_info, bundle)
+    result = await manager.upload_model_version(model_id, model_info, bundle)
 
     assert result == version_id
-    metadata_store.register_model_version.assert_awaited_once_with(
-        model_id, model_info
-    )
+    metadata_store.register_model_version.assert_awaited_once_with(model_id, model_info)
     artifact_store.put_artifact.assert_awaited_once_with(
         ModelVersionArtifactKey(id=version_id),
         bundle,
@@ -157,7 +155,7 @@ async def test_generate_sub_model_splits_and_stores_component(
     )
     _, version_id, sub_model_id = _ids()
     layers = ["encoder.0", "encoder.1"]
-    graph = MagicMock(spec=ModelGraph)
+    graph = MagicMock(spec=ModelVersionGraph)
     input_entrypoint = tmp_path / "input" / "model.onnx"
     input_entrypoint.parent.mkdir()
     input_entrypoint.write_bytes(b"model")
@@ -266,7 +264,7 @@ def test_get_sub_model_opens_sub_model_artifact() -> None:
     expected_context = MagicMock()
     artifact_store.open_artifact.return_value = expected_context
 
-    result = manager.get_sub_model(sub_model_id)
+    result = manager.download_sub_model(sub_model_id)
 
     assert result is expected_context
     artifact_store.open_artifact.assert_called_once_with(

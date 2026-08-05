@@ -14,10 +14,10 @@ from distributed_inference.artifact_store.domain.artifact_key import (
     ModelVersionArtifactKey,
 )
 from distributed_inference.domain.identifiers import (
-    ModelId,
-    ModelVersionId,
     UserId,
 )
+from distributed_inference.model_manager.domain.model import ModelId
+from distributed_inference.model_manager.domain.model_version import ModelVersionId
 from test.support.artifact_store.artifact_bundle_test_utils import build_test_bundle
 
 
@@ -38,10 +38,10 @@ class ArtifactMaterializerContract(ABC):
         key = ModelVersionArtifactKey(
             id=ModelVersionId(
                 model_id=ModelId(
-                    user_id=UserId(user_id=uuid4()),
+                    owner_id=UserId(id=uuid4()),
                     model_name="resnet50",
                 ),
-                version_number=1,
+                version_tag=1,
             )
         )
         bundle = build_test_bundle(
@@ -72,10 +72,10 @@ class ArtifactMaterializerContract(ABC):
         key = ModelVersionArtifactKey(
             id=ModelVersionId(
                 model_id=ModelId(
-                    user_id=UserId(user_id=uuid4()),
+                    owner_id=UserId(id=uuid4()),
                     model_name="missing",
                 ),
-                version_number=1,
+                version_tag=1,
             )
         )
 

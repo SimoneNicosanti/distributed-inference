@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import cast
 
 import onnx
 import onnx.external_data_helper
@@ -13,14 +14,15 @@ from distributed_inference.artifact_materializer.domain.materialized_artifact im
 from distributed_inference.artifact_processing.artifact_workspace import (
     ArtifactWorkspace,
 )
-from distributed_inference.domain.model_graph_info import (
-    ModelInfo,
-    ModelType,
+from distributed_inference.model_manager.domain.model import ModelInfo, ModelType
+from distributed_inference.model_manager.domain.model_version import (
+    ModelVersionInfo,
+    TransformerArchitectureInfo,
 )
-from distributed_inference.model_optimize.application.ports.outbound.model_optimizer import (
+from distributed_inference.model_optimizer.application.ports.outbound.model_optimizer import (
     ModelOptimizer,
 )
-from distributed_inference.model_optimize.domain.optimization_level import (
+from distributed_inference.model_optimizer.domain.optimization_level import (
     OptimizationLevel,
 )
 
@@ -32,6 +34,7 @@ class OnnxModelOptimizer(ModelOptimizer):
         input_paths: MaterializedArtifact,
         output_paths: ArtifactWorkspace,
         model_info: ModelInfo,
+        model_version_info: ModelVersionInfo,
         opt_level: OptimizationLevel,
     ) -> None:
 
@@ -50,16 +53,18 @@ class OnnxModelOptimizer(ModelOptimizer):
                     input_path=input_entrypoint_path,
                     output_path=output_entrypoint_path,
                     model_info=model_info,
+                    model_version_info=model_version_info,
                     opt_level=opt_level,
                 )
 
             case OptimizationLevel.EXTENDED:
-                match model_info.type:
+                match model_info.model_type:
                     case ModelType.CNN:
                         self._optimize_with_ort_standard(
                             input_path=input_entrypoint_path,
                             output_path=output_entrypoint_path,
                             model_info=model_info,
+                            model_version_info=model_version_info,
                             opt_level=opt_level,
                         )
 
@@ -68,11 +73,14 @@ class OnnxModelOptimizer(ModelOptimizer):
                             input_path=input_entrypoint_path,
                             output_path=output_entrypoint_path,
                             model_info=model_info,
+                            model_version_info=model_version_info,
                             opt_level=opt_level,
                         )
 
                     case _:
-                        raise ValueError(f"Unsupported model type: {model_info.type}")
+                        raise ValueError(
+                            f"Unsupported model type: {model_info.model_type}"
+                        )
 
             case _:
                 raise ValueError(f"Unsupported optimization level: {opt_level}")
@@ -87,6 +95,7 @@ class OnnxModelOptimizer(ModelOptimizer):
         input_path: Path,
         output_path: Path,
         model_info: ModelInfo,
+        model_version_info: ModelVersionInfo,
         opt_level: OptimizationLevel,
     ) -> None:
 
@@ -145,20 +154,26 @@ class OnnxModelOptimizer(ModelOptimizer):
         input_path: Path,
         output_path: Path,
         model_info: ModelInfo,
+        model_version_info: ModelVersionInfo,
         opt_level: OptimizationLevel,
     ) -> None:
-        model_type = self._get_ort_transformer_model_type(model_info.type)
+        model_type = self._get_ort_transformer_model_type(model_info.model_type)
 
         options = FusionOptions(model_type=model_type)
         options = ort_transformers_opt.FusionOptions(
             model_type=model_type,
         )
 
+        ## TODO: Not a very pleasant cast
+        architecture_info = cast(
+            TransformerArchitectureInfo, model_version_info.architecture_info
+        )
+
         optimized = ort_transformers_opt.optimize_model(
             input=str(input_path),
             model_type=model_type,
-            num_heads=model_info.num_heads,
-            hidden_size=model_info.hidden_size,
+            num_heads=architecture_info.num_heads,
+            hidden_size=architecture_info.hidden_size,
             optimization_options=options,
             opt_level=0,  ## Need to use this; otherwise it applies optimizations breaking the structure
             use_gpu=False,

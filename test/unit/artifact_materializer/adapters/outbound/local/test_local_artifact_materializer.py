@@ -20,10 +20,10 @@ from distributed_inference.artifact_store.domain.artifact_manifest import (
     ArtifactManifest,
 )
 from distributed_inference.domain.identifiers import (
-    ModelId,
-    ModelVersionId,
     UserId,
 )
+from distributed_inference.model_manager.domain.model import ModelId
+from distributed_inference.model_manager.domain.model_version import ModelVersionId
 
 
 @pytest.mark.unit
@@ -34,10 +34,10 @@ async def test_materializer_delegates_paths_to_local_store(tmp_path: Path) -> No
     key = ModelVersionArtifactKey(
         id=ModelVersionId(
             model_id=ModelId(
-                user_id=UserId(user_id=uuid4()),
+                owner_id=UserId(id=uuid4()),
                 model_name="resnet50",
             ),
-            version_number=1,
+            version_tag=1,
         )
     )
     root_path = tmp_path / "bundle"
@@ -51,9 +51,7 @@ async def test_materializer_delegates_paths_to_local_store(tmp_path: Path) -> No
     )
 
     @asynccontextmanager
-    async def stored_paths() -> AsyncGenerator[
-        tuple[ArtifactManifest, Path, Path]
-    ]:
+    async def stored_paths() -> AsyncGenerator[tuple[ArtifactManifest, Path, Path]]:
         yield manifest, root_path, entrypoint_path
 
     raw_store.get_artifact_manifest_root_path_entry_path.return_value = stored_paths()

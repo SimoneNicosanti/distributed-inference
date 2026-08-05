@@ -1,13 +1,13 @@
 import pytest
 
-from distributed_inference.domain.model_graph_info import (
+from distributed_inference.model_manager.domain.model_version_graph import (
     AGGREGATED_LAYER_TYPE,
     EdgeInfo,
     FlopsInfo,
     LayerInfo,
-    ModelGraph,
     ModelInfo,
     ModelType,
+    ModelVersionGraph,
     TaskType,
     TensorInfo,
 )
@@ -48,8 +48,8 @@ def _layer(
     )
 
 
-def _linear_graph() -> ModelGraph:
-    graph = ModelGraph(model_info=_model_info())
+def _linear_graph() -> ModelVersionGraph:
+    graph = ModelVersionGraph(model_info=_model_info())
     for layer in (
         _layer(
             "input",

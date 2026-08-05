@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from distributed_inference.domain.identifiers import SubModelDeploymentId
+from distributed_inference.model_manager.domain.sub_model import SubModelDeploymentId
 from distributed_inference.worker.application.ports.outbound.sub_model_executor import (
     SubModelExecutor,
 )

@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from distributed_inference.domain.model_graph_info import (
-    DynamicShapeType,
+from distributed_inference.model_manager.domain.model_version import ShapeType
+from distributed_inference.model_manager.domain.model_version_graph import (
     ModelInfo,
     ModelType,
     TaskType,
@@ -30,7 +30,7 @@ TEST_MODELS_INFO = {
         accuracy=0.0,
         task=TaskType.CLASSIFICATION,
         type=ModelType.VIT,
-        dynamic_shapes={"batch_size": DynamicShapeType.BATCH},
+        dynamic_shapes={"batch_size": ShapeType.BATCH},
         num_heads=12,
         hidden_size=768,
     ),
@@ -47,8 +47,8 @@ TEST_MODELS_INFO = {
         task=TaskType.CLASSIFICATION,
         type=ModelType.BERT,
         dynamic_shapes={
-            "batch_size": DynamicShapeType.BATCH,
-            "sequence_length": DynamicShapeType.SEQUENCE,
+            "batch_size": ShapeType.BATCH,
+            "sequence_length": ShapeType.SEQUENCE,
         },
         sequence_sizes=[16, 32, 64, 128, 256],
         num_heads=12,

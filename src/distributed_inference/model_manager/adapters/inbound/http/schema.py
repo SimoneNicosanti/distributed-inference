@@ -1,17 +1,15 @@
 from pydantic import BaseModel
 
-from distributed_inference.domain.identifiers import (
-    ModelId,
+from distributed_inference.model_manager.domain.model import Model, ModelId
+from distributed_inference.model_manager.domain.model_version import (
     ModelVersionId,
-    SubModelId,
-    UserId,
+    ProfiledModelVersion,
 )
-from distributed_inference.domain.model_graph_info import ModelGraph
+from distributed_inference.model_manager.domain.sub_model import SubModel, SubModelId
 
 
 class RegisterModelRequest(BaseModel):
-    owner_id: UserId
-    model_name: str
+    model: Model
 
 
 class RegisterModelResponse(BaseModel):
@@ -28,16 +26,16 @@ class GenerateSubModelRequest(BaseModel):
 
 
 class GenerateSubModelResponse(BaseModel):
-    sub_model_id: SubModelId
+    sub_model: SubModel
 
 
 class DownloadSubModelRequest(BaseModel):
     sub_model_id: SubModelId
 
 
-class GetModelGraphRequest(BaseModel):
+class GetProfiledModelVersionRequest(BaseModel):
     model_version_id: ModelVersionId
 
 
-class GetModelGraphResponse(BaseModel):
-    model_graph: ModelGraph
+class GetProfiledModelVersionResponse(BaseModel):
+    profiled_model_version: ProfiledModelVersion

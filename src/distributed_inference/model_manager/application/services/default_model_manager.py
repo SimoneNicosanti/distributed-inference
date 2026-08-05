@@ -21,24 +21,23 @@ from distributed_inference.artifact_store.domain.artifact_key import (
 from distributed_inference.artifact_store.domain.readable_artifact_bundle import (
     ReadableArtifactBundle,
 )
-from distributed_inference.domain.identifiers import (
-    ModelId,
-    ModelVersionId,
-    SubModelId,
-    UserId,
-)
-from distributed_inference.domain.model_graph_info import (
-    LayerKey,
-    ModelGraph,
-    ModelInfo,
-)
 from distributed_inference.model_manager.application.ports.inbound.model_manager import (
     ModelManager,
 )
+from distributed_inference.model_manager.domain.model import Model, ModelId
+from distributed_inference.model_manager.domain.model_version import (
+    ModelVersion,
+    ModelVersionId,
+    ProfiledModelVersion,
+)
+from distributed_inference.model_manager.domain.model_version_graph import (
+    LayerKey,
+)
+from distributed_inference.model_manager.domain.sub_model import SubModel, SubModelId
 from distributed_inference.model_metadata_store.application.ports.outbound.model_metadata_store import (
     ModelMetadataStore,
 )
-from distributed_inference.model_profile.application.ports.inbound.model_profiler import (
+from distributed_inference.model_profiler.application.ports.inbound.model_profiler import (
     ModelProfiler,
 )
 from distributed_inference.model_splitter.application.ports.outbound.model_splitter import (
@@ -67,47 +66,56 @@ class DefaultModelManager(ModelManager):
         pass
 
     @override
-    async def register_model(self, owner_id: UserId, model_name: str) -> ModelId:
-        return await self._model_metadata_store.register_model(owner_id, model_name)
+    async def register_model(self, model: Model) -> ModelId:
+        return await self._model_metadata_store.register_model(model)
 
     @override
-    async def put_model_version(
-        self, model_id: ModelId, model_info: ModelInfo, bundle: ReadableArtifactBundle
+    async def upload_model_version(
+        self, model_version: ModelVersion, bundle: ReadableArtifactBundle
     ) -> ModelVersionId:
         model_version_id = await self._model_metadata_store.register_model_version(
-            model_id, model_info
+            model_version
         )
         artifact_key = ModelVersionArtifactKey(id=model_version_id)
         await self._artifact_store.put_artifact(artifact_key, bundle)
 
+        model = await self._model_metadata_store.get_model(model_version.model_id)
+        model_info = model.model_info
+
         async with self._artifact_materializer.materialize_artifact(
             artifact_key
         ) as materialized_artifact:
-            model_graph = await self._model_profiler.profile_model(
-                materialized_artifact, model_info
+            profiled_model_version = await self._model_profiler.profile_model_version(
+                materialized_artifact, model_info, model_version
             )
-            await self._model_metadata_store.register_model_version_graph(
-                model_version_id, model_graph
+            await self._model_metadata_store.register_profiled_model_version(
+                profiled_model_version
             )
         return model_version_id
 
     @override
     async def generate_sub_model(
         self, model_version_id: ModelVersionId, layers: Iterable[LayerKey]
-    ) -> SubModelId:
+    ) -> SubModel:
 
         SubModelId.check_valid_layers_format(layers)
 
         layers = tuple(layers)
-        model_graph = await self._model_metadata_store.get_model_graph(model_version_id)
-        if model_graph is None:
+        profiled_model_version = (
+            await self._model_metadata_store.get_profiled_model_version(
+                model_version_id
+            )
+        )
+        if profiled_model_version is None:
             raise ValueError(
                 f"Model graph for model version {model_version_id} still not ready"
             )
 
-        sub_model_id = await self._model_metadata_store.register_sub_model(
-            model_version_id, layers
-        )
+        sub_model_id = SubModelId(model_version_id=model_version_id, layers=layers)
+
+        sub_model = SubModel(sub_model_id=sub_model_id)
+
+        sub_model_id = await self._model_metadata_store.register_sub_model(sub_model)
 
         async with aiofiles.tempfile.TemporaryDirectory() as tmp_dir:
             split_artifact_paths = ArtifactWorkspace(
@@ -119,7 +127,10 @@ class DefaultModelManager(ModelManager):
                 artifact_key
             ) as model_paths:
                 await self._model_splitter.split_model(
-                    model_graph, layers, model_paths, split_artifact_paths
+                    profiled_model_version.model_version_graph,
+                    layers,
+                    model_paths,
+                    split_artifact_paths,
                 )
 
             sub_model_artifact_key = SubModelArtifactKey(id=sub_model_id)
@@ -130,46 +141,26 @@ class DefaultModelManager(ModelManager):
                 sub_model_artifact_key, artifact_bundle
             )
 
-        return sub_model_id
+        return sub_model
 
     @override
-    def get_sub_model(
+    def download_sub_model(
         self, sub_model_id: SubModelId
     ) -> AbstractAsyncContextManager[ReadableArtifactBundle]:
         artifact_key = SubModelArtifactKey(id=sub_model_id)
         return self._artifact_store.open_artifact(artifact_key)
 
     @override
-    async def get_model_graph(self, model_version_id: ModelVersionId) -> ModelGraph:
-        model_graph = await self._model_metadata_store.get_model_graph(model_version_id)
-        if model_graph is None:
-            raise ValueError(
-                f"Model graph for model version {model_version_id} still not ready"
-            )
-        return model_graph
-
-    @override
-    async def check_model_version_existence(
+    async def get_profiled_model_version(
         self, model_version_id: ModelVersionId
-    ) -> bool:
-        exists_metadata = (
-            await self._model_metadata_store.check_model_version_existence(
+    ) -> ProfiledModelVersion:
+        profiled_model_version = (
+            await self._model_metadata_store.get_profiled_model_version(
                 model_version_id
             )
         )
-        artifact_key = ModelVersionArtifactKey(id=model_version_id)
-        exists_artifact = await self._artifact_store.check_artifact_existence(
-            artifact_key
-        )
-        return exists_metadata and exists_artifact
-
-    @override
-    async def check_sub_model_existence(self, sub_model_id: SubModelId) -> bool:
-        exists_metadata = await self._model_metadata_store.check_sub_model_existence(
-            sub_model_id
-        )
-        artifact_key = SubModelArtifactKey(id=sub_model_id)
-        exists_artifact = await self._artifact_store.check_artifact_existence(
-            artifact_key
-        )
-        return exists_metadata and exists_artifact
+        if profiled_model_version is None:
+            raise ValueError(
+                f"Model graph for model version {model_version_id} still not ready"
+            )
+        return profiled_model_version

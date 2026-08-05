@@ -1,5 +1,5 @@
 import copy
-from typing import cast, override
+from typing import List, cast, override
 
 import numpy as np
 import onnx_tool
@@ -9,17 +9,19 @@ import onnx
 from distributed_inference.artifact_processing.artifact_workspace import (
     ArtifactWorkspace,
 )
-from distributed_inference.domain import model_graph_info
-from distributed_inference.domain.model_graph_info import (
-    DynamicShapeType,
+from distributed_inference.model_manager.domain import model_version_graph
+from distributed_inference.model_manager.domain.model_version import (
+    ModelVersionInfo,
+)
+from distributed_inference.model_manager.domain.model_version_graph import (
     EdgeInfo,
     FlopsInfo,
     LayerInfo,
-    ModelGraph,
-    ModelInfo,
+    ModelVersionGraph,
+    ShapePoint,
     TensorInfo,
 )
-from distributed_inference.model_profile.application.ports.outbound.model_graph_extractor import (
+from distributed_inference.model_profiler.application.ports.outbound.model_graph_extractor import (
     ModelGraphExtractor,
 )
 
@@ -34,10 +36,10 @@ class OnnxGraphExtractor(ModelGraphExtractor):
     def extract_model_graph(
         self,
         paths: ArtifactWorkspace,
-        model_info: ModelInfo,
+        model_version_info: ModelVersionInfo,
         profile_flops: bool,
         profile_tensors: bool,
-    ) -> ModelGraph:
+    ) -> ModelVersionGraph:
 
         if paths.entrypoint_path is None:
             raise ValueError(
@@ -48,30 +50,32 @@ class OnnxGraphExtractor(ModelGraphExtractor):
         model_proto = onnx.load_model(path.as_posix())  # type: ignore
 
         inferred_model = OnnxGraphExtractor.__infer_model_shape(model_proto)
-        model_graph: ModelGraph = ModelGraph(model_info=model_info)
+        shape_points: List[ShapePoint] = ModelGraphExtractor.compute_shape_points(
+            model_version_info
+        )
+        model_graph: ModelVersionGraph = ModelVersionGraph(shape_points=shape_points)
 
         try:
             onnx.checker.check_model(inferred_model, full_check=True)  # type: ignore
             # model_proto = infer_shapes(inferred_model)
 
             OnnxGraphExtractor.__init_model_graph(
-                inferred_model, model_graph, model_info
+                inferred_model, model_graph, model_version_info
             )
             OnnxGraphExtractor.__add_model_nodes(
-                inferred_model, model_graph, model_info
+                inferred_model, model_graph, model_version_info
             )
             if profile_flops:
                 OnnxGraphExtractor.__add_layers_flops(
-                    inferred_model, model_graph, model_info
+                    inferred_model, model_graph, model_version_info
                 )
             OnnxGraphExtractor.__add_model_edges(
-                inferred_model, model_graph, model_info
+                inferred_model, model_graph, model_version_info
             )
             if profile_tensors:
                 OnnxGraphExtractor.__add_tensors_info(
-                    inferred_model, model_graph, model_info
+                    inferred_model, model_graph, model_version_info
                 )
-            OnnxGraphExtractor.__add_model_info(inferred_model, model_graph, model_info)
             OnnxGraphExtractor.__clear_model_graph(model_graph)
 
         except onnx.checker.ValidationError as e:
@@ -82,9 +86,9 @@ class OnnxGraphExtractor(ModelGraphExtractor):
     ## This is here because the way the fusions are done depends on the specific tool
     @override
     def aggregate_model_graphs(
-        self, level_1_graph: ModelGraph, level_2_graph: ModelGraph
-    ) -> ModelGraph:
-        agg_model_graph: ModelGraph = copy.deepcopy(level_2_graph)
+        self, level_1_graph: ModelVersionGraph, level_2_graph: ModelVersionGraph
+    ) -> ModelVersionGraph:
+        agg_model_graph: ModelVersionGraph = copy.deepcopy(level_2_graph)
 
         ext_to_process: dict[str, LayerInfo] = {}
         for (
@@ -146,7 +150,7 @@ class OnnxGraphExtractor(ModelGraphExtractor):
 
     @staticmethod
     def _infer_fused_group(
-        basic_model_graph: ModelGraph,
+        basic_model_graph: ModelVersionGraph,
         opt_layer_info: LayerInfo,
     ) -> set[str] | None:
 
@@ -217,12 +221,12 @@ class OnnxGraphExtractor(ModelGraphExtractor):
         return inferred_model
 
     @staticmethod
-    def __clear_model_graph(model_graph: ModelGraph) -> None:
+    def __clear_model_graph(model_graph: ModelVersionGraph) -> None:
         # Removing all nodes that are not reachable from the input node
         # In some cases, there are nodes used to define the weights
         # Or pre-processing operations on them (likq quantization)
         reachable = model_graph.get_reachable_from_layer(
-            model_graph_info.INPUT_LAYER_NAME
+            model_version_graph.INPUT_LAYER_NAME
         ).keys()
 
         all_layers = model_graph.get_all_layers().keys()
@@ -233,7 +237,9 @@ class OnnxGraphExtractor(ModelGraphExtractor):
 
     @staticmethod
     def __init_model_graph(
-        model_proto: onnx.ModelProto, model_graph: ModelGraph, model_info: ModelInfo
+        model_proto: onnx.ModelProto,
+        model_graph: ModelVersionGraph,
+        model_version_info: ModelVersionInfo,
     ) -> None:
 
         input_names: set[str] = set()
@@ -241,10 +247,10 @@ class OnnxGraphExtractor(ModelGraphExtractor):
             input_names.add(input.name)
 
         input_layer_info = LayerInfo(
-            name=model_graph_info.INPUT_LAYER_NAME,
-            type=model_graph_info.INPUT_LAYER_NAME,
+            name=model_version_graph.INPUT_LAYER_NAME,
+            type=model_version_graph.INPUT_LAYER_NAME,
             flops=FlopsInfo(
-                flops={seq_size: 0 for seq_size in model_info.sequence_sizes}
+                flops={shape_point: 0 for shape_point in model_graph.shape_points}
             ),
             weights_size=0,
             inputs=input_names,
@@ -261,10 +267,10 @@ class OnnxGraphExtractor(ModelGraphExtractor):
             output_names.add(output.name)
 
         output_layer_info = LayerInfo(
-            name=model_graph_info.OUTPUT_LAYER_NAME,
-            type=model_graph_info.OUTPUT_LAYER_NAME,
+            name=model_version_graph.OUTPUT_LAYER_NAME,
+            type=model_version_graph.OUTPUT_LAYER_NAME,
             flops=FlopsInfo(
-                flops={seq_size: 0 for seq_size in model_info.sequence_sizes}
+                flops={shape_point: 0 for shape_point in model_graph.shape_points}
             ),
             weights_size=0,
             inputs=output_names,
@@ -279,8 +285,8 @@ class OnnxGraphExtractor(ModelGraphExtractor):
     @staticmethod
     def __add_model_nodes(
         model_proto: onnx.ModelProto,
-        model_graph: ModelGraph,
-        model_info: ModelInfo,
+        model_graph: ModelVersionGraph,
+        model_version_info: ModelVersionInfo,
     ) -> None:
 
         ## Dict of model weights
@@ -294,7 +300,7 @@ class OnnxGraphExtractor(ModelGraphExtractor):
                 OnnxGraphExtractor.__extract_node_info(
                     initializers_dict,
                     node,
-                    model_info,
+                    model_version_info,
                 )
             )
 
@@ -318,8 +324,8 @@ class OnnxGraphExtractor(ModelGraphExtractor):
     @staticmethod
     def __add_tensors_info(
         model_proto: onnx.ModelProto,
-        model_graph: ModelGraph,
-        model_info: ModelInfo,
+        model_graph: ModelVersionGraph,
+        model_version_info: ModelVersionInfo,
     ) -> None:
 
         all_tensors: set[str] = set()
@@ -331,20 +337,20 @@ class OnnxGraphExtractor(ModelGraphExtractor):
         for tensor in all_tensors:
             tensor_info = TensorInfo(
                 name=tensor,
-                shapes={seq_size: [] for seq_size in model_info.sequence_sizes},
-                sizes={seq_size: 0 for seq_size in model_info.sequence_sizes},
+                shapes={shape_point: [] for shape_point in model_graph.shape_points},
+                sizes={shape_point: 0 for shape_point in model_graph.shape_points},
             )
             per_name_tensor_info_dict.setdefault(tensor, tensor_info)
 
         ## Computing tensor dims with different sizes
-        for seq_size in model_info.sequence_sizes:
+        for shape_point in model_graph.shape_points:
             tool_model = onnx_tool.Model(
                 model_proto,
             )
             tool_inputs = {}
             for input in model_proto.graph.input:
                 shape, dtype = OnnxGraphExtractor.__compute_value_info_proto_info(
-                    input, model_info, seq_size
+                    input, model_version_info, shape_point
                 )
                 tool_inputs[input.name] = np.zeros(shape, dtype=dtype)
 
@@ -357,31 +363,33 @@ class OnnxGraphExtractor(ModelGraphExtractor):
                 ]
 
                 shape, size = tool_tensor.get_shape(), tool_tensor.get_memsize()
-                per_name_tensor_info_dict[tensor].shapes[seq_size] = shape
-                per_name_tensor_info_dict[tensor].sizes[seq_size] = size
+                per_name_tensor_info_dict[tensor].shapes[shape_point] = shape
+                per_name_tensor_info_dict[tensor].sizes[shape_point] = size
 
         model_graph.set_tensors_map(per_name_tensor_info_dict)
         pass
 
     @staticmethod
     def __add_layers_flops(
-        model_proto: onnx.ModelProto, model_graph: ModelGraph, model_info: ModelInfo
+        model_proto: onnx.ModelProto,
+        model_graph: ModelVersionGraph,
+        model_version_info: ModelVersionInfo,
     ) -> None:
 
         per_layer_flops_info: dict[str, FlopsInfo] = {}
         for layer in model_graph.get_all_layers().keys():
             flops_info = FlopsInfo(
-                flops={seq_size: 0 for seq_size in model_info.sequence_sizes}
+                flops={shape_point: 0 for shape_point in model_graph.shape_points}
             )
             per_layer_flops_info.setdefault(layer, flops_info)
 
         ## Computing flops with different sizes
-        for seq_size in model_info.sequence_sizes:
+        for shape_point in model_graph.shape_points:
             tool_model = onnx_tool.Model(model_proto)
             tool_inputs = {}
             for input in model_proto.graph.input:
                 shape, dtype = OnnxGraphExtractor.__compute_value_info_proto_info(
-                    input, model_info, seq_size
+                    input, model_version_info, shape_point
                 )
                 tool_inputs[input.name] = np.zeros(shape, dtype=dtype)
 
@@ -392,7 +400,9 @@ class OnnxGraphExtractor(ModelGraphExtractor):
             for node_name, node in tool_graph.nodemap.items():
                 # Maybe we can get the aggregated static memory, but let's do it manually for now
                 # "memory_bytes": int(node.memory),
-                per_layer_flops_info[node_name].flops[seq_size] = int(2 * node.macs[0])
+                per_layer_flops_info[node_name].flops[shape_point] = int(
+                    2 * node.macs[0]
+                )
 
         for layer, flops_info in per_layer_flops_info.items():
             model_graph.get_layer_info(layer).flops = flops_info
@@ -403,7 +413,7 @@ class OnnxGraphExtractor(ModelGraphExtractor):
     def __extract_node_info(
         initializers_dict: dict[str, onnx.TensorProto],
         node: onnx.NodeProto,
-        model_info: ModelInfo,
+        model_version_info: ModelVersionInfo,
     ) -> tuple[set[str], set[str], float]:
 
         input_names: set[str] = set()
@@ -417,8 +427,8 @@ class OnnxGraphExtractor(ModelGraphExtractor):
 
             if input_name in initializers_dict.keys():
                 # This input is a weight
-                weights_size += OnnxGraphExtractor.__compute_tensor_size(
-                    initializers_dict[input_name], model_info
+                weights_size += OnnxGraphExtractor.__compute_tensor_proto_size(
+                    initializers_dict[input_name]
                 )
             else:
                 # This input is an output of another node or model input
@@ -436,7 +446,9 @@ class OnnxGraphExtractor(ModelGraphExtractor):
 
     @staticmethod
     def __add_model_edges(
-        model_proto: onnx.ModelProto, model_graph: ModelGraph, model_info: ModelInfo
+        model_proto: onnx.ModelProto,
+        model_graph: ModelVersionGraph,
+        model_version_info: ModelVersionInfo,
     ) -> None:
         first_layer_name: str
         second_layer_name: str
@@ -477,34 +489,18 @@ class OnnxGraphExtractor(ModelGraphExtractor):
         return common_elements
 
     @staticmethod
-    def __add_model_info(
-        model_proto: onnx.ModelProto, model_graph: ModelGraph, model_info: ModelInfo
-    ) -> None:
-        pass
-
-    @staticmethod
-    def __compute_tensor_size(
-        tensor: onnx.ValueInfoProto | onnx.TensorProto,
-        model_info: ModelInfo,
-        sequence_size: int = 1,
+    def __compute_tensor_proto_size(
+        tensor: onnx.TensorProto,
     ) -> float:
         ## NOTE: Size is computed in bytes since we do not know yet how it will be used
-        if isinstance(tensor, onnx.ValueInfoProto):
-            shape, dtype = OnnxGraphExtractor.__compute_value_info_proto_info(
-                tensor, model_info, sequence_size
-            )
-            total_entries = int(np.prod(shape))
-            return total_entries * dtype.itemsize
-
-        else:
-            array = onnx.numpy_helper.to_array(tensor)
-            return int(array.nbytes)
+        array = onnx.numpy_helper.to_array(tensor)
+        return int(array.nbytes)
 
     @staticmethod
     def __compute_value_info_proto_info(
         value_info_proto: onnx.ValueInfoProto,
-        model_info: ModelInfo,
-        sequence_size: int = 1,
+        model_version_info: ModelVersionInfo,
+        shape_point: ShapePoint,
     ) -> tuple[list[int], np.dtype]:
         # bindings = {
         #     "batch_size": model_info.batch_size,
@@ -512,33 +508,23 @@ class OnnxGraphExtractor(ModelGraphExtractor):
         #     "sequence_length": sequence_size,
         # }
 
-        bindings: dict[str, int] = {}
-        for dyn_shape_name, dyn_shape_type in model_info.dynamic_shapes.items():
-            match dyn_shape_type:
-                case DynamicShapeType.BATCH:
-                    bindings[dyn_shape_name] = 1
-                case DynamicShapeType.SEQUENCE:
-                    bindings[dyn_shape_name] = sequence_size
-                case _:
-                    raise ValueError(f"Unknown dynamic shape type: {dyn_shape_type}")
-
-        shape = [
-            OnnxGraphExtractor._resolve_dimension(dim, bindings)
+        value_info_proto_shape = [
+            OnnxGraphExtractor._resolve_dimension(dim, shape_point)
             for dim in value_info_proto.type.tensor_type.shape.dim
         ]
 
-        dtype = np.dtype(
+        value_info_proto_dtype = np.dtype(
             onnx.helper.tensor_dtype_to_np_dtype(
                 value_info_proto.type.tensor_type.elem_type
             )
         )
 
-        return shape, dtype
+        return value_info_proto_shape, value_info_proto_dtype
 
     @staticmethod
     def _resolve_dimension(
         dim: onnx.TensorShapeProto.Dimension,
-        bindings: dict[str, int],
+        shape_point: ShapePoint,
     ) -> int:
         dimension_type = dim.WhichOneof("value")
 
@@ -550,7 +536,7 @@ class OnnxGraphExtractor(ModelGraphExtractor):
 
         expression = sympy.sympify(dim.dim_param)
 
-        substitutions = {sympy.Symbol(name): value for name, value in bindings.items()}
+        substitutions = {sympy.Symbol(name): value for name, value in shape_point.dims}
 
         resolved = expression.subs(substitutions)
 

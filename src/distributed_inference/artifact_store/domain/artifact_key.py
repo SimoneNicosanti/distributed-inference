@@ -3,7 +3,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from distributed_inference.domain.identifiers import ModelVersionId, SubModelId
+from distributed_inference.model_manager.domain.model_version import ModelVersionId
+from distributed_inference.model_manager.domain.sub_model import SubModelId
 
 
 class ArtifactKind(StrEnum):

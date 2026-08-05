@@ -3,13 +3,13 @@ from typing import List, Tuple
 
 import numpy as np
 
-from distributed_inference.domain.model_graph_info import (
+from distributed_inference.model_manager.domain.model_version_graph import (
     EdgeKey,
-    ModelGraph,
+    ModelVersionGraph,
 )
 
 
-def coarse_graph(model_graph: ModelGraph, iterations: int) -> ModelGraph:
+def coarse_graph(model_graph: ModelVersionGraph, iterations: int) -> ModelVersionGraph:
     coarse_model_graph = copy.deepcopy(model_graph)
     for it in range(iterations):
         print(f"Iteration {it}")
@@ -30,14 +30,16 @@ def coarse_graph(model_graph: ModelGraph, iterations: int) -> ModelGraph:
     return coarse_model_graph
 
 
-def is_linear_edge(model_graph: ModelGraph, edge: EdgeKey) -> bool:
+def is_linear_edge(model_graph: ModelVersionGraph, edge: EdgeKey) -> bool:
     src_out_degree = len(model_graph.get_layer_out_edges(edge[0]))
     dst_in_degree = len(model_graph.get_layer_in_edges(edge[1]))
 
     return src_out_degree == 1 or dst_in_degree == 1
 
 
-def compute_sorted_score_list(model_graph: ModelGraph) -> List[Tuple[EdgeKey, float]]:
+def compute_sorted_score_list(
+    model_graph: ModelVersionGraph,
+) -> List[Tuple[EdgeKey, float]]:
     ## TODO: Validate this kind of scoring or replace it with some other heuristic
     flops_dict = {
         layer: layer_info.flops

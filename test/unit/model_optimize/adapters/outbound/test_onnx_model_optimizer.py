@@ -6,15 +6,15 @@ import pytest
 from distributed_inference.artifact_processing.artifact_workspace import (
     ArtifactWorkspace,
 )
-from distributed_inference.domain.model_graph_info import (
+from distributed_inference.model_manager.domain.model_version_graph import (
     ModelInfo,
     ModelType,
     TaskType,
 )
-from distributed_inference.model_optimize.adapters.outbound.onnx_model_optimizer import (
+from distributed_inference.model_optimizer.adapters.outbound.onnx_model_optimizer import (
     OnnxModelOptimizer,
 )
-from distributed_inference.model_optimize.domain.optimization_level import (
+from distributed_inference.model_optimizer.domain.optimization_level import (
     OptimizationLevel,
 )
 from test.support.artifact_materializer.materialized_artifact_test_utils import (
