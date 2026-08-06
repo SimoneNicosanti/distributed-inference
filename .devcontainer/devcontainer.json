@@ -1,109 +1,239 @@
-// .devcontainer/devcontainer.json
 {
   "name": "distributed-inference-container",
   "build": {
     "dockerfile": "./DevEnv.dockerfile",
-    "context": "."
+    // Context alla RADICE del repo (era "."): il Dockerfile deve poter copiare
+    // pyproject.toml e uv.lock per preinstallare le dipendenze al build time.
+    // Richiede il .dockerignore alla radice, altrimenti spedisci al daemon
+    // tutto il repo, .git e i modelli inclusi.
+    "context": ".."
+    // Se pubblichi un'immagine prebuildata in CI, decommenta e metti la tua org:
+    // con il placeholder ORG il build prova a fare pull di un'immagine
+    // inesistente. Lasciato commentato perché è opzionale.
+    // "cacheFrom": "ghcr.io/TUA-ORG/distributed-inference-devcontainer:latest"
   },
-  // Declaring and mounting volumes for local development
-  // Also adding uv cache for not reinstalling uv on every run
+
   "workspaceFolder": "/workspace/distributed-inference",
+
+  // --init  -> reaping degli zombie (subprocess di pytest, daemon Pyro5)
+  // --shm-size -> /dev/shm di default è 64MB, torch DataLoader e onnxruntime
+  //               con più thread lo saturano ("bus error" o crash oscuri)
+  "runArgs": ["--init", "--shm-size=2g"],
+
+  // Crea la dir sull'host PRIMA del mount: altrimenti Docker la crea root-owned
+  // e il bind di ~/.codex diventa non scrivibile dall'utente vscode.
+  // NOTA: su host Windows ${localEnv:HOME} è vuoto (lì è USERPROFILE).
+  // "initializeCommand": "mkdir -p \"${localEnv:HOME}/.codex\"",
+
   "mounts": [
     "source=${localWorkspaceFolder},target=/workspace/distributed-inference,type=bind",
-    "source=uv-cache-${devcontainerId},target=/home/vscode/.cache/uv,type=volume",
-    "source=${localEnv:HOME}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached",
+
+    // Un unico volume per TUTTE le cache degli strumenti (uv, mypy, ruff, pytest).
+    // Motivo: su bind mount host migliaia di file piccoli sono lentissimi.
+    // Sostituisce il vecchio volume uv-cache-*.
+    "source=tool-cache-${devcontainerId},target=/home/vscode/.cache,type=volume",
+
+    // NESSUN volume per /opt/venv: Docker popolerebbe il volume dall'immagine solo
+    // la prima volta, lasciandoti un venv stale dopo ogni rebuild. Su overlayfs
+    // il venv è già veloce e viene ricostruito coerentemente col lock.
+
+    "source=codex-code-config-${devcontainerId},target=/home/vscode/.codex,type=volume",
     "source=claude-code-config-${devcontainerId},target=/home/vscode/.claude,type=volume"
   ],
+
   "containerEnv": {
-    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
+    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
+
+    // --- uv ---
+    // Venv FUORI dal bind mount: import, uv sync e mypy molto più rapidi.
+    "UV_PROJECT_ENVIRONMENT": "/opt/venv",
+    // Cache (volume) e venv (overlayfs) sono su fs diversi: gli hardlink
+    // fallirebbero con un warning a ogni sync.
+    "UV_LINK_MODE": "copy",
+    // Precompila i .pyc all'install: startup di pytest/mypy/ipython più rapido.
+    "UV_COMPILE_BYTECODE": "1",
+
+    // --- cache degli strumenti fuori dal bind mount ---
+    // Restano fuori dal repo, quindi non serve più ignorarle in git.
+    "MYPY_CACHE_DIR": "/home/vscode/.cache/mypy",
+    "RUFF_CACHE_DIR": "/home/vscode/.cache/ruff",
+
+    // Worker paralleli di mypy 2.x. Sovrascrive num_workers del pyproject,
+    // così puoi usare valori diversi in devcontainer e in CI.
+    // Parti da 4 e sali finché vedi miglioramenti (oltre i core fisici è inutile).
+    "MYPY_NUM_WORKERS": "4"
   },
-  // Installing trunk.io inside the devcontainer for project wide formatting
+
   "features": {
-    "ghcr.io/trunk-io/devcontainer-feature/trunk": "latest",
+    // Sintassi corretta: la major va nel tag dell'immagine, il valore è un oggetto.
+    // La forma "feature": "latest" è legacy e non pinna nulla.
+    "ghcr.io/trunk-io/devcontainer-feature/trunk:1": {},
     "ghcr.io/devcontainers/features/node:2.1.0": {},
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
+    "ghcr.io/sliekens/devcontainer-features/codex:1": {}
   },
-  // Running post create script for installing dependencies inside the devcontainer
+
   "postCreateCommand": ".devcontainer/post-create.sh",
-  // Declaring remote user as the non root one
+
+  // Di default VS Code attacca le estensioni dopo updateContentCommand, quindi
+  // l'estensione Python può partire prima che il venv esista e memorizzare
+  // l'interprete sbagliato. Aspettare postCreate elimina il problema.
+  "waitFor": "postCreateCommand",
+
   "remoteUser": "vscode",
   "containerUser": "vscode",
   "updateRemoteUserUID": true,
-  // Declaring as remote env the one created by the post create script
+
+  // PATH e VIRTUAL_ENV sono già impostati via ENV nel Dockerfile (così valgono
+  // anche per processi non lanciati da VS Code). Qui li ribadiamo per sicurezza.
   "remoteEnv": {
-    "PATH": "${containerWorkspaceFolder}/.venv/bin:${containerEnv:PATH}",
-    "VIRTUAL_ENV": "${containerWorkspaceFolder}/.venv"
+    "PATH": "/opt/venv/bin:${containerEnv:PATH}",
+    "VIRTUAL_ENV": "/opt/venv"
   },
+
   "customizations": {
     "vscode": {
-      // Declaring the extensions to be installed inside the remote env
       "extensions": [
         "ms-python.python",
         "ms-python.vscode-pylance",
         "ms-python.mypy-type-checker",
-        "trunk.io",
-        "codeium.codeium",
-        "vincent-templier.vscode-netron",
         "charliermarsh.ruff",
+        "trunk.io",
+        "vincent-templier.vscode-netron",
         "seelog.python-init-generator",
-        // "openai.chatgpt",
+        "gruntfuggly.todo-tree",
         "anthropic.claude-code",
-        "gruntfuggly.todo-tree"
+        "supermaven.supermaven"
+        // "codeium.codeium" rimosso: con claude-code già presente sono due
+        // assistenti che indicizzano lo stesso workspace in parallelo.
+        // Riattivalo se lo usi davvero, ma non tenerli entrambi "per sicurezza".
       ],
 
       "settings": {
-        "workbench.editor.revealIfOpen": true,
-        "chat.fontSize": 16,
-        "disable-hardware-acceleration": true,
+        // ---------------------------------------------------------------
+        // Interprete
+        // ---------------------------------------------------------------
+        "python.defaultInterpreterPath": "/opt/venv/bin/python",
+        "python.terminal.activateEnvironment": false, // già attivo via PATH
 
-        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
-        "editor.formatOnSave": true,
+        // ---------------------------------------------------------------
+        // Pylance: navigazione e completamenti, NON type checking
+        // (mypy in strict copre già tutto, e in più con regole coerenti
+        //  fra editor, pre-commit e CI)
+        // ---------------------------------------------------------------
+        "python.analysis.typeCheckingMode": "off",
         "python.analysis.indexing": true,
         "python.analysis.autoImportCompletions": true,
-        "python.analysis.typeCheckingMode": "basic",
-        "python.analysis.extraPaths": [
-          "${workspaceFolder}/src"
+        // Il venv non è più nel workspace, ma escludi comunque gli artefatti:
+        // indicizzare .onnx/checkpoint non serve e costa RAM.
+        "python.analysis.exclude": [
+          "**/__pycache__",
+          "**/.mypy_cache",
+          "**/.pytest_cache",
+          "**/experiments/**",
+          "**/*.onnx"
         ],
-        "python.analysis.diagnosticSeverityOverrides": {
-          "reportImplicitOverride": "error",
-          "reportIncompatibleMethodOverride": "error"
-        },
+        // reportImplicitOverride / reportIncompatibleMethodOverride rimossi:
+        // equivalenti a enable_error_code=["explicit-override"] + strict in mypy.
+        // Tenerli entrambi significa la stessa diagnostica due volte nel pannello.
+
+        // ---------------------------------------------------------------
+        // mypy: daemon + scope workspace  (vedi note in fondo)
+        // ---------------------------------------------------------------
         "mypy-type-checker.importStrategy": "fromEnvironment",
-        "mypy-type-checker.path": [
-          "${containerWorkspaceFolder}/.venv/bin/mypy"
-        ],
+        // preferDaemon viene IGNORATO se mypy-type-checker.path è impostato:
+        // per questo "path" non c'è più. importStrategy risolve mypy dal venv.
+        "mypy-type-checker.preferDaemon": false,
+        // OBBLIGATORIA con preferDaemon: il server LSP legge questa chiave come
+        // se esistesse sempre e va in KeyError: 'daemonStatusFile' se il client
+        // non la invia. Il default documentato è "" ma non basta.
+        // Bonus: con un path fisso un hook pre-commit può riusare lo stesso
+        // daemon via `dmypy --status-file`; di default l'estensione genera
+        // /tmp/.vscode.dmypy_status/status-<uuid>.json, nome non prevedibile.
+        "mypy-type-checker.daemonStatusFile": "/home/vscode/.cache/mypy/dmypy-vscode.json",
+        // Il daemon entra in gioco solo con scope workspace/custom. Con "file"
+        // l'estensione lancia un processo mypy nuovo a ogni salvataggio.
+        "mypy-type-checker.reportingScope": "workspace",
+        "mypy-type-checker.showNotifications": "onError",
         "mypy-type-checker.args": [
           "--config-file",
           "${containerWorkspaceFolder}/pyproject.toml"
         ],
-        "pythonInitGenerator.ignoreDirectories": [
-          "__pycache__"
+        "mypy-type-checker.ignorePatterns": [
+          "**/experiments/*",
+          "**/deployment/*",
+          "**/tools/*"
         ],
+
+        // ---------------------------------------------------------------
+        // Formattazione: UNA sola fonte per linguaggio
+        // Python -> estensione ruff (stessa versione del venv, di CI e di
+        //           pre-commit). Ruff è stato rimosso da trunk.yaml.
+        // Resto  -> trunk
+        // ---------------------------------------------------------------
+        "editor.formatOnSave": true,
         "[python]": {
-          "editor.defaultFormatter": "trunk.io",
+          "editor.defaultFormatter": "charliermarsh.ruff",
           "editor.formatOnSave": true,
           "editor.codeActionsOnSave": {
             "source.fixAll.ruff": "explicit",
             "source.organizeImports.ruff": "explicit"
           }
         },
-        "[toml]": {
-          "editor.defaultFormatter": "trunk.io",
-          "editor.formatOnSave": true
+        "[toml]": { "editor.defaultFormatter": "trunk.io" },
+        "[yaml]": { "editor.defaultFormatter": "trunk.io" },
+        "[markdown]": { "editor.defaultFormatter": "trunk.io" },
+        "[shellscript]": { "editor.defaultFormatter": "trunk.io" },
+        "[json]": { "editor.defaultFormatter": "trunk.io" },
+        "[jsonc]": { "editor.defaultFormatter": "trunk.io" },
+        "[dockerfile]": { "editor.defaultFormatter": "trunk.io" },
+
+        // ---------------------------------------------------------------
+        // File watcher / ricerca: costo nascosto in un devcontainer
+        // Il watcher su bind mount consuma CPU in continuazione.
+        // ---------------------------------------------------------------
+        "files.watcherExclude": {
+          "**/.venv/**": true,
+          "**/.mypy_cache/**": true,
+          "**/.ruff_cache/**": true,
+          "**/.pytest_cache/**": true,
+          "**/__pycache__/**": true,
+          "**/.trunk/**": true,
+          "**/*.onnx": true
         },
-        "[yaml]": {
-          "editor.defaultFormatter": "trunk.io",
-          "editor.formatOnSave": true
+        "search.exclude": {
+          "**/.venv": true,
+          "**/.mypy_cache": true,
+          "**/.ruff_cache": true,
+          "**/.trunk/out": true,
+          "**/uv.lock": true
         },
-        "[markdown]": {
-          "editor.defaultFormatter": "trunk.io",
-          "editor.formatOnSave": true
-        },
-        "[shellscript]": {
-          "editor.defaultFormatter": "trunk.io",
-          "editor.formatOnSave": true
-        },
-        "todo-tree.ripgrep.ripgrep": "/usr/bin/rg"
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+
+        // ---------------------------------------------------------------
+        // Varie
+        // ---------------------------------------------------------------
+        "pythonInitGenerator.ignoreDirectories": ["__pycache__"],
+        "todo-tree.ripgrep.ripgrep": "/usr/bin/rg",
+        // Senza questi, todo-tree scandisce anche cache e artefatti.
+        "todo-tree.filtering.excludeGlobs": [
+          "**/.venv/**",
+          "**/.trunk/**",
+          "**/__pycache__/**",
+          "**/*.onnx"
+        ]
+
+        // Rimossi:
+        //  - "disable-hardware-acceleration": non è un setting VS Code (è un
+        //    flag CLI, --disable-gpu). Riga inerte.
+        //  - "chat.fontSize" e "workbench.editor.revealIfOpen": preferenze
+        //    personali. Qui le imponi a tutto il team via repo; il posto giusto
+        //    sono le user settings / Settings Sync.
+        //  - "python.analysis.extraPaths": non serve più, il pacchetto è
+        //    installato in editable (vedi [build-system] nel pyproject).
+        //    Usava anche ${workspaceFolder} mentre il resto del file usa
+        //    ${containerWorkspaceFolder}.
       }
     }
   }

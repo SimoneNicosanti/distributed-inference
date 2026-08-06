@@ -1,0 +1,40 @@
+# Necessario perché il build context passa da .devcontainer alla radice del
+# repo (serve per copiare pyproject.toml e uv.lock nell'immagine).
+# Senza questo file spedisci al daemon Docker l'intero repository.
+
+# Ambienti e cache
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.trunk/out/
+.trunk/logs/
+
+# VCS e metadati
+.git/
+.gitignore
+.github/
+
+# Artefatti pesanti: sono la voce che fa davvero male al tempo di build
+*.onnx
+*.pt
+*.pth
+*.safetensors
+*.bin
+models/
+checkpoints/
+
+# Lavoro esplorativo, non serve nell'immagine
+experiments/
+*.ipynb
+.ipynb_checkpoints/
+
+# Editor
+.vscode/
+.idea/
+*.swp

@@ -470,52 +470,45 @@ wheels = [
 [[package]]
 name = "distributed-inference"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
     { name = "aiorwlock" },
-    { name = "fakeredis" },
     { name = "fastapi" },
     { name = "numpy" },
-    { name = "onnx-tool" },
-    { name = "onnxruntime" },
     { name = "pydantic" },
-    { name = "pydot" },
     { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "readerwriterlock" },
     { name = "redis" },
     { name = "structlog" },
-    { name = "types-aiofiles" },
+    { name = "types-networkx" },
 ]
 
-[package.dev-dependencies]
+[package.optional-dependencies]
+all = [
+    { name = "google-cloud-storage" },
+    { name = "kubernetes" },
+    { name = "networkx" },
+    { name = "onnx" },
+    { name = "onnx-tool" },
+    { name = "onnxruntime" },
+    { name = "onnxscript" },
+    { name = "onnxsim" },
+    { name = "onnxslim" },
+    { name = "pandas" },
+    { name = "prometheus-client" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pyarrow" },
+    { name = "pyomo" },
+    { name = "pyro5" },
+    { name = "pyroute2" },
+    { name = "sqlalchemy" },
+]
 control = [
     { name = "kubernetes" },
     { name = "pyomo" },
     { name = "pyro5" },
-]
-dev = [
-    { name = "ipython" },
-    { name = "matplotlib" },
-    { name = "mypy" },
-    { name = "onnxconverter-common" },
-    { name = "optimum" },
-    { name = "optimum-onnx" },
-    { name = "pillow" },
-    { name = "pre-commit" },
-    { name = "pydot" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-    { name = "safetensors" },
-    { name = "torch", version = "2.13.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "python_full_version < '3.15' and sys_platform == 'darwin'" },
-    { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "python_full_version >= '3.15' or sys_platform != 'darwin'" },
-    { name = "torchvision", version = "0.28.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "python_full_version < '3.15' and sys_platform == 'darwin'" },
-    { name = "torchvision", version = "0.28.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "python_full_version >= '3.15' or sys_platform != 'darwin'" },
-    { name = "transformers" },
-    { name = "ultralytics" },
 ]
 gcp = [
     { name = "google-cloud-storage" },
@@ -527,7 +520,6 @@ measurement = [
     { name = "sqlalchemy" },
 ]
 model-management = [
-    { name = "fastapi" },
     { name = "networkx" },
     { name = "onnx" },
     { name = "onnx-tool" },
@@ -536,7 +528,6 @@ model-management = [
     { name = "onnxsim" },
     { name = "onnxslim" },
     { name = "pyro5" },
-    { name = "types-networkx" },
 ]
 network-agent = [
     { name = "prometheus-client" },
@@ -549,79 +540,103 @@ runtime = [
     { name = "pyro5" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "fakeredis" },
+    { name = "ipython" },
+    { name = "mypy", extra = ["dmypy"] },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-xdist" },
+    { name = "ruff" },
+    { name = "types-aiofiles" },
+    { name = "types-networkx" },
+    { name = "types-pyyaml" },
+]
+export = [
+    { name = "matplotlib" },
+    { name = "onnxconverter-common" },
+    { name = "optimum" },
+    { name = "optimum-onnx" },
+    { name = "pillow" },
+    { name = "pydot" },
+    { name = "safetensors" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "python_full_version < '3.15' and sys_platform == 'darwin'" },
+    { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "python_full_version >= '3.15' or sys_platform != 'darwin'" },
+    { name = "torchvision", version = "0.28.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "python_full_version < '3.15' and sys_platform == 'darwin'" },
+    { name = "torchvision", version = "0.28.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "python_full_version >= '3.15' or sys_platform != 'darwin'" },
+    { name = "transformers" },
+    { name = "ultralytics" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "aiofiles", specifier = ">=25.1.0" },
     { name = "aiorwlock", specifier = ">=1.5.1" },
-    { name = "fakeredis", specifier = ">=2.37.0" },
+    { name = "distributed-inference", extras = ["runtime", "control", "measurement", "network-agent", "model-management", "gcp"], marker = "extra == 'all'" },
     { name = "fastapi", specifier = ">=0.139.2" },
+    { name = "google-cloud-storage", marker = "extra == 'gcp'", specifier = ">=3.0" },
+    { name = "kubernetes", marker = "extra == 'control'", specifier = ">=32.0" },
+    { name = "networkx", marker = "extra == 'model-management'", specifier = ">=3.4" },
     { name = "numpy", specifier = ">=2.0" },
-    { name = "onnx-tool", specifier = ">=1.0.1" },
-    { name = "onnxruntime", specifier = ">=1.27.0" },
+    { name = "onnx", marker = "extra == 'model-management'", specifier = ">=1.17" },
+    { name = "onnx-tool", marker = "extra == 'model-management'", specifier = ">=1.0.1" },
+    { name = "onnxruntime", marker = "extra == 'model-management'", specifier = ">=1.27" },
+    { name = "onnxruntime", marker = "extra == 'runtime'", specifier = ">=1.27" },
+    { name = "onnxscript", marker = "extra == 'model-management'", specifier = ">=0.7" },
+    { name = "onnxsim", marker = "extra == 'model-management'", specifier = ">=0.6.5" },
+    { name = "onnxslim", marker = "extra == 'model-management'", specifier = ">=0.1.94" },
+    { name = "pandas", marker = "extra == 'measurement'", specifier = ">=2.2" },
+    { name = "prometheus-client", marker = "extra == 'measurement'", specifier = ">=0.21" },
+    { name = "prometheus-client", marker = "extra == 'network-agent'", specifier = ">=0.21" },
+    { name = "prometheus-client", marker = "extra == 'runtime'", specifier = ">=0.21" },
+    { name = "psycopg", extras = ["binary"], marker = "extra == 'measurement'", specifier = ">=3.2" },
+    { name = "pyarrow", marker = "extra == 'runtime'", specifier = ">=18.0" },
     { name = "pydantic", specifier = ">=2.8" },
-    { name = "pydot", specifier = ">=4.0.1" },
+    { name = "pyomo", marker = "extra == 'control'", specifier = ">=6.8" },
+    { name = "pyro5", marker = "extra == 'control'", specifier = ">=5.15" },
+    { name = "pyro5", marker = "extra == 'model-management'", specifier = ">=5.15" },
+    { name = "pyro5", marker = "extra == 'runtime'", specifier = ">=5.15" },
+    { name = "pyroute2", marker = "extra == 'network-agent'", specifier = ">=0.7" },
     { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "readerwriterlock", specifier = ">=1.0.9" },
     { name = "redis", specifier = ">=8.0.1" },
+    { name = "sqlalchemy", marker = "extra == 'measurement'", specifier = ">=2.0" },
     { name = "structlog", specifier = ">=24.0" },
-    { name = "types-aiofiles", specifier = ">=25.1.0.20260518" },
+    { name = "types-networkx", specifier = ">=3.6.1.20260624" },
 ]
+provides-extras = ["runtime", "control", "measurement", "network-agent", "model-management", "gcp", "all"]
 
 [package.metadata.requires-dev]
-control = [
-    { name = "kubernetes", specifier = ">=32.0" },
-    { name = "pyomo", specifier = ">=6.8" },
-    { name = "pyro5", specifier = ">=5.15" },
-]
 dev = [
+    { name = "fakeredis", specifier = ">=2.37.0" },
     { name = "ipython", specifier = ">=8.0" },
-    { name = "matplotlib", specifier = ">=3.8" },
-    { name = "mypy", specifier = ">=1.14" },
-    { name = "onnxconverter-common", specifier = "==1.16.0" },
-    { name = "optimum", specifier = "==2.1.0" },
-    { name = "optimum-onnx", specifier = "==0.1.0" },
-    { name = "pillow", specifier = "==12.3.0" },
+    { name = "mypy", extras = ["dmypy", "native-parser"], specifier = ">=2.3" },
     { name = "pre-commit", specifier = ">=4.0" },
-    { name = "pydot", specifier = ">=1.4" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "pytest-cov", specifier = ">=5.0" },
+    { name = "pytest-xdist", specifier = ">=3.6" },
     { name = "ruff", specifier = ">=0.9" },
-    { name = "safetensors", specifier = "==0.8.0" },
+    { name = "types-aiofiles", specifier = ">=25.1.0.20260518" },
+    { name = "types-networkx", specifier = ">=3.4" },
+    { name = "types-pyyaml", specifier = ">=6.0" },
+]
+export = [
+    { name = "matplotlib", specifier = ">=3.8" },
+    { name = "onnxconverter-common", specifier = ">=1.16.0" },
+    { name = "optimum", specifier = ">=2.1.0" },
+    { name = "optimum-onnx", specifier = ">=0.1.0" },
+    { name = "pillow", specifier = ">=12.3.0" },
+    { name = "pydot", specifier = ">=4.0.1" },
+    { name = "safetensors", specifier = ">=0.8.0" },
     { name = "torch", specifier = ">=2.13", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torchvision", specifier = ">=0.28", index = "https://download.pytorch.org/whl/cpu" },
-    { name = "transformers", specifier = "==4.57.6" },
-    { name = "ultralytics", specifier = "==8.4.104" },
-]
-gcp = [{ name = "google-cloud-storage", specifier = ">=3.0" }]
-measurement = [
-    { name = "pandas", specifier = ">=2.2" },
-    { name = "prometheus-client", specifier = ">=0.21" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
-    { name = "sqlalchemy", specifier = ">=2.0" },
-]
-model-management = [
-    { name = "fastapi", specifier = ">=0.139" },
-    { name = "networkx", specifier = ">=3.4" },
-    { name = "onnx", specifier = ">=1.17" },
-    { name = "onnx-tool", specifier = ">=1.0.1" },
-    { name = "onnxruntime", specifier = ">=1.27" },
-    { name = "onnxscript", specifier = ">=0.7" },
-    { name = "onnxsim", specifier = ">=0.6.5" },
-    { name = "onnxslim", specifier = ">=0.1.94" },
-    { name = "pyro5", specifier = ">=5.15" },
-    { name = "types-networkx", specifier = ">=3.4" },
-]
-network-agent = [
-    { name = "prometheus-client", specifier = ">=0.21" },
-    { name = "pyroute2", specifier = ">=0.7" },
-]
-runtime = [
-    { name = "onnxruntime", specifier = ">=1.27" },
-    { name = "prometheus-client", specifier = ">=0.21" },
-    { name = "pyarrow", specifier = ">=18.0" },
-    { name = "pyro5", specifier = ">=5.15" },
+    { name = "transformers", specifier = ">=4.57.6" },
+    { name = "ultralytics", specifier = ">=8.4.104" },
 ]
 
 [[package]]
@@ -631,6 +646,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/9d/a4/e44218c2b394e31a6dd0d6b095c4e1f32d0be54c2a4b250032d717647bab/durationpy-0.10.tar.gz", hash = "sha256:1fa6893409a6e739c9c72334fc65cca1f355dbdd93405d30f726deb5bde42fba", size = 3335, upload-time = "2025-05-17T13:52:37.26Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b0/0d/9feae160378a3553fa9a339b0e9c1a048e147a4127210e286ef18b730f03/durationpy-0.10-py3-none-any.whl", hash = "sha256:3b41e1b601234296b4fb368338fdcd3e13e0b4fb5b67345948f4f2bf9868b286", size = 3922, upload-time = "2025-05-17T13:52:36.463Z" },
+]
+
+[[package]]
+name = "execnet"
+version = "2.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/bf/89/780e11f9588d9e7128a3f87788354c7946a9cbb1401ad38a48c4db9a4f07/execnet-2.1.2.tar.gz", hash = "sha256:63d83bfdd9a23e35b9c6a3261412324f964c2ec8dcd8d3c6916ee9373e0befcd", size = 166622, upload-time = "2025-11-12T09:56:37.75Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/84/02fc1827e8cdded4aa65baef11296a9bbe595c474f0d6d758af082d849fd/execnet-2.1.2-py3-none-any.whl", hash = "sha256:67fba928dd5a544b783f6056f449e5e3931a5c378b128bc18501f7ea79e296ec", size = 40708, upload-time = "2025-11-12T09:56:36.333Z" },
 ]
 
 [[package]]
@@ -1320,6 +1344,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/7c/ab/0dc91d80f3f016634c68d451f294a97320fe903a9b6f90b9e57b3f7f1717/mypy-2.3.0-cp314-cp314t-win_amd64.whl", hash = "sha256:0b025a93cffb9781d231f232be07a17912f35f10a313c24f301c81e842870654", size = 12146869, upload-time = "2026-07-13T11:29:38.874Z" },
     { url = "https://files.pythonhosted.org/packages/85/b5/4c964d02634ba81f4d1c84838e5c5b18ab06d13ed568960f5d6318495ccc/mypy-2.3.0-cp314-cp314t-win_arm64.whl", hash = "sha256:adebc76aab4f3495a88b41d48aa4aff0c03f2822501da76625afcca5975f19e5", size = 10965113, upload-time = "2026-07-13T11:28:07.056Z" },
     { url = "https://files.pythonhosted.org/packages/2c/fa/fdc54fe583ba3cafbcedfb70eeeaf03849f75b1827a07096c7bd996f582d/mypy-2.3.0-py3-none-any.whl", hash = "sha256:6b1cdb579446b60432432b2b2403a6201b4b475a004d7f488511c9ba177c9e88", size = 2753292, upload-time = "2026-07-13T11:33:18.48Z" },
+]
+
+[package.optional-dependencies]
+dmypy = [
+    { name = "psutil" },
 ]
 
 [[package]]
@@ -2154,6 +2183,19 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-xdist"
+version = "3.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "execnet" },
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/78/b4/439b179d1ff526791eb921115fca8e44e596a13efeda518b9d845a619450/pytest_xdist-3.8.0.tar.gz", hash = "sha256:7e578125ec9bc6050861aa93f2d59f1d8d085595d6551c2c90b6f4fad8d3a9f1", size = 88069, upload-time = "2025-07-01T13:30:59.346Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ca/31/d4e37e9e550c2b92a9cbc2e4d0b7420a27224968580b5a447f420847c975/pytest_xdist-3.8.0-py3-none-any.whl", hash = "sha256:202ca578cfeb7370784a8c33d6d05bc6e13b4f25b5053c30a152269fd10f0b88", size = 46396, upload-time = "2025-07-01T13:30:56.632Z" },
+]
+
+[[package]]
 name = "python-dateutil"
 version = "2.9.0.post0"
 source = { registry = "https://pypi.org/simple" }
@@ -2670,6 +2712,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/44/f9/975c2bb35407c241fb788e9c75b2e2642af43a6c9cf81056a119dd98e59c/types_networkx-3.6.1.20260624.tar.gz", hash = "sha256:f031a9ee0bd27de4ab6d3e35a10f3492a4befc7b8c348607892b0ccb1b415d4d", size = 74060, upload-time = "2026-06-24T05:56:25.279Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/d4/67136d3323dd8a8ecc8124531f737dee97819811026da20a2a72949f462a/types_networkx-3.6.1.20260624-py3-none-any.whl", hash = "sha256:071734f88733afaaa06cbb62eb8c603626f4f9aa18424771acbdd3a638828d9a", size = 162457, upload-time = "2026-06-24T05:56:24.063Z" },
+]
+
+[[package]]
+name = "types-pyyaml"
+version = "6.0.12.20260724"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3f/6f/a28f44bcd56bebed42b028a2894c79853e2f5e6b5279e633cb3f287a05e7/types_pyyaml-6.0.12.20260724.tar.gz", hash = "sha256:3c1ce1bb73cd5ec02e90390c2b1f00e810d241d8825fd73ff359696839271b6b", size = 17893, upload-time = "2026-07-24T04:58:43.453Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8b/42/0337fefc615e20ee55d1c8f71b774a9b2b734a04669139c20753b27a2a3a/types_pyyaml-6.0.12.20260724-py3-none-any.whl", hash = "sha256:d57db930a4b2efbc57cf430ec8882765d246929432fa253092f383902329a453", size = 20312, upload-time = "2026-07-24T04:58:42.486Z" },
 ]
 
 [[package]]

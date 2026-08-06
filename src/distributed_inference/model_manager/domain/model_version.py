@@ -1,5 +1,5 @@
 from enum import StrEnum, auto
-from typing import Annotated, List, Literal, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -21,9 +21,17 @@ class ModelVersionQuantization(StrEnum):
     DYNAMIC = auto()
 
 
-class AccuracyMetric(StrEnum):
+class AccuracyMetricType(StrEnum):
     MAE = auto()
     RMSE = auto()
+
+
+class AccuracyMetric(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    type: AccuracyMetricType
+    dataset: str
+    value: float
 
 
 class ModelVersionFormat(StrEnum):
@@ -129,14 +137,14 @@ class ModelVersionInfo(BaseModel):
 
     precision: ModelVersionPrecision
     quantization: ModelVersionQuantization
-    accuracy: dict[AccuracyMetric, float]
+    accuracies: list[AccuracyMetric]
     format: ModelVersionFormat
 
-    static_shapes: List[StaticShapeInfo]
-    dynamic_shapes: List[DynamicShapeInfo]
+    static_shapes: list[StaticShapeInfo]
+    dynamic_shapes: list[DynamicShapeInfo]
 
     architecture_info: ArchitectureInfo
-    state_tensors_info: List[StateTensorInfo]
+    state_tensors_info: list[StateTensorInfo]
 
     ## TODO: Add check for shapes: no shape can be declared twice in the same or different shape group
     ## TODO: Add check for coherence between model type and architecture info
