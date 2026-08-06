@@ -21,6 +21,7 @@ from test.contracts.artifact_materializer.artifact_materializer_contract import 
 
 pytestmark = [pytest.mark.unit, pytest.mark.contract]
 
+
 class TestLocalArtifactMaterializerContract(ArtifactMaterializerContract):
     @override
     def build_materializer_and_store(

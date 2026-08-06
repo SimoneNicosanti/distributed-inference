@@ -12,39 +12,33 @@
     // inesistente. Lasciato commentato perché è opzionale.
     // "cacheFrom": "ghcr.io/TUA-ORG/distributed-inference-devcontainer:latest"
   },
-
   "workspaceFolder": "/workspace/distributed-inference",
-
   // --init  -> reaping degli zombie (subprocess di pytest, daemon Pyro5)
   // --shm-size -> /dev/shm di default è 64MB, torch DataLoader e onnxruntime
   //               con più thread lo saturano ("bus error" o crash oscuri)
-  "runArgs": ["--init", "--shm-size=2g"],
-
+  "runArgs": [
+    "--init",
+    "--shm-size=2g"
+  ],
   // Crea la dir sull'host PRIMA del mount: altrimenti Docker la crea root-owned
   // e il bind di ~/.codex diventa non scrivibile dall'utente vscode.
   // NOTA: su host Windows ${localEnv:HOME} è vuoto (lì è USERPROFILE).
   // "initializeCommand": "mkdir -p \"${localEnv:HOME}/.codex\"",
-
   "mounts": [
     "source=${localWorkspaceFolder},target=/workspace/distributed-inference,type=bind",
-
     // Un unico volume per TUTTE le cache degli strumenti (uv, mypy, ruff, pytest).
     // Motivo: su bind mount host migliaia di file piccoli sono lentissimi.
     // Sostituisce il vecchio volume uv-cache-*.
     "source=tool-cache-${devcontainerId},target=/home/vscode/.cache,type=volume",
-
     // NESSUN volume per /opt/venv: Docker popolerebbe il volume dall'immagine solo
     // la prima volta, lasciandoti un venv stale dopo ogni rebuild. Su overlayfs
     // il venv è già veloce e viene ricostruito coerentemente col lock.
-
     "source=codex-code-config-${devcontainerId},target=/home/vscode/.codex,type=volume",
     "source=claude-code-config-${devcontainerId},target=/home/vscode/.claude,type=volume"
   ],
-
   "containerEnv": {
     "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
     "CODEX_HOME": "/home/vscode/.codex",
-
     // --- uv ---
     // Venv FUORI dal bind mount: import, uv sync e mypy molto più rapidi.
     "UV_PROJECT_ENVIRONMENT": "/opt/venv",
@@ -53,18 +47,15 @@
     "UV_LINK_MODE": "copy",
     // Precompila i .pyc all'install: startup di pytest/mypy/ipython più rapido.
     "UV_COMPILE_BYTECODE": "1",
-
     // --- cache degli strumenti fuori dal bind mount ---
     // Restano fuori dal repo, quindi non serve più ignorarle in git.
     "MYPY_CACHE_DIR": "/home/vscode/.cache/mypy",
     "RUFF_CACHE_DIR": "/home/vscode/.cache/ruff",
-
     // Worker paralleli di mypy 2.x. Sovrascrive num_workers del pyproject,
     // così puoi usare valori diversi in devcontainer e in CI.
     // Parti da 4 e sali finché vedi miglioramenti (oltre i core fisici è inutile).
     "MYPY_NUM_WORKERS": "4"
   },
-
   "features": {
     // Sintassi corretta: la major va nel tag dell'immagine, il valore è un oggetto.
     // La forma "feature": "latest" è legacy e non pinna nulla.
@@ -73,25 +64,20 @@
     "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
     "ghcr.io/jsburckhardt/devcontainer-features/codex:1": {}
   },
-
   "postCreateCommand": ".devcontainer/post-create.sh",
-
   // Di default VS Code attacca le estensioni dopo updateContentCommand, quindi
   // l'estensione Python può partire prima che il venv esista e memorizzare
   // l'interprete sbagliato. Aspettare postCreate elimina il problema.
   "waitFor": "postCreateCommand",
-
   "remoteUser": "vscode",
   "containerUser": "vscode",
   "updateRemoteUserUID": true,
-
   // PATH e VIRTUAL_ENV sono già impostati via ENV nel Dockerfile (così valgono
   // anche per processi non lanciati da VS Code). Qui li ribadiamo per sicurezza.
   "remoteEnv": {
     "PATH": "/opt/venv/bin:${containerEnv:PATH}",
     "VIRTUAL_ENV": "/opt/venv"
   },
-
   "customizations": {
     "vscode": {
       "extensions": [
@@ -99,24 +85,22 @@
         "ms-python.vscode-pylance",
         "ms-python.mypy-type-checker",
         "charliermarsh.ruff",
-        "trunk.io",
         "vincent-templier.vscode-netron",
         "seelog.python-init-generator",
         "gruntfuggly.todo-tree",
         "anthropic.claude-code",
-        "supermaven.supermaven"
+        "supermaven.supermaven",
+        "trunk.io"
         // "codeium.codeium" rimosso: con claude-code già presente sono due
         // assistenti che indicizzano lo stesso workspace in parallelo.
         // Riattivalo se lo usi davvero, ma non tenerli entrambi "per sicurezza".
       ],
-
       "settings": {
         // ---------------------------------------------------------------
         // Interprete
         // ---------------------------------------------------------------
         "python.defaultInterpreterPath": "/opt/venv/bin/python",
         "python.terminal.activateEnvironment": false, // già attivo via PATH
-
         // ---------------------------------------------------------------
         // Pylance: navigazione e completamenti, NON type checking
         // (mypy in strict copre già tutto, e in più con regole coerenti
@@ -137,7 +121,6 @@
         // reportImplicitOverride / reportIncompatibleMethodOverride rimossi:
         // equivalenti a enable_error_code=["explicit-override"] + strict in mypy.
         // Tenerli entrambi significa la stessa diagnostica due volte nel pannello.
-
         // ---------------------------------------------------------------
         // mypy: daemon + scope workspace  (vedi note in fondo)
         // ---------------------------------------------------------------
@@ -165,7 +148,6 @@
           "**/deployment/*",
           "**/tools/*"
         ],
-
         // ---------------------------------------------------------------
         // Formattazione: UNA sola fonte per linguaggio
         // Python -> estensione ruff (stessa versione del venv, di CI e di
@@ -181,14 +163,27 @@
             "source.organizeImports.ruff": "explicit"
           }
         },
-        "[toml]": { "editor.defaultFormatter": "trunk.io" },
-        "[yaml]": { "editor.defaultFormatter": "trunk.io" },
-        "[markdown]": { "editor.defaultFormatter": "trunk.io" },
-        "[shellscript]": { "editor.defaultFormatter": "trunk.io" },
-        "[json]": { "editor.defaultFormatter": "trunk.io" },
-        "[jsonc]": { "editor.defaultFormatter": "trunk.io" },
-        "[dockerfile]": { "editor.defaultFormatter": "trunk.io" },
-
+        "[toml]": {
+          "editor.defaultFormatter": "trunk.io"
+        },
+        "[yaml]": {
+          "editor.defaultFormatter": "trunk.io"
+        },
+        "[markdown]": {
+          "editor.defaultFormatter": "trunk.io"
+        },
+        "[shellscript]": {
+          "editor.defaultFormatter": "trunk.io"
+        },
+        "[json]": {
+          "editor.defaultFormatter": "trunk.io"
+        },
+        "[jsonc]": {
+          "editor.defaultFormatter": "trunk.io"
+        },
+        "[dockerfile]": {
+          "editor.defaultFormatter": "trunk.io"
+        },
         // ---------------------------------------------------------------
         // File watcher / ricerca: costo nascosto in un devcontainer
         // Il watcher su bind mount consuma CPU in continuazione.
@@ -211,11 +206,12 @@
         },
         "files.trimTrailingWhitespace": true,
         "files.insertFinalNewline": true,
-
         // ---------------------------------------------------------------
         // Varie
         // ---------------------------------------------------------------
-        "pythonInitGenerator.ignoreDirectories": ["__pycache__"],
+        "pythonInitGenerator.ignoreDirectories": [
+          "__pycache__"
+        ],
         "todo-tree.ripgrep.ripgrep": "/usr/bin/rg",
         // Senza questi, todo-tree scandisce anche cache e artefatti.
         "todo-tree.filtering.excludeGlobs": [
@@ -224,7 +220,6 @@
           "**/__pycache__/**",
           "**/*.onnx"
         ]
-
         // Rimossi:
         //  - "disable-hardware-acceleration": non è un setting VS Code (è un
         //    flag CLI, --disable-gpu). Riga inerte.

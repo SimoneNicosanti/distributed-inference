@@ -17,6 +17,7 @@ dependencies = [
   "aiofiles>=25.1.0",
   "aiorwlock>=1.5.1",
   "fastapi>=0.139.2",
+  "httpx>=0.28.1",
   "numpy>=2.0",
   "pydantic>=2.8",
   "python-multipart>=0.0.32",
@@ -164,7 +165,7 @@ explicit = true
 # ---------------------------------------------------------------------------
 [tool.mypy]
 python_version = "3.14"
-files = ["src", "test"]
+files = ["src", ]
 
 # Parallelismo introdotto in mypy 2.0 (fino a ~5x con 8 worker). Richiede e
 # abilita automaticamente --native-parser. Sovrascritto da MYPY_NUM_WORKERS,
@@ -206,11 +207,11 @@ show_column_numbers = true
 # experiments/, tools/ e .venv. In più `exclude` non impedisce a mypy di
 # seguirci gli import — per quello serve follow_imports.
 
+## TODO Double check this onnxruntime configuration
 # Stub mancanti nelle librerie di terze parti.
 [[tool.mypy.overrides]]
 module = [
   "Pyro5.*",
-  "onnxruntime.*",
   "onnx_tool.*",
   "onnxsim.*",
   "onnxslim.*",
@@ -219,6 +220,7 @@ module = [
   "pyroute2.*",
   "pyomo.*",
   "fakeredis.*",
+  "ort.*"
 ]
 ignore_missing_imports = true
 
@@ -238,9 +240,11 @@ module = [
   "matplotlib.*",
   "pandas.*",
   "kubernetes.*",
+  "onnxruntime.*",
 ]
-follow_imports = "skip"
-ignore_missing_imports = true
+ignore_missing_imports = false
+follow_imports = "normal"
+follow_untyped_imports = true
 
 # I test possono essere un filo più permissivi: i decoratori di pytest e i
 # fixture non tipizzati generano rumore senza valore diagnostico.
@@ -297,7 +301,7 @@ markers = [
 line-length = 88                               # esplicito ma identico al default: nessun riformattamento
 target-version = "py314"
 src = ["src", "test"]                          # risoluzione corretta dei first-party per isort
-extend-exclude = ["experiments", "deployment"]
+extend-exclude = []
 
 [tool.ruff.lint]
 # ATTENZIONE: questa selezione è più ampia della tua (`extend-select = ["I"]`)

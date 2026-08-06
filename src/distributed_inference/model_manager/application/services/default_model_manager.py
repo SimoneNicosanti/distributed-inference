@@ -1,6 +1,6 @@
-from contextlib import AbstractAsyncContextManager
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, override
+from typing import override
 
 import aiofiles
 
@@ -142,13 +142,6 @@ class DefaultModelManager(ModelManager):
             )
 
         return sub_model
-
-    @override
-    def download_sub_model(
-        self, sub_model_id: SubModelId
-    ) -> AbstractAsyncContextManager[ReadableArtifactBundle]:
-        artifact_key = SubModelArtifactKey(id=sub_model_id)
-        return self._artifact_store.open_artifact(artifact_key)
 
     @override
     async def get_profiled_model_version(

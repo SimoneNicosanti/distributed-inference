@@ -102,7 +102,7 @@ ServiceEndpointType = Annotated[
 class ServiceType(StrEnum):
     MODEL_MANAGER = auto()
     INFERENCE_SERVICE = auto()
-    ...
+    ARTIFACT_STORE = auto()
 
 
 class ServiceInstance(BaseModel):

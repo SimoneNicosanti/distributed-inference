@@ -1,4 +1,4 @@
-from typing import Iterable, Tuple
+from collections.abc import Iterable
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -11,7 +11,7 @@ class SubModelId(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     model_version_id: ModelVersionId
-    layers: Tuple[LayerKey, ...]
+    layers: tuple[LayerKey, ...]
 
     @field_validator("layers")
     @classmethod
@@ -39,9 +39,19 @@ class SubModel(BaseModel):
     sub_model_id: SubModelId
 
 
-class SubModelDeploymentId(BaseModel):
+## This is the replica of a sub-model as defined by a single plan version
+class SubModelReplicaId(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     sub_model_id: SubModelId
-    service_id: ServiceId
     replica_id: int
+
+
+## This is the deployment of a sub-model as defined by a single plan version
+## The deployment is uniquely identified by the sub-model replica id and
+## by the service it is deployed on
+class SubModelDeploymentId(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    sub_model_replica_id: SubModelReplicaId
+    service_id: ServiceId

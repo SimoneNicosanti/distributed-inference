@@ -1,17 +1,18 @@
 from abc import ABC, abstractmethod
 
+from distributed_inference.artifact_materializer.domain.materialized_artifact import (
+    MaterializedArtifact,
+)
+from distributed_inference.domain.plan import DeploymentOptions
 from distributed_inference.worker.application.ports.outbound.sub_model_executor import (
     SubModelExecutor,
 )
-
-
-class SubModelExecutorDeploymentOptions:
-    pass
 
 
 class SubModelExecutorFactory(ABC):
     @abstractmethod
     async def create_sub_model_executor(
         self,
-        deployment: SubModelExecutorDeploymentOptions,
+        materialized_artifact: MaterializedArtifact,
+        deployment_options: DeploymentOptions,
     ) -> SubModelExecutor: ...

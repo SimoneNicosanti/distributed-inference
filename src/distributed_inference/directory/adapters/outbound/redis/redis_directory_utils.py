@@ -11,3 +11,7 @@ def generate_redis_directory_service_key(service_id: ServiceId) -> str:
 
 def generate_redis_directory_service_key_pattern_per_server(server_id: ServerId) -> str:
     return f"discovery:services:{server_id.id}:*"
+
+
+def generate_redis_directory_all_services() -> str:
+    return "discovery:services:*"

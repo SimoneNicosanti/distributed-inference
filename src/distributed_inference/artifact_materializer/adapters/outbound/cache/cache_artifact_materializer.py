@@ -1,8 +1,9 @@
 import asyncio
 import hashlib
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator, override
+from typing import override
 
 import aiofiles
 import aiofiles.os
@@ -89,12 +90,12 @@ class CachedArtifactMaterializer(ArtifactMaterializer):
             cache_file_path = artifact_root_path.joinpath(*file_info.file_ppp.parts)
             await aiofiles.os.makedirs(cache_file_path.parent, exist_ok=True)
 
-            async with artifact_bundle.open_file(
-                file_info.file_ppp
-            ) as artifact_file_reader:
-                async with aiofiles.open(cache_file_path, "wb") as local_file:
-                    while chunk := await artifact_file_reader.read(CHUNK_SIZE):
-                        await local_file.write(chunk)
+            async with (
+                artifact_bundle.open_file(file_info.file_ppp) as artifact_file_reader,
+                aiofiles.open(cache_file_path, "wb") as local_file,
+            ):
+                while chunk := await artifact_file_reader.read(CHUNK_SIZE):
+                    await local_file.write(chunk)
 
         manifest_path = artifact_root_path.joinpath(MANIFEST_FILE_NAME)
         async with aiofiles.open(manifest_path, "w+") as manifest_file:
@@ -132,7 +133,7 @@ class CachedArtifactMaterializer(ArtifactMaterializer):
         root_path = await self._build_artifact_root_path(aritifact_key)
         manifest_path = root_path.joinpath(MANIFEST_FILE_NAME)
 
-        async with aiofiles.open(manifest_path, "r") as manifest_file:
+        async with aiofiles.open(manifest_path) as manifest_file:
             manifest_json = await manifest_file.read()
         return ArtifactManifest.model_validate_json(manifest_json)
 

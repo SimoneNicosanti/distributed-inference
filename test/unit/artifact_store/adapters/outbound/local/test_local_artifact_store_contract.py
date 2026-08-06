@@ -15,6 +15,7 @@ from test.contracts.artifact_store.artifact_store_contract import (
 
 pytestmark = [pytest.mark.unit, pytest.mark.contract]
 
+
 class TestLocalArtifactStoreContract(ArtifactStoreContract):
     @override
     def build_store(self, base_path: Path) -> ArtifactStore:

@@ -5,7 +5,7 @@ from distributed_inference.model_manager.domain.model_version import (
     ModelVersionId,
     ProfiledModelVersion,
 )
-from distributed_inference.model_manager.domain.sub_model import SubModel, SubModelId
+from distributed_inference.model_manager.domain.sub_model import SubModel
 
 
 class RegisterModelRequest(BaseModel):
@@ -27,10 +27,6 @@ class GenerateSubModelRequest(BaseModel):
 
 class GenerateSubModelResponse(BaseModel):
     sub_model: SubModel
-
-
-class DownloadSubModelRequest(BaseModel):
-    sub_model_id: SubModelId
 
 
 class GetProfiledModelVersionRequest(BaseModel):

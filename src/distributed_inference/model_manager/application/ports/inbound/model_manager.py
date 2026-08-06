@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-from contextlib import AbstractAsyncContextManager
-from typing import Iterable
+from collections.abc import Iterable
 
 from distributed_inference.artifact_store.domain.readable_artifact_bundle import (
     ReadableArtifactBundle,
@@ -14,7 +13,7 @@ from distributed_inference.model_manager.domain.model_version import (
 from distributed_inference.model_manager.domain.model_version_graph import (
     LayerKey,
 )
-from distributed_inference.model_manager.domain.sub_model import SubModel, SubModelId
+from distributed_inference.model_manager.domain.sub_model import SubModel
 
 
 class ModelManager(ABC):
@@ -34,12 +33,6 @@ class ModelManager(ABC):
         model_version_id: ModelVersionId,
         layers: Iterable[LayerKey],
     ) -> SubModel: ...
-
-    @abstractmethod
-    def download_sub_model(
-        self,
-        sub_model_id: SubModelId,
-    ) -> AbstractAsyncContextManager[ReadableArtifactBundle]: ...
 
     @abstractmethod
     async def get_profiled_model_version(

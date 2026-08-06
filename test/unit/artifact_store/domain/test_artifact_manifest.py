@@ -32,9 +32,7 @@ def test_manifest_requires_declared_entrypoint() -> None:
     with pytest.raises(ValidationError, match="entrypoint is not declared"):
         ArtifactManifest(
             entrypoint_ppp=PurePosixPath("model.onnx"),
-            files_info=(
-                ArtifactFileInfo(file_ppp=PurePosixPath("weights.data")),
-            ),
+            files_info=(ArtifactFileInfo(file_ppp=PurePosixPath("weights.data")),),
         )
 
 

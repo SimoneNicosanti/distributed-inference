@@ -14,7 +14,9 @@ from distributed_inference.artifact_store.domain.artifact_manifest import (
 
 
 @pytest.mark.unit
-def test_workspace_builder_recursively_lists_files_and_entrypoint(tmp_path: Path) -> None:
+def test_workspace_builder_recursively_lists_files_and_entrypoint(
+    tmp_path: Path,
+) -> None:
     entrypoint = tmp_path / "model.onnx"
     weights = tmp_path / "weights" / "model.data"
     weights.parent.mkdir()
@@ -45,7 +47,9 @@ def test_workspace_builder_requires_entrypoint(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-def test_root_and_manifest_builder_rejects_missing_declared_file(tmp_path: Path) -> None:
+def test_root_and_manifest_builder_rejects_missing_declared_file(
+    tmp_path: Path,
+) -> None:
     entrypoint = PurePosixPath("model.onnx")
     manifest = ArtifactManifest(
         entrypoint_ppp=entrypoint,

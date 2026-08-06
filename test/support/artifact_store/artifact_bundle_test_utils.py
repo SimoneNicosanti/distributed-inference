@@ -31,9 +31,7 @@ def build_test_bundle(
 
     manifest = ArtifactManifest(
         entrypoint_ppp=entrypoint,
-        files_info=tuple(
-            ArtifactFileInfo(file_ppp=path) for path in contents
-        ),
+        files_info=tuple(ArtifactFileInfo(file_ppp=path) for path in contents),
     )
     return LocalReadableArtifactBundle(
         manifest=manifest,

@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any
 
 import numpy as np
 import onnx_tool
@@ -8,8 +8,8 @@ from onnx_tool.utils import NODE_REGISTRY
 
 
 @NODE_REGISTRY.register()  # type: ignore
-class DynamicQuantizeLinearNode(onnx_tool.Node):
-    def shape_infer(self, intensors: List[Tensor], outtensors: List[Tensor]) -> None:  # type: ignore
+class DynamicQuantizeLinearNode(onnx_tool.Node):  # type: ignore
+    def shape_infer(self, intensors: list[Tensor], outtensors: list[Tensor]) -> None:  # type: ignore
         input_shape = intensors[0].get_shape()
 
         # y: tensore quantizzato, stessa shape dell'input
@@ -26,7 +26,7 @@ class DynamicQuantizeLinearNode(onnx_tool.Node):
 
 
 @NODE_REGISTRY.register()  # type: ignore
-class MultiHeadAttentionNode(Node):
+class MultiHeadAttentionNode(Node):  # type: ignore
     """Profiler per com.microsoft::MultiHeadAttention senza KV-cache."""
 
     def __init__(self, node_proto: Any) -> None:
@@ -84,7 +84,7 @@ class MultiHeadAttentionNode(Node):
         self,
         intensors: list[Tensor],
         outtensors: list[Tensor],
-    ) -> int:
+    ) -> int:  # type: ignore
         query_shape = list(intensors[0].get_shape())
         batch_size, query_length, query_hidden_size = query_shape
 

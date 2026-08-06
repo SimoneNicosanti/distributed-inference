@@ -1,6 +1,7 @@
 import asyncio
 import gc
-from typing import Sequence, override
+from collections.abc import Sequence
+from typing import override
 
 import numpy as np
 import onnxruntime as ort
@@ -26,21 +27,21 @@ class OnnxSubModelExecutor(SubModelExecutor):
         onnx_sub_model_executor_options: OnnxSubModelExecutorOptions,
     ) -> None:
         ## Build session to be reused across multiple requests to the same sub-model
-        self.inference_session: ort.InferenceSession = inference_session
+        self._inference_session: ort.InferenceSession = inference_session
 
-        self.inputs_meta_dict: dict[str, ort.NodeArg] = {
+        self._inputs_meta_dict: dict[str, ort.NodeArg] = {
             item.name: item for item in inference_session.get_inputs()
         }
 
-        self.output_names: list[str] = [
+        self._output_names: list[str] = [
             item.name for item in inference_session.get_outputs()
         ]
 
-        self.onnx_sub_model_executor_options = onnx_sub_model_executor_options
+        self._onnx_sub_model_executor_options = onnx_sub_model_executor_options
 
     @override
     async def close(self) -> None:
-        del self.inference_session
+        del self._inference_session
         gc.collect()
 
     @override
@@ -73,7 +74,7 @@ class OnnxSubModelExecutor(SubModelExecutor):
         ## TODO: With this management we are managing only numerical types input
         session_inputs: dict[str, np.ndarray] = {}
 
-        for name, metadata in self.inputs_meta_dict.items():
+        for name, metadata in self._inputs_meta_dict.items():
             tensor = sub_model_execution_input.payload.get_tensor_by_name(name)
 
             if tensor is None:
@@ -85,23 +86,23 @@ class OnnxSubModelExecutor(SubModelExecutor):
             session_inputs[name] = tensor.get_value()
 
         device_type = self._map_device_type(
-            self.onnx_sub_model_executor_options.device_type
+            self._onnx_sub_model_executor_options.device_type
         )
-        device_id = self.onnx_sub_model_executor_options.device_id
+        device_id = self._onnx_sub_model_executor_options.device_id
         session_ort_inputs: dict[str, ort.OrtValue] = {
             name: ort.OrtValue.ortvalue_from_numpy(value, device_type, device_id)
             for name, value in session_inputs.items()
         }
 
         session_ort_outputs_list: Sequence[ort.OrtValue] = (
-            self.inference_session.run_with_ort_values(
-                self.output_names, session_ort_inputs
+            self._inference_session.run_with_ort_values(
+                self._output_names, session_ort_inputs
             )
         )
 
         session_output: dict[str, np.ndarray] = {
             output_name: session_ort_outputs_list[idx].numpy()
-            for idx, output_name in enumerate(self.output_names)
+            for idx, output_name in enumerate(self._output_names)
         }
 
         tensor_bundle = TensorBundle(
@@ -112,7 +113,7 @@ class OnnxSubModelExecutor(SubModelExecutor):
                     dtype=session_output[output_name].dtype,
                     value=session_output[output_name],
                 )
-                for output_name in self.output_names
+                for output_name in self._output_names
             },
         )
 

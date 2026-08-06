@@ -6,7 +6,6 @@ from pathlib import Path
 
 import aiofiles
 import aiofiles.os
-from fastapi import UploadFile
 
 from distributed_inference.artifact_processing.artifact_workspace import (
     build_local_artifact_bundle_from_root_path_and_manifest,
@@ -24,27 +23,25 @@ CHUNK_SIZE = 1024 * 1024
 
 @asynccontextmanager
 async def decompress_artifact_bundle(
-    bundle_file: UploadFile,
+    zip_file_path: Path,
 ) -> AsyncGenerator[ReadableArtifactBundle]:
 
-    await bundle_file.seek(0)
-
-    async with aiofiles.tempfile.TemporaryDirectory() as tmp_dir:
+    async with aiofiles.tempfile.TemporaryDirectory() as extraction_dir:
+        extraction_dir_path = Path(extraction_dir)
         artifact_bundle = await asyncio.to_thread(
-            _readable_artifuct_bundle_build_sync, tmp_dir, bundle_file
+            _readable_artifuct_bundle_build_sync, extraction_dir_path, zip_file_path
         )
         yield artifact_bundle
 
 
 def _readable_artifuct_bundle_build_sync(
-    tmp_dir_str: str, bundle_file: UploadFile
+    extraction_dir_path: Path, zip_file_path: Path
 ) -> ReadableArtifactBundle:
-    extraction_path = Path(tmp_dir_str).resolve(strict=True)
-    with zipfile.ZipFile(bundle_file.file, mode="r") as zip_file:
+    with zipfile.ZipFile(zip_file_path, mode="r") as zip_file:
         ## TODO We should do a lot of check regarding the security of zip extraction
-        zip_file.extractall(path=extraction_path)
+        zip_file.extractall(path=extraction_dir_path)
 
-        manifest_path = extraction_path.joinpath(MANIFEST_FILE_NAME)
+        manifest_path = extraction_dir_path.joinpath(MANIFEST_FILE_NAME)
         if not manifest_path.is_file():
             raise Exception(
                 "Zip file does not contain a manifest or manifest not in the root of the zip file"
@@ -55,7 +52,7 @@ def _readable_artifuct_bundle_build_sync(
         )
 
         artifact_bundle = build_local_artifact_bundle_from_root_path_and_manifest(
-            extraction_path, zip_manifest
+            extraction_dir_path, zip_manifest
         )
         return artifact_bundle
 

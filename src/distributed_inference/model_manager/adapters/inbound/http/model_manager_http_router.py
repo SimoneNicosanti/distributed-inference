@@ -1,14 +1,13 @@
-from collections.abc import AsyncIterator
+import asyncio
+from pathlib import Path
 
 import aiofiles
 from fastapi import APIRouter, File, Form, UploadFile
-from fastapi.responses import StreamingResponse
 
-from distributed_inference.model_manager.adapters.inbound.http import (
+from distributed_inference.artifact_processing import (
     compression_utils,
 )
-from distributed_inference.model_manager.adapters.inbound.http.schema import (
-    DownloadSubModelRequest,
+from distributed_inference.model_manager.adapters.inbound.http.model_manager_http_schema import (
     GenerateSubModelRequest,
     GenerateSubModelResponse,
     GetProfiledModelVersionRequest,
@@ -55,13 +54,18 @@ def build_model_manager_router(
     ) -> UploadModelVersionResponse:
         model_version = ModelVersion.model_validate_json(model_version_json)
 
-        async with compression_utils.decompress_artifact_bundle(
-            bundle_zip,
-        ) as artifact_bundle:
-            model_version_id = await model_manager.upload_model_version(
-                model_version=model_version,
-                bundle=artifact_bundle,
-            )
+        async with aiofiles.tempfile.NamedTemporaryFile() as zip_file:
+            zip_file_path = Path(str(zip_file.name))
+            while chunk := await asyncio.to_thread(bundle_zip.file.read, CHUNK_SIZE):
+                await zip_file.write(chunk)
+
+            async with compression_utils.decompress_artifact_bundle(
+                zip_file_path,
+            ) as artifact_bundle:
+                model_version_id = await model_manager.upload_model_version(
+                    model_version=model_version,
+                    bundle=artifact_bundle,
+                )
 
         return UploadModelVersionResponse(
             model_version_id=model_version_id,
@@ -83,29 +87,10 @@ def build_model_manager_router(
             sub_model=sub_model,
         )
 
-    @router.post("/sub-models/download")
-    async def download_sub_model(
-        request: DownloadSubModelRequest,
-    ) -> StreamingResponse:
-        async def stream_artifact() -> AsyncIterator[bytes]:
-            async with model_manager.download_sub_model(
-                request.sub_model_id
-            ) as sub_model_bundle:
-                async with compression_utils.compress_artifact_bundle(
-                    sub_model_bundle
-                ) as zip_file_path:
-                    async with aiofiles.open(zip_file_path, "rb") as zip_file:
-                        while chunk := await zip_file.read(CHUNK_SIZE):
-                            yield chunk
-
-        return StreamingResponse(
-            stream_artifact(),
-            media_type="application/octet-stream",
-            headers={"Content-Disposition": ('attachment; filename="artifact.zip"')},
-        )
-
-    @router.get("/model-versions/graph", response_model=GetProfiledModelVersionResponse)
-    async def get_model_graph(
+    @router.get(
+        "/model-versions/profiled", response_model=GetProfiledModelVersionResponse
+    )
+    async def get_profiled_model_version(
         request: GetProfiledModelVersionRequest,
     ) -> GetProfiledModelVersionResponse:
         profiled_model_version = await model_manager.get_profiled_model_version(

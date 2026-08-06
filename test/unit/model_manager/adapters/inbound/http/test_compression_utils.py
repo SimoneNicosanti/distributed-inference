@@ -14,7 +14,7 @@ from distributed_inference.artifact_store.domain.artifact_manifest import (
     ArtifactFileInfo,
     ArtifactManifest,
 )
-from distributed_inference.model_manager.adapters.inbound.http.compression_utils import (
+from distributed_inference.artifact_processing.compression_utils import (
     compress_artifact_bundle,
     decompress_artifact_bundle,
 )

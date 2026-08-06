@@ -18,10 +18,10 @@ from distributed_inference.artifact_store.domain.artifact_manifest import (
 from distributed_inference.artifact_store.domain.readable_artifact_bundle import (
     ReadableArtifactBundle,
 )
-from distributed_inference.model_manager.adapters.inbound.http.router import (
+from distributed_inference.model_manager.adapters.inbound.http.model_manager_http_router import (
     build_model_manager_router,
 )
-from distributed_inference.model_manager.adapters.inbound.http.schema import (
+from distributed_inference.model_manager.adapters.inbound.http.model_manager_http_schema import (
     DownloadSubModelRequest,
     GenerateSubModelRequest,
     GetProfiledModelVersionRequest,
