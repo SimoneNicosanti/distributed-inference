@@ -4,3 +4,4 @@ __pycache__*
 *.pyc
 *.codex
 *.claude
+*.token-optimizer

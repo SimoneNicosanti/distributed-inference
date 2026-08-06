@@ -43,6 +43,7 @@
 
   "containerEnv": {
     "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
+    "CODEX_HOME": "/home/vscode/.codex",
 
     // --- uv ---
     // Venv FUORI dal bind mount: import, uv sync e mypy molto più rapidi.
@@ -70,7 +71,7 @@
     "ghcr.io/trunk-io/devcontainer-feature/trunk:1": {},
     "ghcr.io/devcontainers/features/node:2.1.0": {},
     "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
-    "ghcr.io/sliekens/devcontainer-features/codex:1": {}
+    "ghcr.io/jsburckhardt/devcontainer-features/codex:1": {}
   },
 
   "postCreateCommand": ".devcontainer/post-create.sh",
