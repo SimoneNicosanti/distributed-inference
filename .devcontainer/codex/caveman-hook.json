@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/vscode/.codex/hooks/caveman-enable.py"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,12 +1,11 @@
 from pathlib import Path
-from typing import cast
+from typing import cast, override
 
 import onnx
 import onnx.external_data_helper
 import onnxruntime as ort
 import onnxruntime.transformers.optimizer as ort_transformers_opt
 from onnxruntime.transformers.fusion_options import FusionOptions
-from typing_extensions import override
 
 from distributed_inference.artifact_materializer.domain.materialized_artifact import (
     MaterializedArtifact,
@@ -82,6 +81,8 @@ class OnnxModelOptimizer(ModelOptimizer):
                             f"Unsupported model type: {model_info.model_type}"
                         )
 
+            case OptimizationLevel.ALL:
+                pass
             case _:
                 raise ValueError(f"Unsupported optimization level: {opt_level}")
 
@@ -216,3 +217,6 @@ class OnnxModelOptimizer(ModelOptimizer):
 
             case OptimizationLevel.EXTENDED:
                 return ort.GraphOptimizationLevel.ORT_ENABLE_EXTENDED
+
+            case OptimizationLevel.ALL:
+                return ort.GraphOptimizationLevel.ORT_ENABLE_ALL

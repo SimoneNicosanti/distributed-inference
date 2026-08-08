@@ -73,36 +73,12 @@ mypy src test || true
 # 	pre-commit install --install-hooks
 # fi
 
+
 # ---------------------------------------------------------------------------
-# 5. Plugin Claude Code (per-utente, idempotente)
+# 5. Codex Configuration
 # ---------------------------------------------------------------------------
-# .claude è un volume persistente: dalla seconda creazione il plugin è già
-# presente e questi comandi possono uscire con codice non zero. Con
-# `set -euo pipefail` quello terminava lo script, saltando tutto ciò che
-# viene dopo. Da qui i `|| true` espliciti.
-echo "==> Plugin Claude Code"
-## Caveman Installation for claude
-claude plugin marketplace add JuliusBrussee/caveman 2>/dev/null ||
-	echo "    marketplace già presente o non raggiungibile"
-claude plugin install caveman@caveman 2>/dev/null ||
-	echo "    plugin già installato o non raggiungibile"
+sh ./.devcontainer/codex-prepare.sh
 
-## RTK Installation for claude
-curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh 2>/dev/null
-export PATH="$HOME/.local/bin:$PATH"
-rtk init -g ## Claude only
-
-## token-optimizer-mcp Installation for claude
-claude plugin marketplace add ooples/token-optimizer-mcp 2>/dev/null ||
-	echo "    marketplace già presente o non raggiungibile"
-claude plugin install token-optimizer@token-optimizer 2>/dev/null ||
-	echo "    plugin già installato o non raggiungibile"
-
-## token-optimizer
-claude plugin marketplace add alexgreensh/token-optimizer 2>/dev/null ||
-	echo "    marketplace già presente o non raggiungibile"
-claude plugin install token-optimizer@alexgreensh-token-optimizer 2>/dev/null ||
-	echo "    plugin già installato o non raggiungibile"
 # ---------------------------------------------------------------------------
 # 6. Verifica
 # ---------------------------------------------------------------------------

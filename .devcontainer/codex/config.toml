@@ -1,0 +1,11 @@
+default_permissions = "global-write-src-readonly"
+
+[permissions.global-write-src-readonly]
+description = "Global read/write access; project src directory read-only."
+
+[permissions.global-write-src-readonly.filesystem]
+":root" = "write"
+"/workspace/distributed-inference/src" = "read"
+
+[permissions.global-write-src-readonly.network]
+enabled = false

@@ -23,6 +23,9 @@ class ServiceId(BaseModel):
     service_id: UUID = Field(default_factory=uuid4)
 
 
+type WorkerId = ServiceId
+
+
 class UserId(BaseModel):
     model_config = ConfigDict(frozen=True)
 

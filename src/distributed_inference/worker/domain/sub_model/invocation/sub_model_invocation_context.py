@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from distributed_inference.model_manager.domain.sub_model import SubModelDeploymentId
+from distributed_inference.domain.plan import SubModelDeployment
 from distributed_inference.worker.domain.model_pass.model_pass_context import (
     ModelPassContext,
 )
@@ -22,7 +22,7 @@ class SubModelInvocationId(BaseModel):
 class SubModelInvocationContext(BaseModel):
     model_config = ConfigDict(frozen=True)
     model_pass_context: ModelPassContext
-    sub_model_deployment_id: SubModelDeploymentId
+    sub_model_deployment_id: SubModelDeployment
     sub_model_invocation_id: SubModelInvocationId = Field(
         default_factory=SubModelInvocationId
     )

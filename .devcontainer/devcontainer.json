@@ -61,7 +61,7 @@
     // La forma "feature": "latest" è legacy e non pinna nulla.
     "ghcr.io/trunk-io/devcontainer-feature/trunk:1": {},
     "ghcr.io/devcontainers/features/node:2.1.0": {},
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
+    // "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
     "ghcr.io/jsburckhardt/devcontainer-features/codex:1": {}
   },
   "postCreateCommand": ".devcontainer/post-create.sh",
@@ -88,8 +88,9 @@
         "vincent-templier.vscode-netron",
         "seelog.python-init-generator",
         "gruntfuggly.todo-tree",
-        "anthropic.claude-code",
+        // "anthropic.claude-code",
         "supermaven.supermaven",
+        "openai.chatgpt",
         "trunk.io"
         // "codeium.codeium" rimosso: con claude-code già presente sono due
         // assistenti che indicizzano lo stesso workspace in parallelo.

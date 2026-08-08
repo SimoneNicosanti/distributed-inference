@@ -5,3 +5,6 @@ __pycache__*
 *.codex
 *.claude
 *.token-optimizer
+.agents
+skills-lock.json
+*.data

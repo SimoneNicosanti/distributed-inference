@@ -127,21 +127,18 @@ class DefaultSubModelExecutionCoordinator(
     ) -> SubModelInvocationResponse:
 
         sub_model_deployment_id = invocation_request.context.sub_model_deployment_id
-        sub_model_executor = (
-            await self._sub_model_executor_registry.get_sub_model_executor(
-                sub_model_deployment_id
-            )
-        )
-
         sub_model_execution_input = self._build_sub_model_execution_input(
             invocation_request
         )
 
-        sub_model_execution_output = (
-            await sub_model_executor.process_sub_model_inference_input(
-                sub_model_execution_input
+        async with self._sub_model_executor_registry.acquire_sub_model_executor(
+            sub_model_deployment_id
+        ) as sub_model_executor:
+            sub_model_execution_output = (
+                await sub_model_executor.process_sub_model_inference_input(
+                    sub_model_execution_input
+                )
             )
-        )
 
         sub_model_invocation_response = self._build_sub_model_execution_response(
             invocation_request, sub_model_execution_output
