@@ -22,13 +22,16 @@ dependencies = [
   "olive-ai>=0.13.0",
   "onnxoptimizer>=0.4.2",
   "onnxruntime>=1.27.0",
-  "optimum-onnx[onnxruntime]>=0.1.0",
+  "onnxruntime-genai>=0.14.1",
+  "portalocker>=4.4.0",
   "pydantic>=2.8",
   "python-multipart>=0.0.32",
   "pyyaml>=6.0",
   "readerwriterlock>=1.0.9",
   "redis>=8.0.1",
   "structlog>=24.0",
+  "sysv-ipc>=1.2.0",
+  "transformers==5.17.0",
   "types-networkx>=3.6.1.20260624",
 ]
 
@@ -119,7 +122,6 @@ export = [
   "torchvision>=0.28",
   "transformers>=4.57.6",
   "optimum>=2.1.0",
-  "optimum-onnx>=0.1.0",
   "ultralytics>=8.4.104",
   "onnxconverter-common>=1.16.0",
   "safetensors>=0.8.0",
@@ -169,7 +171,25 @@ explicit = true
 # ---------------------------------------------------------------------------
 [tool.mypy]
 python_version = "3.14"
-files = ["src", ]
+files = ["services", "packages"]
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = [
+  "$MYPY_CONFIG_FILE_DIR/packages/directory/src",
+  "$MYPY_CONFIG_FILE_DIR/packages/integration/src",
+  "$MYPY_CONFIG_FILE_DIR/packages/lifecycle/src",
+  "$MYPY_CONFIG_FILE_DIR/packages/scheduling/src",
+  "$MYPY_CONFIG_FILE_DIR/packages/utils/src",
+  "$MYPY_CONFIG_FILE_DIR/packages/artifacts/src",
+
+  "$MYPY_CONFIG_FILE_DIR/services/artifact_materializer/src",
+  "$MYPY_CONFIG_FILE_DIR/services/artifact_store/src",
+  "$MYPY_CONFIG_FILE_DIR/services/controller/src",
+  "$MYPY_CONFIG_FILE_DIR/services/model_manager/src",
+  "$MYPY_CONFIG_FILE_DIR/services/worker/src",
+
+  "$MYPY_CONFIG_FILE_DIR/services",
+]
 
 # Parallelismo introdotto in mypy 2.0 (fino a ~5x con 8 worker). Richiede e
 # abilita automaticamente --native-parser. Sovrascritto da MYPY_NUM_WORKERS,
@@ -262,6 +282,28 @@ init_typed = true
 warn_required_dynamic_aliases = true
 
 # ---------------------------------------------------------------------------
+# PYRIGHT
+# ---------------------------------------------------------------------------
+[tool.pyright]
+extraPaths = [
+  "services/artifact_materializer/src",
+  "services/artifact_processing/src",
+  "services/artifact_store/src",
+  "services/controller/src",
+  "services/domain/src",
+  "services/model_manager/src",
+  "services/worker/src",
+
+  "packages/directory/src",
+  "packages/integration/src",
+  "packages/lifecycle/src",
+  "packages/scheduling/src",
+  "packages/utils/src",
+  "packages/artifacts/src",
+
+  "services", ]
+
+# ---------------------------------------------------------------------------
 # PYTEST
 # ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
@@ -304,7 +346,7 @@ markers = [
 [tool.ruff]
 line-length = 88                               # esplicito ma identico al default: nessun riformattamento
 target-version = "py314"
-src = ["src", "test"]                          # risoluzione corretta dei first-party per isort
+src = ["services/*/src", "packages/*/src", "services"]                     # risoluzione corretta dei first-party per isort
 extend-exclude = []
 
 [tool.ruff.lint]
