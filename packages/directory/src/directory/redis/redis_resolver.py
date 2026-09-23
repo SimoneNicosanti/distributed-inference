@@ -2,8 +2,8 @@ from typing import override
 
 import pydantic
 
-from ext_directory.api.resolver import ServiceResolver
-from ext_directory.redis import redis_directory_utils
+from directory.api.resolver import ServiceResolver
+from directory.redis import redis_directory_utils
 from integration.directory.service_instance import (
     ServiceInstance,
     ServiceProtocol,
@@ -102,7 +102,19 @@ class RedisServiceResolver(ServiceResolver):
             service_instance
             for service_instance in service_instances
             if service_instance.service_type == service_type
-            and service_instance.service_endpoint.protocol == service_protocol
+            and RedisServiceResolver.__check_protocol_present(
+                service_instance, service_protocol
+            )
         ]
 
         return filtered_services
+
+    @classmethod
+    def __check_protocol_present(
+        cls, service_instance: ServiceInstance, service_protocol: ServiceProtocol
+    ) -> bool:
+
+        for endpoint in service_instance.service_endpoints:
+            if endpoint.protocol == service_protocol:
+                return True
+        return False

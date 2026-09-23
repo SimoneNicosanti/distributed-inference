@@ -6,8 +6,11 @@ from worker.application.flow.contracts.sub_model_invocation_completition_registr
 from worker.application.forwarding.contracts.gathering.sub_model_invocation_message_gatherer import (
     SubModelInvocationMessageGatherer,
 )
-from worker.application.forwarding.contracts.routing.sub_model_invocation_response_router import (
-    SubModelInvocationResponseRouter,
+from worker.application.forwarding.contracts.routing.sub_model_invocation_message_builder import (
+    SubModelInvocationMessageBuilder,
+)
+from worker.application.forwarding.contracts.routing.sub_model_invocation_request_builder import (
+    SubModelInvocationRequestBuilder,
 )
 from worker.application.ports.inbound.inference_flow_coordinator import (
     InferenceFlowCoordinator,
@@ -22,12 +25,6 @@ from worker.domain.sub_model.invocation.sub_model_invocation_message import (
     SubModelInvocationAck,
     SubModelInvocationMessage,
 )
-from worker.domain.sub_model.invocation.sub_model_invocation_request_response import (
-    SubModelInvocationResponse,
-)
-from worker.domain.sub_model.route.sub_model_invocation_response_route import (
-    SubModelInvocationResponseRoute,
-)
 
 
 class DefaultInferenceFlowCoordinator(InferenceFlowCoordinator):
@@ -35,9 +32,10 @@ class DefaultInferenceFlowCoordinator(InferenceFlowCoordinator):
         self,
         sub_model_invocation_message_gatherer: SubModelInvocationMessageGatherer,
         sub_model_execution_coordinator: SubModelExecutionCoordinator,
-        sub_model_invocation_response_router: SubModelInvocationResponseRouter,
+        sub_model_invocation_response_router: SubModelInvocationMessageBuilder,
         sub_model_invocation_message_forwarder: SubModelInvocationMessageForwarder,
         completition_registry: SubModelInvocationCompletitionRegistry,
+        sub_model_invocation_request_builder: SubModelInvocationRequestBuilder,
     ):
         self._sub_model_invocation_message_gatherer = (
             sub_model_invocation_message_gatherer
@@ -51,23 +49,28 @@ class DefaultInferenceFlowCoordinator(InferenceFlowCoordinator):
         )
         self._completition_registry = completition_registry
 
+        self._sub_model_invocation_request_builder = (
+            sub_model_invocation_request_builder
+        )
+
     @override
     async def process_sub_model_invocation_message(
         self, sub_model_invocation_message: SubModelInvocationMessage
     ) -> SubModelInvocationAck:
 
         (
-            sub_model_inference_request,
+            sub_model_invocation_messages,
             sub_model_invocation_id,
         ) = await self._sub_model_invocation_message_gatherer.gather_sub_model_invocation_message(
             sub_model_invocation_message
         )
-        if sub_model_inference_request is None:
+        if sub_model_invocation_messages is None:
             ## Inference request could not be gathered
             ## We need to wait for other inference messages to come
             ## We wait to inference completition event to return a positive ack to the sender
 
             ## TODO: We should manage the error here
+            ## The happy path should work though
             await (
                 self._completition_registry.wait_for_sub_model_invocation_completition(
                     sub_model_invocation_id
@@ -75,21 +78,20 @@ class DefaultInferenceFlowCoordinator(InferenceFlowCoordinator):
             )
             return SubModelInvocationAck(context=sub_model_invocation_message.context)
 
-        sub_model_inference_response = await self._sub_model_execution_coordinator.process_sub_model_invocation_request(
-            sub_model_inference_request
+        sub_model_invocation_request = await self._sub_model_invocation_request_builder.build_sub_model_invocation_request(
+            sub_model_invocation_messages, sub_model_invocation_id
+        )
+        sub_model_invocation_response = await self._sub_model_execution_coordinator.process_sub_model_invocation_request(
+            sub_model_invocation_request
         )
 
-        route_instructions = await self._sub_model_invocation_response_router.route_sub_model_invocation_response(
-            sub_model_inference_response
+        next_sub_model_invocation_messages = await self._sub_model_invocation_response_router.build_sub_model_invocation_message_from_context(
+            sub_model_invocation_messages, sub_model_invocation_response
         )
 
-        for route_instruction in route_instructions:
-            ## TODO: Build inference message for the next server
-            next_inference_message = self.__build_next_sub_model_invocation_message(
-                sub_model_inference_response, route_instruction
-            )
+        for next_sub_model_invocation_message in next_sub_model_invocation_messages:
             self._sub_model_invocation_message_forwarder.forward_sub_model_invocation_message(
-                next_inference_message, route_instruction
+                next_sub_model_invocation_message
             )
 
         ## We register the completition event on the registry
@@ -99,11 +101,3 @@ class DefaultInferenceFlowCoordinator(InferenceFlowCoordinator):
 
         ## We return the ack of the coroutine that has materially done the execution
         return SubModelInvocationAck(context=sub_model_invocation_message.context)
-
-    @classmethod
-    def __build_next_sub_model_invocation_message(
-        cls,
-        inference_response: SubModelInvocationResponse,
-        route_instruction: SubModelInvocationResponseRoute,
-    ) -> SubModelInvocationMessage:
-        raise NotImplementedError

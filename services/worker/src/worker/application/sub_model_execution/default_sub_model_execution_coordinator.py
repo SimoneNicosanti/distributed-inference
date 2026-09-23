@@ -63,7 +63,7 @@ class DefaultSubModelExecutionCoordinator(
         ## 1. Create workers based on new plan
         ## 2. Do not delete existing workers, but keep them for possible late requests
         ## 3. Update active plan
-        raise NotImplementedError
+        pass
 
     @override
     async def process_sub_model_invocation_request(
@@ -142,36 +142,23 @@ class DefaultSubModelExecutionCoordinator(
 
         return sub_model_invocation_response
 
+    ## Right now we are considering only stateless models: this means that the payload of the input is the same as the invocation
+    ## In case of stateful models, we need to extract the output from the combined state + output
     async def _build_sub_model_execution_response(
         self,
         invocation_request: SubModelInvocationRequest,
         sub_model_execution_output: SubModelExecutionOutput,
     ) -> SubModelInvocationResponse:
 
-        plan_version = invocation_request.plan_version
-        plan = await self._inference_plan_store.get_service_inference_plan_by_version(
-            plan_version
-        )
-        if plan is None:
-            raise ValueError(f"Plan version {plan_version} does not exist")
-        sub_model_id = invocation_request.sub_model_id
-        sub_model_outputs = plan.sub_model_execution_schemes[sub_model_id].outputs
-
-        filered_payload = invocation_request.payload.filter(sub_model_outputs).merge(
-            sub_model_execution_output.payload.filter(sub_model_outputs)
-        )
-        if set(filered_payload.bundle.keys()) != set(sub_model_outputs):
-            raise ValueError(
-                f"Sub-model {sub_model_id} expects {len(sub_model_outputs)} outputs, but received {len(filered_payload.bundle)}"
-            )
-
         sub_model_invocation_response = SubModelInvocationResponse(
             context=invocation_request.context,
-            payload=filered_payload,
+            payload=sub_model_execution_output.payload,
         )
 
         return sub_model_invocation_response
 
+    ## Right now we are considering only stateless models: this means that the payload of the input is the same as the invocation
+    ## In case of stateful models, we need to add the state to the input as well
     async def _build_sub_model_execution_input(
         self, invocation_request: SubModelInvocationRequest
     ) -> SubModelExecutionInput:
@@ -179,24 +166,10 @@ class DefaultSubModelExecutionCoordinator(
             sub_model_invocation_context=invocation_request.context
         )
 
-        plan_version = invocation_request.plan_version
-        plan = await self._inference_plan_store.get_service_inference_plan_by_version(
-            plan_version
-        )
-        if plan is None:
-            raise ValueError(f"Plan version {plan_version} does not exist")
-        sub_model_id = invocation_request.sub_model_id
-        sub_model_inputs = plan.sub_model_execution_schemes[sub_model_id].inputs
-
-        filtered_payload = invocation_request.payload.filter(sub_model_inputs)
-
-        if set(filtered_payload.bundle.keys()) != set(sub_model_inputs):
-            raise ValueError(
-                f"Sub-model {sub_model_id} expects {len(sub_model_inputs)} inputs, but received {len(filtered_payload.bundle)}"
-            )
+        payload = invocation_request.payload
 
         sub_model_execution_input = SubModelExecutionInput(
             sub_model_execution_context=sub_model_execution_context,
-            payload=filtered_payload,
+            payload=payload,
         )
         return sub_model_execution_input

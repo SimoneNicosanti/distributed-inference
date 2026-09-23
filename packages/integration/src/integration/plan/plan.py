@@ -47,7 +47,10 @@ class SubModelDeployment(BaseModel):
     replica_idx: int
 
 
-class SubModelExecutionScheme(BaseModel):
+## This represents the execution scheme of a sub-model
+## It is represented by input and output tensors and that's it
+## Possible additional tensors carried for skip connections are in the SubModelSkipScheme
+class ExecutionScheme(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     inputs: list[str]
@@ -62,11 +65,30 @@ class SubModelExecutionScheme(BaseModel):
         return self
 
 
-class SubModelFollowers(BaseModel):
+## Additional tensors carried by this sub-model to skip connections
+class SkipScheme(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    follower_id: SubModelDeployment
-    tensors_to_pass: list[str]
+    skip_tensors: list[str]
+
+    @model_validator(mode="after")
+    def validate_skip_tensors(self) -> Self:
+        if len(self.skip_tensors) != len(set(self.skip_tensors)):
+            raise ValueError("Carried tensors must be unique")
+        return self
+
+
+class SubModelConnection(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    other_deployment: SubModelDeployment
+    connection_tensors: list[str]
+
+    @model_validator(mode="after")
+    def validate_tensors_to_pass(self) -> Self:
+        if len(self.connection_tensors) != len(set(self.connection_tensors)):
+            raise ValueError("Carried tensors must be unique")
+        return self
 
 
 class PriorityKey(BaseModel):
@@ -86,8 +108,10 @@ class ServiceInferencePlan(BaseModel):
     worker_id: WorkerId
 
     sub_model_deployments: list[SubModelDeployment]
-    sub_model_execution_schemes: dict[SubModelId, SubModelExecutionScheme]
-    sub_model_execution_topology: dict[SubModelDeployment, list[SubModelFollowers]]
+    sub_model_execution_schemes: dict[SubModelId, ExecutionScheme]
+    sub_model_skip_schemes: dict[SubModelId, SkipScheme]
+    sub_model_next_connections: dict[SubModelDeployment, list[SubModelConnection]]
+    sub_model_prev_connections: dict[SubModelDeployment, list[SubModelConnection]]
     priorities: dict[PriorityKey, PriorityValue]
 
     @model_validator(mode="after")

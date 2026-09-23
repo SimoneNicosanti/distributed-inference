@@ -1,8 +1,15 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from enum import StrEnum, auto
-from typing import Annotated, Literal, override
+from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    AnyUrl,
+    BaseModel,
+    ConfigDict,
+    HttpUrl,
+    TypeAdapter,
+    model_validator,
+)
 
 from integration.identifiers.identifiers import ServiceId
 
@@ -17,104 +24,67 @@ class ServiceProtocol(StrEnum):
     ...
 
 
+type EndpointValue = str  ## String representing the endpoint
+type EndpointKey = str  ## String representing the endpoint method name
+
+
+## TODO: Do actual validation
+class PyroUrl(AnyUrl):
+    @classmethod
+    def validate(cls, v: AnyUrl) -> AnyUrl:
+        return v
+
+
+## TODO: Do actual validation
+class ArrowUrl(AnyUrl):
+    @classmethod
+    def validate(cls, v: AnyUrl) -> AnyUrl:
+        return v
+
+
+## TODO: Do actual validation
+class GrpcUrl(AnyUrl):
+    @classmethod
+    def validate(cls, v: AnyUrl) -> AnyUrl:
+        return v
+
+
 class ServiceEndpoint(BaseModel, ABC):
     ## TODO: Add validation for host and port
     model_config = ConfigDict(frozen=True)
 
-    host: str
-    port: Annotated[int, Field(ge=1024, le=65535)]
     protocol: ServiceProtocol
+    endpoints: dict[EndpointKey, EndpointValue]
 
-    @field_validator("host")
-    @classmethod
-    def validate_host(cls, host: str) -> str:
+    @model_validator(mode="after")
+    def validate_endpoints(self) -> Self:
+        for key, value in self.endpoints.items():
+            match self.protocol:
+                case ServiceProtocol.HTTP:
+                    validator = TypeAdapter(HttpUrl)
+                case ServiceProtocol.PYRO:
+                    validator = TypeAdapter(PyroUrl)
+                case ServiceProtocol.ARROW:
+                    validator = TypeAdapter(ArrowUrl)
+                case ServiceProtocol.GRPC:
+                    validator = TypeAdapter(GrpcUrl)
+                case _:
+                    raise ValueError(f"Invalid protocol {self.protocol}")
 
-        def is_valid_hostname(hostname: str) -> bool:
-            import re
+            validator.validate_python(value)
 
-            if not hostname or len(hostname) > 253:
-                return False
+        return self
 
-            label_pattern = re.compile(
-                r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?",
-                re.IGNORECASE,
-            )
-
-            return all(label_pattern.fullmatch(label) for label in hostname.split("."))
-
-        def is_valid_ip_addr(ipaddr: str) -> bool:
-            import ipaddress
-
-            try:
-                ipaddress.ip_address(ipaddr)
-                return True
-            except ValueError:
-                return False
-
-        if not is_valid_hostname(host) and not is_valid_ip_addr(host):
-            raise ValueError(f"Invalid host {host}")
-
-        return host
-
-    @abstractmethod
-    def get_endpoint_string(self) -> str: ...
-
-
-class HostServiceEndpoint(ServiceEndpoint):
-    model_config = ConfigDict(frozen=True)
-    kind: Literal["host_port"] = "host_port"
-
-    @override
-    def get_endpoint_string(self) -> str:
-        match self.protocol:
-            case ServiceProtocol.HTTP:
-                return f"http://{self.host}:{self.port}"
-            case ServiceProtocol.GRPC:
-                return f"{self.host}:{self.port}"
-            case ServiceProtocol.ARROW:
-                return f"grpc://{self.host}:{self.port}"
-            case _:
-                raise ValueError(f"Invalid protocol {self.protocol}")
-
-    @field_validator("protocol")
-    @classmethod
-    def validate_protocol(cls, protocol: ServiceProtocol) -> ServiceProtocol:
-        if protocol == ServiceProtocol.PYRO:
-            raise ValueError("PYRO protocol is not supported for host endpoint")
-        return protocol
-
-
-class UriServiceEndpoint(ServiceEndpoint):
-    model_config = ConfigDict(frozen=True)
-    kind: Literal["uri"] = "uri"
-
-    object_identifier: Annotated[str, Field(min_length=1)]
-
-    @override
-    def get_endpoint_string(self) -> str:
-        match self.protocol:
-            case ServiceProtocol.PYRO:
-                return f"PYRO:{self.object_identifier}@{self.host}:{self.port}"
-            case _:
-                raise ValueError(f"Invalid protocol {self.protocol}")
-
-    @field_validator("protocol")
-    @classmethod
-    def validate_protocol(cls, protocol: ServiceProtocol) -> ServiceProtocol:
-        if protocol == ServiceProtocol.HTTP:
-            raise ValueError("HTTP protocol is not supported for uri endpoint")
-        return protocol
-
-
-type ServiceEndpointType = Annotated[
-    HostServiceEndpoint | UriServiceEndpoint,
-    Field(discriminator="kind"),
-]
+    def get_endpoint_by_key(self, key: EndpointKey) -> EndpointValue:
+        if key not in self.endpoints:
+            raise ValueError(f"Endpoint {key} not found")
+        return self.endpoints[key]
 
 
 class ServiceType(StrEnum):
     MODEL_MANAGER = auto()
     INFERENCE_SERVICE = auto()
+    CONTROLLER = auto()
     ARTIFACT_STORE = auto()
 
 
@@ -124,4 +94,4 @@ class ServiceInstance(BaseModel):
     service_id: ServiceId
     service_type: ServiceType
 
-    service_endpoint: ServiceEndpointType
+    service_endpoints: list[ServiceEndpoint]

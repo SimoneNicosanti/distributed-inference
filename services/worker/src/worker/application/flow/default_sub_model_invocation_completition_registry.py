@@ -30,7 +30,7 @@ class DefaultCompletitionRegistry(SubModelInvocationCompletitionRegistry):
     ) -> None:
         if sub_model_invocation_id in self._completition_events:
             self._completition_events[sub_model_invocation_id].set_result(None)
-        self._completition_events.pop(sub_model_invocation_id)
+            self._completition_events.pop(sub_model_invocation_id)
 
     @override
     async def register_sub_model_invocation_failure(

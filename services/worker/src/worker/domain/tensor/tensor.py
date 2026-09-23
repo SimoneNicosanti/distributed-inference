@@ -74,3 +74,6 @@ class TensorBundle(BaseModel):
                 **other.bundle,
             }
         )
+
+    def get_tensor_names(self) -> list[str]:
+        return list(self.bundle.keys())

@@ -187,6 +187,7 @@ mypy_path = [
   "$MYPY_CONFIG_FILE_DIR/services/controller/src",
   "$MYPY_CONFIG_FILE_DIR/services/model_manager/src",
   "$MYPY_CONFIG_FILE_DIR/services/worker/src",
+  "$MYPY_CONFIG_FILE_DIR/services/ingress/src",
 
   "$MYPY_CONFIG_FILE_DIR/services",
 ]
@@ -293,6 +294,7 @@ extraPaths = [
   "services/domain/src",
   "services/model_manager/src",
   "services/worker/src",
+  "services/ingress/src",
 
   "packages/directory/src",
   "packages/integration/src",

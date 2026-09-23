@@ -24,8 +24,8 @@ class InMemorySubModelInvocationMessageGatherer(
     ) -> GatherKey:
 
         gather_key = GatherKey(
-            model_pass_context=sub_model_invocation_message.context.model_pass_context,
-            sub_model_deployment_id=sub_model_invocation_message.context.sub_model_deployment_id,
+            model_pass_context=sub_model_invocation_message.model_pass_context,
+            sub_model_deployment_id=sub_model_invocation_message.sub_model_deployment_id,
         )
 
         if gather_key not in self._memory_store:
