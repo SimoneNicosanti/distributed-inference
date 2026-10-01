@@ -1,18 +1,18 @@
 from typing import override
 
-from integration.model.model import Model, ModelId
-from integration.model.model_version import (
-    ModelVersion,
-    ModelVersionId,
-)
-from integration.model.sub_model import (
-    SubModel,
-    SubModelId,
-)
 from model_manager.application.ports.outbound.model_metadata_store import (
     ModelMetadataStore,
 )
 from model_manager.domain.profiled_model_version import ProfiledModelVersion
+from shared.model.model import Model, ModelId
+from shared.model.model_version import (
+    ModelVersion,
+    ModelVersionId,
+)
+from shared.model.sub_model import (
+    SubModel,
+    SubModelId,
+)
 
 
 class InMemoryModelMetadataStore(ModelMetadataStore):

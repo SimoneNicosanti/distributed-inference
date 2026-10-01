@@ -1,11 +1,11 @@
 from pydantic import BaseModel
 
-from integration.model.model import Model, ModelId
-from integration.model.model_version import (
+from model_manager.domain.profiled_model_version import ProfiledModelVersion
+from shared.model.model import Model, ModelId
+from shared.model.model_version import (
     ModelVersionId,
 )
-from integration.model.sub_model import SubModel
-from model_manager.domain.profiled_model_version import ProfiledModelVersion
+from shared.model.sub_model import SubModel
 
 
 class RegisterModelRequest(BaseModel):

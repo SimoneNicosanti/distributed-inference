@@ -2,7 +2,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from integration.flow.flow import FlowId
+from shared.flow.flow import FlowId
 
 # class InferenceRequestId(BaseModel):
 #     model_config = ConfigDict(frozen=True)

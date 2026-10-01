@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 
-from integration.model.sub_model import SubModelId
-from integration.plan.plan import InferencePlanVersion, SubModelDeployment
+from shared.model.sub_model import SubModelId
+from shared.plan.plan import InferencePlanVersion, SubModelDeployment
 from worker.domain.model_pass.model_pass_context import (
     ModelPassContext,
 )

@@ -12,16 +12,6 @@ from artifacts.workspace.artifact_workspace import (
     build_artifact_bundle_from_artifact_workspace,
     build_artifact_workspace_from_artifact_bundle,
 )
-from integration.model.keys import LayerKey
-from integration.model.model import Model, ModelId
-from integration.model.model_version import (
-    ModelVersion,
-    ModelVersionId,
-)
-from integration.model.sub_model import (
-    SubModel,
-    SubModelId,
-)
 from model_manager.application.ports.inbound.model_manager import (
     ModelManager,
 )
@@ -35,6 +25,16 @@ from model_manager.application.ports.outbound.model_splitter import (
     ModelSplitter,
 )
 from model_manager.domain.profiled_model_version import ProfiledModelVersion
+from shared.model.keys import LayerKey
+from shared.model.model import Model, ModelId
+from shared.model.model_version import (
+    ModelVersion,
+    ModelVersionId,
+)
+from shared.model.sub_model import (
+    SubModel,
+    SubModelId,
+)
 
 
 class DefaultModelManager(ModelManager):

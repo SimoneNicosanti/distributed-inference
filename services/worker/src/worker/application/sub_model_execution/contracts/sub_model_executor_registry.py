@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager
 
-from integration.plan.plan import SubModelDeployment
+from shared.plan.plan import SubModelDeployment
 from worker.application.ports.outbound.sub_model_executor import (
     SubModelExecutor,
 )

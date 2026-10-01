@@ -6,7 +6,7 @@ from typing import Self, TypedDict, cast
 import networkx as nx
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
-from integration.model.keys import EdgeKey, LayerKey
+from shared.model.keys import EdgeKey, LayerKey
 
 INPUT_LAYER_NAME: LayerKey = "InputLayer"
 OUTPUT_LAYER_NAME: LayerKey = "OutputLayer"

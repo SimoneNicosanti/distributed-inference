@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 
-from integration.model.model_version import ModelVersion, ModelVersionId
 from model_manager.domain.model_version_graph import ModelVersionGraph
+from shared.model.model_version import ModelVersion, ModelVersionId
 
 
 class ProfiledModelVersion(BaseModel):

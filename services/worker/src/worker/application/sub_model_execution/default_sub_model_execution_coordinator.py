@@ -1,7 +1,7 @@
 import asyncio
 from typing import override
 
-from integration.plan.plan import ServiceInferencePlan
+from shared.plan.plan import ServiceInferencePlan
 from lifecycle.async_lifecycle import AsyncLifecycle
 from worker.application.deployment.contracts.service_inference_plan_preparer import (
     ServiceInferencePlanPreparer,

@@ -1,18 +1,18 @@
 from abc import ABC, abstractmethod
 
-from integration.model.model import (
+from model_manager.domain.profiled_model_version import ProfiledModelVersion
+from shared.model.model import (
     Model,
     ModelId,
 )
-from integration.model.model_version import (
+from shared.model.model_version import (
     ModelVersion,
     ModelVersionId,
 )
-from integration.model.sub_model import (
+from shared.model.sub_model import (
     SubModel,
     SubModelId,
 )
-from model_manager.domain.profiled_model_version import ProfiledModelVersion
 
 
 class ModelMetadataStore(ABC):

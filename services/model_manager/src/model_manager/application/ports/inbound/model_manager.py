@@ -2,14 +2,14 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
 from artifacts.workspace.artifact_bundle import ArtifactBundle
-from integration.model.keys import LayerKey
-from integration.model.model import Model, ModelId
-from integration.model.model_version import (
+from model_manager.domain.profiled_model_version import ProfiledModelVersion
+from shared.model.keys import LayerKey
+from shared.model.model import Model, ModelId
+from shared.model.model_version import (
     ModelVersion,
     ModelVersionId,
 )
-from integration.model.sub_model import SubModel
-from model_manager.domain.profiled_model_version import ProfiledModelVersion
+from shared.model.sub_model import SubModel
 
 
 class ModelManager(ABC):

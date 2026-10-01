@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 
 from artifacts.workspace.artifact_workspace import ArtifactWorkspace
-from integration.model.model import ModelInfo
-from integration.model.model_version import (
+from shared.model.model import ModelInfo
+from shared.model.model_version import (
     ModelVersion,
 )
 from model_manager.domain.profiled_model_version import ProfiledModelVersion

@@ -24,6 +24,7 @@ dependencies = [
   "onnxruntime>=1.27.0",
   "onnxruntime-genai>=0.14.1",
   "portalocker>=4.4.0",
+  "pyarrow>=25.0.0",
   "pydantic>=2.8",
   "python-multipart>=0.0.32",
   "pyyaml>=6.0",
@@ -177,6 +178,7 @@ explicit_package_bases = true
 mypy_path = [
   "$MYPY_CONFIG_FILE_DIR/packages/directory/src",
   "$MYPY_CONFIG_FILE_DIR/packages/integration/src",
+  "$MYPY_CONFIG_FILE_DIR/packages/shared/src",
   "$MYPY_CONFIG_FILE_DIR/packages/lifecycle/src",
   "$MYPY_CONFIG_FILE_DIR/packages/scheduling/src",
   "$MYPY_CONFIG_FILE_DIR/packages/utils/src",
@@ -245,7 +247,8 @@ module = [
   "pyroute2.*",
   "pyomo.*",
   "fakeredis.*",
-  "ort.*"
+  "ort.*",
+  "pyarrow.*",
 ]
 ignore_missing_imports = true
 
@@ -266,6 +269,7 @@ module = [
   "pandas.*",
   "kubernetes.*",
   "onnxruntime.*",
+  "pyarrow.*",
 ]
 ignore_missing_imports = false
 follow_imports = "normal"
@@ -298,6 +302,7 @@ extraPaths = [
 
   "packages/directory/src",
   "packages/integration/src",
+  "packages/shared/src",
   "packages/lifecycle/src",
   "packages/scheduling/src",
   "packages/utils/src",

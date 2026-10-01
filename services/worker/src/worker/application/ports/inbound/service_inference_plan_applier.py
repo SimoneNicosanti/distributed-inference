@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from integration.plan.plan import ServiceInferencePlan
+from shared.plan.plan import ServiceInferencePlan
 
 
 class ServiceInferencePlanApplier(ABC):

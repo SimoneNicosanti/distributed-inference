@@ -5,7 +5,7 @@ from asyncio import Future
 from dataclasses import dataclass
 from typing import Any, override
 
-from integration.plan.plan import InferencePlanVersion, ServiceInferencePlan
+from shared.plan.plan import InferencePlanVersion, ServiceInferencePlan
 from scheduling.queue_request import QueueRequest
 from worker.application.deployment.contracts.service_inference_plan_preparer import (
     ServiceInferencePlanPreparer,

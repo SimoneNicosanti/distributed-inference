@@ -1,6 +1,6 @@
 from typing import override
 
-from integration.plan.plan import InferencePlanVersion, ServiceInferencePlan
+from shared.plan.plan import InferencePlanVersion, ServiceInferencePlan
 
 from worker.application.ports.outbound.service_inference_plan_store import (
     ServiceInferencePlanStore,

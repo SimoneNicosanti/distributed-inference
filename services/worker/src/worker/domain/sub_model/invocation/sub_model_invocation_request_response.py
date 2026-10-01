@@ -1,8 +1,8 @@
 from pydantic import BaseModel, ConfigDict
 
-from integration.flow.flow import FlowId
-from integration.model.sub_model import SubModelId
-from integration.plan.plan import InferencePlanVersion, SubModelDeployment
+from shared.flow.flow import FlowId
+from shared.model.sub_model import SubModelId
+from shared.plan.plan import InferencePlanVersion, SubModelDeployment
 from worker.domain.sub_model.invocation.sub_model_invocation_context import (
     SubModelInvocationContext,
 )

@@ -30,3 +30,15 @@ If you find a test that has not been committed yet, you are allowed to change it
 
 ## Other TODO
 -
+
+
+
+from torch.fx.passes.split_module import split_module
+
+split_gm = split_module(
+    gm,
+    gm,
+    lambda node: partition[node.name],
+    keep_original_node_name=True,
+    tuple_return=True,
+)

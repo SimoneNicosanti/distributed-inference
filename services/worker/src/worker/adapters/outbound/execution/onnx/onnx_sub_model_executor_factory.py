@@ -4,7 +4,7 @@ from typing import override
 import onnxruntime as ort
 
 from artifacts.workspace.artifact_bundle import ArtifactBundle
-from integration.plan.plan import ResourceAllocation
+from shared.plan.plan import ResourceAllocation
 from model_manager.adapters.outbound.model_optimizer.onnx_model_optimizer import (
     OnnxModelOptimizer,
 )

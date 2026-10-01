@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from artifacts.workspace.artifact_bundle import ArtifactBundle
-from integration.plan.plan import ResourceAllocation
+from shared.plan.plan import ResourceAllocation
 from worker.application.ports.outbound.sub_model_executor import (
     SubModelExecutor,
 )

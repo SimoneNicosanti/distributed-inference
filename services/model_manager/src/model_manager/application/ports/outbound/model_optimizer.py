@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from artifacts.workspace.artifact_workspace import (
     ArtifactWorkspace,
 )
-from integration.model.model import ModelInfo
-from integration.model.model_version import (
+from shared.model.model import ModelInfo
+from shared.model.model_version import (
     ModelVersionInfo,
 )
 from utils.model.optimization.api.optimization_level import (

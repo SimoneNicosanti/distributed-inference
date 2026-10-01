@@ -4,8 +4,8 @@ from collections.abc import Iterable
 from artifacts.workspace.artifact_workspace import (
     ArtifactWorkspace,
 )
-from integration.model.keys import LayerKey
 from model_manager.domain.model_version_graph import ModelVersionGraph
+from shared.model.keys import LayerKey
 
 
 class ModelSplitter(ABC):

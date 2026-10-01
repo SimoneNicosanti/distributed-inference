@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from integration.plan.plan import SubModelDeployment
+from shared.plan.plan import SubModelDeployment
 
 from worker.domain.model_pass.model_pass_context import (
     ModelPassContext,

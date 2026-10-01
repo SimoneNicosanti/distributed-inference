@@ -11,7 +11,7 @@ from onnx.utils import extract_model
 from artifacts.workspace.artifact_workspace import (
     ArtifactWorkspace,
 )
-from integration.model.keys import LayerKey
+from shared.model.keys import LayerKey
 from model_manager.application.ports.outbound.model_splitter import (
     ModelSplitter,
 )

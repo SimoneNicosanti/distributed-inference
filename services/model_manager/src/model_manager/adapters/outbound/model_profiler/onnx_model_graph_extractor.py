@@ -9,7 +9,7 @@ import sympy
 from artifacts.workspace.artifact_workspace import (
     ArtifactWorkspace,
 )
-from integration.model.model_version import (
+from shared.model.model_version import (
     ModelVersionInfo,
 )
 from model_manager.application.ports.outbound.model_graph_extractor import (

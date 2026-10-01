@@ -2,7 +2,7 @@ from enum import StrEnum, auto
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
-from integration.plan.plan import InferencePlanVersion
+from shared.plan.plan import InferencePlanVersion
 
 from worker.domain.model_invocation.model_invocation_context import (
     ModelInvocationContext,

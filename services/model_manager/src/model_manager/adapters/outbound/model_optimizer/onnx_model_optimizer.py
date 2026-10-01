@@ -10,13 +10,13 @@ from onnxruntime.transformers.fusion_options import FusionOptions
 from artifacts.workspace.artifact_workspace import (
     ArtifactWorkspace,
 )
-from integration.model.model import ModelInfo, ModelType
-from integration.model.model_version import (
-    ModelVersionInfo,
-    TransformerArchitectureInfo,
-)
 from model_manager.application.ports.outbound.model_optimizer import (
     ModelOptimizer,
+)
+from shared.model.model import ModelInfo, ModelType
+from shared.model.model_version import (
+    ModelVersionInfo,
+    TransformerArchitectureInfo,
 )
 from utils.model.optimization.api.optimization_level import (
     OptimizationLevel,

@@ -1,7 +1,7 @@
 import asyncio
 import hashlib
 import shutil
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import override
@@ -51,7 +51,7 @@ class LocalArtifactStore(ArtifactStore):
     async def download_artifact(
         self,
         artifact_ref: ArtifactRef,
-    ) -> AsyncIterator[ArtifactBundle]:
+    ) -> AsyncGenerator[ArtifactBundle]:
         artifact_lock = self._locks.setdefault(artifact_ref, aiorwlock.RWLock())
 
         async with artifact_lock.reader_lock:

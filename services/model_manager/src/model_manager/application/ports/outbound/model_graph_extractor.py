@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from artifacts.workspace.artifact_workspace import (
     ArtifactWorkspace,
 )
-from integration.model.model_version import (
+from shared.model.model_version import (
     ModelVersionInfo,
 )
 from model_manager.domain.model_version_graph import (

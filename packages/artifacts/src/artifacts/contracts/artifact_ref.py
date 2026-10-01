@@ -1,5 +1,3 @@
-from hashlib import md5
-
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -12,4 +10,4 @@ class ArtifactRef(BaseModel):
 
 
 async def build_artifact_ref(value: str) -> ArtifactRef:
-    return ArtifactRef(value=md5(value.encode("utf-8")).hexdigest())
+    return ArtifactRef(value=value)

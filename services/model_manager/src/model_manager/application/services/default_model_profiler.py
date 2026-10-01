@@ -6,11 +6,6 @@ from typing import override
 from artifacts.workspace.artifact_workspace import (
     ArtifactWorkspace,
 )
-from integration.model.model import ModelInfo
-from integration.model.model_version import (
-    ModelVersion,
-    ModelVersionInfo,
-)
 from model_manager.application.ports.outbound.model_graph_extractor import (
     ModelGraphExtractor,
 )
@@ -24,6 +19,11 @@ from model_manager.domain.model_version_graph import (
     ModelVersionGraph,
 )
 from model_manager.domain.profiled_model_version import ProfiledModelVersion
+from shared.model.model import ModelInfo
+from shared.model.model_version import (
+    ModelVersion,
+    ModelVersionInfo,
+)
 from utils.model.optimization.api.optimization_level import (
     OptimizationLevel,
 )

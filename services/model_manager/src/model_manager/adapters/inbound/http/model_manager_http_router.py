@@ -5,7 +5,6 @@ import aiofiles
 from fastapi import APIRouter, File, Form, UploadFile
 
 from artifacts.archive import zip_archive
-from integration.model.model_version import ModelVersion
 from model_manager.adapters.inbound.http.model_manager_http_schema import (
     GenerateSubModelRequest,
     GenerateSubModelResponse,
@@ -18,6 +17,7 @@ from model_manager.adapters.inbound.http.model_manager_http_schema import (
 from model_manager.application.ports.inbound.model_manager import (
     ModelManager,
 )
+from shared.model.model_version import ModelVersion
 
 CHUNK_SIZE = 1024 * 1024
 

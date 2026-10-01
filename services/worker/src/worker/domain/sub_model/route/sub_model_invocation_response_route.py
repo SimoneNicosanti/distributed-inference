@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 
-from integration.plan.plan import SubModelDeployment
+from shared.plan.plan import SubModelDeployment
 from worker.domain.sub_model.invocation.sub_model_invocation_message import (
     SubModelInvocationMessage,
 )
