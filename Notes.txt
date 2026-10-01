@@ -15,7 +15,7 @@ YOU ARE NOT ALLOWED TO RUN TESTS.
 
 I want you to write tests and modify the current tests in the test directory. If you find a test, check if its implementation is aligned with the current implementation; if it is then evaluate it and if you do not find it appropriate change it; otherwise, align it with the current implementation.
 
-In writing tests, try to align with the directory structure inside the src directory. 
+In writing tests, try to align with the directory structure inside the src directory.
 
 In writing tests, you can skip the control_plane directory for now.
 
@@ -25,3 +25,20 @@ When you are done, I want you to tell me possible breaks in the execution flows.
 I want the tests to be of middle complexity: do not overengineer them, they just need to check for the core functionalities and possible breaks.
 
 If you find a test that has not been committed yet, you are allowed to change it; in doing so, consider what I told you about checking if the test is appropriate or not.
+
+
+
+## Other TODO
+-
+
+
+
+from torch.fx.passes.split_module import split_module
+
+split_gm = split_module(
+    gm,
+    gm,
+    lambda node: partition[node.name],
+    keep_original_node_name=True,
+    tuple_return=True,
+)

@@ -1,0 +1,3 @@
+PAYLOAD_SIZE = 25 * 1024 * 1024  # 25 MB Payload Size
+
+PROBE_TIMEOUT_S = 10

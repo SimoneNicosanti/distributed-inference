@@ -55,7 +55,7 @@ uv sync "${UV_SYNC_ARGS[@]}"
 # dall'estensione VS Code parte da cache calda, invece di analizzare tutto il
 # progetto al primo salvataggio.
 echo "==> Warm-up cache mypy"
-mypy src test || true
+mypy --config-file pyproject.toml || true
 
 # ---------------------------------------------------------------------------
 # 4. Hook pre-commit
@@ -77,7 +77,7 @@ mypy src test || true
 # ---------------------------------------------------------------------------
 # 5. Codex Configuration
 # ---------------------------------------------------------------------------
-sh ./.devcontainer/codex-prepare.sh
+bash ./.devcontainer/codex-prepare.sh
 
 # ---------------------------------------------------------------------------
 # 6. Verifica

@@ -54,7 +54,7 @@
     // Worker paralleli di mypy 2.x. Sovrascrive num_workers del pyproject,
     // così puoi usare valori diversi in devcontainer e in CI.
     // Parti da 4 e sali finché vedi miglioramenti (oltre i core fisici è inutile).
-    "MYPY_NUM_WORKERS": "4"
+    "MYPY_NUM_WORKERS": "4",
   },
   "features": {
     // Sintassi corretta: la major va nel tag dell'immagine, il valore è un oggetto.
@@ -91,7 +91,8 @@
         // "anthropic.claude-code",
         "supermaven.supermaven",
         "openai.chatgpt",
-        "trunk.io"
+        "trunk.io",
+        "darkstyle.codex-token-usage-for-enterprises",
         // "codeium.codeium" rimosso: con claude-code già presente sono due
         // assistenti che indicizzano lo stesso workspace in parallelo.
         // Riattivalo se lo usi davvero, ma non tenerli entrambi "per sicurezza".
@@ -119,6 +120,8 @@
           "**/experiments/**",
           "**/*.onnx"
         ],
+        "python.analysis.importFormat": "absolute",
+        "mypy-type-checker.cwd": "${containerWorkspaceFolder}",
         // reportImplicitOverride / reportIncompatibleMethodOverride rimossi:
         // equivalenti a enable_error_code=["explicit-override"] + strict in mypy.
         // Tenerli entrambi significa la stessa diagnostica due volte nel pannello.
@@ -138,7 +141,7 @@
         "mypy-type-checker.daemonStatusFile": "/home/vscode/.cache/mypy/dmypy-vscode.json",
         // Il daemon entra in gioco solo con scope workspace/custom. Con "file"
         // l'estensione lancia un processo mypy nuovo a ogni salvataggio.
-        "mypy-type-checker.reportingScope": "workspace",
+        "mypy-type-checker.reportingScope": "custom",
         "mypy-type-checker.showNotifications": "onError",
         "mypy-type-checker.args": [
           "--config-file",
