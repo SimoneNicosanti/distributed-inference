@@ -41,7 +41,7 @@ class DefaultNetworkProfilingCoordinator(NetworkProfilingCoordinator, AsyncLifec
         self._worker_id = worker_id
         self._activity_manager = activity_manager
         self._service_resolver = service_resolver
-        self._loop_task: asyncio.Task | None = None
+        self._loop_task: asyncio.Task[None] | None = None
 
         self._net_probe_client = net_probe_client
         self._net_profile_publisher = net_profile_publisher

@@ -108,35 +108,3 @@ class InMemoryModelMetadataStore(ModelMetadataStore):
         model_version_id: ModelVersionId,
     ) -> bool:
         return model_version_id in self._profiled_model_versions.keys()
-
-    @override
-    async def register_sub_model(
-        self,
-        sub_model: SubModel,
-    ) -> SubModelId:
-
-        sub_model_id = sub_model.sub_model_id
-        model_version_id = sub_model_id.model_version_id
-        if model_version_id not in self._profiled_model_versions.keys():
-            raise ValueError(f"Model version {model_version_id} does not exist")
-
-        if sub_model_id in self._sub_models.keys():
-            ## Idempotence
-            return sub_model_id
-
-        self._sub_models[sub_model_id] = sub_model
-
-        return sub_model_id
-
-    @override
-    async def get_sub_model(self, sub_model_id: SubModelId) -> SubModel:
-        if sub_model_id not in self._sub_models.keys():
-            raise ValueError(f"Sub model {sub_model_id} does not exist")
-        return self._sub_models[sub_model_id]
-
-    @override
-    async def check_sub_model_existence(
-        self,
-        sub_model_id: SubModelId,
-    ) -> bool:
-        return sub_model_id in self._sub_models.keys()

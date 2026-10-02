@@ -3,9 +3,9 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from integration.flow.flow import FlowId
-from integration.identifiers.identifiers import WorkerId
-from integration.model.sub_model import (
+from shared.flow.flow import FlowId
+from shared.identifiers.identifiers import WorkerId
+from shared.model.sub_model import (
     SubModelId,
 )
 

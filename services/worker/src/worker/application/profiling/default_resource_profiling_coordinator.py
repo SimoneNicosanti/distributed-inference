@@ -43,7 +43,7 @@ class DefaultResourceProfilingCoordinator(ResourceProfilingCoordinator, AsyncLif
 
         self._res_profile_publisher = res_profile_publisher
 
-        self._loop_task: asyncio.Task | None = None
+        self._loop_task: asyncio.Task[None] | None = None
         self._running_lock = asyncio.Lock()
         pass
 

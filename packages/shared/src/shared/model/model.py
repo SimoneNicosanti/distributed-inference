@@ -2,7 +2,7 @@ from enum import StrEnum, auto
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from integration.identifiers.identifiers import UserId
+from shared.identifiers.identifiers import UserId
 
 
 class ModelTask(StrEnum):

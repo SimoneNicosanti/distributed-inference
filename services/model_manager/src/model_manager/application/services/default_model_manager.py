@@ -103,8 +103,6 @@ class DefaultModelManager(ModelManager):
 
         sub_model = SubModel(sub_model_id=sub_model_id)
 
-        sub_model_id = await self._model_metadata_store.register_sub_model(sub_model)
-
         async with aiofiles.tempfile.TemporaryDirectory() as tmp_dir:
             sub_model_workspace = ArtifactWorkspace(
                 root_path=Path(tmp_dir), entrypoint_path=None

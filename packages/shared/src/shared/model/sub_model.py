@@ -2,8 +2,8 @@ from collections.abc import Iterable
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from integration.model.keys import LayerKey
-from integration.model.model_version import ModelVersionId
+from shared.model.keys import LayerKey
+from shared.model.model_version import ModelVersionId
 
 
 class SubModelId(BaseModel):

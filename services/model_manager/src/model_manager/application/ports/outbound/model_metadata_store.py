@@ -9,10 +9,6 @@ from shared.model.model_version import (
     ModelVersion,
     ModelVersionId,
 )
-from shared.model.sub_model import (
-    SubModel,
-    SubModelId,
-)
 
 
 class ModelMetadataStore(ABC):
@@ -60,20 +56,4 @@ class ModelMetadataStore(ABC):
     async def check_profiled_model_version_existence(
         self,
         model_version_id: ModelVersionId,
-    ) -> bool: ...
-
-    ## Sub Model APIs
-    @abstractmethod
-    async def register_sub_model(
-        self,
-        sub_model: SubModel,
-    ) -> SubModelId: ...
-
-    @abstractmethod
-    async def get_sub_model(self, sub_model_id: SubModelId) -> SubModel: ...
-
-    @abstractmethod
-    async def check_sub_model_existence(
-        self,
-        sub_model_id: SubModelId,
     ) -> bool: ...

@@ -11,11 +11,11 @@ from onnx.utils import extract_model
 from artifacts.workspace.artifact_workspace import (
     ArtifactWorkspace,
 )
-from shared.model.keys import LayerKey
 from model_manager.application.ports.outbound.model_splitter import (
     ModelSplitter,
 )
 from model_manager.domain.model_version_graph import ModelVersionGraph
+from shared.model.keys import LayerKey
 
 
 class OnnxModelSplitter(ModelSplitter):

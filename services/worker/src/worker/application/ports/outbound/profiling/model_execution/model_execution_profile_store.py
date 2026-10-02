@@ -22,6 +22,11 @@ class ModelExecutionProfileStore(ABC):
     ) -> list[ModelExecutionProfile]: ...
 
     @abstractmethod
+    async def get_all_profiled_model_ids_by_worker_id(
+        self, worker_id: WorkerId
+    ) -> list[ModelVersionId]: ...
+
+    @abstractmethod
     async def check_model_execution_profile_exists(
         self, worker_id: WorkerId, model_version_id: ModelVersionId
     ) -> bool: ...

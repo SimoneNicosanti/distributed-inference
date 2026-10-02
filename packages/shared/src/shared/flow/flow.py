@@ -2,7 +2,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from integration.identifiers.identifiers import UserId
+from shared.identifiers.identifiers import UserId
 
 
 class FlowInfo(BaseModel):

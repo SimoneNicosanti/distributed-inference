@@ -20,6 +20,7 @@ dependencies = [
   "httpx>=0.28.1",
   "numpy>=2.0",
   "olive-ai>=0.13.0",
+  "onnx-tool>=1.0.1",
   "onnxoptimizer>=0.4.2",
   "onnxruntime>=1.27.0",
   "onnxruntime-genai>=0.14.1",
@@ -30,10 +31,15 @@ dependencies = [
   "pyyaml>=6.0",
   "readerwriterlock>=1.0.9",
   "redis>=8.0.1",
+  "scipy-stubs>=1.18.1.1",
   "structlog>=24.0",
   "sysv-ipc>=1.2.0",
   "transformers==5.17.0",
   "types-networkx>=3.6.1.20260624",
+  "types-pexpect>=4.9.0.20260518",
+  "types-protobuf>=7.35.1.20260906",
+  "types-psutil>=7.2.2.20260906",
+  "types-pygments>=2.21.0.20260819",
 ]
 
 # ---------------------------------------------------------------------------
@@ -248,7 +254,8 @@ module = [
   "pyomo.*",
   "fakeredis.*",
   "ort.*",
-  "pyarrow.*",
+
+  "onnxruntime.*",
 ]
 ignore_missing_imports = true
 
@@ -268,12 +275,20 @@ module = [
   "matplotlib.*",
   "pandas.*",
   "kubernetes.*",
-  "onnxruntime.*",
-  "pyarrow.*",
+
 ]
 ignore_missing_imports = false
 follow_imports = "normal"
 follow_untyped_imports = true
+
+
+# pyproject.toml
+[[tool.mypy.overrides]]
+module = "pyarrow.*"
+ignore_missing_imports = false
+follow_imports = "normal"
+follow_untyped_imports = true
+disable_error_code = ["no-any-unimported", "attr-defined"]
 
 # I test possono essere un filo più permissivi: i decoratori di pytest e i
 # fixture non tipizzati generano rumore senza valore diagnostico.

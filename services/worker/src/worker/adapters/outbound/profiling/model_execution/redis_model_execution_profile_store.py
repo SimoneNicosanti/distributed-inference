@@ -12,7 +12,7 @@ from worker.application.ports.outbound.profiling.model_execution.model_execution
 from worker.domain.profiling.model_execution_profile import ModelExecutionProfile
 
 
-class RedisModelExecutionProfileStorage(ModelExecutionProfileStore):
+class RedisModelExecutionProfileStore(ModelExecutionProfileStore):
     def __init__(self, redis: redis_asyncio.Redis) -> None:
         self._redis = redis
 
@@ -42,6 +42,18 @@ class RedisModelExecutionProfileStorage(ModelExecutionProfileStore):
             raise ValueError("Model execution profile not found")
 
         return ModelExecutionProfile.model_validate_json(value)
+
+    @override
+    async def get_all_profiled_model_ids_by_worker_id(
+        self, worker_id: WorkerId
+    ) -> list[ModelVersionId]:
+
+        model_execution_profiles = await self.get_all_profiles_by_worker_id(worker_id)
+
+        return [
+            model_execution_profile.model_version_id
+            for model_execution_profile in model_execution_profiles
+        ]
 
     @override
     async def get_all_profiles_by_worker_id(

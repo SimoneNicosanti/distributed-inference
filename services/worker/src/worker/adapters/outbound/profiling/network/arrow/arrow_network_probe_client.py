@@ -30,11 +30,6 @@ from worker.domain.profiling.network_profile import ConnectionInfo
 
 
 class ArrowNetworkProbeClient(NetworkProbeClient):
-    def __init__(
-        self,
-    ):
-        pass
-
     @override
     async def probe_connection(self, worker_instance: WorkerInstance) -> ConnectionInfo:
 

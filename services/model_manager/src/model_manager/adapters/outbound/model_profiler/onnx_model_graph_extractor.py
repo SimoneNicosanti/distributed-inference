@@ -9,9 +9,6 @@ import sympy
 from artifacts.workspace.artifact_workspace import (
     ArtifactWorkspace,
 )
-from shared.model.model_version import (
-    ModelVersionInfo,
-)
 from model_manager.application.ports.outbound.model_graph_extractor import (
     ModelGraphExtractor,
 )
@@ -23,6 +20,9 @@ from model_manager.domain.model_version_graph import (
     ModelVersionGraph,
     ShapePoint,
     TensorInfo,
+)
+from shared.model.model_version import (
+    ModelVersionInfo,
 )
 
 
