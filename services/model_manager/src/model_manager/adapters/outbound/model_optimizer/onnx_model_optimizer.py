@@ -7,17 +7,17 @@ import onnxruntime as ort
 import onnxruntime.transformers.optimizer as ort_transformers_opt
 from onnxruntime.transformers.fusion_options import FusionOptions
 
-from artifacts.workspace.artifact_workspace import (
+from artifacts.contracts.artifact_workspace import (
     ArtifactWorkspace,
 )
 from model_manager.application.ports.outbound.model_optimizer import (
     ModelOptimizer,
 )
-from shared.model.model import ModelInfo, ModelType
-from shared.model.model_version import (
-    ModelVersionInfo,
-    TransformerArchitectureInfo,
+from model_manager.domain.model import ModelInfo
+from model_manager.domain.model_variant import (
+    ModelVariantInfo,
 )
+from shared.model.model import ModelType, TransformerArchitectureInfo
 from utils.model.optimization.api.optimization_level import (
     OptimizationLevel,
 )
@@ -30,7 +30,7 @@ class OnnxModelOptimizer(ModelOptimizer):
         input_workspace: ArtifactWorkspace,
         output_workspace: ArtifactWorkspace,
         model_info: ModelInfo,
-        model_version_info: ModelVersionInfo,
+        model_variant_info: ModelVariantInfo,
         opt_level: OptimizationLevel,
     ) -> None:
 
@@ -49,7 +49,7 @@ class OnnxModelOptimizer(ModelOptimizer):
                     input_path=input_entrypoint_path,
                     output_path=output_entrypoint_path,
                     model_info=model_info,
-                    model_version_info=model_version_info,
+                    model_variant_info=model_variant_info,
                     opt_level=opt_level,
                 )
 
@@ -60,7 +60,7 @@ class OnnxModelOptimizer(ModelOptimizer):
                             input_path=input_entrypoint_path,
                             output_path=output_entrypoint_path,
                             model_info=model_info,
-                            model_version_info=model_version_info,
+                            model_variant_info=model_variant_info,
                             opt_level=opt_level,
                         )
 
@@ -69,7 +69,7 @@ class OnnxModelOptimizer(ModelOptimizer):
                             input_path=input_entrypoint_path,
                             output_path=output_entrypoint_path,
                             model_info=model_info,
-                            model_version_info=model_version_info,
+                            model_variant_info=model_variant_info,
                             opt_level=opt_level,
                         )
 
@@ -93,7 +93,7 @@ class OnnxModelOptimizer(ModelOptimizer):
         input_path: Path,
         output_path: Path,
         model_info: ModelInfo,
-        model_version_info: ModelVersionInfo,
+        model_variant_info: ModelVariantInfo,
         opt_level: OptimizationLevel,
     ) -> None:
 
@@ -152,7 +152,7 @@ class OnnxModelOptimizer(ModelOptimizer):
         input_path: Path,
         output_path: Path,
         model_info: ModelInfo,
-        model_version_info: ModelVersionInfo,
+        model_variant_info: ModelVariantInfo,
         opt_level: OptimizationLevel,
     ) -> None:
         model_type = self._get_ort_transformer_model_type(model_info.model_type)
@@ -164,7 +164,7 @@ class OnnxModelOptimizer(ModelOptimizer):
 
         ## TODO: Not a very pleasant cast
         architecture_info = cast(
-            TransformerArchitectureInfo, model_version_info.architecture_info
+            TransformerArchitectureInfo, model_info.architecture_info
         )
 
         optimized = ort_transformers_opt.optimize_model(

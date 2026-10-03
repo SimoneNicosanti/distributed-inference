@@ -2,7 +2,7 @@ import asyncio
 from typing import override
 
 from lifecycle.async_lifecycle import AsyncLifecycle
-from shared.identifiers.identifiers import WorkerId
+from shared.service.service import WorkerId
 from worker.application.ports.outbound.activity_manager import ActivityManager
 from worker.application.ports.outbound.directory.service_directory import (
     ServiceDirectory,

@@ -1,25 +1,20 @@
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat
 
-from shared.identifiers.identifiers import UserId
+from shared.user.user import UserId
 
 
 class FlowInfo(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     name: str
-    lambda_val: float
+    lambda_val: NonNegativeFloat
 
-    accuracy_req: float
-    response_req: float
-    energy_req: float
-
-
-class Flows(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    flows: list[FlowInfo]
+    accuracy_req: NonNegativeFloat
+    response_req: NonNegativeFloat
+    energy_req: NonNegativeFloat
+    throughput_req: NonNegativeFloat
 
 
 class FlowId(BaseModel):
@@ -27,3 +22,10 @@ class FlowId(BaseModel):
 
     user_id: UserId
     flow_id: UUID = Field(default_factory=uuid4)
+
+
+class Flow(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    flow_id: FlowId
+    flow_info: FlowInfo

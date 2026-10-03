@@ -4,10 +4,10 @@ from pathlib import Path, PurePosixPath
 import pytest
 
 from artifacts.contracts.artifact_manifest import ArtifactFileInfo, ArtifactManifest
-from artifacts.contracts.artifact_ref import ArtifactRef
+from shared.artifact.artifact_ref import ArtifactRef
 from artifacts.storage.cached_artifact_store import CachedArtifactStore
 from artifacts.storage.local_artifact_store import LocalArtifactStore
-from artifacts.workspace.artifact_bundle import ArtifactBundle
+from artifacts.contracts.artifact_bundle import ArtifactBundle
 
 
 def build_bundle(root_path: Path, content: bytes) -> ArtifactBundle:

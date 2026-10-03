@@ -2,7 +2,7 @@ from typing import override
 
 from redis import asyncio as redis_asyncio
 
-from shared.identifiers.identifiers import WorkerId
+from shared.service.service import WorkerId
 from worker.application.ports.outbound.profiling.network.network_profile_publisher import (
     NetworkProfilePublisher,
 )

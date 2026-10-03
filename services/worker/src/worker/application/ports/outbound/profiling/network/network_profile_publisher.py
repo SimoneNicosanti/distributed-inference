@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from shared.identifiers.identifiers import WorkerId
+from shared.service.service import WorkerId
 from worker.domain.profiling.network_profile import NetworkProfile
 
 

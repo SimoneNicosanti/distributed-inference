@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 
 from shared.model.keys import LayerKey
-from shared.model.model_version import ModelVersionId
+from shared.model.model_variant import ModelVariantId
 
 
 class BackendLayerExecutionProfile(BaseModel):
@@ -23,5 +23,5 @@ class LayerExecutionProfile(BaseModel):
 class ModelExecutionProfile(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    model_version_id: ModelVersionId
+    model_version_id: ModelVariantId
     layer_profiles: dict[LayerKey, LayerExecutionProfile]

@@ -4,8 +4,8 @@ from typing import override
 
 from redis import asyncio as redis_asyncio
 
-from shared.identifiers.identifiers import WorkerId
-from shared.model.model_version import ModelVersionId
+from shared.service.service import WorkerId
+from shared.model.model_variant import ModelVariantId
 from worker.application.ports.outbound.profiling.model_execution.model_execution_profile_store import (
     ModelExecutionProfileStore,
 )
@@ -31,7 +31,7 @@ class RedisModelExecutionProfileStore(ModelExecutionProfileStore):
 
     @override
     async def get_model_execution_profile_by_worker_id(
-        self, worker_id: WorkerId, model_version_id: ModelVersionId
+        self, worker_id: WorkerId, model_version_id: ModelVariantId
     ) -> ModelExecutionProfile:
         worker_key = await self.__build_worker_key(worker_id)
         profile_id = await self.__compute_model_version_id_hash(model_version_id)
@@ -46,7 +46,7 @@ class RedisModelExecutionProfileStore(ModelExecutionProfileStore):
     @override
     async def get_all_profiled_model_ids_by_worker_id(
         self, worker_id: WorkerId
-    ) -> list[ModelVersionId]:
+    ) -> list[ModelVariantId]:
 
         model_execution_profiles = await self.get_all_profiles_by_worker_id(worker_id)
 
@@ -67,7 +67,7 @@ class RedisModelExecutionProfileStore(ModelExecutionProfileStore):
 
     @override
     async def check_model_execution_profile_exists(
-        self, worker_id: WorkerId, model_version_id: ModelVersionId
+        self, worker_id: WorkerId, model_version_id: ModelVariantId
     ) -> bool:
         worker_key = await self.__build_worker_key(worker_id)
         profile_id = await self.__compute_model_version_id_hash(model_version_id)
@@ -83,7 +83,7 @@ class RedisModelExecutionProfileStore(ModelExecutionProfileStore):
 
     @staticmethod
     async def __compute_model_version_id_hash(
-        model_version_id: ModelVersionId,
+        model_version_id: ModelVariantId,
     ) -> str:
         md5_value = await asyncio.to_thread(
             md5, model_version_id.model_dump_json().encode("utf-8")

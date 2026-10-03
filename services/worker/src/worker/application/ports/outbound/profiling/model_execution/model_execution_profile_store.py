@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from shared.identifiers.identifiers import WorkerId
-from shared.model.model_version import ModelVersionId
+from shared.service.service import WorkerId
+from shared.model.model_variant import ModelVariantId
 from worker.domain.profiling.model_execution_profile import ModelExecutionProfile
 
 
@@ -13,7 +13,7 @@ class ModelExecutionProfileStore(ABC):
 
     @abstractmethod
     async def get_model_execution_profile_by_worker_id(
-        self, worker_id: WorkerId, model_version_id: ModelVersionId
+        self, worker_id: WorkerId, model_version_id: ModelVariantId
     ) -> ModelExecutionProfile: ...
 
     @abstractmethod
@@ -24,9 +24,9 @@ class ModelExecutionProfileStore(ABC):
     @abstractmethod
     async def get_all_profiled_model_ids_by_worker_id(
         self, worker_id: WorkerId
-    ) -> list[ModelVersionId]: ...
+    ) -> list[ModelVariantId]: ...
 
     @abstractmethod
     async def check_model_execution_profile_exists(
-        self, worker_id: WorkerId, model_version_id: ModelVersionId
+        self, worker_id: WorkerId, model_version_id: ModelVariantId
     ) -> bool: ...

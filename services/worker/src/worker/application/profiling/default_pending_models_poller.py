@@ -3,8 +3,8 @@ from collections.abc import AsyncGenerator
 from typing import override
 
 from lifecycle.async_lifecycle import AsyncLifecycle
-from shared.identifiers.identifiers import WorkerId
-from shared.model.model_version import ModelVersionId
+from shared.service.service import WorkerId
+from shared.model.model_variant import ModelVariantId
 from worker.application.ports.outbound.profiling.model_execution.model_execution_profile_store import (
     ModelExecutionProfileStore,
 )
@@ -32,11 +32,11 @@ class DefaultPendingModelsPoller(PendingModelsPoller, AsyncLifecycle):
 
         self._poll_task: asyncio.Task[None] | None = None
 
-        self._poll_queue: asyncio.Queue[ModelVersionId] = asyncio.Queue(maxsize=64)
-        self._scheduled_model_ids: set[ModelVersionId] = set()
+        self._poll_queue: asyncio.Queue[ModelVariantId] = asyncio.Queue(maxsize=64)
+        self._scheduled_model_ids: set[ModelVariantId] = set()
 
     @override
-    async def pending_models(self) -> AsyncGenerator[ModelVersionId]:
+    async def pending_models(self) -> AsyncGenerator[ModelVariantId]:
         while True:
             model_id = await self._poll_queue.get()
 

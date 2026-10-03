@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 
-from shared.model.sub_model import SubModelId
+from shared.model.model_partition import ModelPartitionId
 from shared.plan.plan import InferencePlanVersion, SubModelDeployment
 from worker.domain.model_pass.model_pass_context import (
     ModelPassContext,
@@ -33,7 +33,7 @@ class SubModelInvocationMessage(BaseModel):
         return self.context.model_pass_context.plan_version
 
     @property
-    def sub_model_id(self) -> SubModelId:
+    def sub_model_id(self) -> ModelPartitionId:
         return self.context.sub_model_deployment_id.sub_model_id
 
     @property

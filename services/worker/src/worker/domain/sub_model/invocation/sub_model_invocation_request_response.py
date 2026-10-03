@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 
 from shared.flow.flow import FlowId
-from shared.model.sub_model import SubModelId
+from shared.model.model_partition import ModelPartitionId
 from shared.plan.plan import InferencePlanVersion, SubModelDeployment
 from worker.domain.sub_model.invocation.sub_model_invocation_context import (
     SubModelInvocationContext,
@@ -21,7 +21,7 @@ class SubModelInvocationRequest(BaseModel):
         return self.context.model_pass_context.plan_version
 
     @property
-    def sub_model_id(self) -> SubModelId:
+    def sub_model_id(self) -> ModelPartitionId:
         return self.context.sub_model_deployment_id.sub_model_id
 
     @property

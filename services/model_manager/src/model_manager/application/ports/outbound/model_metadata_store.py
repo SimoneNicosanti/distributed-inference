@@ -1,20 +1,20 @@
 from abc import ABC, abstractmethod
 
-from model_manager.domain.profiled_model_version import ProfiledModelVersion
+from model_manager.domain.model import Model
+from model_manager.domain.model_partition import ModelPartition
+from model_manager.domain.profiled_model_variant import ProfiledModelVariant
 from shared.model.model import (
-    Model,
     ModelId,
 )
-from shared.model.model_version import (
-    ModelVersion,
-    ModelVersionId,
+from shared.model.model_variant import (
+    ModelVariantId,
 )
 
 
 class ModelMetadataStore(ABC):
     ## Model APIs
     @abstractmethod
-    async def register_model(self, model: Model) -> ModelId: ...
+    async def add_model(self, model: Model) -> None: ...
 
     @abstractmethod
     async def get_model(self, model_id: ModelId) -> Model: ...
@@ -22,38 +22,27 @@ class ModelMetadataStore(ABC):
     @abstractmethod
     async def check_model_existence(self, model_id: ModelId) -> bool: ...
 
-    ## Model Version APIs
+    ## Profiled Model Variant APIs
     @abstractmethod
-    async def register_model_version(
+    async def add_profiled_model_variant(
         self,
-        model_version: ModelVersion,
-    ) -> ModelVersionId: ...
+        profiled_model_variant: ProfiledModelVariant,
+    ) -> None: ...
 
     @abstractmethod
-    async def get_model_version(
-        self, model_version_id: ModelVersionId
-    ) -> ModelVersion: ...
+    async def get_profiled_model_variant(
+        self, model_variant_id: ModelVariantId
+    ) -> ProfiledModelVariant: ...
 
     @abstractmethod
-    async def check_model_version_existence(
+    async def check_profiled_model_variant_existence(
         self,
-        model_version_id: ModelVersionId,
+        model_variant_id: ModelVariantId,
     ) -> bool: ...
 
-    ## Profiled Model Version APIs
+    ## Model Partition APIs
     @abstractmethod
-    async def register_profiled_model_version(
+    async def add_model_partition(
         self,
-        profiled_model_version: ProfiledModelVersion,
-    ) -> ModelVersionId: ...
-
-    @abstractmethod
-    async def get_profiled_model_version(
-        self, model_version_id: ModelVersionId
-    ) -> ProfiledModelVersion | None: ...
-
-    @abstractmethod
-    async def check_profiled_model_version_existence(
-        self,
-        model_version_id: ModelVersionId,
-    ) -> bool: ...
+        model_partition: ModelPartition,
+    ) -> None: ...

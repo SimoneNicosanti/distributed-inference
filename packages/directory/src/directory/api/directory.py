@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from directory.contracts.service_instance import (
     ServiceInstance,
 )
-from shared.identifiers.identifiers import ServiceId
+from shared.service.service import ServiceId
 
 
 class ServiceDirectory(ABC):

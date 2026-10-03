@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 from directory.contracts.service_instance import ServiceInstance
 from directory.redis.redis_directory import RedisDirectory
-from shared.identifiers.identifiers import WorkerId
+from shared.service.service import WorkerId
 from worker.application.ports.outbound.directory.service_directory import (
     ServiceDirectory,
 )

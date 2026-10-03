@@ -4,9 +4,9 @@ from typing import Any, Self
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from shared.flow.flow import FlowId
-from shared.identifiers.identifiers import WorkerId
-from shared.model.sub_model import (
-    SubModelId,
+from shared.service.service import WorkerId
+from shared.model.model_partition import (
+    ModelPartitionId,
 )
 
 
@@ -41,7 +41,7 @@ class ResourceAllocation(BaseModel):
 class SubModelDeployment(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    sub_model_id: SubModelId
+    sub_model_id: ModelPartitionId
     worker_id: WorkerId
     resource_allocation: ResourceAllocation
     replica_idx: int
@@ -108,8 +108,8 @@ class ServiceInferencePlan(BaseModel):
     worker_id: WorkerId
 
     sub_model_deployments: list[SubModelDeployment]
-    sub_model_execution_schemes: dict[SubModelId, ExecutionScheme]
-    sub_model_skip_schemes: dict[SubModelId, SkipScheme]
+    sub_model_execution_schemes: dict[ModelPartitionId, ExecutionScheme]
+    sub_model_skip_schemes: dict[ModelPartitionId, SkipScheme]
     sub_model_next_connections: dict[SubModelDeployment, list[SubModelConnection]]
     sub_model_prev_connections: dict[SubModelDeployment, list[SubModelConnection]]
     priorities: dict[PriorityKey, PriorityValue]

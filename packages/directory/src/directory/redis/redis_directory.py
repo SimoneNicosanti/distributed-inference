@@ -5,7 +5,7 @@ from directory.contracts.service_instance import (
     ServiceInstance,
 )
 from redis import asyncio as redis_asyncio
-from shared.identifiers.identifiers import ServiceId
+from shared.service.service import ServiceId
 
 
 class RedisDirectory(ServiceDirectory):

@@ -3,11 +3,8 @@ from typing import override
 
 import onnxruntime as ort
 
-from artifacts.workspace.artifact_bundle import ArtifactBundle
+from artifacts.contracts.artifact_bundle import ArtifactBundle
 from shared.plan.plan import ResourceAllocation
-from model_manager.adapters.outbound.model_optimizer.onnx_model_optimizer import (
-    OnnxModelOptimizer,
-)
 from worker.adapters.outbound.execution.onnx.onnx_sub_model_executor import (
     OnnxSubModelExecutor,
 )

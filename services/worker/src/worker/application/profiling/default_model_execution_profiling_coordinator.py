@@ -2,11 +2,11 @@ import asyncio
 from contextlib import aclosing
 from typing import override
 
-from artifacts.contracts.artifact_ref import ArtifactRef
+from shared.artifact.artifact_ref import ArtifactRef
 from artifacts.storage.artifact_store import ArtifactStore
 from lifecycle.async_lifecycle import AsyncLifecycle
-from shared.identifiers.identifiers import WorkerId
-from shared.model.model_version import ModelVersionId
+from shared.service.service import WorkerId
+from shared.model.model_variant import ModelVariantId
 from worker.application.ports.outbound.activity_manager import ActivityManager
 from worker.application.ports.outbound.profiling.model_execution.model_execution_profile_store import (
     ModelExecutionProfileStore,
@@ -54,7 +54,7 @@ class DefaultModelExecutionProfileCoordinator(
 
     @override
     async def profile_model_execution(
-        self, model_version_id: ModelVersionId
+        self, model_version_id: ModelVariantId
     ) -> ModelExecutionProfile:
         artifact_ref = ArtifactRef(value=model_version_id.model_dump_json())
 
@@ -77,7 +77,7 @@ class DefaultModelExecutionProfileCoordinator(
                 return model_profile
 
     async def _coordinate_model_execution_profiling(
-        self, model_version_id: ModelVersionId
+        self, model_version_id: ModelVariantId
     ) -> None:
         model_profile = await self.profile_model_execution(
             model_version_id=model_version_id

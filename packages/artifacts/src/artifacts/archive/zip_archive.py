@@ -10,10 +10,7 @@ from artifacts.contracts.artifact_manifest import (
     MANIFEST_FILE_NAME,
     ArtifactManifest,
 )
-from artifacts.workspace.artifact_bundle import ArtifactBundle
-from artifacts.workspace.artifact_workspace import (
-    build_artifact_bundle_from_root_path_and_manifest,
-)
+from artifacts.contracts.artifact_bundle import ArtifactBundle
 
 
 @asynccontextmanager
@@ -46,9 +43,7 @@ def _artifact_source_build_sync(
             manifest_path.read_text(encoding="utf-8")
         )
 
-        return build_artifact_bundle_from_root_path_and_manifest(
-            extraction_dir_path, zip_manifest
-        )
+        return ArtifactBundle(manifest=zip_manifest, root_path=extraction_dir_path)
 
 
 @asynccontextmanager

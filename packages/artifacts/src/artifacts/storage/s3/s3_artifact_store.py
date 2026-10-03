@@ -12,10 +12,10 @@ from artifacts.contracts.artifact_manifest import (
     MANIFEST_FILE_NAME,
     ArtifactManifest,
 )
-from artifacts.contracts.artifact_ref import ArtifactRef
+from shared.artifact.artifact_ref import ArtifactRef
 from artifacts.storage.artifact_store import ArtifactStore
 from artifacts.storage.s3.s3_client import S3Client
-from artifacts.workspace.artifact_bundle import ArtifactBundle
+from artifacts.contracts.artifact_bundle import ArtifactBundle
 
 
 class S3ArtifactStore(ArtifactStore):

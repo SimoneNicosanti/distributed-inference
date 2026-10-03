@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from directory.contracts.service_instance import ServiceInstance
-from shared.identifiers.identifiers import WorkerId
+from shared.service.service import WorkerId
 from worker.domain.directory.worker_instance import WorkerInstance
 
 

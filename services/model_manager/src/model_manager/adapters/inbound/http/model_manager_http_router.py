@@ -1,104 +1,124 @@
-import asyncio
-from pathlib import Path
+from fastapi import APIRouter
 
-import aiofiles
-from fastapi import APIRouter, File, Form, UploadFile
-
-from artifacts.archive import zip_archive
-from model_manager.adapters.inbound.http.model_manager_http_schema import (
-    GenerateSubModelRequest,
-    GenerateSubModelResponse,
-    GetProfiledModelVersionRequest,
-    GetProfiledModelVersionResponse,
+from integration.model_manager.http.model_manager_http_paths import (
+    FINALIZE_MODEL_VARIANT_REGISTRATION_PATH,
+    GENERATE_MODEL_PARTITION_PATH,
+    REGISTER_MODEL_PATH,
+    START_MODEL_VARIANT_REGISTRATION_PATH,
+)
+from integration.model_manager.http.model_manager_http_schema import (
+    FinalizeModelVariantRegistrationRequest,
+    GenerateModelPartitionRequest,
+    GenerateModelPartitionResponse,
     RegisterModelRequest,
-    RegisterModelResponse,
-    UploadModelVersionResponse,
+    StartModelVariantRegistrationRequest,
+    StartModelVariantRegistrationResponse,
 )
-from model_manager.application.ports.inbound.model_manager import (
-    ModelManager,
+from model_manager.application.ports.inbound.model_partitioner import ModelPartitioner
+from model_manager.application.ports.inbound.model_registry import ModelRegistry
+from model_manager.application.ports.inbound.model_variant_registry import (
+    ModelVariantRegistry,
 )
-from shared.model.model_version import ModelVersion
+from model_manager.domain.model import Model, ModelInfo
+from model_manager.domain.model_variant import ModelVariant, ModelVariantInfo
 
 CHUNK_SIZE = 1024 * 1024
 
 
 def build_model_manager_router(
-    model_manager: ModelManager,
+    model_registry: ModelRegistry,
+    model_variant_registry: ModelVariantRegistry,
+    model_partitioner: ModelPartitioner,
 ) -> APIRouter:
 
     router = APIRouter(
-        prefix="/model-manager",
         tags=["model-manager"],
     )
 
     @router.post(
-        "/models",
-        response_model=RegisterModelResponse,
+        path=REGISTER_MODEL_PATH,
     )
     async def register_model(
         request: RegisterModelRequest,
-    ) -> RegisterModelResponse:
-        model_id = await model_manager.register_model(model=request.model)
+    ) -> None:
+        model_dto = request.model_dto
 
-        return RegisterModelResponse(model_id=model_id)
+        model_info = ModelInfo(
+            model_task=model_dto.model_task,
+            architecture_info=model_dto.architecture_info,
+        )
+        model = Model(
+            model_id=model_dto.model_id,
+            visibility=model_dto.visibility,
+            model_info=model_info,
+        )
+
+        await model_registry.register_model(model=model)
 
     @router.post(
-        "/model-versions",
-        response_model=UploadModelVersionResponse,
+        path=START_MODEL_VARIANT_REGISTRATION_PATH,
+        response_model=StartModelVariantRegistrationResponse,
     )
-    async def upload_model_version(
-        model_version_json: str = Form(),
-        bundle_zip: UploadFile = File(),
-    ) -> UploadModelVersionResponse:
-        model_version = ModelVersion.model_validate_json(model_version_json)
+    async def start_model_variant_registration(
+        request: StartModelVariantRegistrationRequest,
+    ) -> StartModelVariantRegistrationResponse:
 
-        async with aiofiles.tempfile.NamedTemporaryFile() as zip_file:
-            zip_file_path = Path(str(zip_file.name))
-            while chunk := await asyncio.to_thread(bundle_zip.file.read, CHUNK_SIZE):
-                await zip_file.write(chunk)
+        model_variant_dto = request.model_variant_dto
 
-            await zip_file.flush()
+        model_variant_info = ModelVariantInfo(
+            precision=model_variant_dto.precision,
+            quantization=model_variant_dto.quantization,
+            accuracies=model_variant_dto.accuracies,
+            format=model_variant_dto.format,
+            static_shapes=model_variant_dto.static_shapes,
+            dynamic_shapes=model_variant_dto.dynamic_shapes,
+        )
 
-            async with zip_archive.decompress_artifact_bundle(
-                zip_file_path,
-            ) as artifact_bundle:
-                model_version_id = await model_manager.upload_model_version(
-                    model_version=model_version,
-                    bundle=artifact_bundle,
-                )
+        model_variant = ModelVariant(
+            model_variant_id=model_variant_dto.id,
+            model_variant_info=model_variant_info,
+        )
 
-        return UploadModelVersionResponse(
-            model_version_id=model_version_id,
+        artifact_ref = await model_variant_registry.start_model_variant_registration(
+            model_variant=model_variant
+        )
+
+        return StartModelVariantRegistrationResponse(
+            artifact_ref=artifact_ref,
         )
 
     @router.post(
-        "/sub-models",
-        response_model=GenerateSubModelResponse,
+        path=FINALIZE_MODEL_VARIANT_REGISTRATION_PATH,
     )
-    async def generate_sub_model(
-        request: GenerateSubModelRequest,
-    ) -> GenerateSubModelResponse:
-        sub_model = await model_manager.generate_sub_model(
-            model_version_id=request.model_version_id,
-            layers=request.layers,
+    async def finalize_model_variant_registration(
+        request: FinalizeModelVariantRegistrationRequest,
+    ) -> None:
+
+        model_variant_id = request.model_variant_id
+
+        await model_variant_registry.finalize_model_variant_registration(
+            model_variant_id=model_variant_id
         )
 
-        return GenerateSubModelResponse(
-            sub_model=sub_model,
-        )
-
-    @router.get(
-        "/model-versions/profiled", response_model=GetProfiledModelVersionResponse
+    @router.post(
+        path=GENERATE_MODEL_PARTITION_PATH,
+        response_model=GenerateModelPartitionResponse,
     )
-    async def get_profiled_model_version(
-        request: GetProfiledModelVersionRequest,
-    ) -> GetProfiledModelVersionResponse:
-        profiled_model_version = await model_manager.get_profiled_model_version(
-            request.model_version_id
+    async def generate_model_variant_partition(
+        request: GenerateModelPartitionRequest,
+    ) -> GenerateModelPartitionResponse:
+
+        model_variant_id = request.model_variant_id
+        layers = request.layers
+
+        model_partition = await model_partitioner.generate_model_variant_partition(
+            model_variant_id=model_variant_id,
+            layers=layers,
         )
 
-        return GetProfiledModelVersionResponse(
-            profiled_model_version=profiled_model_version
+        return GenerateModelPartitionResponse(
+            model_partition_id=model_partition.model_partition_id,
+            artifact_ref=model_partition.artifact_ref,
         )
 
     return router

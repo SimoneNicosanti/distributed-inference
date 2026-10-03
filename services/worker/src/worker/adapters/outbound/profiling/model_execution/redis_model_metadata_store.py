@@ -2,7 +2,7 @@ from typing import override
 
 from redis import asyncio as redis_asyncio
 
-from shared.model.model_version import ModelVersionId
+from shared.model.model_variant import ModelVariantId
 from worker.application.ports.outbound.profiling.model_execution.model_metadata_store import (
     ModelMetadataStore,
 )
@@ -14,7 +14,7 @@ class RedisModelMetadataStore(ModelMetadataStore):
         self._redis = redis
 
     @override
-    async def get_all_model_version_ids(self) -> list[ModelVersionId]:
+    async def get_all_model_version_ids(self) -> list[ModelVariantId]:
         redis_key = await self.__build_redis_key()
         pass
 

@@ -4,9 +4,9 @@ from typing import override
 
 import aiorwlock
 
-from artifacts.contracts.artifact_ref import ArtifactRef
+from shared.artifact.artifact_ref import ArtifactRef
 from artifacts.storage.artifact_store import ArtifactStore
-from artifacts.workspace.artifact_bundle import ArtifactBundle
+from artifacts.contracts.artifact_bundle import ArtifactBundle
 
 
 class CachedArtifactStore(ArtifactStore):

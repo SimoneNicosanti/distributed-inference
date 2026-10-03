@@ -10,7 +10,7 @@ from pydantic import (
     model_validator,
 )
 
-from shared.identifiers.identifiers import ServiceId
+from shared.service.service import ServiceId
 
 
 class CapabilityProtocol(StrEnum):

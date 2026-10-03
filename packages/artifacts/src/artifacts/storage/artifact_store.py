@@ -3,8 +3,8 @@
 from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager
 
-from artifacts.contracts.artifact_ref import ArtifactRef
-from artifacts.workspace.artifact_bundle import ArtifactBundle
+from shared.artifact.artifact_ref import ArtifactRef
+from artifacts.contracts.artifact_bundle import ArtifactBundle
 
 
 class ArtifactStore(ABC):

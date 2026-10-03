@@ -1,6 +1,6 @@
 from typing import override
 
-from artifacts.contracts.artifact_ref import build_artifact_ref
+from shared.artifact.artifact_ref import build_artifact_ref
 from artifacts.storage.artifact_store import ArtifactStore
 from shared.plan.plan import ServiceInferencePlan
 from worker.application.deployment.contracts.service_inference_plan_preparer import (

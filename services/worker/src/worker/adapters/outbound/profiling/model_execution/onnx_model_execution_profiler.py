@@ -9,9 +9,9 @@ import numpy as np
 import onnx
 import onnxruntime as ort
 
-from artifacts.workspace.artifact_bundle import ArtifactBundle
+from artifacts.contracts.artifact_bundle import ArtifactBundle
 from shared.model.keys import LayerKey
-from shared.model.model_version import ModelVersionId
+from shared.model.model_variant import ModelVariantId
 from worker.application.ports.outbound.profiling.model_execution.model_execution_profiler import (
     ModelExecutionProfiler,
 )
@@ -44,7 +44,7 @@ PROFILE_ITERATIONS = 25
 class OnnxModelExecutionProfiler(ModelExecutionProfiler):
     @override
     async def profile_model_execution(
-        self, model_version_id: ModelVersionId, artifact_bundle: ArtifactBundle
+        self, model_version_id: ModelVariantId, artifact_bundle: ArtifactBundle
     ) -> ModelExecutionProfile:
 
         entrypoint_path = artifact_bundle.entrypoint_path

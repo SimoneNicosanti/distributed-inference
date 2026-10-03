@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 
-from artifacts.workspace.artifact_workspace import (
+from artifacts.contracts.artifact_workspace import (
     ArtifactWorkspace,
 )
-from shared.model.model import ModelInfo
-from shared.model.model_version import (
-    ModelVersionInfo,
+from model_manager.domain.model import ModelInfo
+from model_manager.domain.model_variant import (
+    ModelVariantInfo,
 )
 from utils.model.optimization.api.optimization_level import (
     OptimizationLevel,
@@ -19,6 +19,6 @@ class ModelOptimizer(ABC):
         input_workspace: ArtifactWorkspace,
         output_workspace: ArtifactWorkspace,
         model_info: ModelInfo,
-        model_version_info: ModelVersionInfo,
+        model_variant_info: ModelVariantInfo,
         opt_level: OptimizationLevel,
     ) -> None: ...

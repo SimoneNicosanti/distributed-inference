@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 
-from shared.identifiers.identifiers import WorkerId
+from shared.service.service import WorkerId
 
 
 class ConnectionInfo(BaseModel):

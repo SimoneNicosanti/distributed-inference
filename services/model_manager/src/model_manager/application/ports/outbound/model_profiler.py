@@ -1,18 +1,18 @@
 from abc import ABC, abstractmethod
 
-from artifacts.workspace.artifact_workspace import ArtifactWorkspace
-from shared.model.model import ModelInfo
-from shared.model.model_version import (
-    ModelVersion,
+from artifacts.contracts.artifact_workspace import ArtifactWorkspace
+from model_manager.domain.model import ModelInfo
+from model_manager.domain.model_variant import (
+    ModelVariant,
 )
-from model_manager.domain.profiled_model_version import ProfiledModelVersion
+from model_manager.domain.model_variant_profile import ModelVariantProfile
 
 
 class ModelProfiler(ABC):
     @abstractmethod
-    async def profile_model_version(
+    async def profile_model_variant(
         self,
         artifact_workspace: ArtifactWorkspace,
         model_info: ModelInfo,
-        model_version: ModelVersion,
-    ) -> ProfiledModelVersion: ...
+        model_variant: ModelVariant,
+    ) -> ModelVariantProfile: ...
