@@ -21,15 +21,15 @@ class ModelInfo(BaseModel):
         return self.architecture_info.kind
 
 
-## A model represents a group of model versions all handling a
+## A model represents a group of model variants all handling a
 # specific task and with a specific model type. A model is:
 ## - Owned by a specific user that declares visibility for it.
-## - Can have multiple versions each with a specific configuration.
+## - Can have multiple variants each with a specific configuration.
 ## For example, we can consider a yolo11-cls model owned by the system
 ## Possible multiple variants: yolo11-cls-n-fp32-b0 or yolo11-cls-x-int8-b8, which are:
 ## - nano, fp32, dynamic batch
 ## - xlarge, quantized int8, static batch size 8
-## When asking, the user can use all the versions of the models he owns and all the public models
+## When asking, the user can use all the variants of the models he owns and all the public models
 class Model(BaseModel):
     model_config = ConfigDict(frozen=True)
 

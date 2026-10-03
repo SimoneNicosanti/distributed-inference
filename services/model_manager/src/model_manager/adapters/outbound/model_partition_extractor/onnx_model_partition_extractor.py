@@ -14,7 +14,7 @@ from artifacts.contracts.artifact_workspace import (
 from model_manager.application.ports.outbound.model_partition_extractor import (
     ModelPartitionExtractor,
 )
-from model_manager.domain.model_variant_graph import ModelVariantGraph
+from model_manager.domain.model_variant_topology import ModelVariantTopology
 from shared.model.keys import LayerKey
 
 
@@ -22,7 +22,7 @@ class OnnxModelPartitionExtractor(ModelPartitionExtractor):
     @override
     async def extract_model_partition(
         self,
-        model_graph: ModelVariantGraph,
+        topology: ModelVariantTopology,
         layers: Iterable[LayerKey],
         input_paths: ArtifactWorkspace,
         output_paths: ArtifactWorkspace,
@@ -44,7 +44,7 @@ class OnnxModelPartitionExtractor(ModelPartitionExtractor):
 
         ## TODO: Might this extraction become long? In that case, we should run it in a to_thread
         component_inputs, component_outputs = (
-            model_graph.extract_incoming_outgoing_tensors_of_sub_model(set(layers))
+            topology.extract_incoming_outgoing_tensors_of_partition(set(layers))
         )
 
         input_names = list(component_inputs)

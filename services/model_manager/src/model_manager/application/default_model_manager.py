@@ -120,7 +120,7 @@ class DefaultModelManager(ModelRegistry, ModelVariantRegistry, ModelPartitioner)
         ModelPartitionId.check_valid_layers_format(layers)
 
         layers = tuple(layers)
-        profiled_model_version = (
+        profiled_model_variant = (
             await self._model_metadata_store.get_profiled_model_variant(
                 model_variant_id
             )
@@ -135,14 +135,14 @@ class DefaultModelManager(ModelRegistry, ModelVariantRegistry, ModelPartitioner)
                 root_path=Path(tmp_dir), entrypoint_path=None
             )
 
-            variant_artifact_ref = profiled_model_version.artifact_ref
+            variant_artifact_ref = profiled_model_variant.artifact_ref
             async with self._artifact_store.download_artifact(
                 variant_artifact_ref
             ) as variant_bundle:
                 model_variant_workspace = variant_bundle.to_workspace()
 
                 await self._model_splitter.extract_model_partition(
-                    profiled_model_version.profile.model_variant_graph,
+                    profiled_model_variant.profile.topology,
                     layers,
                     model_variant_workspace,
                     partition_workspace,
