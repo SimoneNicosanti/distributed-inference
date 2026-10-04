@@ -11,7 +11,7 @@ from worker.application.ports.outbound.profiling.model_execution.model_execution
 from worker.application.ports.outbound.profiling.model_execution.model_metadata_store import (
     ModelMetadataStore,
 )
-from worker.application.profiling.contracts.pending_models_poller import (
+from worker.application.profiling.abc.pending_models_poller import (
     PendingModelsPoller,
 )
 

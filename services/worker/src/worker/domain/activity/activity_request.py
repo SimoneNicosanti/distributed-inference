@@ -37,9 +37,6 @@ class ResourceRequirement(BaseModel):
         return self
 
 
-type ResourceLock = dict[ResourceType, ResourceRequirement]
-
-
 class ActivityType(StrEnum):
     INFERENCE_EXECUTION = auto()
     INFERENCE_FORWARDING = auto()
@@ -52,7 +49,7 @@ class ActivityRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     activity_type: ActivityType
-    required_locks: ResourceLock
+    resource_requirements: dict[ResourceType, ResourceRequirement]
 
 
 class ActivityGrantId(BaseModel):

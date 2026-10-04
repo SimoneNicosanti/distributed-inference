@@ -4,10 +4,10 @@ from typing import Any, Self
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from shared.flow.flow import FlowId
-from shared.service.service import WorkerId
 from shared.model.model_partition import (
     ModelPartitionId,
 )
+from shared.service.service import WorkerId
 
 
 @total_ordering
@@ -38,10 +38,10 @@ class ResourceAllocation(BaseModel):
 ##   - As such this index is scoped by the tuple (sub-model-id, worker-id, resource-allocation)
 ## In this way, we can also avoid rebuild of executors: if the deployment has not change we already have everything we need
 ## TODO: Use an hash of allocated resources to distinguish between deployments!!
-class SubModelDeployment(BaseModel):
+class PartitionDeployment(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    sub_model_id: ModelPartitionId
+    partition_id: ModelPartitionId
     worker_id: WorkerId
     resource_allocation: ResourceAllocation
     replica_idx: int
@@ -81,7 +81,7 @@ class SkipScheme(BaseModel):
 class SubModelConnection(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    other_deployment: SubModelDeployment
+    other_deployment: PartitionDeployment
     connection_tensors: list[str]
 
     @model_validator(mode="after")
@@ -95,7 +95,7 @@ class PriorityKey(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     flow_id: FlowId
-    sub_model_deployment: SubModelDeployment
+    sub_model_deployment: PartitionDeployment
 
 
 type PriorityValue = int
@@ -107,11 +107,11 @@ class ServiceInferencePlan(BaseModel):
     plan_version: InferencePlanVersion
     worker_id: WorkerId
 
-    sub_model_deployments: list[SubModelDeployment]
+    sub_model_deployments: list[PartitionDeployment]
     sub_model_execution_schemes: dict[ModelPartitionId, ExecutionScheme]
     sub_model_skip_schemes: dict[ModelPartitionId, SkipScheme]
-    sub_model_next_connections: dict[SubModelDeployment, list[SubModelConnection]]
-    sub_model_prev_connections: dict[SubModelDeployment, list[SubModelConnection]]
+    sub_model_next_connections: dict[PartitionDeployment, list[SubModelConnection]]
+    sub_model_prev_connections: dict[PartitionDeployment, list[SubModelConnection]]
     priorities: dict[PriorityKey, PriorityValue]
 
     @model_validator(mode="after")
@@ -124,7 +124,7 @@ class ServiceInferencePlan(BaseModel):
     def get_priority(
         self,
         flow_id: FlowId,
-        sub_model_deployment: SubModelDeployment,
+        sub_model_deployment: PartitionDeployment,
     ) -> PriorityValue:
         priority_key = PriorityKey(
             flow_id=flow_id,

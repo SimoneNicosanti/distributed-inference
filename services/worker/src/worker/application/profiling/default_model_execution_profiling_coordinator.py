@@ -2,11 +2,11 @@ import asyncio
 from contextlib import aclosing
 from typing import override
 
-from shared.artifact.artifact_ref import ArtifactRef
 from artifacts.storage.artifact_store import ArtifactStore
 from lifecycle.async_lifecycle import AsyncLifecycle
-from shared.service.service import WorkerId
+from shared.artifact.artifact_ref import ArtifactRef
 from shared.model.model_variant import ModelVariantId
+from shared.service.service import WorkerId
 from worker.application.ports.outbound.activity_manager import ActivityManager
 from worker.application.ports.outbound.profiling.model_execution.model_execution_profile_store import (
     ModelExecutionProfileStore,
@@ -14,10 +14,10 @@ from worker.application.ports.outbound.profiling.model_execution.model_execution
 from worker.application.ports.outbound.profiling.model_execution.model_execution_profiler import (
     ModelExecutionProfiler,
 )
-from worker.application.profiling.contracts.model_execution_profiling_coordinator import (
+from worker.application.profiling.abc.model_execution_profiling_coordinator import (
     ModelExecutionProfilingCoordinator,
 )
-from worker.application.profiling.contracts.pending_models_poller import (
+from worker.application.profiling.abc.pending_models_poller import (
     PendingModelsPoller,
 )
 from worker.domain.activity.activity_request import (
@@ -111,7 +111,7 @@ class DefaultModelExecutionProfileCoordinator(
     def _build_activity_request() -> ActivityRequest:
         return ActivityRequest(
             activity_type=ActivityType.PROFILING_EXECUTION,
-            required_locks={
+            resource_requirements={
                 ResourceType.COMPUTE: ResourceRequirement(quantity=0, exclusive=True)
             },
         )

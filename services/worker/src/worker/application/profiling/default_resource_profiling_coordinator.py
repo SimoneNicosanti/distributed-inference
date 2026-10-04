@@ -16,7 +16,7 @@ from worker.application.ports.outbound.profiling.resource.ram_profiler import (
 from worker.application.ports.outbound.profiling.resource.resource_profile_publisher import (
     ResourceProfilePublisher,
 )
-from worker.application.profiling.contracts.resource_profiling_coordinator import (
+from worker.application.profiling.abc.resource_profiling_coordinator import (
     ResourceProfilingCoordinator,
 )
 from worker.domain.profiling.resource_profile import ResourceProfile

@@ -13,7 +13,7 @@ from worker.application.ports.outbound.profiling.network.network_probe_client im
 from worker.application.ports.outbound.profiling.network.network_profile_publisher import (
     NetworkProfilePublisher,
 )
-from worker.application.profiling.contracts.network_profiling_coordinator import (
+from worker.application.profiling.abc.network_profiling_coordinator import (
     NetworkProfilingCoordinator,
 )
 from worker.domain.activity.activity_request import (
@@ -107,7 +107,7 @@ class DefaultNetworkProfilingCoordinator(NetworkProfilingCoordinator, AsyncLifec
         }
         activity_request = ActivityRequest(
             activity_type=ActivityType.PROFILING_NETWORK,
-            required_locks=required_lock,
+            resource_requirements=required_lock,
         )
 
         return activity_request

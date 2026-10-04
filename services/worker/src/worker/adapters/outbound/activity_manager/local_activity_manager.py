@@ -35,7 +35,7 @@ class LocalActivityManagerAdapter(ActivityManager):
             resource_type: self._all_res[resource_type]
             if requirement.exclusive
             else requirement.quantity
-            for resource_type, requirement in request.required_locks.items()
+            for resource_type, requirement in request.resource_requirements.items()
         }
 
         async with self._condition:
