@@ -1,16 +1,13 @@
+import asyncio
+from contextlib import suppress
 from typing import override
 
+from lifecycle.async_lifecycle import AsyncLifecycle
 from worker.application.partition_execution.abc.partition_execution_coordinator import (
     PartitionExecutionCoordinator,
 )
-from worker.application.partition_invocation.abc.partition_invocation_completion_registry import (
-    PartitionInvocationCompletionRegistry,
-)
-from worker.application.partition_invocation.input.abc.partition_invocation_contribution_collector import (
-    PartitionInvocationContributionCollector,
-)
-from worker.application.partition_invocation.output.partition_invocation_request_assembler import (
-    PartitionInvocationRequestAssembler,
+from worker.application.partition_invocation.input.abc.partition_invocation_contribution_inbox import (
+    PartitionInvocationContributionInbox,
 )
 from worker.application.partition_invocation.output.partition_output_router import (
     PartitionOutputRouter,
@@ -27,54 +24,97 @@ from worker.domain.partition.partition_invocation_contribution import (
 )
 
 
-class DefaultPartitionInvocationCoordinator(PartitionInvocationCoordinator):
+class DefaultPartitionInvocationCoordinator(
+    PartitionInvocationCoordinator, AsyncLifecycle
+):
     def __init__(
         self,
-        contribution_collector: PartitionInvocationContributionCollector,
+        max_concurrent_invocations: int,
+        contribution_inbox: PartitionInvocationContributionInbox,
         partition_execution_coordinator: PartitionExecutionCoordinator,
         output_router: PartitionOutputRouter,
         contribution_sender: PartitionInvocationContributionSender,
-        completion_registry: PartitionInvocationCompletionRegistry,
-        request_assembler: PartitionInvocationRequestAssembler,
     ):
-        self._contribution_collector = contribution_collector
+
+        if max_concurrent_invocations <= 0:
+            raise ValueError(
+                f"max_concurrent_invocations must be a positive integer, got {max_concurrent_invocations}"
+            )
+
+        self._max_concurrent_invocations = max_concurrent_invocations
+        self._contribution_inbox = contribution_inbox
         self._partition_execution_coordinator = partition_execution_coordinator
         self._output_router = output_router
         self._contribution_sender = contribution_sender
-        self._completion_registry = completion_registry
-        self._request_assembler = request_assembler
+
+        self._supervisor_task: asyncio.Task[None] | None = None
 
     @override
     async def process_partition_invocation_contribution(
         self, contribution: PartitionInvocationContribution
     ) -> PartitionInvocationContributionAck:
 
-        (
-            collected_contributions,
-            partition_invocation_id,
-        ) = await self._contribution_collector.collect(contribution)
-        if collected_contributions is None:
-            await self._completion_registry.wait_for_partition_invocation_completion(
-                partition_invocation_id
-            )
-            return PartitionInvocationContributionAck(context=contribution.context)
-
-        partition_invocation_request = await self._request_assembler.assemble(
-            collected_contributions, partition_invocation_id
+        completion_future = await self._contribution_inbox.submit_contribution(
+            contribution
         )
-        partition_invocation_result = await self._partition_execution_coordinator.process_partition_invocation_request(
-            partition_invocation_request
-        )
-
-        routed_contributions = await self._output_router.route(
-            collected_contributions, partition_invocation_result
-        )
-
-        for routed_contribution in routed_contributions:
-            self._contribution_sender.send(routed_contribution)
-
-        await self._completion_registry.register_partition_invocation_success(
-            partition_invocation_id
-        )
+        await asyncio.shield(completion_future)
 
         return PartitionInvocationContributionAck(context=contribution.context)
+
+    async def _worker_loop(self) -> None:
+        while True:
+            ready_request = await self._contribution_inbox.next_ready()
+            (
+                request,
+                future,
+                contributions,
+            ) = (
+                ready_request.request,
+                ready_request.future,
+                ready_request.contributions,
+            )
+
+            partition_invocation_result = await self._partition_execution_coordinator.process_partition_invocation_request(
+                request
+            )
+
+            routed_contributions = await self._output_router.route(
+                contributions, partition_invocation_result
+            )
+
+            for routed_contribution in routed_contributions:
+                self._contribution_sender.send(routed_contribution)
+
+            ## We can move the set_result depending on when we want to notify the completion of the invocation
+            future.set_result(None)
+
+    async def _run_workers(self) -> None:
+        async with asyncio.TaskGroup() as task_group:
+            for index in range(self._max_concurrent_invocations):
+                task_group.create_task(
+                    self._worker_loop(),
+                    name=f"partition-invocation-worker-{index}",
+                )
+
+    @override
+    async def start(self) -> None:
+        if self._supervisor_task is not None:
+            return
+
+        self._supervisor_task = asyncio.create_task(
+            self._run_workers(),
+            name="partition-invocation-supervisor",
+        )
+
+    @override
+    async def stop(self) -> None:
+        task = self._supervisor_task
+        self._supervisor_task = None
+
+        if task is None:
+            return
+
+        task.cancel()
+
+        with suppress(asyncio.CancelledError):
+            await task

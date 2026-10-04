@@ -1,9 +1,13 @@
+from typing import override
+
+from worker.application.partition_invocation.input.abc.partition_invocation_request_assembler import (
+    PartitionInvocationRequestAssembler,
+)
 from worker.application.ports.outbound.service_inference_plan_store import (
     ServiceInferencePlanStore,
 )
 from worker.domain.context.partition_invocation_context import (
     PartitionInvocationContext,
-    PartitionInvocationId,
 )
 from worker.domain.partition.partition_invocation import (
     PartitionInvocationRequest,
@@ -14,16 +18,16 @@ from worker.domain.partition.partition_invocation_contribution import (
 from worker.domain.partition.tensor_bundle import TensorBundle
 
 
-class PartitionInvocationRequestAssembler:
+class DefaultPartitionInvocationRequestAssembler(PartitionInvocationRequestAssembler):
     def __init__(self, plan_store: ServiceInferencePlanStore):
         super().__init__()
         self._plan_store = plan_store
 
     ## Builds a complete partition invocation request from collected contributions.
+    @override
     async def assemble(
         self,
         contributions: list[PartitionInvocationContribution],
-        partition_invocation_id: PartitionInvocationId,
     ) -> PartitionInvocationRequest:
 
         plan = await self._plan_store.get_service_inference_plan_by_version(
@@ -50,7 +54,6 @@ class PartitionInvocationRequestAssembler:
             context=PartitionInvocationContext(
                 model_pass_context=model_pass_context,
                 partition_deployment_id=partition_deployment_id,
-                partition_invocation_id=partition_invocation_id,
             ),
             payload=full_payload,
         )

@@ -45,5 +45,7 @@ class InMemoryPartitionInvocationContributionStore(
         return self._memory_store[collection_key]
 
     @override
-    async def delete(self, collection_key: PartitionInvocationCollectionKey) -> None:
-        self._memory_store.pop(collection_key)
+    async def pop(
+        self, collection_key: PartitionInvocationCollectionKey
+    ) -> list[PartitionInvocationContribution]:
+        return self._memory_store.pop(collection_key)
