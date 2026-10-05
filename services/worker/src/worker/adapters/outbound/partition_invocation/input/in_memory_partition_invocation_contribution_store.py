@@ -3,7 +3,7 @@ from typing import override
 from worker.application.partition_invocation.input.partition_invocation_collection_key import (
     PartitionInvocationCollectionKey,
 )
-from worker.application.ports.outbound.partition_invocation_contribution_store import (
+from worker.application.ports.outbound.partition_invocation.partition_invocation_contribution_store import (
     PartitionInvocationContributionStore,
 )
 from worker.domain.partition.partition_invocation_contribution import (

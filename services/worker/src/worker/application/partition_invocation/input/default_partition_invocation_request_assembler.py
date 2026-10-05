@@ -3,7 +3,7 @@ from typing import override
 from worker.application.partition_invocation.input.abc.partition_invocation_request_assembler import (
     PartitionInvocationRequestAssembler,
 )
-from worker.application.ports.outbound.service_inference_plan_store import (
+from worker.application.ports.outbound.plan_store.service_inference_plan_store import (
     ServiceInferencePlanStore,
 )
 from worker.domain.context.partition_invocation_context import (

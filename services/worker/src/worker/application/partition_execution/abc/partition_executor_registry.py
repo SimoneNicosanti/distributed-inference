@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager
 
 from shared.plan.plan import PartitionDeployment
-from worker.application.ports.outbound.partition_executor import (
+from worker.application.ports.outbound.partition_execution.partition_executor import (
     PartitionExecutor,
 )
 

@@ -10,7 +10,7 @@ from worker.adapters.outbound.partition_execution.onnx.onnx_partition_executor_o
     OnnxDeviceType,
     OnnxPartitionExecutorOptions,
 )
-from worker.application.ports.outbound.partition_executor import (
+from worker.application.ports.outbound.partition_execution.partition_executor import (
     PartitionExecutor,
 )
 from worker.domain.partition.partition_execution import (

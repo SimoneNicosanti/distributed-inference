@@ -8,13 +8,13 @@ from worker.application.deployment.abc.service_inference_plan_preparer import (
 from worker.application.partition_execution.abc.partition_executor_registry import (
     PartitionExecutorRegistry,
 )
-from worker.application.ports.inbound.service_inference_plan_applier import (
+from worker.application.ports.inbound.deployment.service_inference_plan_applier import (
     ServiceInferencePlanApplier,
 )
-from worker.application.ports.outbound.partition_executor_factory import (
+from worker.application.ports.outbound.partition_execution.partition_executor_factory import (
     PartitionExecutorFactory,
 )
-from worker.application.ports.outbound.service_inference_plan_store import (
+from worker.application.ports.outbound.plan_store.service_inference_plan_store import (
     ServiceInferencePlanStore,
 )
 
@@ -60,7 +60,6 @@ class DefaultServiceInferencePlanDeployer(
         self, service_inference_plan: ServiceInferencePlan
     ) -> None:
         for partition_deployment in service_inference_plan.sub_model_deployments:
-            partition_id = partition_deployment.partition_id
             resource_allocation = partition_deployment.resource_allocation
 
             ## If we already have the deployment, we skip the rebuild
@@ -72,7 +71,7 @@ class DefaultServiceInferencePlanDeployer(
             ):
                 continue
 
-            artifact_ref = await build_artifact_ref(partition_id.model_dump_json())
+            artifact_ref = partition_deployment.artifact_ref
             async with self._artifact_store.download_artifact(artifact_ref) as bundle:
                 partition_executor = await self._partition_executor_factory.create(
                     bundle, resource_allocation

@@ -3,7 +3,9 @@ from typing import override
 
 from lifecycle.async_lifecycle import AsyncLifecycle
 from shared.service.service import WorkerId
-from worker.application.ports.outbound.activity_manager import ActivityManager
+from worker.application.ports.outbound.activity_manager.activity_manager import (
+    ActivityManager,
+)
 from worker.application.ports.outbound.profiling.resource.cpu_profiler import (
     CpuProfiler,
 )

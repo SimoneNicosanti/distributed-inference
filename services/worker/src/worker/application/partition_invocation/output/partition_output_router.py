@@ -1,4 +1,4 @@
-from worker.application.ports.outbound.service_inference_plan_store import (
+from worker.application.ports.outbound.plan_store.service_inference_plan_store import (
     ServiceInferencePlanStore,
 )
 from worker.domain.partition.partition_invocation import (

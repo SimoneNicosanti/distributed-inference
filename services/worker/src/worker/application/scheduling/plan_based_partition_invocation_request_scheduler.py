@@ -10,7 +10,7 @@ from shared.plan.plan import InferencePlanVersion, ServiceInferencePlan
 from worker.application.deployment.abc.service_inference_plan_preparer import (
     ServiceInferencePlanPreparer,
 )
-from worker.application.ports.outbound.service_inference_plan_store import (
+from worker.application.ports.outbound.plan_store.service_inference_plan_store import (
     ServiceInferencePlanStore,
 )
 from worker.application.scheduling.abc.partition_invocation_request_scheduler import (

@@ -8,6 +8,7 @@ from worker.application.deployment.abc.service_inference_plan_preparer import (
 )
 from worker.application.partition_invocation.input.abc.partition_invocation_contribution_inbox import (
     PartitionInvocationContributionInbox,
+    ReadyPartitionInvocationRequest,
 )
 from worker.application.partition_invocation.input.abc.partition_invocation_request_assembler import (
     PartitionInvocationRequestAssembler,
@@ -15,13 +16,10 @@ from worker.application.partition_invocation.input.abc.partition_invocation_requ
 from worker.application.partition_invocation.input.partition_invocation_collection_key import (
     PartitionInvocationCollectionKey,
 )
-from worker.application.partition_invocation.input.ready_partition_invocation_request import (
-    ReadyPartitionInvocationRequest,
-)
-from worker.application.ports.outbound.partition_invocation_contribution_store import (
+from worker.application.ports.outbound.partition_invocation.partition_invocation_contribution_store import (
     PartitionInvocationContributionStore,
 )
-from worker.application.ports.outbound.service_inference_plan_store import (
+from worker.application.ports.outbound.plan_store.service_inference_plan_store import (
     ServiceInferencePlanStore,
 )
 from worker.domain.partition.partition_invocation_contribution import (

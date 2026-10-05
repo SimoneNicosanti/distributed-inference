@@ -7,7 +7,9 @@ from lifecycle.async_lifecycle import AsyncLifecycle
 from shared.artifact.artifact_ref import ArtifactRef
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import WorkerId
-from worker.application.ports.outbound.activity_manager import ActivityManager
+from worker.application.ports.outbound.activity_manager.activity_manager import (
+    ActivityManager,
+)
 from worker.application.ports.outbound.profiling.model_execution.model_execution_profile_store import (
     ModelExecutionProfileStore,
 )

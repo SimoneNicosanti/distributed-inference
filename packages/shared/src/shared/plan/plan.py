@@ -3,6 +3,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from shared.artifact.artifact_ref import ArtifactRef
 from shared.flow.flow import FlowId
 from shared.model.model_partition import (
     ModelPartitionId,
@@ -42,6 +43,7 @@ class PartitionDeployment(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     partition_id: ModelPartitionId
+    artifact_ref: ArtifactRef
     worker_id: WorkerId
     resource_allocation: ResourceAllocation
     replica_idx: int

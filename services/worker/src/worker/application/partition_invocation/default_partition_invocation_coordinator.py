@@ -12,10 +12,10 @@ from worker.application.partition_invocation.input.abc.partition_invocation_cont
 from worker.application.partition_invocation.output.partition_output_router import (
     PartitionOutputRouter,
 )
-from worker.application.ports.inbound.partition_invocation_coordinator import (
+from worker.application.ports.inbound.partition_invocation.partition_invocation_coordinator import (
     PartitionInvocationCoordinator,
 )
-from worker.application.ports.outbound.partition_invocation_contribution_sender import (
+from worker.application.ports.outbound.partition_invocation.partition_invocation_contribution_sender import (
     PartitionInvocationContributionSender,
 )
 from worker.domain.partition.partition_invocation_contribution import (

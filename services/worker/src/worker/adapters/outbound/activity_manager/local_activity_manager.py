@@ -1,7 +1,9 @@
 import asyncio
 from typing import override
 
-from worker.application.ports.outbound.activity_manager import ActivityManager
+from worker.application.ports.outbound.activity_manager.activity_manager import (
+    ActivityManager,
+)
 from worker.domain.activity.activity_request import (
     ActivityGrant,
     ActivityGrantId,

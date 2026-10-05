@@ -8,7 +8,7 @@ from shared.plan.plan import PartitionDeployment
 from worker.application.partition_execution.abc.partition_executor_registry import (
     PartitionExecutorRegistry,
 )
-from worker.application.ports.outbound.partition_executor import (
+from worker.application.ports.outbound.partition_execution.partition_executor import (
     PartitionExecutor,
 )
 

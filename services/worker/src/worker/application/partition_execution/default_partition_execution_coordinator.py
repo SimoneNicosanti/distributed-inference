@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import suppress
 from typing import override
 
 from lifecycle.async_lifecycle import AsyncLifecycle
@@ -12,8 +13,10 @@ from worker.application.partition_execution.abc.partition_execution_coordinator 
 from worker.application.partition_execution.abc.partition_executor_registry import (
     PartitionExecutorRegistry,
 )
-from worker.application.ports.outbound.activity_manager import ActivityManager
-from worker.application.ports.outbound.service_inference_plan_store import (
+from worker.application.ports.outbound.activity_manager.activity_manager import (
+    ActivityManager,
+)
+from worker.application.ports.outbound.plan_store.service_inference_plan_store import (
     ServiceInferencePlanStore,
 )
 from worker.application.scheduling.abc.partition_invocation_request_scheduler import (
@@ -55,6 +58,8 @@ class DefaultPartitionExecutionCoordinator(
         )
         self._partition_executor_registry = partition_executor_registry
 
+        self._controller_task: asyncio.Task[None] | None = None
+
     @override
     async def prepare_service_inference_plan(
         self, service_inference_plan: ServiceInferencePlan
@@ -85,8 +90,7 @@ class DefaultPartitionExecutionCoordinator(
 
         return partition_invocation_result
 
-    @override
-    async def start(self) -> None:
+    async def _controller_loop(self) -> None:
         while True:
             (
                 partition_invocation_request,
@@ -106,8 +110,24 @@ class DefaultPartitionExecutionCoordinator(
             partition_invocation_result_future.set_result(partition_invocation_result)
 
     @override
+    async def start(self) -> None:
+        if self._controller_task is not None:
+            return
+
+        self._controller_task = asyncio.create_task(
+            self._controller_loop(),
+            name="partition-invocation-coordinator",
+        )
+
+    @override
     async def stop(self) -> None:
-        raise NotImplementedError
+        if self._controller_task is None:
+            return
+
+        self._controller_task.cancel()
+
+        with suppress(asyncio.CancelledError):
+            await self._controller_task
 
     def _build_activity_request(self) -> ActivityRequest:
         activity_request = ActivityRequest(
