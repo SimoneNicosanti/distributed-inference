@@ -3,8 +3,8 @@ from collections.abc import AsyncGenerator
 from typing import override
 
 from lifecycle.async_lifecycle import AsyncLifecycle
-from shared.service.service import WorkerId
 from shared.model.model_variant import ModelVariantId
+from shared.service.service import WorkerId
 from worker.application.ports.outbound.profiling.model_execution.model_execution_profile_store import (
     ModelExecutionProfileStore,
 )

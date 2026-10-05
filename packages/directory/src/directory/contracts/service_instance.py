@@ -73,16 +73,28 @@ class CapabilityInterface(BaseModel):
 
 
 class CapabilityType(StrEnum):
-    MODEL_MANAGER = auto()
-    CONTROLLER = auto()
-    ARTIFACT_STORE = auto()
+    ## Declared by model manager
+    MODEL_PARTITION = auto()
+    MODEL_REGISTRATION = auto()
 
-    INFERENCE_SERVICE = auto()
+    ## Declared by deployment optimization
+    DEPLOYMENT_OPTIMIZATION = auto()
+
+    ## Declared by artifact storage (e.g. S3)
+    ARTIFACT_STORAGE = auto()
+
+    ## Profile storage
+    PROFILE_STORAGE = auto()
+
+    ## Declared by worker
+    PARTITION_INFERENCE = auto()
+    DEPLOYMENT_ACTUATION = auto()
     NETWORK_PROFILING = auto()
     EXECUTION_PROFILING = auto()
+    RESOURCE_PROFILING = auto()
 
 
-class ServiceCapabilities(BaseModel):
+class Capability(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     type: CapabilityType
@@ -98,9 +110,20 @@ class ServiceInstance(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     service_id: ServiceId
-    capabilities: list[ServiceCapabilities]
+    capabilities: list[Capability]
 
-    def get_capability_by_type(
+    def get_capabilities_by_type(
         self, capability_type: CapabilityType
-    ) -> list[ServiceCapabilities]:
+    ) -> list[Capability]:
         return list(filter(lambda x: x.type == capability_type, self.capabilities))
+
+    def get_capability_interfaces_by_type_and_protocol(
+        self, capability_type: CapabilityType, protocol: CapabilityProtocol
+    ) -> list[CapabilityInterface]:
+
+        capabilities = self.get_capabilities_by_type(capability_type)
+        interfaces = []
+        for capability in capabilities:
+            interfaces.extend(capability.get_interfaces_by_protocol(protocol))
+
+        return interfaces

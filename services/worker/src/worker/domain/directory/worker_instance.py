@@ -15,9 +15,11 @@ class WorkerInstance(ServiceInstance):
             raise ValueError("Worker instance must have at least one capability")
 
         required_capabilities = {
-            CapabilityType.INFERENCE_SERVICE,
+            CapabilityType.PARTITION_INFERENCE,
+            CapabilityType.DEPLOYMENT_ACTUATION,
             CapabilityType.NETWORK_PROFILING,
             CapabilityType.EXECUTION_PROFILING,
+            CapabilityType.RESOURCE_PROFILING,
         }
 
         actual_capabilities = {capability.type for capability in self.capabilities}

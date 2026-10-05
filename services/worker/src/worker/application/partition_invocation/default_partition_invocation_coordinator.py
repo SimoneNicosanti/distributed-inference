@@ -9,13 +9,13 @@ from worker.application.partition_execution.abc.partition_execution_coordinator 
 from worker.application.partition_invocation.input.abc.partition_invocation_contribution_inbox import (
     PartitionInvocationContributionInbox,
 )
-from worker.application.partition_invocation.output.partition_output_router import (
+from worker.application.partition_invocation.output.abc.partition_output_router import (
     PartitionOutputRouter,
 )
 from worker.application.ports.inbound.partition_invocation.partition_invocation_coordinator import (
     PartitionInvocationCoordinator,
 )
-from worker.application.ports.outbound.partition_invocation.partition_invocation_contribution_sender import (
+from worker.application.ports.outbound.partition_invocation.sender.partition_invocation_contribution_sender import (
     PartitionInvocationContributionSender,
 )
 from worker.domain.partition.partition_invocation_contribution import (
@@ -82,10 +82,14 @@ class DefaultPartitionInvocationCoordinator(
                 contributions, partition_invocation_result
             )
 
-            for routed_contribution in routed_contributions:
-                self._contribution_sender.send(routed_contribution)
+            asyncio.gather(
+                *[
+                    self._contribution_sender.send(contribution)
+                    for contribution in routed_contributions
+                ]
+            )
 
-            ## We can move the set_result depending on when we want to notify the completion of the invocation
+            ## NOTE: We can move the set_result depending on when we want to notify the completion of the invocation
             future.set_result(None)
 
     async def _run_workers(self) -> None:

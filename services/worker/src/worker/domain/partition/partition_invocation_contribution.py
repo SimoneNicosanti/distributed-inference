@@ -2,6 +2,7 @@ from pydantic import BaseModel, ConfigDict
 
 from shared.model.model_partition import ModelPartitionId
 from shared.plan.plan import InferencePlanVersion, PartitionDeployment
+from shared.service.service import WorkerId
 from worker.domain.context.model_pass_context import (
     ModelPassContext,
 )
@@ -43,6 +44,10 @@ class PartitionInvocationContribution(BaseModel):
     @property
     def partition_deployment(self) -> PartitionDeployment:
         return self.context.partition_deployment_id
+
+    @property
+    def worker_id(self) -> WorkerId:
+        return self.context.partition_deployment_id.worker_id
 
 
 ## Acknowledges receipt of a partition invocation contribution.

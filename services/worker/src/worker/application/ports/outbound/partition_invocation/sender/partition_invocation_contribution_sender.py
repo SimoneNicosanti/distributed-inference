@@ -7,7 +7,7 @@ from worker.domain.partition.partition_invocation_contribution import (
 
 class PartitionInvocationContributionSender(ABC):
     @abstractmethod
-    def send(
+    async def send(
         self,
         contribution: PartitionInvocationContribution,
     ) -> None: ...

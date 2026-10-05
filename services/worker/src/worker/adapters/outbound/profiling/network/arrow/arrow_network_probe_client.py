@@ -33,7 +33,7 @@ class ArrowNetworkProbeClient(NetworkProbeClient):
     @override
     async def probe_connection(self, worker_instance: WorkerInstance) -> ConnectionInfo:
 
-        network_probe_capabilities = worker_instance.get_capability_by_type(
+        network_probe_capabilities = worker_instance.get_capabilities_by_type(
             CapabilityType.NETWORK_PROFILING
         )
 

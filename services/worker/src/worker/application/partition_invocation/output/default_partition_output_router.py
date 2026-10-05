@@ -1,3 +1,8 @@
+from typing import override
+
+from worker.application.partition_invocation.output.abc.partition_output_router import (
+    PartitionOutputRouter,
+)
 from worker.application.ports.outbound.plan_store.service_inference_plan_store import (
     ServiceInferencePlanStore,
 )
@@ -11,11 +16,12 @@ from worker.domain.partition.partition_invocation_contribution import (
 from worker.domain.partition.tensor_bundle import TensorBundle
 
 
-class PartitionOutputRouter:
+class DefaultPartitionOutputRouter(PartitionOutputRouter):
     def __init__(self, plan_store: ServiceInferencePlanStore):
         super().__init__()
         self._plan_store = plan_store
 
+    @override
     async def route(
         self,
         contributions: list[PartitionInvocationContribution],

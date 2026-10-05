@@ -16,7 +16,7 @@ from worker.application.partition_invocation.input.abc.partition_invocation_requ
 from worker.application.partition_invocation.input.partition_invocation_collection_key import (
     PartitionInvocationCollectionKey,
 )
-from worker.application.ports.outbound.partition_invocation.partition_invocation_contribution_store import (
+from worker.application.ports.outbound.partition_invocation.store.partition_invocation_contribution_store import (
     PartitionInvocationContributionStore,
 )
 from worker.application.ports.outbound.plan_store.service_inference_plan_store import (

@@ -1,7 +1,6 @@
 from struct import Struct
 
 import pyarrow as pa
-
 import pyarrow.types
 
 PROTOCOL_VERSION = 1
