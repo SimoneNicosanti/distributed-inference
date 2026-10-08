@@ -1,16 +1,13 @@
 from abc import ABC, abstractmethod
 
-from shared.service.service import WorkerId
 from shared.model.model_variant import ModelVariantId
-from worker.domain.profiling.model_execution_profile import ModelExecutionProfile
+from shared.service.service import WorkerId
+from worker.domain.profiling.model_execution.model_execution_profile import (
+    ModelExecutionProfile,
+)
 
 
-class ModelExecutionProfileStore(ABC):
-    @abstractmethod
-    async def put_model_execution_profile(
-        self, worker_id: WorkerId, model_execution_profile: ModelExecutionProfile
-    ) -> None: ...
-
+class ModelExecutionProfileReader(ABC):
     @abstractmethod
     async def get_model_execution_profile_by_worker_id(
         self, worker_id: WorkerId, model_version_id: ModelVariantId

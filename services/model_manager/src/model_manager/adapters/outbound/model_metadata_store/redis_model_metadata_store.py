@@ -9,6 +9,7 @@ from integration.redis.model_partition.keys_factory import (
 )
 from integration.redis.profiled_model_variant.keys_factory import (
     build_profiled_model_variant_dict_name,
+    build_profiled_model_variant_ids_key,
     build_profiled_model_variant_key,
 )
 from integration.redis.profiled_model_variant.profiled_model_variant_dto import (
@@ -84,12 +85,22 @@ class RedisModelMetadataStore(ModelMetadataStore):
             profiled_model_variant.model_variant_id
         )
         dto = self._to_profiled_model_variant_dto(profiled_model_variant)
-
-        await self._redis.hset(
-            set_name,
-            profiled_model_variant_key,
-            dto.model_dump_json(),
+        dto_json = dto.model_dump_json()
+        model_variant_id_json = (
+            profiled_model_variant.model_variant_id.model_dump_json()
         )
+
+        async with self._redis.pipeline(transaction=True) as pipeline:
+            pipeline.hset(
+                set_name,
+                profiled_model_variant_key,
+                dto_json,
+            )
+            pipeline.sadd(
+                build_profiled_model_variant_ids_key(),
+                model_variant_id_json,
+            )
+            await pipeline.execute()
 
     @override
     async def get_profiled_model_variant(

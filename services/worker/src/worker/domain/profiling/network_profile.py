@@ -10,7 +10,14 @@ class ConnectionInfo(BaseModel):
     round_trip_time_s: float
 
 
+class WorkerConnection(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    worker_id: WorkerId
+    connection_info: ConnectionInfo
+
+
 class NetworkProfile(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    connections: dict[WorkerId, ConnectionInfo]
+    connections: list[WorkerConnection]

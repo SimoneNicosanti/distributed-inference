@@ -10,7 +10,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 class ResourceType(StrEnum):
     COMPUTE = auto()
-    MEMORY = auto()
     NETWORK = auto()
 
 
@@ -38,11 +37,11 @@ class ResourceRequirement(BaseModel):
 
 
 class ActivityType(StrEnum):
-    INFERENCE_EXECUTION = auto()
-    INFERENCE_FORWARDING = auto()
+    EXECUTION_INFERENCE = auto()
+    EXECUTION_PROFILING = auto()
 
-    PROFILING_NETWORK = auto()
-    PROFILING_EXECUTION = auto()
+    NETWORK_TRANSMISSION = auto()
+    NETWORK_PROFILING = auto()
 
 
 class ActivityRequest(BaseModel):

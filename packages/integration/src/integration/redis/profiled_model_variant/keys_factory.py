@@ -19,3 +19,7 @@ async def build_profiled_model_variant_key(model_variant_id: ModelVariantId) -> 
         hashlib.md5, model_variant_id.model_dump_json().encode("utf-8")
     )
     return model_variant_id_md5_valeu.hexdigest()
+
+
+def build_profiled_model_variant_ids_key() -> str:
+    return "profiled-model-variant:ids"

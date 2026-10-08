@@ -1,7 +1,9 @@
 from typing import override
 
+from integration.worker.profiling.redis.network_profile_keys import (
+    build_network_profile_key_per_worker,
+)
 from redis import asyncio as redis_asyncio
-
 from shared.service.service import WorkerId
 from worker.application.ports.outbound.profiling.network.network_profile_publisher import (
     NetworkProfilePublisher,
@@ -18,12 +20,9 @@ class RedisNetworkProfilePublisher(NetworkProfilePublisher):
         self, worker_id: WorkerId, network_profile: NetworkProfile
     ) -> None:
 
-        redis_key = self.__build_redis_key(worker_id)
+        redis_key = build_network_profile_key_per_worker(worker_id)
         redis_value = network_profile.model_dump_json()
 
         success = await self._redis.set(redis_key, redis_value)
         if not success:
             raise Exception("Failed to publish network profile")
-
-    def __build_redis_key(self, worker_id: WorkerId) -> str:
-        return f"worker:{worker_id.service_id}:network-profile"

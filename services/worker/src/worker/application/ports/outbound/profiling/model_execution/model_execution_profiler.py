@@ -1,12 +1,16 @@
 from abc import ABC, abstractmethod
 
 from artifacts.contracts.artifact_bundle import ArtifactBundle
-from shared.model.model_variant import ModelVariantId
-from worker.domain.profiling.model_execution_profile import ModelExecutionProfile
+from worker.domain.profiling.model_execution.model_execution_profile import (
+    ModelExecutionProfile,
+)
+from worker.domain.profiling.model_execution.model_static_profile import (
+    ModelStaticProfile,
+)
 
 
 class ModelExecutionProfiler(ABC):
     @abstractmethod
     async def profile_model_execution(
-        self, model_version_id: ModelVariantId, artifact_bundle: ArtifactBundle
+        self, model_static_profile: ModelStaticProfile, artifact_bundle: ArtifactBundle
     ) -> ModelExecutionProfile: ...

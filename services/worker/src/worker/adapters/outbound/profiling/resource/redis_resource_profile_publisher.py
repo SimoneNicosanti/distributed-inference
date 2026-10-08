@@ -2,6 +2,9 @@ from typing import override
 
 from redis import asyncio as redis_asyncio
 
+from integration.worker.profiling.redis.resource_profile_keys import (
+    build_resource_profile_key_per_worker,
+)
 from shared.service.service import WorkerId
 from worker.application.ports.outbound.profiling.resource.resource_profile_publisher import (
     ResourceProfilePublisher,
@@ -18,12 +21,9 @@ class RedisResourceProfilePublisher(ResourceProfilePublisher):
         self, worker_id: WorkerId, resource_profile: ResourceProfile
     ) -> None:
 
-        redis_key = self.__build_redis_key(worker_id)
+        redis_key = build_resource_profile_key_per_worker(worker_id)
         redis_value = resource_profile.model_dump_json()
 
         success = await self._redis.set(redis_key, redis_value)
         if not success:
             raise Exception("Failed to publish resource profile")
-
-    def __build_redis_key(self, worker_id: WorkerId) -> str:
-        return f"worker:{worker_id.service_id}:resource-profile"

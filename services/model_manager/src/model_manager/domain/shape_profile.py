@@ -1,28 +1,33 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, NonNegativeFloat, PositiveInt
 
 from shared.model.keys import LayerKey, TensorKey
 
 
+class InputShapePoint(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    shape: tuple[PositiveInt, ...]
+
+
 ## This is a dynamic shape configuration for which the profiling is done
-## It wraps a tuple of tuple like:
-## ((batch_size, x), (sequence_size, y))
-## Multiple ShapePoints are the different configurations we are profiling
+## For each input, it tells a concrete shape it has
 class ShapePoint(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    dims: tuple[tuple[str, int], ...]
+    input_shape_points: tuple[InputShapePoint, ...]
 
 
 class LayerShapeProperty(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    flops: float
+    flops: NonNegativeFloat
 
 
 class TensorShapeProperty(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    shape: tuple[int, ...]
+    shape: tuple[PositiveInt, ...]
 
 
 class ShapeProfile(BaseModel):

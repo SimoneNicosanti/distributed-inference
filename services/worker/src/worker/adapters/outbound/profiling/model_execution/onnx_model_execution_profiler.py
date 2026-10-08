@@ -1,25 +1,26 @@
-import gc
-import time
-from collections.abc import AsyncGenerator
+import json
+import tempfile
+from collections import defaultdict
 from pathlib import Path
-from typing import override
+from typing import Protocol, override
 
-import aiofiles
 import numpy as np
-import onnx
 import onnxruntime as ort
 
 from artifacts.contracts.artifact_bundle import ArtifactBundle
-from shared.model.keys import LayerKey
-from shared.model.model_variant import ModelVariantId
 from worker.application.ports.outbound.profiling.model_execution.model_execution_profiler import (
     ModelExecutionProfiler,
 )
-from worker.domain.profiling.model_execution_profile import (
+from worker.domain.profiling.model_execution.model_execution_profile import (
     BackendLayerExecutionProfile,
     LayerExecutionProfile,
     ModelExecutionProfile,
+    ShapeExecutionProfile,
 )
+from worker.domain.profiling.model_execution.model_static_profile import (
+    ModelStaticProfile,
+)
+from worker.domain.profiling.model_execution.shape_point import ShapePoint
 
 ORT_TO_NUMPY_TYPE = {
     "tensor(float)": np.float32,
@@ -40,102 +41,124 @@ WARMUP_ITERATIONS = 10
 
 PROFILE_ITERATIONS = 25
 
+NODE_EVENT_CATEGORY = "Node"
+NODE_EVENT_SUFFIX = "_kernel_time"
+CPU_EXECUTION_PROVIDER = "CPUExecutionProvider"
+
+
+class OrtInputInfo(Protocol):
+    name: str
+    type: str
+
+
+class OrtInputInfoProvider(Protocol):
+    def get_inputs(self) -> list[OrtInputInfo]: ...
+
 
 class OnnxModelExecutionProfiler(ModelExecutionProfiler):
     @override
     async def profile_model_execution(
-        self, model_version_id: ModelVariantId, artifact_bundle: ArtifactBundle
+        self, model_static_profile: ModelStaticProfile, artifact_bundle: ArtifactBundle
     ) -> ModelExecutionProfile:
-
-        entrypoint_path = artifact_bundle.entrypoint_path
-        model = onnx.load_model(entrypoint_path, load_external_data=False)
-
-        layer_profiles = {}
-        async for (
-            layer_name,
-            single_layer_onnx_model,
-        ) in self._get_single_layer_sub_models(model, entrypoint_path):
-            layer_execution_profile = await self._profile_single_layer_execution(
-                layer_name, single_layer_onnx_model
+        shape_execution_profiles = tuple(
+            self._profile_shape_point_cpu(
+                artifact_bundle.entrypoint_path,
+                shape_point,
             )
-
-            layer_profiles[layer_name] = layer_execution_profile
+            for shape_point in model_static_profile.shape_points
+        )
 
         return ModelExecutionProfile(
-            model_version_id=model_version_id,
+            model_version_id=model_static_profile.model_variant_id,
+            shape_execution_profiles=shape_execution_profiles,
+        )
+
+    @staticmethod
+    def _profile_shape_point_cpu(
+        model_path: Path,
+        shape_point: ShapePoint,
+    ) -> ShapeExecutionProfile:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            session_options = ort.SessionOptions()
+            session_options.enable_profiling = True
+            session_options.profile_file_prefix = str(
+                Path(temp_dir_name).joinpath("onnxruntime_profile")
+            )
+            session_options.graph_optimization_level = (
+                ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
+            )
+
+            session = ort.InferenceSession(
+                model_path.as_posix(),
+                sess_options=session_options,
+                providers=[CPU_EXECUTION_PROVIDER],
+            )
+            inputs = OnnxModelExecutionProfiler._create_inputs(session, shape_point)
+
+            for _ in range(WARMUP_ITERATIONS + PROFILE_ITERATIONS):
+                session.run(None, inputs)
+
+            profile_path = Path(session.end_profiling())
+            profile_events = json.loads(profile_path.read_text())
+
+        durations_by_layer: dict[str, list[float]] = defaultdict(list)
+        for event in profile_events:
+            event_name = event.get("name")
+            event_arguments = event.get("args", {})
+            if (
+                event.get("cat") != NODE_EVENT_CATEGORY
+                or not isinstance(event_name, str)
+                or not event_name.endswith(NODE_EVENT_SUFFIX)
+                or event_arguments.get("provider") != CPU_EXECUTION_PROVIDER
+            ):
+                continue
+
+            layer_name = event_name.removesuffix(NODE_EVENT_SUFFIX)
+            durations_by_layer[layer_name].append(float(event["dur"]) / 1_000_000)
+
+        layer_profiles = {}
+        for layer_name, durations in durations_by_layer.items():
+            measured_durations = durations[-PROFILE_ITERATIONS:]
+            if len(measured_durations) != PROFILE_ITERATIONS:
+                raise ValueError(
+                    f"Expected {PROFILE_ITERATIONS} profiling samples for "
+                    f"layer {layer_name!r}, got {len(measured_durations)}"
+                )
+
+            layer_profiles[layer_name] = LayerExecutionProfile(
+                layer_key=layer_name,
+                cpu_execution_profile=BackendLayerExecutionProfile(
+                    execution_time=float(np.mean(measured_durations)),
+                    memory=0,
+                ),
+                gpu_execution_profile=None,
+            )
+
+        return ShapeExecutionProfile(
+            shape_point=shape_point,
             layer_profiles=layer_profiles,
         )
 
-    async def _get_single_layer_sub_models(
-        self, model: onnx.ModelProto, model_path: Path
-    ) -> AsyncGenerator[tuple[LayerKey, onnx.ModelProto]]:
-
-        initializer_names = {
-            initializer.name for initializer in model.graph.initializer
-        }
-
-        async with aiofiles.tempfile.TemporaryDirectory() as tmp_dir_name:
-            tmp_dir = Path(tmp_dir_name)
-            for node in model.graph.node:
-                input_names = set(node.input) - initializer_names
-                output_names = set(node.output)
-
-                tmp_model_path = tmp_dir.joinpath(f"{node.name}.onnx")
-
-                onnx.utils.extract_model(
-                    model_path, tmp_model_path, list(input_names), list(output_names)
+    @staticmethod
+    def _create_inputs(
+        session: OrtInputInfoProvider,
+        shape_point: ShapePoint,
+    ) -> dict[str, np.ndarray]:
+        inputs: dict[str, np.ndarray] = {}
+        for input_info in session.get_inputs():
+            shape = shape_point.input_shape_points.get(input_info.name)
+            if shape is None:
+                raise ValueError(
+                    f"Missing concrete shape for model input {input_info.name!r}"
                 )
 
-                node_onnx_model = onnx.load_model(tmp_model_path)
-                yield node.name, node_onnx_model
+            numpy_type = ORT_TO_NUMPY_TYPE.get(input_info.type)
+            if numpy_type is None:
+                raise ValueError(f"Unsupported ONNX input type: {input_info.type!r}")
 
-    async def _profile_single_layer_execution(
-        self, layer_name: str, node_onnx_model: onnx.ModelProto
-    ) -> LayerExecutionProfile:
-
-        ## TODO: Implement the GPU profiling logic
-
-        cpu_profile = await self._profile_single_layer_execution_cpu(node_onnx_model)
-
-        return LayerExecutionProfile(
-            layer_key=layer_name,
-            cpu_execution_profile=cpu_profile,
-            gpu_execution_profile=None,
-        )
-
-    async def _profile_single_layer_execution_cpu(
-        self, node_onnx_model: onnx.ModelProto
-    ) -> BackendLayerExecutionProfile:
-
-        ## TODO: Here we are assuming that there is no dynamic shape
-        session = ort.InferenceSession(
-            node_onnx_model.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
-
-        input_dict: dict[str, ort.OrtValue] = {}
-        for input_info in session.get_inputs():
-            numpy_type = ORT_TO_NUMPY_TYPE[input_info.type]
-
-            input_array = np.ones(
-                input_info.shape,
+            inputs[input_info.name] = np.ones(
+                shape,
                 dtype=numpy_type,
             )
 
-            input_dict[input_info.name] = ort.OrtValue.ortvalue_from_numpy(input_array)
-
-        for _ in range(WARMUP_ITERATIONS):
-            session.run_with_ort_values(None, input_dict)
-
-        times = np.zeros(PROFILE_ITERATIONS)
-        for i in range(PROFILE_ITERATIONS):
-            start = time.perf_counter_ns()
-            session.run_with_ort_values(None, input_dict)
-            end = time.perf_counter_ns()
-            times[i] = (end - start) / 1e9
-
-        del session
-        gc.collect()
-
-        return BackendLayerExecutionProfile(
-            execution_time=float(np.mean(times)), memory=0
-        )
+        return inputs

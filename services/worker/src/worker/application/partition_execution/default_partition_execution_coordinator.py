@@ -4,6 +4,9 @@ from typing import override
 
 from lifecycle.async_lifecycle import AsyncLifecycle
 from shared.plan.plan import ServiceInferencePlan
+from worker.application.activity.abc.activity_request_factory import (
+    ActivityRequestFactory,
+)
 from worker.application.deployment.abc.service_inference_plan_preparer import (
     ServiceInferencePlanPreparer,
 )
@@ -22,12 +25,7 @@ from worker.application.ports.outbound.plan_store.service_inference_plan_store i
 from worker.application.scheduling.abc.partition_invocation_request_scheduler import (
     PartitionInvocationRequestScheduler,
 )
-from worker.domain.activity.activity_request import (
-    ActivityRequest,
-    ActivityType,
-    ResourceRequirement,
-    ResourceType,
-)
+from worker.domain.activity.activity_request import ActivityType
 from worker.domain.context.partition_execution_context import (
     PartitionExecutionContext,
 )
@@ -47,11 +45,13 @@ class DefaultPartitionExecutionCoordinator(
     def __init__(
         self,
         inference_plan_store: ServiceInferencePlanStore,
+        activity_request_factory: ActivityRequestFactory,
         activity_manager: ActivityManager,
         partition_invocation_request_scheduler: PartitionInvocationRequestScheduler,
         partition_executor_registry: PartitionExecutorRegistry,
     ) -> None:
         self._inference_plan_store = inference_plan_store
+        self._activity_request_factory = activity_request_factory
         self._activity_manager = activity_manager
         self._partition_invocation_request_scheduler = (
             partition_invocation_request_scheduler
@@ -97,7 +97,11 @@ class DefaultPartitionExecutionCoordinator(
                 partition_invocation_result_future,
             ) = await self._partition_invocation_request_scheduler.dequeue()
 
-            activity_request = self._build_activity_request()
+            activity_request = (
+                self._activity_request_factory.create_request_for_activity_type(
+                    ActivityType.EXECUTION_INFERENCE
+                )
+            )
             activity_grant = await self._activity_manager.acquire_activity_grant(
                 activity_request
             )
@@ -128,15 +132,6 @@ class DefaultPartitionExecutionCoordinator(
 
         with suppress(asyncio.CancelledError):
             await self._controller_task
-
-    def _build_activity_request(self) -> ActivityRequest:
-        activity_request = ActivityRequest(
-            activity_type=ActivityType.INFERENCE_EXECUTION,
-            resource_requirements={
-                ResourceType.COMPUTE: ResourceRequirement(quantity=0, exclusive=True)
-            },
-        )
-        return activity_request
 
     async def _execute_partition_invocation(
         self, partition_invocation_request: PartitionInvocationRequest

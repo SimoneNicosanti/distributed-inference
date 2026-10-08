@@ -1,20 +1,25 @@
 import asyncio
-from contextlib import aclosing
+from contextlib import aclosing, suppress
 from typing import override
 
 from artifacts.storage.artifact_store import ArtifactStore
 from lifecycle.async_lifecycle import AsyncLifecycle
-from shared.artifact.artifact_ref import ArtifactRef
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import WorkerId
+from worker.application.activity.abc.activity_request_factory import (
+    ActivityRequestFactory,
+)
 from worker.application.ports.outbound.activity_manager.activity_manager import (
     ActivityManager,
 )
-from worker.application.ports.outbound.profiling.model_execution.model_execution_profile_store import (
-    ModelExecutionProfileStore,
+from worker.application.ports.outbound.profiling.model_execution.model_execution_profile_publisher import (
+    ModelExecutionProfilePublisher,
 )
 from worker.application.ports.outbound.profiling.model_execution.model_execution_profiler import (
     ModelExecutionProfiler,
+)
+from worker.application.ports.outbound.profiling.model_execution.model_static_profile_reader import (
+    ModelStaticProfileReader,
 )
 from worker.application.profiling.abc.model_execution_profiling_coordinator import (
     ModelExecutionProfilingCoordinator,
@@ -22,13 +27,10 @@ from worker.application.profiling.abc.model_execution_profiling_coordinator impo
 from worker.application.profiling.abc.pending_models_poller import (
     PendingModelsPoller,
 )
-from worker.domain.activity.activity_request import (
-    ActivityRequest,
-    ActivityType,
-    ResourceRequirement,
-    ResourceType,
+from worker.domain.activity.activity_request import ActivityType
+from worker.domain.profiling.model_execution.model_execution_profile import (
+    ModelExecutionProfile,
 )
-from worker.domain.profiling.model_execution_profile import ModelExecutionProfile
 
 
 class DefaultModelExecutionProfileCoordinator(
@@ -38,17 +40,21 @@ class DefaultModelExecutionProfileCoordinator(
         self,
         worker_id: WorkerId,
         pending_models_poller: PendingModelsPoller,
+        model_static_profile_reader: ModelStaticProfileReader,
+        activity_request_factory: ActivityRequestFactory,
         activity_manager: ActivityManager,
         model_execution_profiler: ModelExecutionProfiler,
         artifact_store: ArtifactStore,
-        model_exec_profile_storage: ModelExecutionProfileStore,
+        model_exec_profile_publisher: ModelExecutionProfilePublisher,
     ):
         self._worker_id = worker_id
         self._pending_models_poller = pending_models_poller
+        self._model_static_profile_reader = model_static_profile_reader
+        self._activity_request_factory = activity_request_factory
         self._activity_manager = activity_manager
         self._model_execution_profiler = model_execution_profiler
         self._artifact_store = artifact_store
-        self._model_exec_profile_storage = model_exec_profile_storage
+        self._model_exec_profile_storage = model_exec_profile_publisher
 
         self._profile_loop_task: asyncio.Task[None] | None = None
 
@@ -56,52 +62,62 @@ class DefaultModelExecutionProfileCoordinator(
 
     @override
     async def profile_model_execution(
-        self, model_version_id: ModelVariantId
+        self, model_variant_id: ModelVariantId
     ) -> ModelExecutionProfile:
-        artifact_ref = ArtifactRef(value=model_version_id.model_dump_json())
+        model_static_profile = (
+            await self._model_static_profile_reader.get_model_static_profile(
+                model_variant_id=model_variant_id
+            )
+        )
 
         async with (
             self._profiling_lock,
-            self._artifact_store.download_artifact(artifact_ref) as artifact_bundle,
+            self._artifact_store.download_artifact(
+                model_static_profile.artifact_ref
+            ) as artifact_bundle,
         ):
-            activity_request = self._build_activity_request()
+            activity_request = (
+                self._activity_request_factory.create_request_for_activity_type(
+                    ActivityType.EXECUTION_PROFILING
+                )
+            )
             activity_grant = await self._activity_manager.acquire_activity_grant(
                 request=activity_request
             )
             async with activity_grant:
-                model_profile = (
+                model_execution_profile = (
                     await self._model_execution_profiler.profile_model_execution(
-                        model_version_id=model_version_id,
+                        model_static_profile=model_static_profile,
                         artifact_bundle=artifact_bundle,
                     )
                 )
 
-                return model_profile
+                return model_execution_profile
 
     async def _coordinate_model_execution_profiling(
-        self, model_version_id: ModelVariantId
+        self, model_variant_id: ModelVariantId
     ) -> None:
-        model_profile = await self.profile_model_execution(
-            model_version_id=model_version_id
+        model_execution_profile = await self.profile_model_execution(
+            model_variant_id=model_variant_id
         )
-        await self._model_exec_profile_storage.put_model_execution_profile(
-            worker_id=self._worker_id, model_execution_profile=model_profile
+        await self._model_exec_profile_storage.puplish_model_execution_profile(
+            worker_id=self._worker_id, model_execution_profile=model_execution_profile
         )
 
     async def _profile_loop(self) -> None:
         async with aclosing(
-            self._pending_models_poller.pending_models()
-        ) as pending_models:
-            async for pending_model in pending_models:
+            self._pending_models_poller.pending_model_ids()
+        ) as pending_model_ids:
+            async for pending_model_id in pending_model_ids:
                 await self._coordinate_model_execution_profiling(
-                    model_version_id=pending_model
+                    model_variant_id=pending_model_id
                 )
 
     @override
     async def start(self) -> None:
-        ## We start the profiling with polling for pending models
-        async with asyncio.TaskGroup() as task_group:
-            self._profile_loop_task = task_group.create_task(self._profile_loop())
+        if self._profile_loop_task is not None:
+            return
+        self._profile_loop_task = asyncio.create_task(self._profile_loop())
 
     @override
     async def stop(self) -> None:
@@ -109,11 +125,5 @@ class DefaultModelExecutionProfileCoordinator(
             return
         self._profile_loop_task.cancel()
 
-    @staticmethod
-    def _build_activity_request() -> ActivityRequest:
-        return ActivityRequest(
-            activity_type=ActivityType.PROFILING_EXECUTION,
-            resource_requirements={
-                ResourceType.COMPUTE: ResourceRequirement(quantity=0, exclusive=True)
-            },
-        )
+        with suppress(asyncio.CancelledError):
+            await self._profile_loop_task

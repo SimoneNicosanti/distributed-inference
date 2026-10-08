@@ -2,6 +2,7 @@ from pydantic import BaseModel, ConfigDict
 
 from shared.model.keys import LayerKey
 from shared.model.model_variant import ModelVariantId
+from worker.domain.profiling.model_execution.shape_point import ShapePoint
 
 
 class BackendLayerExecutionProfile(BaseModel):
@@ -20,8 +21,15 @@ class LayerExecutionProfile(BaseModel):
     gpu_execution_profile: BackendLayerExecutionProfile | None
 
 
+class ShapeExecutionProfile(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    shape_point: ShapePoint
+    layer_profiles: dict[LayerKey, LayerExecutionProfile]
+
+
 class ModelExecutionProfile(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     model_version_id: ModelVariantId
-    layer_profiles: dict[LayerKey, LayerExecutionProfile]
+    shape_execution_profiles: tuple[ShapeExecutionProfile, ...]

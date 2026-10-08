@@ -65,13 +65,8 @@ def build_model_manager_router(
 
         model_variant_dto = request.model_variant_dto
 
-        model_variant_info = ModelVariantInfo(
-            precision=model_variant_dto.precision,
-            quantization=model_variant_dto.quantization,
-            accuracies=model_variant_dto.accuracies,
-            format=model_variant_dto.format,
-            static_shapes=model_variant_dto.static_shapes,
-            dynamic_shapes=model_variant_dto.dynamic_shapes,
+        model_variant_info = ModelVariantInfo.model_validate(
+            model_variant_dto.model_dump(exclude={"id"})
         )
 
         model_variant = ModelVariant(

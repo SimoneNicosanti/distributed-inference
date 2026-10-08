@@ -1,11 +1,9 @@
 import asyncio
+from contextlib import suppress
 from typing import override
 
 from lifecycle.async_lifecycle import AsyncLifecycle
 from shared.service.service import WorkerId
-from worker.application.ports.outbound.activity_manager.activity_manager import (
-    ActivityManager,
-)
 from worker.application.ports.outbound.profiling.resource.cpu_profiler import (
     CpuProfiler,
 )
@@ -30,14 +28,12 @@ class DefaultResourceProfilingCoordinator(ResourceProfilingCoordinator, AsyncLif
     def __init__(
         self,
         worker_id: WorkerId,
-        activity_manager: ActivityManager,
         gpu_profiler: GpuProfiler,
         cpu_profiler: CpuProfiler,
         memory_profiler: RamProfiler,
         res_profile_publisher: ResourceProfilePublisher,
     ):
         self._worker_id = worker_id
-        self._activity_manager = activity_manager
 
         self._gpu_profiler = gpu_profiler
         self._cpu_profiler = cpu_profiler
@@ -75,12 +71,17 @@ class DefaultResourceProfilingCoordinator(ResourceProfilingCoordinator, AsyncLif
 
     @override
     async def start(self) -> None:
-        ## We do periodical profiling here.
-        async with asyncio.TaskGroup() as task_group:
-            self._loop_task = task_group.create_task(self._profile_loop())
+        if self._loop_task is not None:
+            return
+        self._loop_task = asyncio.create_task(self._profile_loop())
 
     @override
     async def stop(self) -> None:
         if self._loop_task is None:
             return
         self._loop_task.cancel()
+
+        with suppress(asyncio.CancelledError):
+            await self._loop_task
+
+        self._loop_task = None

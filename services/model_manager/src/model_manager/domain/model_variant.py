@@ -1,15 +1,27 @@
-from pydantic import BaseModel, ConfigDict
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, PositiveInt, model_validator
 
 from shared.model.model import ModelId
 from shared.model.model_variant import (
     AccuracyMetric,
-    DynamicShape,
     ModelVariantFormat,
     ModelVariantId,
     NumericPrecision,
     QuantizationType,
-    StaticShape,
 )
+
+
+class DynamicShapeValues(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    values: frozenset[PositiveInt]
+
+
+class InputInfo(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    shape: tuple[str | PositiveInt, ...]  ## int --> Static ; str --> Dynamic
 
 
 class ModelVariantInfo(BaseModel):
@@ -20,11 +32,23 @@ class ModelVariantInfo(BaseModel):
     accuracies: list[AccuracyMetric]
     format: ModelVariantFormat
 
-    static_shapes: list[StaticShape]
-    dynamic_shapes: list[DynamicShape]
+    inputs_info: dict[str, InputInfo]
+    dynamic_dimension_values: dict[str, DynamicShapeValues]
 
-    ## TODO: Add check for shapes: no shape can be declared twice in the same or different shape group
-    ## TODO: Add check for coherence between model type and architecture info
+    @model_validator(mode="after")
+    def validate_input_shapes(self) -> Self:
+        for input_name, input_info in self.inputs_info.items():
+            input_shape = input_info.shape
+            for shape in input_shape:
+                if isinstance(shape, int):
+                    continue
+                else:
+                    if shape not in self.dynamic_dimension_values:
+                        raise ValueError(
+                            f"Unknown dynamic dimension {shape!r} in input {input_name!r}"
+                        )
+
+        return self
 
 
 class ModelVariant(BaseModel):

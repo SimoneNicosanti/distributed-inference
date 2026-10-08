@@ -18,7 +18,9 @@ class ModelVariantProfile(BaseModel):
         TensorKey, TensorProperty
     ]  ## Properties that are invariant to the input shape
 
-    shape_profiles: dict[ShapePoint, ShapeProfile]
+    shape_profiles: dict[
+        ShapePoint, ShapeProfile
+    ]  ## Properties that variant to the input shape
 
     optimization_contractions: list[
         tuple[LayerKey, ...]

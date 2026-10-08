@@ -7,9 +7,6 @@ from worker.domain.profiling.resource_profile import GpuProfile
 
 
 class NoGpuProfiler(GpuProfiler):
-    def __init__(self):
-        pass
-
     @override
     async def profile_gpus(self) -> tuple[GpuProfile, ...]:
         return ()

@@ -1,14 +1,20 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, PositiveInt
 
 from shared.model.model_variant import (
     AccuracyMetric,
-    DynamicShape,
     ModelVariantFormat,
     ModelVariantId,
     NumericPrecision,
     QuantizationType,
-    StaticShape,
 )
+
+
+class DynamicShapeValuesDto(BaseModel):
+    values: frozenset[PositiveInt]
+
+
+class InputInfoDto(BaseModel):
+    shape: tuple[str | PositiveInt, ...]
 
 
 class ModelVariantDto(BaseModel):
@@ -19,5 +25,5 @@ class ModelVariantDto(BaseModel):
     accuracies: list[AccuracyMetric]
     format: ModelVariantFormat
 
-    static_shapes: list[StaticShape]
-    dynamic_shapes: list[DynamicShape]
+    inputs_info: dict[str, InputInfoDto]
+    dynamic_dimension_values: dict[str, DynamicShapeValuesDto]

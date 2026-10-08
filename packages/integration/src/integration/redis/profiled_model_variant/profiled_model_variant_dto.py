@@ -1,20 +1,32 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NonNegativeFloat,
+    PositiveInt,
+)
 
 from shared.artifact.artifact_ref import ArtifactRef
 from shared.model.keys import LayerKey, TensorKey
 from shared.model.model_variant import (
     AccuracyMetric,
-    DynamicShape,
     ModelVariantFormat,
     ModelVariantId,
     NumericPrecision,
     QuantizationType,
-    StaticShape,
 )
 
 
 class RedisDto(BaseModel):
     model_config = ConfigDict(frozen=True)
+
+
+class DynamicShapeValuesDto(RedisDto):
+    values: frozenset[PositiveInt]
+
+
+class InputInfoDto(RedisDto):
+    shape: tuple[str | PositiveInt, ...]
 
 
 class InfoDto(RedisDto):
@@ -23,8 +35,8 @@ class InfoDto(RedisDto):
     accuracies: list[AccuracyMetric]
     format: ModelVariantFormat
 
-    static_shapes: list[StaticShape]
-    dynamic_shapes: list[DynamicShape]
+    inputs_info: dict[str, InputInfoDto]
+    dynamic_dimension_values: dict[str, DynamicShapeValuesDto]
 
 
 class LayerDescriptionDto(RedisDto):
@@ -61,16 +73,21 @@ class TensorPropertyDto(RedisDto):
     shape_expression: tuple[int | str, ...]
 
 
+class InputShapePointDto(RedisDto):
+    name: str
+    shape: tuple[PositiveInt, ...]
+
+
 class ShapePointDto(RedisDto):
-    dims: tuple[tuple[str, int], ...]
+    input_shape_points: tuple[InputShapePointDto, ...]
 
 
 class LayerShapePropertyDto(RedisDto):
-    flops: float
+    flops: NonNegativeFloat
 
 
 class TensorShapePropertyDto(RedisDto):
-    shape: tuple[int, ...]
+    shape: tuple[PositiveInt, ...]
 
 
 class ShapeProfileDto(RedisDto):
@@ -85,6 +102,10 @@ class ProfileDto(RedisDto):
     invariant_tensor_properties: dict[TensorKey, TensorPropertyDto]
     shape_profiles: list[ShapeProfileDto]
     optimization_contractions: list[tuple[LayerKey, ...]]
+
+    @property
+    def shape_points(self) -> list[ShapePointDto]:
+        return [shape_profile.shape_point for shape_profile in self.shape_profiles]
 
 
 class ProfiledModelVariantDto(RedisDto):

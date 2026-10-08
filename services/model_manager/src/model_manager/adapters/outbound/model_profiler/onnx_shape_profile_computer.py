@@ -1,11 +1,9 @@
 import itertools
-import re
 from typing import override
 
 import numpy as np
 import onnx
 import onnx_tool
-import sympy
 from onnx.shape_inference import infer_shapes
 
 from artifacts.contracts.artifact_workspace import ArtifactWorkspace
@@ -19,6 +17,7 @@ from model_manager.domain.model import ModelInfo
 from model_manager.domain.model_variant import ModelVariantInfo
 from model_manager.domain.model_variant_topology import ModelVariantTopology
 from model_manager.domain.shape_profile import (
+    InputShapePoint,
     LayerShapeProperty,
     ShapePoint,
     ShapeProfile,
@@ -67,28 +66,36 @@ class OnnxShapeProfileComputer(ShapeProfileComputer):
     def _compute_shape_points(
         model_variant_info: ModelVariantInfo,
     ) -> list[ShapePoint]:
-        static_dimensions = [
-            (shape.name, shape.value) for shape in model_variant_info.static_shapes
-        ]
-        dynamic_options = [
-            [
-                (shape.name, value)
-                for value in range(
-                    shape.min_value,
-                    shape.max_value + 1,
-                    shape.step_size,
+        dynamic_dimension_names = tuple(
+            sorted(model_variant_info.dynamic_dimension_values)
+        )
+        dynamic_dimension_options = tuple(
+            sorted(model_variant_info.dynamic_dimension_values[dimension_name].values)
+            for dimension_name in dynamic_dimension_names
+        )
+
+        shape_points = []
+        for dynamic_values in itertools.product(*dynamic_dimension_options):
+            dimension_bindings = dict(
+                zip(dynamic_dimension_names, dynamic_values, strict=True)
+            )
+            input_shape_points = tuple(
+                InputShapePoint(
+                    name=input_name,
+                    shape=tuple(
+                        dimension_bindings[dimension]
+                        if isinstance(dimension, str)
+                        else dimension
+                        for dimension in input_info.shape
+                    ),
                 )
-            ]
-            for shape in model_variant_info.dynamic_shapes
-        ]
+                for input_name, input_info in sorted(
+                    model_variant_info.inputs_info.items()
+                )
+            )
+            shape_points.append(ShapePoint(input_shape_points=input_shape_points))
 
-        if not dynamic_options:
-            return [ShapePoint(dims=tuple(sorted(static_dimensions)))]
-
-        return [
-            ShapePoint(dims=tuple(sorted([*static_dimensions, *dynamic_dimensions])))
-            for dynamic_dimensions in itertools.product(*dynamic_options)
-        ]
+        return shape_points
 
     @staticmethod
     def _compute_shape_profile(
@@ -103,10 +110,14 @@ class OnnxShapeProfileComputer(ShapeProfileComputer):
         initializer_names = {
             initializer.name for initializer in model_proto.graph.initializer
         }
+        input_shapes = {
+            input_shape_point.name: input_shape_point.shape
+            for input_shape_point in shape_point.input_shape_points
+        }
         tool_inputs = {
             value_info.name: OnnxShapeProfileComputer._create_input(
                 value_info,
-                shape_point,
+                input_shapes[value_info.name],
             )
             for value_info in model_proto.graph.input
             if value_info.name not in initializer_names
@@ -162,7 +173,7 @@ class OnnxShapeProfileComputer(ShapeProfileComputer):
     @staticmethod
     def _create_input(
         value_info_proto: onnx.ValueInfoProto,
-        shape_point: ShapePoint,
+        shape: tuple[int, ...],
     ) -> np.ndarray:
         if value_info_proto.type.WhichOneof("value") != "tensor_type":
             raise ValueError(
@@ -175,58 +186,8 @@ class OnnxShapeProfileComputer(ShapeProfileComputer):
                 f"Input {value_info_proto.name!r} has an undefined data type"
             )
 
-        shape = tuple(
-            OnnxShapeProfileComputer._resolve_dimension(dimension, shape_point)
-            for dimension in tensor_type.shape.dim
-        )
         data_type = np.dtype(
             onnx.helper.tensor_dtype_to_np_dtype(tensor_type.elem_type)
         )
 
         return np.zeros(shape, dtype=data_type)
-
-    @staticmethod
-    def _resolve_dimension(
-        dimension: onnx.TensorShapeProto.Dimension,
-        shape_point: ShapePoint,
-    ) -> int:
-        dimension_type = dimension.WhichOneof("value")
-        if dimension_type == "dim_value":
-            return int(dimension.dim_value)
-        if dimension_type != "dim_param":
-            raise ValueError("Anonymous dynamic dimension cannot be resolved")
-
-        expression_text = dimension.dim_param
-        if re.fullmatch(r"[A-Za-z0-9_+\-*/%(),\s]+", expression_text) is None:
-            raise ValueError(f"Unsupported symbolic dimension: {expression_text!r}")
-
-        bindings = dict(shape_point.dims)
-        functions = {
-            "ceil": sympy.ceiling,
-            "ceiling": sympy.ceiling,
-            "floor": sympy.floor,
-            "Max": sympy.Max,
-            "Min": sympy.Min,
-        }
-        identifiers = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expression_text))
-        unknown_identifiers = identifiers - bindings.keys() - functions.keys()
-        if unknown_identifiers:
-            raise ValueError(
-                f"Unresolved symbolic dimension {expression_text!r}: "
-                f"unknown identifiers {sorted(unknown_identifiers)!r}"
-            )
-
-        symbols = {name: sympy.Symbol(name) for name in bindings}
-        expression = sympy.sympify(expression_text, locals={**symbols, **functions})
-        substitutions = {symbols[name]: value for name, value in bindings.items()}
-        resolved = expression.subs(substitutions)
-
-        if resolved.free_symbols:
-            raise ValueError(f"Unresolved symbolic dimension: {dimension.dim_param!r}")
-        if resolved.is_integer is not True:
-            raise ValueError(f"Non-integer symbolic dimension: {dimension.dim_param!r}")
-
-        value = int(resolved)
-        if value < 0:
-            raise ValueError(f"Negative tensor dimension: {value}")
-        return value
