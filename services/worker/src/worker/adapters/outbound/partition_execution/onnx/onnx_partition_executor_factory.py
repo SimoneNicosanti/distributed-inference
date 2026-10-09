@@ -4,7 +4,6 @@ from typing import override
 import onnxruntime as ort
 
 from artifacts.contracts.artifact_bundle import ArtifactBundle
-from shared.plan.plan import ResourceAllocation
 from worker.adapters.outbound.partition_execution.onnx.onnx_partition_executor import (
     OnnxPartitionExecutor,
 )
@@ -18,6 +17,7 @@ from worker.application.ports.outbound.partition_execution.partition_executor im
 from worker.application.ports.outbound.partition_execution.partition_executor_factory import (
     PartitionExecutorFactory,
 )
+from worker.domain.plan.deployment_plan import ResourceAllocation
 
 
 class OnnxInferenceSessionBuilder:

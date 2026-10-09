@@ -6,6 +6,8 @@ from typing import override
 import numpy as np
 import onnxruntime as ort
 
+from shared.tensor.tensor import Tensor
+from shared.tensor.tensor_bundle import TensorBundle
 from worker.adapters.outbound.partition_execution.onnx.onnx_partition_executor_options import (
     OnnxDeviceType,
     OnnxPartitionExecutorOptions,
@@ -17,7 +19,6 @@ from worker.domain.partition.partition_execution import (
     PartitionExecutionInput,
     PartitionExecutionOutput,
 )
-from worker.domain.partition.tensor_bundle import Tensor, TensorBundle
 
 
 class OnnxPartitionExecutor(PartitionExecutor):

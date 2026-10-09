@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any
 
 
-class Invoker(ABC):
+class ContributionSender[ConT](ABC):
     @abstractmethod
-    async def invoke(
+    async def send(
         self,
-        request: Any,
+        contribution: ConT,
     ) -> None: ...

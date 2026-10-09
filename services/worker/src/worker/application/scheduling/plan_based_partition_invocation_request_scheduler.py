@@ -6,12 +6,9 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from scheduling.queue_request import QueueRequest
-from shared.plan.plan import InferencePlanVersion, ServiceInferencePlan
-from worker.application.deployment.abc.service_inference_plan_preparer import (
-    ServiceInferencePlanPreparer,
-)
-from worker.application.ports.outbound.plan_store.service_inference_plan_store import (
-    ServiceInferencePlanStore,
+from shared.plan.plan_version import PlanVersion
+from worker.application.ports.outbound.plan_store.scheduling_plan_reader import (
+    SchedulingPlanReader,
 )
 from worker.application.scheduling.abc.partition_invocation_request_scheduler import (
     PartitionInvocationRequestScheduler,
@@ -19,19 +16,17 @@ from worker.application.scheduling.abc.partition_invocation_request_scheduler im
 from worker.domain.partition.partition_invocation import (
     PartitionInvocationRequest,
 )
+from worker.domain.plan.scheduling_plan import PriorityKey
 
 
 @dataclass
 class QueuedPartitionInvocationRequest(QueueRequest[PartitionInvocationRequest, Any]):
-    plan_version: InferencePlanVersion
+    plan_version: PlanVersion
     per_plan_priority: int
     sequence: int
 
     def __lt__(self, other: Any) -> bool:
-        if not isinstance(
-            other,
-            QueuedPartitionInvocationRequest,
-        ):
+        if not isinstance(other, QueuedPartitionInvocationRequest):
             return NotImplemented
 
         return (
@@ -47,39 +42,29 @@ class QueuedPartitionInvocationRequest(QueueRequest[PartitionInvocationRequest, 
         )
 
 
-class PlanBasedPartitionInvocationRequestScheduler(
-    PartitionInvocationRequestScheduler, ServiceInferencePlanPreparer
-):
-    def __init__(self, inference_plan_store: ServiceInferencePlanStore) -> None:
+class PlanBasedPartitionInvocationRequestScheduler(PartitionInvocationRequestScheduler):
+    def __init__(self, scheduling_plan_reader: SchedulingPlanReader) -> None:
         self._lock = asyncio.Lock()
-
         self._priority_queue: asyncio.PriorityQueue[
             QueuedPartitionInvocationRequest
         ] = asyncio.PriorityQueue()
-
         self._sequence = itertools.count()
-
-        self._plan_store = inference_plan_store
+        self._scheduling_plan_reader = scheduling_plan_reader
 
     @override
     async def enqueue(
         self, request: PartitionInvocationRequest, future: Future[Any]
     ) -> None:
-        plan_version = request.plan_version
-
         async with self._lock:
             request_priority = await self._assign_priority(request)
-
             queued_request = QueuedPartitionInvocationRequest(
                 request=request,
                 future=future,
                 timestamp=time.monotonic_ns(),
                 per_plan_priority=request_priority,
                 sequence=next(self._sequence),
-                plan_version=plan_version,
+                plan_version=request.plan_version,
             )
-
-            ## We do not need to wait because the enqueue is protected by the lock
             self._priority_queue.put_nowait(queued_request)
 
     @override
@@ -91,25 +76,18 @@ class PlanBasedPartitionInvocationRequestScheduler(
     async def length(self) -> int:
         return self._priority_queue.qsize()
 
-    @override
-    async def prepare_service_inference_plan(
-        self, service_inference_plan: ServiceInferencePlan
-    ) -> None:
-        ## We do not need special ops, we just need to sync with the plan in the store
-        pass
-
     async def _assign_priority(self, request: PartitionInvocationRequest) -> int:
         plan_version = request.plan_version
-        plan = await self._plan_store.get_service_inference_plan_by_version(
-            plan_version
+        scheduling_plan = (
+            await self._scheduling_plan_reader.get_scheduling_plan_by_version(
+                plan_version
+            )
         )
-        if plan is None:
-            raise ValueError(f"Plan version {plan_version} does not exist")
+        if scheduling_plan is None:
+            raise ValueError(f"Scheduling plan for version {plan_version} not found")
 
-        flow_id = request.flow_id
-        partition_deployment = request.partition_deployment
-        priority_value = plan.get_priority(flow_id, partition_deployment)
-        if priority_value is None:
-            raise ValueError(f"No priority for {flow_id}/{partition_deployment}")
-
-        return priority_value
+        priority_key = PriorityKey(
+            flow_id=request.flow_id,
+            partition_replica_id=request.partition_replica_id,
+        )
+        return scheduling_plan.get_priority_by_key(priority_key)

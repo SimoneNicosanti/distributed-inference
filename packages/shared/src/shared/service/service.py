@@ -17,3 +17,5 @@ class ServiceId(BaseModel):
 
 
 type WorkerId = ServiceId
+
+type ResultSinkId = ServiceId

@@ -1,10 +1,11 @@
 from typing import override
 
+from shared.tensor.tensor_bundle import TensorBundle
 from worker.application.partition_invocation.input.abc.partition_invocation_request_assembler import (
     PartitionInvocationRequestAssembler,
 )
-from worker.application.ports.outbound.plan_store.service_inference_plan_store import (
-    ServiceInferencePlanStore,
+from worker.application.ports.outbound.plan_store.partition_execution_plan_reader import (
+    PartitionExecutionPlanReader,
 )
 from worker.domain.context.partition_invocation_context import (
     PartitionInvocationContext,
@@ -15,45 +16,45 @@ from worker.domain.partition.partition_invocation import (
 from worker.domain.partition.partition_invocation_contribution import (
     PartitionInvocationContribution,
 )
-from worker.domain.partition.tensor_bundle import TensorBundle
 
 
 class DefaultPartitionInvocationRequestAssembler(PartitionInvocationRequestAssembler):
-    def __init__(self, plan_store: ServiceInferencePlanStore):
+    def __init__(
+        self, partition_execution_plan_reader: PartitionExecutionPlanReader
+    ) -> None:
         super().__init__()
-        self._plan_store = plan_store
+        self._partition_execution_plan_reader = partition_execution_plan_reader
 
-    ## Builds a complete partition invocation request from collected contributions.
     @override
     async def assemble(
         self,
         contributions: list[PartitionInvocationContribution],
     ) -> PartitionInvocationRequest:
-
-        plan = await self._plan_store.get_service_inference_plan_by_version(
-            contributions[0].plan_version
+        plan_version = contributions[0].plan_version
+        execution_plan = await self._partition_execution_plan_reader.get_partition_execution_plan_by_version(
+            plan_version
         )
-        if plan is None:
+        if execution_plan is None:
             raise ValueError(
-                f"Service inference plan for version {contributions[0].plan_version} not found"
+                f"Partition execution plan for version {plan_version} not found"
             )
 
         partition_id = contributions[0].partition_id
-        execution_scheme = plan.sub_model_execution_schemes[partition_id]
+        execution_scheme = execution_plan.get_scheme_by_partition_id(partition_id)
 
         full_payload = TensorBundle(bundle={})
         for contribution in contributions:
             full_payload = full_payload.merge(
-                contribution.bundle.filter(execution_scheme.inputs)
+                contribution.bundle.filter(list(execution_scheme.inputs))
             )
 
         model_pass_context = contributions[0].model_pass_context
-        partition_deployment_id = contributions[0].partition_deployment
+        replica_id = contributions[0].target_replica_id
 
         return PartitionInvocationRequest(
             context=PartitionInvocationContext(
                 model_pass_context=model_pass_context,
-                partition_deployment_id=partition_deployment_id,
+                partition_replica_id=replica_id,
             ),
             payload=full_payload,
         )

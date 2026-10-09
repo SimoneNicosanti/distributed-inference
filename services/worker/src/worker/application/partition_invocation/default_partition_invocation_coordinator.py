@@ -3,14 +3,14 @@ from contextlib import suppress
 from typing import override
 
 from lifecycle.async_lifecycle import AsyncLifecycle
-from worker.application.activity.abc.activity_request_factory import (
-    ActivityRequestFactory,
-)
 from worker.application.partition_execution.abc.partition_execution_coordinator import (
     PartitionExecutionCoordinator,
 )
 from worker.application.partition_invocation.input.abc.partition_invocation_contribution_inbox import (
     PartitionInvocationContributionInbox,
+)
+from worker.application.partition_invocation.output.abc.contribution_send_coordinator import (
+    ContributionSendCoordinator,
 )
 from worker.application.partition_invocation.output.abc.partition_output_router import (
     PartitionOutputRouter,
@@ -18,13 +18,6 @@ from worker.application.partition_invocation.output.abc.partition_output_router 
 from worker.application.ports.inbound.partition_invocation.partition_invocation_coordinator import (
     PartitionInvocationCoordinator,
 )
-from worker.application.ports.outbound.activity_manager.activity_manager import (
-    ActivityManager,
-)
-from worker.application.ports.outbound.partition_invocation.sender.partition_invocation_contribution_sender import (
-    PartitionInvocationContributionSender,
-)
-from worker.domain.activity.activity_request import ActivityType
 from worker.domain.partition.partition_invocation_contribution import (
     PartitionInvocationContribution,
     PartitionInvocationContributionAck,
@@ -40,9 +33,7 @@ class DefaultPartitionInvocationCoordinator(
         contribution_inbox: PartitionInvocationContributionInbox,
         partition_execution_coordinator: PartitionExecutionCoordinator,
         output_router: PartitionOutputRouter,
-        activity_request_factory: ActivityRequestFactory,
-        activity_manager: ActivityManager,
-        contribution_sender: PartitionInvocationContributionSender,
+        contribution_sender_coordinator: ContributionSendCoordinator,
     ):
 
         if max_concurrent_invocations <= 0:
@@ -54,9 +45,7 @@ class DefaultPartitionInvocationCoordinator(
         self._contribution_inbox = contribution_inbox
         self._partition_execution_coordinator = partition_execution_coordinator
         self._output_router = output_router
-        self._activity_request_factory = activity_request_factory
-        self._activity_manager = activity_manager
-        self._contribution_sender = contribution_sender
+        self._contribution_sender_coordinator = contribution_sender_coordinator
 
         self._supervisor_task: asyncio.Task[None] | None = None
 
@@ -70,7 +59,9 @@ class DefaultPartitionInvocationCoordinator(
         )
         await asyncio.shield(completion_future)
 
-        return PartitionInvocationContributionAck(context=contribution.context)
+        return PartitionInvocationContributionAck(
+            context=contribution.source_invocation_context
+        )
 
     async def _worker_loop(self) -> None:
         while True:
@@ -92,22 +83,10 @@ class DefaultPartitionInvocationCoordinator(
             routed_contributions = await self._output_router.route(
                 contributions, partition_invocation_result
             )
-            activity_request = (
-                self._activity_request_factory.create_request_for_activity_type(
-                    ActivityType.NETWORK_TRANSMISSION
-                )
+
+            await self._contribution_sender_coordinator.send_all_contributions(
+                routed_contributions
             )
-            activity_grant = await self._activity_manager.acquire_activity_grant(
-                activity_request
-            )
-            async with activity_grant:
-                all_sent_future = asyncio.gather(
-                    *[
-                        self._contribution_sender.send(contribution)
-                        for contribution in routed_contributions
-                    ]
-                )
-                await all_sent_future
 
             ## NOTE: We can move the set_result depending on when we want to notify the completion of the invocation
             future.set_result(None)

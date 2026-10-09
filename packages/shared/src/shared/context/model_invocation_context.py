@@ -3,6 +3,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 from shared.flow.flow import FlowId
+from shared.service.service import ResultSinkId
 
 # class InferenceRequestId(BaseModel):
 #     model_config = ConfigDict(frozen=True)
@@ -25,3 +26,5 @@ class ModelInvocationContext(BaseModel):
     # inference_run_context: InferenceRunContext
     model_invocation_id: ModelInvocationId = Field(default_factory=uuid4)
     flow_id: FlowId
+
+    result_sink: ResultSinkId

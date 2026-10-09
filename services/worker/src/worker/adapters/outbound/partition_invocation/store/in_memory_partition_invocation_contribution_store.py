@@ -27,7 +27,7 @@ class InMemoryPartitionInvocationContributionStore(
 
         collection_key = PartitionInvocationCollectionKey(
             model_pass_context=contribution.model_pass_context,
-            partition_deployment_id=contribution.partition_deployment,
+            partition_replica_id=contribution.target_replica_id,
         )
 
         if collection_key not in self._memory_store:

@@ -1,7 +1,7 @@
 from typing import Any, override
 
+from ingress.application.abc.result_collector import ResultCollector
 from ingress.application.ports.inbound.result_receiver import ResultReceiver
-from ingress.application.result_collector import ResultCollector
 
 
 class DefaultResultReceiver(ResultReceiver):
@@ -11,6 +11,6 @@ class DefaultResultReceiver(ResultReceiver):
 
     @override
     async def receive_result(self, request_id: Any, result_data: Any) -> None:
-        await self._gatherer.add_result(request_id, result_data)
+        await self._gatherer.add_result_contribution(request_id, result_data)
 
         return None

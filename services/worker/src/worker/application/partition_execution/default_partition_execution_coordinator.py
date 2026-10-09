@@ -3,12 +3,8 @@ from contextlib import suppress
 from typing import override
 
 from lifecycle.async_lifecycle import AsyncLifecycle
-from shared.plan.plan import ServiceInferencePlan
 from worker.application.activity.abc.activity_request_factory import (
     ActivityRequestFactory,
-)
-from worker.application.deployment.abc.service_inference_plan_preparer import (
-    ServiceInferencePlanPreparer,
 )
 from worker.application.partition_execution.abc.partition_execution_coordinator import (
     PartitionExecutionCoordinator,
@@ -18,9 +14,6 @@ from worker.application.partition_execution.abc.partition_executor_registry impo
 )
 from worker.application.ports.outbound.activity_manager.activity_manager import (
     ActivityManager,
-)
-from worker.application.ports.outbound.plan_store.service_inference_plan_store import (
-    ServiceInferencePlanStore,
 )
 from worker.application.scheduling.abc.partition_invocation_request_scheduler import (
     PartitionInvocationRequestScheduler,
@@ -40,17 +33,15 @@ from worker.domain.partition.partition_invocation import (
 
 
 class DefaultPartitionExecutionCoordinator(
-    PartitionExecutionCoordinator, ServiceInferencePlanPreparer, AsyncLifecycle
+    PartitionExecutionCoordinator, AsyncLifecycle
 ):
     def __init__(
         self,
-        inference_plan_store: ServiceInferencePlanStore,
         activity_request_factory: ActivityRequestFactory,
         activity_manager: ActivityManager,
         partition_invocation_request_scheduler: PartitionInvocationRequestScheduler,
         partition_executor_registry: PartitionExecutorRegistry,
     ) -> None:
-        self._inference_plan_store = inference_plan_store
         self._activity_request_factory = activity_request_factory
         self._activity_manager = activity_manager
         self._partition_invocation_request_scheduler = (
@@ -59,16 +50,6 @@ class DefaultPartitionExecutionCoordinator(
         self._partition_executor_registry = partition_executor_registry
 
         self._controller_task: asyncio.Task[None] | None = None
-
-    @override
-    async def prepare_service_inference_plan(
-        self, service_inference_plan: ServiceInferencePlan
-    ) -> None:
-        ## TODO: Check this flow; it is probably different
-        ## 1. Create workers based on new plan
-        ## 2. Do not delete existing workers, but keep them for possible late requests
-        ## 3. Update active plan
-        pass
 
     @override
     async def process_partition_invocation_request(
@@ -137,13 +118,13 @@ class DefaultPartitionExecutionCoordinator(
         self, partition_invocation_request: PartitionInvocationRequest
     ) -> PartitionInvocationResult:
 
-        partition_deployment = partition_invocation_request.partition_deployment
+        replica_id = partition_invocation_request.partition_replica_id
         partition_execution_input = await self._build_partition_execution_input(
             partition_invocation_request
         )
 
         async with self._partition_executor_registry.acquire_partition_executor(
-            partition_deployment
+            replica_id
         ) as partition_executor:
             partition_execution_output = await partition_executor.execute(
                 partition_execution_input

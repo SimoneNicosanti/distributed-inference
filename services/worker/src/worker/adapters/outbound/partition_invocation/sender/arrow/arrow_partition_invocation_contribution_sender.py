@@ -15,11 +15,14 @@ from integration.worker.partition_invocation.arrow.arrow_partition_invocation_co
     SUBMIT_CONTRIBUTION_COMMAND,
     build_contribution_schema,
 )
+from worker.application.ports.outbound.directory.partition_deployment_registry import (
+    PartitionDeploymentRegistry,
+)
 from worker.application.ports.outbound.directory.service_directory import (
     ServiceDirectory,
 )
-from worker.application.ports.outbound.partition_invocation.sender.partition_invocation_contribution_sender import (
-    PartitionInvocationContributionSender,
+from worker.application.ports.outbound.partition_invocation.sender.contribution_sender import (
+    ContributionSender,
 )
 from worker.domain.directory.worker_instance import WorkerInstance
 from worker.domain.partition.partition_invocation_contribution import (
@@ -28,13 +31,17 @@ from worker.domain.partition.partition_invocation_contribution import (
 )
 
 
-class ArrowPartitionInvocationContributionSender(PartitionInvocationContributionSender):
+class ArrowPartitionInvocationContributionSender(
+    ContributionSender[PartitionInvocationContribution]
+):
     def __init__(
         self,
         directory: ServiceDirectory,
+        partition_deployment_registry: PartitionDeploymentRegistry,
         timeout_s: float = 30.0,
     ) -> None:
         self._directory = directory
+        self._partition_deployment_registry = partition_deployment_registry
         self._timeout_s = timeout_s
 
     @override
@@ -42,8 +49,13 @@ class ArrowPartitionInvocationContributionSender(PartitionInvocationContribution
         self,
         contribution: PartitionInvocationContribution,
     ) -> None:
+        deployment_id = (
+            await self._partition_deployment_registry.get_partition_deployment_id(
+                contribution.target_replica_id
+            )
+        )
         worker_instance = await self._directory.get_worker_instance_by_worker_id(
-            contribution.worker_id
+            deployment_id.worker_id
         )
 
         interface = self._select_arrow_interface(worker_instance)
@@ -107,7 +119,7 @@ class ArrowPartitionInvocationContributionSender(PartitionInvocationContribution
             ack_buffer.to_pybytes()
         )
 
-        if ack.context != contribution.context:
+        if ack.context != contribution.source_invocation_context:
             raise RuntimeError("Partition invocation acknowledgement context mismatch")
 
     @staticmethod
@@ -123,7 +135,7 @@ class ArrowPartitionInvocationContributionSender(PartitionInvocationContribution
 
         arrays: list[pa.Array] = [
             pa.array(
-                [contribution.context.model_dump_json()],
+                [contribution.model_dump_json(exclude={"bundle"})],
                 type=pa.large_string(),
             )
         ]

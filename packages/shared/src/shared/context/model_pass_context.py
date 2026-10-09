@@ -3,10 +3,10 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from shared.plan.plan import InferencePlanVersion
-from worker.domain.context.model_invocation_context import (
+from shared.context.model_invocation_context import (
     ModelInvocationContext,
 )
+from shared.plan.plan_version import PlanVersion
 
 type ModelPassId = UUID
 
@@ -22,6 +22,6 @@ class ModelPassContext(BaseModel):
     model_config = ConfigDict(frozen=True)
     model_invocation_context: ModelInvocationContext
 
-    plan_version: InferencePlanVersion
+    plan_version: PlanVersion
     model_pass_type: ModelPassType
     model_pass_id: ModelPassId = Field(default_factory=uuid4)

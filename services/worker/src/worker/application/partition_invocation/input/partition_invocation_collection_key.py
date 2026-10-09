@@ -1,13 +1,13 @@
 from pydantic import BaseModel, ConfigDict
 
-from shared.plan.plan import PartitionDeployment
-from worker.domain.context.model_pass_context import (
+from shared.context.model_pass_context import (
     ModelPassContext,
 )
+from shared.plan.partition_replica_id import PartitionReplicaId
 
 
 class PartitionInvocationCollectionKey(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     model_pass_context: ModelPassContext
-    partition_deployment_id: PartitionDeployment
+    partition_replica_id: PartitionReplicaId

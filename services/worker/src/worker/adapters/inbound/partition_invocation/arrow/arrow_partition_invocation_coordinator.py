@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 import pyarrow as pa
 from pyarrow import flight
@@ -8,14 +9,14 @@ from integration.worker.partition_invocation.arrow.arrow_partition_invocation_co
     SUBMIT_CONTRIBUTION_COMMAND,
     validate_contribution_schema,
 )
+from shared.tensor.tensor import Tensor
+from shared.tensor.tensor_bundle import TensorBundle
 from worker.application.ports.inbound.partition_invocation.partition_invocation_coordinator import (
     PartitionInvocationCoordinator,
 )
 from worker.domain.partition.partition_invocation_contribution import (
     PartitionInvocationContribution,
-    PartitionInvocationContributionContext,
 )
-from worker.domain.partition.tensor_bundle import Tensor, TensorBundle
 
 
 class ArrowPartitionInvocationCoordinator(flight.FlightServerBase):
@@ -103,19 +104,18 @@ class ArrowPartitionInvocationCoordinator(flight.FlightServerBase):
 
         context_index = batch.schema.get_field_index(CONTEXT_FIELD_NAME)
 
-        context_scalar = batch.column(context_index)[row_index]
+        metadata_scalar = batch.column(context_index)[row_index]
 
-        if not context_scalar.is_valid:
+        if not metadata_scalar.is_valid:
             raise pa.ArrowInvalid("Missing contribution context")
 
         try:
-            contribution_context = (
-                PartitionInvocationContributionContext.model_validate_json(
-                    context_scalar.as_py()
-                )
-            )
-        except (TypeError, ValueError) as error:
+            contribution_metadata = json.loads(metadata_scalar.as_py())
+        except (TypeError, json.JSONDecodeError) as error:
             raise pa.ArrowInvalid(f"Invalid contribution context: {error}") from error
+
+        if not isinstance(contribution_metadata, dict):
+            raise pa.ArrowInvalid("Invalid contribution context: expected an object")
 
         bundle: dict[str, Tensor] = {}
 
@@ -146,7 +146,12 @@ class ArrowPartitionInvocationCoordinator(flight.FlightServerBase):
 
             bundle[field.name] = Tensor(value=value)
 
-        return PartitionInvocationContribution(
-            context=contribution_context,
-            bundle=TensorBundle(bundle=bundle),
-        )
+        try:
+            return PartitionInvocationContribution.model_validate(
+                {
+                    **contribution_metadata,
+                    "bundle": TensorBundle(bundle=bundle),
+                }
+            )
+        except ValueError as error:
+            raise pa.ArrowInvalid(f"Invalid contribution context: {error}") from error

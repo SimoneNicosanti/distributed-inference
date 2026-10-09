@@ -93,6 +93,9 @@ class CapabilityType(StrEnum):
     EXECUTION_PROFILING = auto()
     RESOURCE_PROFILING = auto()
 
+    # Declared by ingress
+    INVOCATION_OUTPUT = auto()
+
 
 class Capability(BaseModel):
     model_config = ConfigDict(frozen=True)
