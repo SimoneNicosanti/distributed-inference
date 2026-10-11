@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from shared.plan.plan_version import PlanVersion
-from worker.domain.plan.scheduling_plan import SchedulingPlan
+from worker.domain.plan.worker.scheduling_plan import SchedulingPlan
 
 
 class SchedulingPlanReader(ABC):

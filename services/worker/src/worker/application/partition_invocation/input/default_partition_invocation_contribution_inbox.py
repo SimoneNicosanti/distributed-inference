@@ -23,7 +23,7 @@ from worker.application.ports.outbound.plan_store.routing_plan_reader import (
 from worker.domain.partition.partition_invocation_contribution import (
     PartitionInvocationContribution,
 )
-from worker.domain.plan.routing_plan import RoutingPlan
+from worker.domain.plan.worker.routing_plan import RoutingPlan
 
 
 class DefaultPartitionInvocationContributionInbox(PartitionInvocationContributionInbox):

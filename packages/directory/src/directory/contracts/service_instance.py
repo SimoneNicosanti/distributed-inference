@@ -94,7 +94,7 @@ class CapabilityType(StrEnum):
     RESOURCE_PROFILING = auto()
 
     # Declared by ingress
-    INVOCATION_OUTPUT = auto()
+    RESULT_SINKER = auto()
 
 
 class Capability(BaseModel):

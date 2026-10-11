@@ -16,7 +16,7 @@ from worker.application.scheduling.abc.partition_invocation_request_scheduler im
 from worker.domain.partition.partition_invocation import (
     PartitionInvocationRequest,
 )
-from worker.domain.plan.scheduling_plan import PriorityKey
+from worker.domain.plan.worker.scheduling_plan import PriorityKey
 
 
 @dataclass

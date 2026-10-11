@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from shared.plan.plan_version import PlanVersion
-from worker.domain.plan.partition_execution_plan import PartitionExecutionPlan
+from worker.domain.plan.worker.partition_execution_plan import PartitionExecutionPlan
 
 
 class PartitionExecutionPlanReader(ABC):

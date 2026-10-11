@@ -2,13 +2,12 @@ from typing import override
 
 from artifacts.storage.artifact_store import ArtifactStore
 from shared.plan.partition_deployment_id import PartitionDeploymentId
+from shared.plan.plan_version import PlanVersion
 from shared.service.service import WorkerId
 from worker.application.partition_execution.abc.partition_executor_registry import (
     PartitionExecutorRegistry,
 )
-from worker.application.ports.inbound.deployment.worker_plan_deployer import (
-    WorkerPlanDeployer,
-)
+from worker.application.ports.inbound.deployment.plan_deployer import PlanDeployer
 from worker.application.ports.outbound.directory.partition_deployment_registry import (
     PartitionDeploymentRegistry,
 )
@@ -21,10 +20,10 @@ from worker.application.ports.outbound.partition_execution.partition_executor_fa
 from worker.application.ports.outbound.plan_store.worker_plan_store import (
     WorkerPlanStore,
 )
-from worker.domain.plan.worker_plan import WorkerPlan
+from worker.domain.plan.worker.worker_plan import WorkerPlan
 
 
-class DefaultWorkerPlanDeployer(WorkerPlanDeployer):
+class DefaultWorkerPlanDeployer(PlanDeployer[WorkerPlan]):
     def __init__(
         self,
         worker_id: WorkerId,
@@ -44,9 +43,9 @@ class DefaultWorkerPlanDeployer(WorkerPlanDeployer):
         self._partition_deployment_registry = partition_deployment_registry
 
     @override
-    async def prepare_worker_plan(self, worker_plan: WorkerPlan) -> None:
-        await self._create_partition_executors(worker_plan)
-        await self._worker_plan_store.put_worker_plan(worker_plan)
+    async def prepare_plan(self, plan: WorkerPlan) -> None:
+        await self._create_partition_executors(plan)
+        await self._worker_plan_store.put_worker_plan(plan)
 
     async def _create_partition_executors(self, worker_plan: WorkerPlan) -> None:
         deployment_plan = worker_plan.deployment_plan
@@ -83,9 +82,10 @@ class DefaultWorkerPlanDeployer(WorkerPlanDeployer):
                     )
 
             await self._partition_deployment_registry.register_partition_deployment(
-                deployment_id
+                plan_version=worker_plan.plan_version,
+                deployment_id=deployment_id,
             )
 
     @override
-    async def apply_worker_plan(self, worker_plan: WorkerPlan) -> None:
-        await self._worker_plan_store.activate_worker_plan(worker_plan.plan_version)
+    async def apply_plan(self, plan_version: PlanVersion) -> None:
+        await self._worker_plan_store.activate_worker_plan(plan_version)

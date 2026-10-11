@@ -51,10 +51,11 @@ class ArrowPartitionInvocationContributionSender(
     ) -> None:
         deployment_id = (
             await self._partition_deployment_registry.get_partition_deployment_id(
-                contribution.target_replica_id
+                plan_version=contribution.plan_version,
+                replica_id=contribution.target_replica_id,
             )
         )
-        worker_instance = await self._directory.get_worker_instance_by_worker_id(
+        worker_instance = await self._directory.get_worker_instance_by_id(
             deployment_id.worker_id
         )
 

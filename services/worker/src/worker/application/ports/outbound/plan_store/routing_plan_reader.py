@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from shared.plan.plan_version import PlanVersion
-from worker.domain.plan.routing_plan import RoutingPlan
+from worker.domain.plan.worker.routing_plan import RoutingPlan
 
 
 class RoutingPlanReader(ABC):

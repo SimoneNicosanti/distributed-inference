@@ -84,12 +84,13 @@ class DefaultPartitionInvocationCoordinator(
                 contributions, partition_invocation_result
             )
 
+            ## NOTE: We can move the set_result depending on when we want to notify the completion of the invocation
+            ## We put this here to unlock the future set without waiting for the whole pipeline completion
+            future.set_result(None)
+
             await self._contribution_sender_coordinator.send_all_contributions(
                 routed_contributions
             )
-
-            ## NOTE: We can move the set_result depending on when we want to notify the completion of the invocation
-            future.set_result(None)
 
     async def _run_workers(self) -> None:
         async with asyncio.TaskGroup() as task_group:

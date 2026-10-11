@@ -45,9 +45,7 @@ class DefaultPartitionOutputRouter(PartitionOutputRouter):
             PartitionInvocationContribution | ModelPassResultContribution
         ] = []
 
-        available_tensor_names = set(
-            partition_invocation_result.payload.get_tensor_names()
-        )
+        available_tensor_names = partition_invocation_result.payload.get_tensor_names()
         for contribution in contributions:
             available_tensor_names.update(contribution.bundle.get_tensor_names())
 
@@ -64,21 +62,21 @@ class DefaultPartitionOutputRouter(PartitionOutputRouter):
                 partition_invocation_result.payload.filter(tensor_names)
             )
 
+            routed_contribution: (
+                PartitionInvocationContribution | ModelPassResultContribution
+            )
             if next_replica_id is None:
-                routed_contributions.append(
-                    ModelPassResultContribution(
-                        model_pass_context=partition_invocation_result.model_pass_context,
-                        bundle=payload,
-                    )
+                routed_contribution = ModelPassResultContribution(
+                    model_pass_context=partition_invocation_result.model_pass_context,
+                    bundle=payload,
                 )
-                continue
-
-            routed_contributions.append(
-                PartitionInvocationContribution(
+            else:
+                routed_contribution = PartitionInvocationContribution(
                     source_invocation_context=partition_invocation_result.context,
                     target_replica_id=next_replica_id,
                     bundle=payload,
                 )
-            )
+
+            routed_contributions.append(routed_contribution)
 
         return routed_contributions
