@@ -1,10 +1,10 @@
 from pydantic import BaseModel, PositiveInt
 
 from shared.model.model_variant import (
-    AccuracyMetric,
     ModelVariantFormat,
     ModelVariantId,
     NumericPrecision,
+    PerformanceMetric,
     QuantizationType,
 )
 
@@ -22,7 +22,7 @@ class ModelVariantDto(BaseModel):
 
     precision: NumericPrecision
     quantization: QuantizationType
-    accuracies: list[AccuracyMetric]
+    accuracies: list[PerformanceMetric]
     format: ModelVariantFormat
 
     inputs_info: dict[str, InputInfoDto]

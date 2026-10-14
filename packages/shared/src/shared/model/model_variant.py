@@ -1,7 +1,6 @@
 from enum import StrEnum, auto
-from typing import Self
 
-from pydantic import BaseModel, ConfigDict, PositiveInt, model_validator
+from pydantic import BaseModel, ConfigDict
 
 from shared.model.model import (
     ModelId,
@@ -20,15 +19,18 @@ class QuantizationType(StrEnum):
     DYNAMIC = auto()
 
 
-class AccuracyMetricType(StrEnum):
+class PerformanceMetricType(StrEnum):
     MAE = auto()
     RMSE = auto()
 
+    MAP_AT_50 = auto()
+    MAP_AT_75 = auto()
 
-class AccuracyMetric(BaseModel):
+
+class PerformanceMetric(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    type: AccuracyMetricType
+    type: PerformanceMetricType
     dataset: str
     value: float
 
@@ -38,43 +40,12 @@ class ModelVariantFormat(StrEnum):
     TORCH_EXPORTED_PROGRAM = auto()
 
 
-class ShapeType(StrEnum):
-    BATCH = auto()
-    SEQUENCE = auto()
-
-
 # class LLMArchitectureInfo(BaseModel):
 #     kind: Literal[ModelType.LLM] = ModelType.LLM
 #     context_length: int
 #     vocab_size: int
 #     num_kv_heads: int
 #     # etc, grows here only, nowhere else touched
-
-
-class Shape(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    type: ShapeType
-    name: str
-
-
-class DynamicShape(Shape):
-    min_value: PositiveInt
-    max_value: PositiveInt
-    step_size: PositiveInt = 1
-
-    @model_validator(mode="after")
-    def validate_model(self) -> Self:
-        if self.min_value >= self.max_value:
-            raise ValueError("min must be < max")
-
-        return self
-
-
-class StaticShape(Shape):
-    model_config = ConfigDict(frozen=True)
-
-    value: PositiveInt
 
 
 class StateTensorKind(StrEnum):

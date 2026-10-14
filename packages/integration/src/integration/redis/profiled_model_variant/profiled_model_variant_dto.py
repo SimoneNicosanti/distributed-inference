@@ -9,10 +9,10 @@ from pydantic import (
 from shared.artifact.artifact_ref import ArtifactRef
 from shared.model.keys import LayerKey, TensorKey
 from shared.model.model_variant import (
-    AccuracyMetric,
     ModelVariantFormat,
     ModelVariantId,
     NumericPrecision,
+    PerformanceMetric,
     QuantizationType,
 )
 
@@ -32,7 +32,7 @@ class InputInfoDto(RedisDto):
 class InfoDto(RedisDto):
     precision: NumericPrecision
     quantization: QuantizationType
-    accuracies: list[AccuracyMetric]
+    accuracies: list[PerformanceMetric]
     format: ModelVariantFormat
 
     inputs_info: dict[str, InputInfoDto]

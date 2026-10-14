@@ -76,6 +76,10 @@ class DefaultPartitionInvocationCoordinator(
                 ready_request.contributions,
             )
 
+            ## NOTE: We can move the set_result depending on when we want to notify the completion of the invocation
+            ## We put this here to unlock the future set without waiting for the whole pipeline completion
+            future.set_result(None)
+
             partition_invocation_result = await self._partition_execution_coordinator.process_partition_invocation_request(
                 request
             )
@@ -83,10 +87,6 @@ class DefaultPartitionInvocationCoordinator(
             routed_contributions = await self._output_router.route(
                 contributions, partition_invocation_result
             )
-
-            ## NOTE: We can move the set_result depending on when we want to notify the completion of the invocation
-            ## We put this here to unlock the future set without waiting for the whole pipeline completion
-            future.set_result(None)
 
             await self._contribution_sender_coordinator.send_all_contributions(
                 routed_contributions
