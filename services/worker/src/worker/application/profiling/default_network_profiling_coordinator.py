@@ -92,9 +92,7 @@ class DefaultNetworkProfilingCoordinator(NetworkProfilingCoordinator, AsyncLifec
 
     async def _coordinate_network_profiling(self) -> None:
         network_profile = await self.profile_network()
-        await self._net_profile_publisher.publish_network_profile(
-            self._worker_id, network_profile
-        )
+        await self._net_profile_publisher.publish_network_profile(network_profile)
 
     async def _profile_loop(self) -> None:
         while True:

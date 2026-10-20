@@ -60,9 +60,7 @@ class DefaultResourceProfilingCoordinator(ResourceProfilingCoordinator, AsyncLif
 
     async def _coordinate_resource_profiling(self) -> None:
         resource_profile = await self.profile_resources()
-        await self._res_profile_publisher.publish_resource_profile(
-            self._worker_id, resource_profile
-        )
+        await self._res_profile_publisher.publish_resource_profile(resource_profile)
 
     async def _profile_loop(self) -> None:
         while True:

@@ -34,14 +34,6 @@ When revising an earlier recommendation:
 
 If a previous response was incorrect or incomplete, correct it explicitly.
 
-## Agent delegation
-
-Do not spawn, create, invoke, or delegate work to sub-agents.
-
-Perform all analysis, inspection, reasoning, implementation, and tool usage directly within the current agent.
-
-Do not use agent orchestration, background agents, parallel agents, delegated workers, or equivalent mechanisms, even when available.
-
 ## Repository modifications
 
 Files outside these protected paths may be created, modified, moved, renamed, or deleted as needed to fulfill the current request:

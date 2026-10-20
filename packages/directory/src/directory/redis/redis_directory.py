@@ -9,17 +9,30 @@ from shared.service.service import ServiceId
 
 
 class RedisDirectory(ServiceDirectory):
-    def __init__(self, redis: redis_asyncio.Redis) -> None:
+    def __init__(self, redis: redis_asyncio.Redis, entry_ttl: int) -> None:
         self._redis = redis
+        self._entry_ttl = entry_ttl
 
     @override
-    async def put_service_instance(self, service_instance: ServiceInstance) -> None:
+    async def put_service_instance(
+        self,
+        service_instance: ServiceInstance,
+    ) -> None:
         base_key = self.__build_base_key()
         service_key = self.__build_service_key(service_instance.service_id)
 
-        await self._redis.hset(
-            base_key, service_key, service_instance.model_dump_json()
+        pipeline = self._redis.pipeline(transaction=True)
+        pipeline.hset(
+            base_key,
+            service_key,
+            service_instance.model_dump_json(),
         )
+        pipeline.hexpire(
+            base_key,
+            self._entry_ttl,
+            service_key,
+        )
+        await pipeline.execute()
 
     @override
     async def get_service_instance_by_service_id(

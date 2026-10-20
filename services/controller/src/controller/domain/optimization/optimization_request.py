@@ -4,6 +4,7 @@ from controller.domain.optimization.qos_constraints import QoSRequirements
 from controller.domain.optimization.stream_info import StreamInfo
 from shared.flow.flow import FlowId
 from shared.model.model import ModelTask
+from shared.service.service import WorkerId
 
 
 class OptimizationRequest(BaseModel):
@@ -14,3 +15,8 @@ class OptimizationRequest(BaseModel):
 
     stream_info: StreamInfo
     qos_requirements: QoSRequirements
+
+    ingress_id: WorkerId
+
+
+type OptimizationRequestsByFlow = dict[FlowId, OptimizationRequest]
