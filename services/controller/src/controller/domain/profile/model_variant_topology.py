@@ -1,4 +1,5 @@
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from typing import Any, TypedDict, cast
 
 import networkx as nx
@@ -22,6 +23,13 @@ class EdgeDescription(BaseModel):
     source: LayerKey
     target: LayerKey
     tensors: frozenset[TensorKey] = Field(default_factory=frozenset)
+
+
+@dataclass(frozen=True, slots=True)
+class TensorRoute:
+    source: LayerKey
+    destinations: tuple[LayerKey, ...]
+    maximal_destinations: tuple[LayerKey, ...]
 
 
 class _LayerAttributes(TypedDict):
@@ -87,6 +95,37 @@ class ModelVariantTopology:
                 nx.topological_sort(cast(Any, self._graph)),
             )
         )
+
+    def is_reachable(self, source: LayerKey, target: LayerKey) -> bool:
+        """Return whether ``target`` is reachable from ``source`` in the DAG."""
+        return bool(nx.has_path(cast(Any, self._graph), source, target))
+
+    def tensor_routes(self) -> Mapping[TensorKey, TensorRoute]:
+        sources: dict[TensorKey, LayerKey] = {}
+        destinations: dict[TensorKey, set[LayerKey]] = {}
+        for edge in self.edges().values():
+            for tensor in edge.tensors:
+                existing_source = sources.get(tensor)
+                if existing_source is not None and existing_source != edge.source:
+                    raise ValueError(f"Tensor {tensor!r} has multiple sources")
+                sources[tensor] = edge.source
+                destinations.setdefault(tensor, set()).add(edge.target)
+
+        return {
+            tensor: TensorRoute(
+                source=sources[tensor],
+                destinations=tuple(sorted(tensor_destinations)),
+                maximal_destinations=tuple(
+                    destination
+                    for destination in sorted(tensor_destinations)
+                    if not any(
+                        destination != other and self.is_reachable(destination, other)
+                        for other in tensor_destinations
+                    )
+                ),
+            )
+            for tensor, tensor_destinations in sorted(destinations.items())
+        }
 
     def layers(self) -> Mapping[LayerKey, LayerDescription]:
         nodes = cast(

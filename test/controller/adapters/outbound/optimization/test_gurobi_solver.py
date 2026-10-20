@@ -526,6 +526,7 @@ async def test_solves_feasible_single_worker_instance() -> None:
     assert len(flow_solution.components) == 1
     assert flow_solution.components[0].worker_id == device
     assert flow_solution.components[0].layer_keys == (_INPUT, _COMPUTE, _OUTPUT)
+    assert flow_solution.components[0].mean_execution_time_s == pytest.approx(0.1)
 
 
 @pytest.mark.asyncio
@@ -582,6 +583,9 @@ async def test_solves_multi_variant_two_worker_two_priority_instance() -> None:
         edge,
         device_a,
     )
+    assert tuple(
+        component.mean_execution_time_s for component in flow_solution.components
+    ) == pytest.approx((0, 0.04, 0))
 
 
 @pytest.mark.asyncio

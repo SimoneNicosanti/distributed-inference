@@ -33,6 +33,10 @@ def add_response_time_constraints(
     connections = context.network_topology.connections()
     for flow in p.flows:
         flow_index = p.flow_index[flow]
+        workers = p.workers_by_flow[flow]
+        successors_by_worker = {
+            source: context.network_topology.successors(source) for source in workers
+        }
         batch_fill = gp.quicksum(
             p.batch_fill_time[flow, model_variant]
             * assignment.model_selected[flow, model_variant]
@@ -60,9 +64,9 @@ def add_response_time_constraints(
             )
             * network.adjacent_component_workers[flow, cut, source, target]
             for cut in range(1, max_components)
-            for source in p.workers_by_flow[flow]
-            for target in p.workers_by_flow[flow]
-            if (flow, cut, source, target) in network.adjacent_component_workers
+            for source in workers
+            for target in workers
+            if source == target or target in successors_by_worker[source]
         )
         model.addConstr(
             qos.response_time[flow]

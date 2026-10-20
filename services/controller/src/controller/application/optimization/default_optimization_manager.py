@@ -40,4 +40,4 @@ class DefaultOptimizationManager(OptimizationManager):
             context,
             self._problem_config,
         )
-        self._solution_store.put_solution(solution)
+        await self._solution_store.put_solution(solution)

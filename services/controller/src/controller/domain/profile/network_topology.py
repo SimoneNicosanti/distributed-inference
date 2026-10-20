@@ -81,6 +81,14 @@ class NetworkTopology:
     def workers(self) -> frozenset[WorkerId]:
         return frozenset(self._graph.nodes)
 
+    def successors(self, source: WorkerId) -> frozenset[WorkerId]:
+        self._require_worker(source)
+        return frozenset(self._graph.successors(source))
+
+    def predecessors(self, target: WorkerId) -> frozenset[WorkerId]:
+        self._require_worker(target)
+        return frozenset(self._graph.predecessors(target))
+
     def connections(self) -> Mapping[NetworkConnectionKey, NetworkConnection]:
         connections = cast(
             Iterable[tuple[WorkerId, WorkerId, NetworkConnection]],
@@ -89,3 +97,7 @@ class NetworkTopology:
         return {
             (source, target): connection for source, target, connection in connections
         }
+
+    def _require_worker(self, worker_id: WorkerId) -> None:
+        if worker_id not in self._graph:
+            raise ValueError(f"Unknown worker: {worker_id.service_id}")

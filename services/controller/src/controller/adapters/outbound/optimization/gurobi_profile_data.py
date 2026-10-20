@@ -1,6 +1,5 @@
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass
 
 from controller.domain.optimization.optimization_context import OptimizationContext
 from controller.domain.profile.model_variant_execution_profile import (
@@ -17,12 +16,6 @@ from shared.service.service import WorkerId
 
 class GurobiProfileDataError(ValueError):
     pass
-
-
-@dataclass(frozen=True, slots=True)
-class TensorRoute:
-    source: LayerKey
-    destinations: tuple[LayerKey, ...]
 
 
 def fixed_shape_profile(profile: ModelVariantStaticProfile) -> ShapeProfile:
@@ -48,28 +41,6 @@ def batch_size(profile: ModelVariantStaticProfile) -> int:
             f"{profile.model_variant_id.model_dump_json()}"
         )
     return next(iter(batch_sizes))
-
-
-def tensor_routes(profile: ModelVariantStaticProfile) -> dict[TensorKey, TensorRoute]:
-    sources: dict[TensorKey, LayerKey] = {}
-    destinations: dict[TensorKey, set[LayerKey]] = {}
-    for edge in profile.topology.edges().values():
-        for tensor in edge.tensors:
-            existing_source = sources.get(tensor)
-            if existing_source is not None and existing_source != edge.source:
-                raise GurobiProfileDataError(
-                    f"Tensor {tensor!r} has multiple sources in "
-                    f"{profile.model_variant_id.model_dump_json()}"
-                )
-            sources[tensor] = edge.source
-            destinations.setdefault(tensor, set()).add(edge.target)
-    return {
-        tensor: TensorRoute(
-            source=sources[tensor],
-            destinations=tuple(sorted(tensor_destinations)),
-        )
-        for tensor, tensor_destinations in sorted(destinations.items())
-    }
 
 
 def tensor_size_bytes(
@@ -108,7 +79,7 @@ def layer_activation_sizes_bytes(
     profile: ModelVariantStaticProfile,
 ) -> dict[LayerKey, int]:
     sizes = dict.fromkeys(profile.topology.layers(), 0)
-    for tensor, route in tensor_routes(profile).items():
+    for tensor, route in profile.topology.tensor_routes().items():
         sizes[route.source] += tensor_size_bytes(profile, tensor)
     return sizes
 

@@ -7,7 +7,6 @@ from controller.adapters.outbound.optimization.gurobi_problem import (
     FlowModel,
     GurobiProblem,
 )
-from controller.adapters.outbound.optimization.gurobi_profile_data import tensor_routes
 from controller.domain.optimization.optimization_context import OptimizationContext
 from controller.domain.optimization.optimization_request import (
     OptimizationRequestsByFlow,
@@ -20,14 +19,20 @@ from shared.service.service import WorkerId
 
 @dataclass(slots=True)
 class AssignmentVariables:
+    max_components: int
     model_selected: dict[FlowModel, gp.Var]
     layer_component: dict[tuple[FlowId, ModelVariantId, LayerKey, int], gp.Var]
     component_worker: dict[tuple[FlowId, int, WorkerId], gp.Var]
     component_active: dict[tuple[FlowId, int], gp.Var]
     component_last: dict[tuple[FlowId, int], gp.Var]
-    layer_component_worker: dict[
-        tuple[FlowId, ModelVariantId, LayerKey, int, WorkerId], gp.Var
-    ]
+
+    def component_active_at(self, flow: FlowId, component: int) -> gp.Var | gp.LinExpr:
+        """Return the activation variable, or zero for the terminal sentinel."""
+        if component == self.max_components + 1:
+            return gp.LinExpr(0.0)
+        if component < 1 or component > self.max_components:
+            raise IndexError(f"component index out of range: {component}")
+        return self.component_active[flow, component]
 
 
 @dataclass(slots=True)
@@ -41,7 +46,7 @@ class ComputeQueueVariables:
     component_priority: dict[tuple[FlowId, int, WorkerId, int], gp.Var]
     priority_used: dict[tuple[WorkerId, int], gp.Var]
     priority_class_utilization: dict[tuple[FlowId, int, WorkerId, int], gp.Var]
-    lower_priority_utilization: dict[tuple[WorkerId, int], gp.Var]
+    higher_priority_utilization: dict[tuple[WorkerId, int], gp.Var]
     compute_bin_selected: dict[tuple[WorkerId, int, int], gp.Var]
     queue_wait_bin: dict[tuple[WorkerId, int, int], gp.Var]
     queue_wait: dict[tuple[WorkerId, int], gp.Var]
@@ -52,7 +57,9 @@ class ComputeQueueVariables:
 
 @dataclass(slots=True)
 class NetworkVariables:
-    tensor_crosses_cut: dict[tuple[FlowId, ModelVariantId, TensorKey, int], gp.Var]
+    tensor_crossing_auxiliary: dict[
+        tuple[FlowId, ModelVariantId, TensorKey, int], gp.Var
+    ]
     adjacent_component_workers: dict[tuple[FlowId, int, WorkerId, WorkerId], gp.Var]
     transmission_time: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var]
     network_utilization: dict[WorkerId, gp.Var]
@@ -62,6 +69,10 @@ class NetworkVariables:
 
 @dataclass(slots=True)
 class MemoryVariables:
+    component_weight_bytes: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var]
+    component_activation_bytes: dict[
+        tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var
+    ]
     max_activation_bytes: dict[WorkerId, gp.Var]
 
 
@@ -92,10 +103,6 @@ def _add_assignment_variables(
     component_worker: dict[tuple[FlowId, int, WorkerId], gp.Var] = {}
     component_active: dict[tuple[FlowId, int], gp.Var] = {}
     component_last: dict[tuple[FlowId, int], gp.Var] = {}
-    layer_component_worker: dict[
-        tuple[FlowId, ModelVariantId, LayerKey, int, WorkerId], gp.Var
-    ] = {}
-
     components = range(1, max_components + 1)
     for flow in problem.flows:
         flow_index = problem.flow_index[flow]
@@ -119,19 +126,6 @@ def _add_assignment_variables(
                             ),
                         )
                     )
-                    for worker in problem.workers_by_flow[flow]:
-                        worker_index = problem.worker_index[worker]
-                        layer_component_worker[
-                            flow, model_variant, layer, component, worker
-                        ] = model.addVar(
-                            lb=0.0,
-                            ub=1.0,
-                            name=(
-                                f"z[{flow_index},{model_index},{layer_index},"
-                                f"{component},{worker_index}]"
-                            ),
-                        )
-
         for component in components:
             component_active[flow, component] = model.addVar(
                 lb=0.0,
@@ -145,20 +139,19 @@ def _add_assignment_variables(
             )
             for worker in problem.workers_by_flow[flow]:
                 component_worker[flow, component, worker] = model.addVar(
-                    lb=0.0,
-                    ub=1.0,
+                    vtype=GRB.BINARY,
                     name=(
                         f"e[{flow_index},{component},{problem.worker_index[worker]}]"
                     ),
                 )
 
     return AssignmentVariables(
+        max_components=max_components,
         model_selected=model_selected,
         layer_component=layer_component,
         component_worker=component_worker,
         component_active=component_active,
         component_last=component_last,
-        layer_component_worker=layer_component_worker,
     )
 
 
@@ -286,7 +279,7 @@ def _add_compute_queue_variables(
         component_priority=component_priority,
         priority_used=priority_used,
         priority_class_utilization=priority_class_utilization,
-        lower_priority_utilization=lower_priority_utilization,
+        higher_priority_utilization=lower_priority_utilization,
         compute_bin_selected=compute_bin_selected,
         queue_wait_bin=queue_wait_bin,
         queue_wait=queue_wait,
@@ -305,14 +298,16 @@ def _add_network_variables(
     max_components: int,
     network_utilization_limit: float,
 ) -> NetworkVariables:
-    tensor_crosses_cut: dict[tuple[FlowId, ModelVariantId, TensorKey, int], gp.Var] = {}
+    tensor_crossing_auxiliary: dict[
+        tuple[FlowId, ModelVariantId, TensorKey, int], gp.Var
+    ] = {}
     adjacent_component_workers: dict[
         tuple[FlowId, int, WorkerId, WorkerId], gp.Var
     ] = {}
     transmission_time: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var] = {}
     component_transmission_response: dict[tuple[FlowId, int], gp.Var] = {}
     cuts = range(1, max_components)
-    connections = context.network_topology.connections()
+    topology = context.network_topology
 
     for flow in problem.flows:
         flow_index = problem.flow_index[flow]
@@ -322,13 +317,17 @@ def _add_network_variables(
         for model_variant in problem.models_by_flow[flow]:
             model_index = problem.model_index[flow, model_variant]
             static_profile = context.static_profiles_by_variant[model_variant]
-            for tensor in tensor_routes(static_profile):
+            for tensor, route in static_profile.topology.tensor_routes().items():
+                if len(route.maximal_destinations) <= 1:
+                    continue
                 tensor_index = problem.tensor_index[model_variant, tensor]
                 for cut in cuts:
-                    tensor_crosses_cut[flow, model_variant, tensor, cut] = model.addVar(
-                        lb=0.0,
-                        ub=1.0,
-                        name=f"c[{flow_index},{model_index},{tensor_index},{cut}]",
+                    tensor_crossing_auxiliary[flow, model_variant, tensor, cut] = (
+                        model.addVar(
+                            lb=0.0,
+                            ub=1.0,
+                            name=f"c[{flow_index},{model_index},{tensor_index},{cut}]",
+                        )
                     )
             for cut in cuts:
                 for worker in problem.workers_by_flow[flow]:
@@ -347,8 +346,9 @@ def _add_network_variables(
             )
             for source in problem.workers_by_flow[flow]:
                 source_index = problem.worker_index[source]
+                successors = topology.successors(source)
                 for target in problem.workers_by_flow[flow]:
-                    if source != target and (source, target) not in connections:
+                    if source != target and target not in successors:
                         continue
                     target_index = problem.worker_index[target]
                     adjacent_component_workers[flow, cut, source, target] = (
@@ -377,7 +377,7 @@ def _add_network_variables(
             )
 
     return NetworkVariables(
-        tensor_crosses_cut=tensor_crosses_cut,
+        tensor_crossing_auxiliary=tensor_crossing_auxiliary,
         adjacent_component_workers=adjacent_component_workers,
         transmission_time=transmission_time,
         network_utilization=network_utilization,
@@ -390,18 +390,55 @@ def _add_memory_variables(
     model: gp.Model,
     problem: GurobiProblem,
     context: OptimizationContext,
+    *,
+    max_components: int,
 ) -> MemoryVariables:
+    component_weight_bytes: dict[
+        tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var
+    ] = {}
+    component_activation_bytes: dict[
+        tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var
+    ] = {}
+    for flow in problem.flows:
+        flow_index = problem.flow_index[flow]
+        for model_variant in problem.models_by_flow[flow]:
+            model_index = problem.model_index[flow, model_variant]
+            for component in range(1, max_components + 1):
+                for worker in problem.workers_by_flow[flow]:
+                    worker_index = problem.worker_index[worker]
+                    available_bytes = context.resource_profiles_by_worker[
+                        worker
+                    ].ram_profile.available_bytes
+                    key = (flow, model_variant, component, worker)
+                    component_weight_bytes[key] = model.addVar(
+                        lb=0.0,
+                        ub=available_bytes,
+                        name=(
+                            f"mem_weight[{flow_index},{model_index},{component},"
+                            f"{worker_index}]"
+                        ),
+                    )
+                    component_activation_bytes[key] = model.addVar(
+                        lb=0.0,
+                        ub=available_bytes,
+                        name=(
+                            f"mem_activation[{flow_index},{model_index},{component},"
+                            f"{worker_index}]"
+                        ),
+                    )
     return MemoryVariables(
+        component_weight_bytes=component_weight_bytes,
+        component_activation_bytes=component_activation_bytes,
         max_activation_bytes={
             worker: model.addVar(
                 lb=0.0,
                 ub=context.resource_profiles_by_worker[
                     worker
                 ].ram_profile.available_bytes,
-                name=f"q_activation[{problem.worker_index[worker]}]",
+                name=f"max_activation[{problem.worker_index[worker]}]",
             )
             for worker in problem.workers
-        }
+        },
     )
 
 
@@ -462,6 +499,11 @@ def add_gurobi_variables(
             max_components=max_components,
             network_utilization_limit=network_utilization_limit,
         ),
-        memory=_add_memory_variables(model, problem, context),
+        memory=_add_memory_variables(
+            model,
+            problem,
+            context,
+            max_components=max_components,
+        ),
         qos=_add_qos_variables(model, problem, requests_by_flow),
     )

@@ -2,14 +2,17 @@ import asyncio
 from contextlib import suppress
 from typing import override
 
-from controller.application.deployment.abc.deployment_manager import DeploymentManager
+from controller.application.deployment.abc.actuation_manager import ActuationManager
 from controller.application.deployment.abc.solution_observer import SolutionObserver
 from controller.domain.optimization.optimization_solution import OptimizationSolution
 from lifecycle.async_lifecycle import AsyncLifecycle
 
 
-class DefaultActuationManager(DeploymentManager, AsyncLifecycle):
-    def __init__(self, solution_observer: SolutionObserver) -> None:
+class DefaultActuationManager(ActuationManager, AsyncLifecycle):
+    def __init__(
+        self,
+        solution_observer: SolutionObserver,
+    ) -> None:
         self._solution_observer = solution_observer
         self._observer_task: asyncio.Task[None] | None = None
         pass

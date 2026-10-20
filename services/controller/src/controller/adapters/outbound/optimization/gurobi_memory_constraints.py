@@ -1,4 +1,5 @@
 import gurobipy as gp
+from gurobipy import GRB
 
 from controller.adapters.outbound.optimization.gurobi_problem import (
     GurobiProblem,
@@ -54,35 +55,84 @@ def add_memory_constraints(
         relevant_flows = tuple(
             flow for flow in p.flows if worker in p.workers_by_flow[flow]
         )
-        weights = gp.quicksum(
-            weights_by_layer[model_variant, layer]
-            * assignment.layer_component_worker[
-                flow, model_variant, layer, component, worker
-            ]
-            for flow in relevant_flows
-            for model_variant in p.models_by_flow[flow]
-            for layer in layers_by_model[model_variant]
-            for component in range(1, max_components + 1)
-        )
+        weight_contributions: list[gp.Var] = []
         for flow in relevant_flows:
+            flow_index = p.flow_index[flow]
             for model_variant in p.models_by_flow[flow]:
+                model_index = p.model_index[flow, model_variant]
                 for component in range(1, max_components + 1):
-                    activations = gp.quicksum(
-                        activations_by_layer[model_variant, layer]
-                        * assignment.layer_component_worker[
-                            flow, model_variant, layer, component, worker
+                    key = (flow, model_variant, component, worker)
+                    e = assignment.component_worker[flow, component, worker]
+                    weight_bytes = memory.component_weight_bytes[key]
+                    activation_bytes = memory.component_activation_bytes[key]
+                    weight_expression = gp.quicksum(
+                        weights_by_layer[model_variant, layer]
+                        * assignment.layer_component[
+                            flow, model_variant, layer, component
                         ]
                         for layer in layers_by_model[model_variant]
                     )
-                    model.addConstr(
-                        memory.max_activation_bytes[worker] >= activations,
+                    activation_expression = gp.quicksum(
+                        activations_by_layer[model_variant, layer]
+                        * assignment.layer_component[
+                            flow, model_variant, layer, component
+                        ]
+                        for layer in layers_by_model[model_variant]
+                    )
+                    model.addGenConstrIndicator(
+                        e,
+                        False,
+                        weight_bytes,
+                        GRB.EQUAL,
+                        0.0,
                         name=(
-                            f"max_activation[{worker_index},{p.flow_index[flow]},"
-                            f"{p.model_index[flow, model_variant]},{component}]"
+                            f"weight_inactive[{flow_index},{model_index},{component},"
+                            f"{worker_index}]"
+                        ),
+                    )
+                    model.addGenConstrIndicator(
+                        e,
+                        True,
+                        weight_bytes - weight_expression,
+                        GRB.EQUAL,
+                        0.0,
+                        name=(
+                            f"weight_value[{flow_index},{model_index},{component},"
+                            f"{worker_index}]"
+                        ),
+                    )
+                    model.addGenConstrIndicator(
+                        e,
+                        False,
+                        activation_bytes,
+                        GRB.EQUAL,
+                        0.0,
+                        name=(
+                            f"activation_inactive[{flow_index},{model_index},"
+                            f"{component},{worker_index}]"
+                        ),
+                    )
+                    model.addGenConstrIndicator(
+                        e,
+                        True,
+                        activation_bytes - activation_expression,
+                        GRB.EQUAL,
+                        0.0,
+                        name=(
+                            f"activation_value[{flow_index},{model_index},"
+                            f"{component},{worker_index}]"
+                        ),
+                    )
+                    weight_contributions.append(weight_bytes)
+                    model.addConstr(
+                        memory.max_activation_bytes[worker] >= activation_bytes,
+                        name=(
+                            f"max_activation[{worker_index},{flow_index},"
+                            f"{model_index},{component}]"
                         ),
                     )
         model.addConstr(
-            weights + memory.max_activation_bytes[worker]
+            gp.quicksum(weight_contributions) + memory.max_activation_bytes[worker]
             <= context.resource_profiles_by_worker[worker].ram_profile.available_bytes,
             name=f"memory_capacity[{worker_index}]",
         )

@@ -50,6 +50,10 @@ def extract_solution(
     connections = context.network_topology.connections()
 
     for flow in p.flows:
+        workers = p.workers_by_flow[flow]
+        successors_by_worker = {
+            source: context.network_topology.successors(source) for source in workers
+        }
         selected_models = tuple(
             model_variant
             for model_variant in p.models_by_flow[flow]
@@ -110,10 +114,9 @@ def extract_solution(
                     * network.adjacent_component_workers[
                         flow, component, source, target
                     ].X
-                    for source in p.workers_by_flow[flow]
-                    for target in p.workers_by_flow[flow]
-                    if (flow, component, source, target)
-                    in network.adjacent_component_workers
+                    for source in workers
+                    for target in workers
+                    if source == target or target in successors_by_worker[source]
                 )
                 if component < max_components
                 else 0.0

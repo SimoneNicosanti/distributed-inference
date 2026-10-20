@@ -11,7 +11,6 @@ from controller.adapters.outbound.optimization.gurobi_profile_data import (
     fixed_shape_profile,
     layer_execution_profiles,
     layer_weight_size_bytes,
-    tensor_routes,
     tensor_size_bytes,
 )
 from controller.domain.optimization.optimization_context import OptimizationContext
@@ -201,7 +200,7 @@ def _build_gurobi_problem(
                 f"Model variant {model_key(model)} needs input and output layers"
             )
         layers_by_model[model] = layers
-        routes = tensor_routes(profile)
+        routes = profile.topology.tensor_routes()
         tensors = tuple(routes)
         tensors_by_model[model] = tensors
         for tensor in tensors:
