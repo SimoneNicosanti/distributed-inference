@@ -16,7 +16,7 @@ class WorkerInstance(ServiceInstance):
 
         required_capabilities = {
             CapabilityType.PARTITION_INFERENCE,
-            CapabilityType.DEPLOYMENT_ACTUATION,
+            CapabilityType.PLAN_ACTUATION,
             CapabilityType.NETWORK_PROFILING,
             CapabilityType.EXECUTION_PROFILING,
             CapabilityType.RESOURCE_PROFILING,

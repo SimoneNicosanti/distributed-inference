@@ -19,10 +19,6 @@ class DeploymentPlan(BaseModel):
 
     @model_validator(mode="after")
     def validate_deployments(self) -> Self:
-
-        if len(self.replica_ids) == 0:
-            raise ValueError("Deployments must not be empty")
-
         if len(self.replica_ids) != len(set(self.replica_ids)):
             raise ValueError("Replicas must be unique")
 

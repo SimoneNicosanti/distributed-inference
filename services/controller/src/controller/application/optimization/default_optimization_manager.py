@@ -7,7 +7,7 @@ from controller.application.optimization.abc.solver import Solver
 from controller.application.ports.inbound.optimization.optimization_manager import (
     OptimizationManager,
 )
-from controller.application.ports.outbound.optimization_solution_store import (
+from controller.application.ports.outbound.store.optimization_solution_store import (
     OptimizationSolutionStore,
 )
 from controller.domain.optimization.optimization_request import (

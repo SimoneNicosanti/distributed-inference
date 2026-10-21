@@ -83,3 +83,81 @@ def test_tensor_without_consumers_has_no_route() -> None:
     ).tensor_routes()
 
     assert "unused" not in routes
+
+
+def _topology_with_model_boundaries() -> ModelVariantTopology:
+    return ModelVariantTopology(
+        layers={
+            "input": LayerDescription(
+                name="input",
+                type="Input",
+                is_input=True,
+                is_output=False,
+            ),
+            "first": LayerDescription(
+                name="first",
+                type="Compute",
+                is_input=False,
+                is_output=False,
+            ),
+            "second": LayerDescription(
+                name="second",
+                type="Compute",
+                is_input=False,
+                is_output=False,
+            ),
+            "output": LayerDescription(
+                name="output",
+                type="Output",
+                is_input=False,
+                is_output=True,
+            ),
+        },
+        edges=(
+            EdgeDescription(
+                source="input",
+                target="first",
+                tensors=frozenset({"model_input"}),
+            ),
+            EdgeDescription(
+                source="first",
+                target="second",
+                tensors=frozenset({"intermediate"}),
+            ),
+            EdgeDescription(
+                source="second",
+                target="output",
+                tensors=frozenset({"model_output"}),
+            ),
+        ),
+    )
+
+
+def test_component_contract_includes_input_carried_by_input_layer() -> None:
+    contract = _topology_with_model_boundaries().component_tensor_contract(
+        ("input", "first")
+    )
+
+    assert contract.input_tensor_keys == ("model_input",)
+    assert contract.output_tensor_keys == ("intermediate",)
+
+
+def test_component_contract_includes_output_carried_by_output_layer() -> None:
+    contract = _topology_with_model_boundaries().component_tensor_contract(
+        ("second", "output")
+    )
+
+    assert contract.input_tensor_keys == ("intermediate",)
+    assert contract.output_tensor_keys == ("model_output",)
+
+
+def test_synthetic_boundary_layer_is_a_pass_through_component() -> None:
+    topology = _topology_with_model_boundaries()
+
+    input_contract = topology.component_tensor_contract(("input",))
+    output_contract = topology.component_tensor_contract(("output",))
+
+    assert input_contract.input_tensor_keys == ("model_input",)
+    assert input_contract.output_tensor_keys == ("model_input",)
+    assert output_contract.input_tensor_keys == ("model_output",)
+    assert output_contract.output_tensor_keys == ("model_output",)

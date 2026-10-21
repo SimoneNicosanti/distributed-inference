@@ -21,10 +21,6 @@ class PartitionExecutionPlan(BaseModel):
 
     @model_validator(mode="after")
     def validate_execution_plan(self) -> Self:
-
-        if len(self.partition_ids) == 0:
-            raise ValueError("Execution plan must not be empty")
-
         if len(self.partition_ids) != len(set(self.partition_ids)):
             raise ValueError("Partitions must be unique")
 

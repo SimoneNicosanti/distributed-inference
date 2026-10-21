@@ -88,7 +88,7 @@ class CapabilityType(StrEnum):
 
     ## Declared by worker
     PARTITION_INFERENCE = auto()
-    DEPLOYMENT_ACTUATION = auto()
+    PLAN_ACTUATION = auto()
     NETWORK_PROFILING = auto()
     EXECUTION_PROFILING = auto()
     RESOURCE_PROFILING = auto()

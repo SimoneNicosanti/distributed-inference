@@ -28,9 +28,6 @@ class SchedulingPlan(BaseModel):
         if len(self.priority_keys) != len(set(self.priority_keys)):
             raise ValueError("Priority keys must be unique")
 
-        if len(self.priority_keys) == 0:
-            raise ValueError("Scheduling plan must not be empty")
-
         if len(self.priority_keys) != len(self.priorities):
             raise ValueError("Priorities must be present for all priority keys")
 

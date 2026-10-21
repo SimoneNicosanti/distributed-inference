@@ -116,10 +116,6 @@ class RoutingPlan(BaseModel):
 
     @model_validator(mode="after")
     def validate_routing_plan(self) -> Self:
-
-        if len(self.replica_ids) == 0:
-            raise ValueError("Routing plan must not be empty")
-
         if len(self.replica_ids) != len(set(self.replica_ids)):
             raise ValueError("Replicas must be unique")
 

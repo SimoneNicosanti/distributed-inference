@@ -10,7 +10,7 @@ from controller.application.optimization.abc.solver import Solver
 from controller.application.optimization.default_optimization_manager import (
     DefaultOptimizationManager,
 )
-from controller.application.ports.outbound.optimization_solution_store import (
+from controller.application.ports.outbound.store.optimization_solution_store import (
     OptimizationSolutionStore,
 )
 from controller.domain.optimization.optimization_context import OptimizationContext

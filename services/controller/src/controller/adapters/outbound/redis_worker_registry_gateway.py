@@ -10,7 +10,7 @@ _SERVICE_REGISTRY_KEY = "discovery:services"
 _REQUIRED_WORKER_CAPABILITIES = frozenset(
     {
         CapabilityType.PARTITION_INFERENCE,
-        CapabilityType.DEPLOYMENT_ACTUATION,
+        CapabilityType.PLAN_ACTUATION,
         CapabilityType.NETWORK_PROFILING,
         CapabilityType.EXECUTION_PROFILING,
         CapabilityType.RESOURCE_PROFILING,

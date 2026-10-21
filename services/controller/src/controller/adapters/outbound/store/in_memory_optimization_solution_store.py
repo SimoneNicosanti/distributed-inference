@@ -2,7 +2,7 @@ import asyncio
 from typing import override
 
 from controller.application.deployment.abc.solution_observer import SolutionObserver
-from controller.application.ports.outbound.optimization_solution_store import (
+from controller.application.ports.outbound.store.optimization_solution_store import (
     OptimizationSolutionStore,
 )
 from controller.domain.optimization.optimization_solution import OptimizationSolution
@@ -10,7 +10,7 @@ from controller.domain.optimization.optimization_solution import OptimizationSol
 
 class InMemoryOptimizationSolutionStore(OptimizationSolutionStore, SolutionObserver):
     def __init__(self) -> None:
-        self._curr_solution: OptimizationSolution | None = None
+        self._current_solution: OptimizationSolution | None = None
         self._updates: asyncio.Queue[OptimizationSolution] = asyncio.Queue(maxsize=1)
 
     @override
@@ -25,12 +25,10 @@ class InMemoryOptimizationSolutionStore(OptimizationSolutionStore, SolutionObser
 
     @override
     async def get_current_solution(self) -> OptimizationSolution | None:
-        async with self._condition:
-            await self._condition.wait()
-            if self._curr_solution is None:
-                raise RuntimeError("No solution found")
-            return self._curr_solution
+        return self._current_solution
 
     @override
     async def observe_new_solution(self) -> OptimizationSolution:
-        async with self._condition:
+        solution = await self._updates.get()
+        self._updates.task_done()
+        return solution

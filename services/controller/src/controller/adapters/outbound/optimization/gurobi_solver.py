@@ -205,6 +205,7 @@ class GurobiSolver(Solver):
                         variables.compute_queue,
                         variables.network,
                         variables.qos,
+                        requests_by_flow=requests_by_flow,
                         context=context,
                         max_components=problem_config.max_components,
                         priority_count=problem_config.priority_count,

@@ -522,11 +522,30 @@ async def test_solves_feasible_single_worker_instance() -> None:
     assert solution.is_optimal
     assert len(solution.flow_solutions) == 1
     flow_solution = solution.flow_solutions[0]
+    assert flow_solution.ingress_id == device
     assert flow_solution.mean_response_time_s <= 1
     assert len(flow_solution.components) == 1
     assert flow_solution.components[0].worker_id == device
     assert flow_solution.components[0].layer_keys == (_INPUT, _COMPUTE, _OUTPUT)
+    assert flow_solution.components[0].input_layer_keys == (_INPUT,)
+    assert flow_solution.components[0].output_layer_keys == (_OUTPUT,)
+    assert flow_solution.components[0].executable_layer_keys == (_COMPUTE,)
+    assert flow_solution.components[0].tensor_contract.input_tensor_keys == (
+        _INPUT_TENSOR,
+    )
+    assert flow_solution.components[0].tensor_contract.output_tensor_keys == (
+        _OUTPUT_TENSOR,
+    )
+    assert flow_solution.cuts == ()
     assert flow_solution.components[0].mean_execution_time_s == pytest.approx(0.1)
+
+    with pytest.raises(
+        ValueError,
+        match="The first component must be placed on the ingress worker",
+    ):
+        type(flow_solution).model_validate(
+            flow_solution.model_dump() | {"ingress_id": _worker(2)}
+        )
 
 
 @pytest.mark.asyncio
@@ -772,6 +791,7 @@ async def test_solves_branched_dag_on_sparse_asymmetric_network() -> None:
 
     assert solution.is_optimal
     flow_solution = solution.flow_solutions[0]
+    assert flow_solution.ingress_id == device
     assert flow_solution.model_variant_id == _BRANCHED_MODEL_VARIANT_ID
     assert tuple(component.worker_id for component in flow_solution.components) == (
         device,
@@ -786,6 +806,36 @@ async def test_solves_branched_dag_on_sparse_asymmetric_network() -> None:
         frozenset({_STEM, _BRANCH_A_1, _BRANCH_A_2}),
         frozenset({_BRANCH_B, _MERGE, _HEAD}),
         frozenset({_BRANCHED_OUTPUT}),
+    )
+    assert tuple(
+        component.tensor_contract.input_tensor_keys
+        for component in flow_solution.components
+    ) == (
+        ("input_to_stem",),
+        ("input_to_stem",),
+        ("branch_a_2_output", "stem_fanout"),
+        ("head_output",),
+    )
+    assert tuple(
+        component.tensor_contract.output_tensor_keys
+        for component in flow_solution.components
+    ) == (
+        ("input_to_stem",),
+        ("branch_a_2_output", "stem_fanout"),
+        ("head_output",),
+        ("head_output",),
+    )
+    assert tuple(
+        (
+            cut.source_component_index,
+            cut.destination_component_index,
+            cut.tensor_keys,
+        )
+        for cut in flow_solution.cuts
+    ) == (
+        (1, 2, ("input_to_stem",)),
+        (2, 3, ("branch_a_2_output", "stem_fanout")),
+        (3, 4, ("head_output",)),
     )
 
 
@@ -857,6 +907,38 @@ async def test_partitions_and_places_compute_on_faster_worker() -> None:
         (_INPUT,),
         (_COMPUTE,),
         (_OUTPUT,),
+    )
+    assert tuple(component.input_layer_keys for component in components) == (
+        (_INPUT,),
+        (),
+        (),
+    )
+    assert tuple(component.output_layer_keys for component in components) == (
+        (),
+        (),
+        (_OUTPUT,),
+    )
+    assert tuple(component.executable_layer_keys for component in components) == (
+        (),
+        (_COMPUTE,),
+        (),
+    )
+    assert tuple(
+        component.tensor_contract.input_tensor_keys for component in components
+    ) == ((_INPUT_TENSOR,), (_INPUT_TENSOR,), (_OUTPUT_TENSOR,))
+    assert tuple(
+        component.tensor_contract.output_tensor_keys for component in components
+    ) == ((_INPUT_TENSOR,), (_OUTPUT_TENSOR,), (_OUTPUT_TENSOR,))
+    assert tuple(
+        (
+            cut.source_component_index,
+            cut.destination_component_index,
+            cut.tensor_keys,
+        )
+        for cut in solution.flow_solutions[0].cuts
+    ) == (
+        (1, 2, (_INPUT_TENSOR,)),
+        (2, 3, (_OUTPUT_TENSOR,)),
     )
 
 

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any, TypedDict, cast
 
 import networkx as nx
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from shared.model.keys import EdgeKey, LayerKey, TensorKey
 
@@ -30,6 +30,23 @@ class TensorRoute:
     source: LayerKey
     destinations: tuple[LayerKey, ...]
     maximal_destinations: tuple[LayerKey, ...]
+
+
+class ComponentTensorContract(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    input_tensor_keys: tuple[TensorKey, ...]
+    output_tensor_keys: tuple[TensorKey, ...]
+
+    @field_validator("input_tensor_keys", "output_tensor_keys")
+    @classmethod
+    def canonicalize_tensor_keys(
+        cls,
+        tensor_keys: tuple[TensorKey, ...],
+    ) -> tuple[TensorKey, ...]:
+        if len(tensor_keys) != len(set(tensor_keys)):
+            raise ValueError("Component tensor keys must be unique")
+        return tuple(sorted(tensor_keys))
 
 
 class _LayerAttributes(TypedDict):
@@ -126,6 +143,46 @@ class ModelVariantTopology:
             )
             for tensor, tensor_destinations in sorted(destinations.items())
         }
+
+    def component_tensor_contract(
+        self,
+        component_layers: Iterable[LayerKey],
+    ) -> ComponentTensorContract:
+        if isinstance(component_layers, (str, bytes)):
+            raise ValueError("Component layers must be an iterable of layer keys")
+
+        layer_keys = frozenset(component_layers)
+        if not layer_keys:
+            raise ValueError("A component must contain at least one layer")
+
+        unknown_layer_keys = layer_keys - self._graph.nodes
+        if unknown_layer_keys:
+            raise ValueError(
+                f"Unknown component layers: {sorted(unknown_layer_keys)!r}"
+            )
+
+        descriptions = self.layers()
+        input_tensor_keys: set[TensorKey] = set()
+        output_tensor_keys: set[TensorKey] = set()
+
+        for edge in self.edges().values():
+            source_in_component = edge.source in layer_keys
+            target_in_component = edge.target in layer_keys
+
+            if target_in_component and not source_in_component:
+                input_tensor_keys.update(edge.tensors)
+            if source_in_component and not target_in_component:
+                output_tensor_keys.update(edge.tensors)
+
+            if source_in_component and descriptions[edge.source].is_input:
+                input_tensor_keys.update(edge.tensors)
+            if target_in_component and descriptions[edge.target].is_output:
+                output_tensor_keys.update(edge.tensors)
+
+        return ComponentTensorContract(
+            input_tensor_keys=tuple(input_tensor_keys),
+            output_tensor_keys=tuple(output_tensor_keys),
+        )
 
     def layers(self) -> Mapping[LayerKey, LayerDescription]:
         nodes = cast(
