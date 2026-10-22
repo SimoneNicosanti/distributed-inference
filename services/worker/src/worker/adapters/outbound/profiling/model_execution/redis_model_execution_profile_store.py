@@ -4,16 +4,22 @@ from typing import override
 
 from redis import asyncio as redis_asyncio
 
-from integration.worker.profiling.redis.execution_profile_dto import (
+from integration.dto.worker_profiles.execution_profile_dto import (
     ModelExecutionProfileDto,
-    ShapeExecutionProfileDto,
 )
-from integration.worker.profiling.redis.execution_profile_keys import (
+from integration.redis.worker_profiles.execution_profile_keys import (
     build_execution_profile_ids_key_per_worker,
     build_execution_profile_key_per_worker,
 )
+from integration.shared.id_json import (
+    model_variant_id_from_json,
+    model_variant_id_to_json,
+)
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import WorkerId
+from worker.adapters.outbound.profiling.model_execution.mappers.model_execution_profile_mapper import (
+    ModelExecutionProfileMapper,
+)
 from worker.application.ports.outbound.profiling.model_execution.model_execution_profile_publisher import (
     ModelExecutionProfilePublisher,
 )
@@ -22,7 +28,6 @@ from worker.application.ports.outbound.profiling.model_execution.model_execution
 )
 from worker.domain.profiling.model_execution.model_execution_profile import (
     ModelExecutionProfile,
-    ShapeExecutionProfile,
 )
 
 
@@ -41,12 +46,12 @@ class RedisModelExecutionProfileStore(
         profile_id = await self.__compute_model_version_id_hash(
             model_execution_profile.model_version_id
         )
-        profile_json = self._to_dto(
+        profile_json = ModelExecutionProfileMapper.model_execution_profile_to_dto(
             worker_id,
             model_execution_profile,
         ).model_dump_json()
-        model_variant_id_json = (
-            model_execution_profile.model_version_id.model_dump_json()
+        model_variant_id_json = model_variant_id_to_json(
+            model_execution_profile.model_version_id
         )
 
         async with self._redis.pipeline(transaction=True) as pipeline:
@@ -67,15 +72,17 @@ class RedisModelExecutionProfileStore(
             raise ValueError("Model execution profile not found")
 
         dto = ModelExecutionProfileDto.model_validate_json(value)
-        self._validate_dto_identity(dto, worker_id, model_version_id)
-        return self._to_domain(dto)
+        ModelExecutionProfileMapper.validate_dto_identity(
+            dto, worker_id, model_version_id
+        )
+        return ModelExecutionProfileMapper.model_execution_profile_from_dto(dto)
 
     @override
     async def get_all_profiled_model_ids_by_worker_id(
         self, worker_id: WorkerId
     ) -> list[ModelVariantId]:
         return [
-            ModelVariantId.model_validate_json(value)
+            model_variant_id_from_json(value)
             async for value in self._redis.sscan_iter(
                 build_execution_profile_ids_key_per_worker(worker_id)
             )
@@ -92,8 +99,10 @@ class RedisModelExecutionProfileStore(
         profiles: list[ModelExecutionProfile] = []
         for value in values:
             dto = ModelExecutionProfileDto.model_validate_json(value)
-            self._validate_dto_identity(dto, worker_id)
-            profiles.append(self._to_domain(dto))
+            ModelExecutionProfileMapper.validate_dto_identity(dto, worker_id)
+            profiles.append(
+                ModelExecutionProfileMapper.model_execution_profile_from_dto(dto)
+            )
         return profiles
 
     @override
@@ -110,45 +119,6 @@ class RedisModelExecutionProfileStore(
         model_version_id: ModelVariantId,
     ) -> str:
         md5_value = await asyncio.to_thread(
-            md5, model_version_id.model_dump_json().encode("utf-8")
+            md5, model_variant_id_to_json(model_version_id).encode("utf-8")
         )
         return md5_value.hexdigest()
-
-    @staticmethod
-    def _to_dto(
-        worker_id: WorkerId,
-        profile: ModelExecutionProfile,
-    ) -> ModelExecutionProfileDto:
-        return ModelExecutionProfileDto(
-            worker_id=worker_id,
-            model_variant_id=profile.model_version_id,
-            shape_execution_profiles=tuple(
-                ShapeExecutionProfileDto.model_validate(shape_profile.model_dump())
-                for shape_profile in profile.shape_execution_profiles
-            ),
-        )
-
-    @staticmethod
-    def _to_domain(dto: ModelExecutionProfileDto) -> ModelExecutionProfile:
-        return ModelExecutionProfile(
-            model_version_id=dto.model_variant_id,
-            shape_execution_profiles=tuple(
-                ShapeExecutionProfile.model_validate(shape_profile.model_dump())
-                for shape_profile in dto.shape_execution_profiles
-            ),
-        )
-
-    @staticmethod
-    def _validate_dto_identity(
-        dto: ModelExecutionProfileDto,
-        worker_id: WorkerId,
-        model_variant_id: ModelVariantId | None = None,
-    ) -> None:
-        if dto.worker_id != worker_id:
-            raise ValueError(
-                "Stored execution profile worker does not match its Redis key"
-            )
-        if model_variant_id is not None and dto.model_variant_id != model_variant_id:
-            raise ValueError(
-                "Stored execution profile variant does not match its Redis field"
-            )

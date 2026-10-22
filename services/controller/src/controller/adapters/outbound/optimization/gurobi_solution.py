@@ -27,6 +27,7 @@ from controller.domain.optimization.optimization_solution import (
     FlowOptimizationSolution,
     OptimizationSolution,
 )
+from integration.shared.id_json import flow_id_to_json
 from shared.flow.flow import FlowId
 
 
@@ -39,7 +40,7 @@ def _nonnegative(value: float) -> float:
 
 
 def _flow_key(flow: FlowId) -> str:
-    return flow.model_dump_json()
+    return flow_id_to_json(flow)
 
 
 def _solution_value(term: GurobiAffineTerm) -> float:

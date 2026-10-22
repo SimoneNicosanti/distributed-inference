@@ -1,28 +1,28 @@
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, TypedDict, cast
 
 import networkx as nx
-from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from shared.model.keys import EdgeKey, LayerKey, TensorKey
 
 
-class LayerDescription(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class LayerDescription:
     name: str
     type: str
     is_input: bool
     is_output: bool
 
 
-class EdgeDescription(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class EdgeDescription:
     source: LayerKey
     target: LayerKey
-    tensors: frozenset[TensorKey] = Field(default_factory=frozenset)
+    tensors: frozenset[TensorKey] = field(default_factory=frozenset)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "tensors", frozenset(self.tensors))
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,21 +32,17 @@ class TensorRoute:
     maximal_destinations: tuple[LayerKey, ...]
 
 
-class ComponentTensorContract(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class ComponentTensorContract:
     input_tensor_keys: tuple[TensorKey, ...]
     output_tensor_keys: tuple[TensorKey, ...]
 
-    @field_validator("input_tensor_keys", "output_tensor_keys")
-    @classmethod
-    def canonicalize_tensor_keys(
-        cls,
-        tensor_keys: tuple[TensorKey, ...],
-    ) -> tuple[TensorKey, ...]:
-        if len(tensor_keys) != len(set(tensor_keys)):
-            raise ValueError("Component tensor keys must be unique")
-        return tuple(sorted(tensor_keys))
+    def __post_init__(self) -> None:
+        for field_name in ("input_tensor_keys", "output_tensor_keys"):
+            tensor_keys = tuple(getattr(self, field_name))
+            if len(tensor_keys) != len(set(tensor_keys)):
+                raise ValueError("Component tensor keys must be unique")
+            object.__setattr__(self, field_name, tuple(sorted(tensor_keys)))
 
 
 class _LayerAttributes(TypedDict):

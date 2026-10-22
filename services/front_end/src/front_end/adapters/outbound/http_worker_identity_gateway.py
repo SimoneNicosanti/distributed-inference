@@ -11,6 +11,7 @@ from integration.worker.http_worker_constants import (
 from integration.worker.worker_identity.http_worker_identity_query_paths import (
     WORKER_IDENTITY_PATH,
 )
+from integration.dto.worker_identity.worker_identity_dto import WorkerIdentityDto
 from shared.service.service import ServiceId, WorkerId
 
 
@@ -29,4 +30,5 @@ class HttpWorkerIdentityGateway(WorkerIdentityGateway):
             f"{self._base_url}{WORKER_IDENTITY_PATH}"
         )
         response.raise_for_status()
-        return ServiceId.model_validate(response.json())
+        dto = WorkerIdentityDto.model_validate(response.json())
+        return ServiceId(service_id=dto.service_id)

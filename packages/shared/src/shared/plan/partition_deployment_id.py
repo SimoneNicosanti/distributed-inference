@@ -1,11 +1,10 @@
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 from shared.plan.partition_replica_id import PartitionReplicaId
 from shared.service.service import WorkerId
 
 
-class PartitionDeploymentId(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class PartitionDeploymentId:
     replica_id: PartitionReplicaId
     worker_id: WorkerId

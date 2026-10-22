@@ -1,6 +1,4 @@
-from typing import Self
-
-from pydantic import BaseModel, ConfigDict, model_validator
+from dataclasses import dataclass
 
 from shared.plan.plan_version import PlanVersion
 from worker.domain.plan.worker.deployment_plan import DeploymentPlan
@@ -9,17 +7,15 @@ from worker.domain.plan.worker.routing_plan import RoutingPlan
 from worker.domain.plan.worker.scheduling_plan import SchedulingPlan
 
 
-class WorkerPlan(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class WorkerPlan:
     plan_version: PlanVersion
     deployment_plan: DeploymentPlan
     scheduling_plan: SchedulingPlan
     partition_execution_plan: PartitionExecutionPlan
     routing_plan: RoutingPlan
 
-    @model_validator(mode="after")
-    def validate_plan(self) -> Self:
+    def __post_init__(self) -> None:
         deployed_replica_ids = set(self.deployment_plan.replica_ids)
 
         if deployed_replica_ids != set(self.routing_plan.replica_ids):
@@ -38,5 +34,3 @@ class WorkerPlan(BaseModel):
         }
         if not scheduled_replica_ids.issubset(deployed_replica_ids):
             raise ValueError("Scheduling plan references undeployed replicas")
-
-        return self

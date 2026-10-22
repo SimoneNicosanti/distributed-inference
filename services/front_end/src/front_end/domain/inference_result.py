@@ -1,9 +1,8 @@
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 from shared.tensor.tensor_bundle import TensorBundle
 
 
-class InferenceResult(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class InferenceResult:
     bundle: TensorBundle

@@ -1,8 +1,8 @@
 from typing import override
 
-from pydantic import BaseModel, ConfigDict
 from redis import asyncio as redis_asyncio
 
+from integration.dto.model.model_partition_dto import ModelPartitionDto
 from integration.redis.model_partition.keys_factory import (
     build_model_partition_dict_name,
     build_model_partition_key,
@@ -12,13 +12,6 @@ from shared.model.model_partition import ModelPartitionId
 from worker.application.ports.outbound.model_metadata.model_partition_metadata_reader import (
     ModelPartitionMetadataReader,
 )
-
-
-class _ModelPartitionMetadata(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    model_partition_id: ModelPartitionId
-    artifact_ref: ArtifactRef
 
 
 class RedisModelPartitionMetadataReader(ModelPartitionMetadataReader):
@@ -36,7 +29,7 @@ class RedisModelPartitionMetadataReader(ModelPartitionMetadataReader):
         if value is None:
             raise KeyError(f"Model partition {partition_id} not found")
 
-        metadata = _ModelPartitionMetadata.model_validate_json(value)
+        metadata = ModelPartitionDto.model_validate_json(value)
         if metadata.model_partition_id != partition_id:
             raise ValueError("Model partition metadata ID mismatch")
 

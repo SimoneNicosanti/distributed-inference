@@ -9,8 +9,8 @@ from controller.application.ports.outbound.profile.network_profile_store_gateway
 from controller.domain.profile.network_topology import (
     NetworkConnection,
 )
-from integration.worker.profiling.redis.network_profile_dto import NetworkProfileDto
-from integration.worker.profiling.redis.network_profile_keys import (
+from integration.dto.worker_profiles.network_profile_dto import NetworkProfileDto
+from integration.redis.worker_profiles.network_profile_keys import (
     build_network_profile_key_per_worker,
 )
 from shared.service.service import WorkerId

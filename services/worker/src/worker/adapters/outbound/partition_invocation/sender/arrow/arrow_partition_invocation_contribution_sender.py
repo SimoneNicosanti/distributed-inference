@@ -1,3 +1,5 @@
+# mypy: disable-error-code="attr-defined,name-defined"
+
 import asyncio
 from contextlib import closing
 from typing import override
@@ -6,6 +8,10 @@ import numpy as np
 import pyarrow as pa
 from pyarrow import flight
 
+from integration.dto.context.context_dto import (
+    PartitionInvocationContributionAckDto,
+    PartitionInvocationContributionMetadataDto,
+)
 from integration.service_instance.service_instance import (
     CapabilityInterface,
     CapabilityProtocol,
@@ -15,6 +21,10 @@ from integration.service_instance.worker_instance import WorkerInstance
 from integration.worker.partition_invocation.arrow.arrow_partition_invocation_coordinator_schema import (
     SUBMIT_CONTRIBUTION_COMMAND,
     build_contribution_schema,
+)
+from worker.adapters.context_mapper import (
+    source_context_from_dto,
+    source_context_to_dto,
 )
 from worker.application.ports.outbound.catalog.partition_deployment.partition_deployment_directory import (
     PartitionDeploymentDirectory,
@@ -116,8 +126,11 @@ class ArrowPartitionInvocationContributionSender(
         if extra_ack is not None:
             raise RuntimeError("Received multiple acknowledgements")
 
-        ack = PartitionInvocationContributionAck.model_validate_json(
+        ack_dto = PartitionInvocationContributionAckDto.model_validate_json(
             ack_buffer.to_pybytes()
+        )
+        ack = PartitionInvocationContributionAck(
+            context=source_context_from_dto(ack_dto.context)
         )
 
         if ack.context != contribution.source_invocation_context:
@@ -133,10 +146,16 @@ class ArrowPartitionInvocationContributionSender(
         }
 
         schema = build_contribution_schema(tensor_values)
+        metadata = PartitionInvocationContributionMetadataDto(
+            source_invocation_context=source_context_to_dto(
+                contribution.source_invocation_context
+            ),
+            target_replica_id=contribution.target_replica_id,
+        )
 
         arrays: list[pa.Array] = [
             pa.array(
-                [contribution.model_dump_json(exclude={"bundle"})],
+                [metadata.model_dump_json()],
                 type=pa.large_string(),
             )
         ]

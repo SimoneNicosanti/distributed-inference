@@ -88,7 +88,7 @@ class DefaultNetworkProfilingCoordinator(NetworkProfilingCoordinator, AsyncLifec
                     )
                     connections.append(worker_connection)
 
-            return NetworkProfile(connections=connections)
+            return NetworkProfile(connections=tuple(connections))
 
     async def _coordinate_network_profiling(self) -> None:
         network_profile = await self.profile_network()

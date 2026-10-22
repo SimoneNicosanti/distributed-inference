@@ -98,5 +98,5 @@ class DefaultModelProfiler(ModelProfiler):
             shape_profiles=shape_profiles,
             invariant_layer_properties=invariant_layer_properties,
             invariant_tensor_properties=invariant_tensor_properties,
-            optimization_contractions=optimization_contractions,
+            optimization_contractions=tuple(optimization_contractions),
         )

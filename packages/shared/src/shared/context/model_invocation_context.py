@@ -1,19 +1,18 @@
+from dataclasses import dataclass, field
 from uuid import UUID, uuid4
-
-from pydantic import BaseModel, ConfigDict, Field
 
 from shared.flow.flow import FlowId
 from shared.service.service import ResultSinkId
 
-# class InferenceRequestId(BaseModel):
-#     model_config = ConfigDict(frozen=True)
-#     id: UUID = Field(default_factory=uuid4)
+# @dataclass(frozen=True, slots=True)
+# class InferenceRequestId:
+#     id: UUID = field(default_factory=uuid4)
 
 ## An inference run represents the invocation of multiple models
-# class InferenceRunContext(BaseModel):
-#     model_config = ConfigDict(frozen=True)
+# @dataclass(frozen=True, slots=True)
+# class InferenceRunContext:
 #     inference_request_id: InferenceRequestId
-#     inference_run_id: UUID = Field(default_factory=uuid4)
+#     inference_run_id: UUID = field(default_factory=uuid4)
 
 type ModelInvocationId = UUID
 
@@ -21,10 +20,9 @@ type ModelInvocationId = UUID
 ## This is the context id for model invocation.
 ## The user can call for a model multiple times;
 ## this is what is used to distiguish between invocations
-class ModelInvocationContext(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class ModelInvocationContext:
     # inference_run_context: InferenceRunContext
-    model_invocation_id: ModelInvocationId = Field(default_factory=uuid4)
     flow_id: FlowId
-
     result_sink: ResultSinkId
+    model_invocation_id: ModelInvocationId = field(default_factory=uuid4)

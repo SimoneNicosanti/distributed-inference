@@ -1,28 +1,21 @@
-from typing import Self
-
-from pydantic import BaseModel, ConfigDict, model_validator
+from dataclasses import dataclass
 
 from shared.plan.partition_replica_id import PartitionReplicaId
 
 
-class ResourceAllocation(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class ResourceAllocation:
     use_gpu: bool
 
 
-class DeploymentPlan(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class DeploymentPlan:
     replica_ids: tuple[PartitionReplicaId, ...]
     allocations: tuple[ResourceAllocation, ...]
 
-    @model_validator(mode="after")
-    def validate_deployments(self) -> Self:
+    def __post_init__(self) -> None:
         if len(self.replica_ids) != len(set(self.replica_ids)):
             raise ValueError("Replicas must be unique")
 
         if len(self.replica_ids) != len(self.allocations):
             raise ValueError("Each replica must have an allocation")
-
-        return self

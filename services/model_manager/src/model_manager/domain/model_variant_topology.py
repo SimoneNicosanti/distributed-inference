@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
 from typing import Any, TypedDict, cast
 
 import networkx as nx
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from shared.model.keys import EdgeKey, LayerKey, TensorKey
 
@@ -15,9 +15,8 @@ LAYER_DESCRIPTION_PARAM_NAME = "description"
 EDGE_DESCRIPTION_PARAM_NAME = "description"
 
 
-class LayerDescription(BaseModel):
-    model_config = ConfigDict(frozen=False)
-
+@dataclass(frozen=True, slots=True)
+class LayerDescription:
     name: str
     type: str
 
@@ -25,13 +24,15 @@ class LayerDescription(BaseModel):
     is_output: bool
 
 
-class EdgeDescription(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class EdgeDescription:
     source: LayerKey
     target: LayerKey
 
-    tensors: set[TensorKey] = Field(default_factory=set)
+    tensors: frozenset[TensorKey] = field(default_factory=frozenset)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "tensors", frozenset(self.tensors))
 
 
 class LayerAttributes(TypedDict):
@@ -49,19 +50,15 @@ type RawModelGraph = nx.DiGraph[
 ]
 
 
-## TODO: Implement serialization logic for this class
-class ModelVariantTopology(BaseModel):
-    model_config = ConfigDict(
-        frozen=False,
-    )
+class ModelVariantTopology:
+    __slots__ = ("_graph",)
+
+    def __init__(self) -> None:
+        self._graph = self.create_raw_model_graph()
 
     @staticmethod
     def create_raw_model_graph() -> RawModelGraph:
         return nx.DiGraph()
-
-    _graph: RawModelGraph = PrivateAttr(
-        default_factory=create_raw_model_graph,
-    )
 
     def add_layer(self, layer_key: LayerKey, layer_descrip: LayerDescription) -> None:
         additional_dict = {LAYER_DESCRIPTION_PARAM_NAME: layer_descrip}

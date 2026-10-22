@@ -61,7 +61,7 @@ from worker.adapters.outbound.profiling.model_execution.redis_model_static_profi
 from worker.adapters.outbound.profiling.network.arrow.arrow_network_probe_client import (
     ArrowNetworkProbeClient,
 )
-from worker.adapters.outbound.profiling.network.redis.redis_network_profile_publisher import (
+from worker.adapters.outbound.profiling.network.publisher.redis_network_profile_publisher import (
     RedisNetworkProfilePublisher,
 )
 from worker.adapters.outbound.profiling.resource.cgroup_cpu_profiler import (
@@ -71,7 +71,7 @@ from worker.adapters.outbound.profiling.resource.cgroup_ram_profiler import (
     CgroupRamProfiler,
 )
 from worker.adapters.outbound.profiling.resource.no_gpu_profiler import NoGpuProfiler
-from worker.adapters.outbound.profiling.resource.redis_resource_profile_publisher import (
+from worker.adapters.outbound.profiling.resource.publisher.redis_resource_profile_publisher import (
     RedisResourceProfilePublisher,
 )
 from worker.application.activity.default_activity_request_factory import (

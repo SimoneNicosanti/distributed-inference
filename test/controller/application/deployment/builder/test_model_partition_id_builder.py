@@ -21,12 +21,13 @@ def _component(
     index: int,
     layer_keys: tuple[str, ...],
     *,
+    worker_id: ServiceId | None = None,
     input_layer_keys: tuple[str, ...] = (),
     output_layer_keys: tuple[str, ...] = (),
 ) -> ComponentSolution:
     return ComponentSolution(
         component_index=index,
-        worker_id=ServiceId(),
+        worker_id=worker_id or ServiceId(),
         layer_keys=layer_keys,
         input_layer_keys=input_layer_keys,
         output_layer_keys=output_layer_keys,
@@ -50,7 +51,12 @@ def test_builds_partitions_only_from_executable_layers() -> None:
     )
     ingress_id = ServiceId()
     components = (
-        _component(1, ("input",), input_layer_keys=("input",)),
+        _component(
+            1,
+            ("input",),
+            worker_id=ingress_id,
+            input_layer_keys=("input",),
+        ),
         _component(2, ("compute",)),
         _component(3, ("output",), output_layer_keys=("output",)),
     )

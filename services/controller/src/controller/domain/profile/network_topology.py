@@ -1,19 +1,28 @@
+import math
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from typing import Any, TypedDict, cast
 
 import networkx as nx
-from pydantic import BaseModel, ConfigDict, Field
 
 from shared.service.service import WorkerId
 
 
-class NetworkConnection(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class NetworkConnection:
     source: WorkerId
     target: WorkerId
-    throughput_bytes_per_sec: float = Field(gt=0, allow_inf_nan=False)
-    round_trip_time_s: float = Field(ge=0, allow_inf_nan=False)
+    throughput_bytes_per_sec: float
+    round_trip_time_s: float
+
+    def __post_init__(self) -> None:
+        if (
+            not math.isfinite(self.throughput_bytes_per_sec)
+            or self.throughput_bytes_per_sec <= 0
+        ):
+            raise ValueError("Throughput must be finite and positive")
+        if not math.isfinite(self.round_trip_time_s) or self.round_trip_time_s < 0:
+            raise ValueError("Round-trip time must be finite and non-negative")
 
 
 class _WorkerAttributes(TypedDict):

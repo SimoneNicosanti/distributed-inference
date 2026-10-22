@@ -2,6 +2,11 @@ from typing import override
 
 from redis import asyncio as redis_asyncio
 
+from integration.shared.id_json import (
+    partition_deployment_id_from_json,
+    partition_deployment_id_to_json,
+    partition_replica_id_to_json,
+)
 from shared.plan.partition_deployment_id import PartitionDeploymentId
 from shared.plan.partition_replica_id import PartitionReplicaId
 from shared.plan.plan_version import PlanVersion
@@ -27,8 +32,8 @@ class RedisPartitionDeploymentCatalog(
     ) -> None:
         await self._redis.hset(
             self._build_deployments_key(plan_version),
-            deployment_id.replica_id.model_dump_json(),
-            deployment_id.model_dump_json(),
+            partition_replica_id_to_json(deployment_id.replica_id),
+            partition_deployment_id_to_json(deployment_id),
         )
 
     @override
@@ -39,7 +44,7 @@ class RedisPartitionDeploymentCatalog(
     ) -> PartitionDeploymentId:
         value = await self._redis.hget(
             self._build_deployments_key(plan_version),
-            replica_id.model_dump_json(),
+            partition_replica_id_to_json(replica_id),
         )
         if value is None:
             raise KeyError(
@@ -47,7 +52,7 @@ class RedisPartitionDeploymentCatalog(
                 f"for plan version {plan_version}"
             )
 
-        deployment_id = PartitionDeploymentId.model_validate_json(value)
+        deployment_id = partition_deployment_id_from_json(value)
         if deployment_id.replica_id != replica_id:
             raise ValueError("Partition deployment registry ID mismatch")
 

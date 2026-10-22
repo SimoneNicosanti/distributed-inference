@@ -1,4 +1,7 @@
-from pydantic import BaseModel, ConfigDict, NonNegativeFloat
+import math
+from collections.abc import Mapping
+from dataclasses import dataclass
+from types import MappingProxyType
 
 from controller.domain.profile.model_variant_static_profile import ShapePoint
 from shared.model.keys import LayerKey
@@ -6,27 +9,41 @@ from shared.model.model_variant import ModelVariantId
 from shared.service.service import WorkerId
 
 
-class LayerExecutionProfile(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class LayerExecutionProfile:
+    execution_time_s: float
 
-    execution_time_s: NonNegativeFloat
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.execution_time_s) or self.execution_time_s < 0:
+            raise ValueError("Execution time must be finite and non-negative")
 
 
-class ShapeExecutionProfile(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class ShapeExecutionProfile:
     shape_point: ShapePoint
-    layer_profiles: dict[LayerKey, LayerExecutionProfile]
+    layer_profiles: Mapping[LayerKey, LayerExecutionProfile]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "layer_profiles",
+            MappingProxyType(dict(self.layer_profiles)),
+        )
 
 
-class ModelVariantExecutionProfile(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class ModelVariantExecutionProfile:
     shape_execution_profiles: tuple[ShapeExecutionProfile, ...]
 
 
-class WorkerExecutionProfiles(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class WorkerExecutionProfiles:
     worker_id: WorkerId
-    execution_profiles: dict[ModelVariantId, ModelVariantExecutionProfile]
+    execution_profiles: Mapping[ModelVariantId, ModelVariantExecutionProfile]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "execution_profiles",
+            MappingProxyType(dict(self.execution_profiles)),
+        )

@@ -12,7 +12,8 @@ from front_end.application.ports.outbound.worker_gateway import (
     WorkerIngressGateway,
 )
 from front_end.domain.inference_result import InferenceResult
-from integration.worker.ingress.arrow_model_invocation_schema import (
+from integration.shared.id_json import flow_id_to_json
+from integration.worker.ingress.arrow.arrow_model_invocation_schema import (
     RUN_MODEL_INVOCATION_COMMAND,
     build_model_invocation_request_schema,
     validate_model_invocation_result_schema,
@@ -82,7 +83,7 @@ class ArrowWorkerIngressGateway(WorkerIngressGateway):
         schema = build_model_invocation_request_schema(tensor_values)
 
         arrays: list[pa.Array] = [
-            pa.array([flow_id.model_dump_json()], type=pa.large_string())
+            pa.array([flow_id_to_json(flow_id)], type=pa.large_string())
         ]
         arrays.extend(
             pa.FixedShapeTensorArray.from_numpy_ndarray(np.expand_dims(value, axis=0))

@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, status
-from pydantic import ValidationError
 
+from controller.adapters.inbound.mappers.optimization_request_mapper import (
+    OptimizationRequestMapper,
+)
 from controller.application.ports.inbound.optimization.optimization_manager import (
     OptimizationManager,
 )
-from controller.domain.optimization.optimization_request import OptimizationRequest
 from integration.controller.http.optimization_http_paths import (
     OPTIMIZE_INFERENCE_DISTRIBUTION_PATH,
 )
@@ -27,13 +28,13 @@ def build_optimization_manager_router(
     ) -> None:
         try:
             requests = tuple(
-                OptimizationRequest.model_validate(request_dto.model_dump())
+                OptimizationRequestMapper.to_optimization_request(request_dto)
                 for request_dto in request.requests
             )
-        except ValidationError as error:
+        except ValueError as error:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail=error.errors(),
+                detail=str(error),
             ) from error
 
         await optimization_manager.optimize_inference_distribution(

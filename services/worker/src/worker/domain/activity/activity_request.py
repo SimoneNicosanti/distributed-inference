@@ -1,11 +1,10 @@
 import math
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass, field
 from enum import StrEnum, auto
-from types import TracebackType
+from types import MappingProxyType, TracebackType
 from typing import Self
 from uuid import UUID, uuid4
-
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ResourceType(StrEnum):
@@ -13,14 +12,12 @@ class ResourceType(StrEnum):
     NETWORK = auto()
 
 
-class ResourceRequirement(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class ResourceRequirement:
     quantity: float
     exclusive: bool
 
-    @model_validator(mode="after")
-    def validate_request(self) -> Self:
-
+    def __post_init__(self) -> None:
         if not math.isfinite(self.quantity):
             raise ValueError("Resource quantity must be finite")
 
@@ -33,8 +30,6 @@ class ResourceRequirement(BaseModel):
             if self.quantity <= 0:
                 raise ValueError("Quantity must be positive")
 
-        return self
-
 
 class ActivityType(StrEnum):
     EXECUTION_INFERENCE = auto()
@@ -44,20 +39,26 @@ class ActivityType(StrEnum):
     NETWORK_PROFILING = auto()
 
 
-class ActivityRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class ActivityRequest:
     activity_type: ActivityType
-    resource_requirements: dict[ResourceType, ResourceRequirement]
+    resource_requirements: Mapping[ResourceType, ResourceRequirement]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "resource_requirements",
+            MappingProxyType(dict(self.resource_requirements)),
+        )
 
 
-class ActivityGrantId(BaseModel):
-    model_config = ConfigDict(frozen=True)
-    id: UUID = Field(default_factory=uuid4)
+@dataclass(frozen=True, slots=True)
+class ActivityGrantId:
+    id: UUID = field(default_factory=uuid4)
 
 
-class ActivityGrantInfo(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class ActivityGrantInfo:
     activity_grant_id: ActivityGrantId
 
 

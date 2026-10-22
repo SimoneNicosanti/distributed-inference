@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 from shared.context.model_invocation_context import ModelInvocationContext
 from shared.context.model_pass_context import ModelPassType
@@ -10,9 +9,8 @@ from shared.tensor.tensor_bundle import TensorBundle
 from worker.domain.model_pass.model_pass_result import ModelPassResult
 
 
-class ModelPassRequestInfo(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class ModelPassRequestInfo:
     model_invocation_context: ModelInvocationContext
     plan_version: PlanVersion
     model_pass_type: ModelPassType

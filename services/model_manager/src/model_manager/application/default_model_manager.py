@@ -63,7 +63,7 @@ class DefaultModelManager(ModelRegistry, ModelVariantRegistry, ModelPartitioner)
     ) -> ArtifactRef:
 
         artifact_ref = await self._artifact_ref_factory.build_artifact_ref(
-            model_variant.model_variant_id.model_dump_json()
+            model_variant.model_variant_id
         )
         self._pending_model_variants[model_variant.model_variant_id] = (
             model_variant,
@@ -149,9 +149,7 @@ class DefaultModelManager(ModelRegistry, ModelVariantRegistry, ModelPartitioner)
                 )
 
             partition_artifact_ref = (
-                await self._artifact_ref_factory.build_artifact_ref(
-                    partition_id.model_dump_json()
-                )
+                await self._artifact_ref_factory.build_artifact_ref(partition_id)
             )
             partition_bundle = ArtifactBundle.from_workspace(partition_workspace)
             await self._artifact_store.put_artifact(

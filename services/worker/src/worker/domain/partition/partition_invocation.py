@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 from shared.context.model_pass_context import ModelPassContext
 from shared.flow.flow import FlowId
@@ -13,8 +13,8 @@ from worker.domain.context.partition_invocation_context import (
 
 ## This is the input of the partition.
 ## It contains only the inputs of the partition, not the skip tensors.
-class PartitionInvocationRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class PartitionInvocationRequest:
     context: PartitionInvocationContext
 
     payload: TensorBundle
@@ -37,9 +37,8 @@ class PartitionInvocationRequest(BaseModel):
 
 
 ## This is the output of the sub-model as returned to the caller
-class PartitionInvocationResult(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class PartitionInvocationResult:
     context: PartitionInvocationContext
 
     payload: TensorBundle

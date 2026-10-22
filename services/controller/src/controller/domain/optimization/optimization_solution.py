@@ -1,13 +1,6 @@
-from typing import Self
-
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    NonNegativeFloat,
-    PositiveInt,
-    field_validator,
-    model_validator,
-)
+import math
+from dataclasses import dataclass, field
+from uuid import UUID, uuid4
 
 from controller.domain.profile.model_variant_topology import ComponentTensorContract
 from shared.flow.flow import FlowId
@@ -16,14 +9,14 @@ from shared.model.model_variant import ModelVariantId
 from shared.service.service import WorkerId
 
 
-class OptimizationSolutionId(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class OptimizationSolutionId:
+    value: UUID = field(default_factory=uuid4)
 
 
-class ComponentSolution(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    component_index: PositiveInt
+@dataclass(frozen=True, slots=True)
+class ComponentSolution:
+    component_index: int
     worker_id: WorkerId
 
     layer_keys: tuple[LayerKey, ...]
@@ -32,15 +25,27 @@ class ComponentSolution(BaseModel):
 
     tensor_contract: ComponentTensorContract
 
-    priority: PositiveInt
+    priority: int
 
-    mean_execution_time_s: NonNegativeFloat
-    mean_execution_queue_time_s: NonNegativeFloat
-    mean_transmission_time_s: NonNegativeFloat
-    transmission_latency_s: NonNegativeFloat
+    mean_execution_time_s: float
+    mean_execution_queue_time_s: float
+    mean_transmission_time_s: float
+    transmission_latency_s: float
 
-    @model_validator(mode="after")
-    def validate_boundary_layers(self) -> Self:
+    def __post_init__(self) -> None:
+        if self.component_index <= 0:
+            raise ValueError("Component index must be positive")
+        if self.priority <= 0:
+            raise ValueError("Component priority must be positive")
+        times = (
+            self.mean_execution_time_s,
+            self.mean_execution_queue_time_s,
+            self.mean_transmission_time_s,
+            self.transmission_latency_s,
+        )
+        if any(not math.isfinite(value) or value < 0 for value in times):
+            raise ValueError("Component times must be finite and non-negative")
+
         layer_keys = set(self.layer_keys)
         input_layer_keys = set(self.input_layer_keys)
         output_layer_keys = set(self.output_layer_keys)
@@ -58,8 +63,6 @@ class ComponentSolution(BaseModel):
         if input_layer_keys & output_layer_keys:
             raise ValueError("Component input and output layers must be disjoint")
 
-        return self
-
     @property
     def executable_layer_keys(self) -> tuple[LayerKey, ...]:
         boundary_layer_keys = set(self.input_layer_keys) | set(self.output_layer_keys)
@@ -68,52 +71,46 @@ class ComponentSolution(BaseModel):
         )
 
 
-class CutSolution(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    source_component_index: PositiveInt
-    destination_component_index: PositiveInt
+@dataclass(frozen=True, slots=True)
+class CutSolution:
+    source_component_index: int
+    destination_component_index: int
     tensor_keys: tuple[TensorKey, ...]
 
-    @field_validator("tensor_keys")
-    @classmethod
-    def canonicalize_tensor_keys(
-        cls,
-        tensor_keys: tuple[TensorKey, ...],
-    ) -> tuple[TensorKey, ...]:
+    def __post_init__(self) -> None:
+        if self.source_component_index <= 0 or self.destination_component_index <= 0:
+            raise ValueError("Cut component indices must be positive")
+        tensor_keys = tuple(self.tensor_keys)
         if len(tensor_keys) != len(set(tensor_keys)):
             raise ValueError("Cut tensor keys must be unique")
-        return tuple(sorted(tensor_keys))
-
-    @model_validator(mode="after")
-    def validate_adjacent_components(self) -> Self:
+        object.__setattr__(self, "tensor_keys", tuple(sorted(tensor_keys)))
         if self.destination_component_index != self.source_component_index + 1:
             raise ValueError("A cut must connect adjacent components")
-        return self
 
 
-class FlowOptimizationSolution(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class FlowOptimizationSolution:
     flow_id: FlowId
     ingress_id: WorkerId
     model_variant_id: ModelVariantId
     components: tuple[ComponentSolution, ...]
     cuts: tuple[CutSolution, ...]
 
-    mean_batch_fill_time_s: NonNegativeFloat
-    mean_response_time_s: NonNegativeFloat
+    mean_batch_fill_time_s: float
+    mean_response_time_s: float
 
-    @model_validator(mode="after")
-    def validate_ingress_placement(self) -> Self:
+    def __post_init__(self) -> None:
         if not self.components:
             raise ValueError("A flow solution must contain at least one component")
-        return self
+        if self.components[0].worker_id != self.ingress_id:
+            raise ValueError("The first component must be placed on the ingress worker")
+        times = self.mean_batch_fill_time_s, self.mean_response_time_s
+        if any(not math.isfinite(value) or value < 0 for value in times):
+            raise ValueError("Flow times must be finite and non-negative")
 
 
-class OptimizationSolution(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class OptimizationSolution:
     flow_solutions: tuple[FlowOptimizationSolution, ...]
     objective_value: float
     is_optimal: bool

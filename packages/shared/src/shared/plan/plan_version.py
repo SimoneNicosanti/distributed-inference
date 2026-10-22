@@ -1,16 +1,10 @@
-from functools import total_ordering
-from typing import Any
-
-from pydantic import BaseModel, ConfigDict, PositiveInt
+from dataclasses import dataclass
 
 
-@total_ordering
-class PlanVersion(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True, order=True)
+class PlanVersion:
+    version_number: int
 
-    version_number: PositiveInt
-
-    def __lt__(self, other: Any) -> bool:
-        if not isinstance(other, PlanVersion):
-            return NotImplemented
-        return self.version_number < other.version_number
+    def __post_init__(self) -> None:
+        if isinstance(self.version_number, bool) or self.version_number <= 0:
+            raise ValueError("Plan version number must be positive")

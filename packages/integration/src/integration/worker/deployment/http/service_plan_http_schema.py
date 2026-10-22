@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 
-from integration.worker.deployment.dto.service_plan_dto import ServicePlanDto
+from integration.dto.service_plan.service_plan_dto import ServicePlanDto
 
 
 class PrepareServicePlanRequest(BaseModel):

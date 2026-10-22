@@ -6,8 +6,8 @@ from front_end.application.ports.outbound.model_loading_gateway import (
     ModelArtifactUploader,
     ModelManagerGateway,
 )
-from integration.model_manager.dto.model_dto import ModelDto
-from integration.model_manager.dto.model_variant_dto import ModelVariantDto
+from integration.dto.model.model_dto import ModelDto
+from integration.dto.model.model_variant_dto import ModelVariantDto
 from shared.artifact.artifact_ref import ArtifactRef
 
 

@@ -1,7 +1,6 @@
 ## A model pass can be made up of multiple partition invocations.
+from dataclasses import dataclass, field
 from uuid import UUID, uuid4
-
-from pydantic import BaseModel, ConfigDict, Field
 
 from shared.context.model_pass_context import (
     ModelPassContext,
@@ -16,8 +15,8 @@ type PartitionInvocationId = UUID
 ## - The model pass it belongs to
 ## - The partition replica it is invoking
 ## - The partition invocation id (unique for the partition replica)
-class PartitionInvocationContext(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class PartitionInvocationContext:
     model_pass_context: ModelPassContext
     partition_replica_id: PartitionReplicaId
-    partition_invocation_id: PartitionInvocationId = Field(default_factory=uuid4)
+    partition_invocation_id: PartitionInvocationId = field(default_factory=uuid4)

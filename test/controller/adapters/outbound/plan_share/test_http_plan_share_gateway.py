@@ -7,20 +7,22 @@ from pydantic import HttpUrl
 from controller.adapters.outbound.plan_share.http_plan_share_gateway import (
     HttpPlanShareGateway,
 )
+from controller.application.ports.outbound.directory.worker_directory_gateway import (
+    WorkerDirectoryGateway,
+)
 from controller.domain.plan.deployment_plan import DeploymentPlan
 from controller.domain.plan.partition_execution_plan import PartitionExecutionPlan
 from controller.domain.plan.routing_plan import RoutingPlan
 from controller.domain.plan.scheduling_plan import SchedulingPlan
 from controller.domain.plan.service_plan import ServicePlan
 from controller.domain.plan.worker_plan import WorkerPlan
-from directory.api.directory import ServiceDirectory
 from integration.service_instance.service_instance import (
     Capability,
     CapabilityInterface,
     CapabilityProtocol,
     CapabilityType,
-    ServiceInstance,
 )
+from integration.service_instance.worker_instance import WorkerInstance
 from integration.worker.deployment.http.service_plan_http_schema import (
     PrepareServicePlanRequest,
 )
@@ -28,26 +30,22 @@ from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
 
 
-class StubServiceDirectory(ServiceDirectory):
-    def __init__(self, service_instance: ServiceInstance) -> None:
+class StubServiceDirectory(WorkerDirectoryGateway):
+    def __init__(self, service_instance: WorkerInstance) -> None:
         self._service_instance = service_instance
 
     @override
-    async def get_service_instance_by_service_id(
+    async def get_registered_worker_ids(self) -> set[ServiceId]:
+        return {self._service_instance.service_id}
+
+    @override
+    async def get_worker_instance_by_id(
         self,
         service_id: ServiceId,
-    ) -> ServiceInstance:
+    ) -> WorkerInstance:
         if service_id != self._service_instance.service_id:
             raise KeyError(service_id)
         return self._service_instance
-
-    @override
-    async def get_all_service_instances(self) -> list[ServiceInstance]:
-        return [self._service_instance]
-
-    @override
-    async def put_service_instance(self, service_instance: ServiceInstance) -> None:
-        self._service_instance = service_instance
 
 
 def _service_plan(plan_version: PlanVersion) -> ServicePlan:
@@ -69,19 +67,25 @@ def _service_plan(plan_version: PlanVersion) -> ServicePlan:
 def _worker_instance(
     worker_id: ServiceId,
     interfaces: list[CapabilityInterface],
-) -> ServiceInstance:
-    return ServiceInstance(
+) -> WorkerInstance:
+    capabilities = [
+        Capability(type=capability_type, interfaces=[])
+        for capability_type in (
+            CapabilityType.PARTITION_INFERENCE,
+            CapabilityType.NETWORK_PROFILING,
+            CapabilityType.EXECUTION_PROFILING,
+            CapabilityType.RESOURCE_PROFILING,
+        )
+    ]
+    capabilities.append(
+        Capability(
+            type=CapabilityType.PLAN_ACTUATION,
+            interfaces=interfaces,
+        )
+    )
+    return WorkerInstance(
         service_id=worker_id,
-        capabilities=(
-            [
-                Capability(
-                    type=CapabilityType.PLAN_ACTUATION,
-                    interfaces=interfaces,
-                )
-            ]
-            if interfaces
-            else []
-        ),
+        capabilities=capabilities,
     )
 
 

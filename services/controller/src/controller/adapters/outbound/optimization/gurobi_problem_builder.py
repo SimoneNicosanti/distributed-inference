@@ -22,6 +22,7 @@ from controller.domain.optimization.solver_config import ProblemConfig
 from controller.domain.profile.model_variant_static_profile import (
     ModelVariantStaticProfile,
 )
+from integration.shared.id_json import flow_id_to_json, model_variant_id_to_json
 from shared.flow.flow import FlowId
 from shared.model.keys import LayerKey, TensorKey
 from shared.model.model import ModelVisibility
@@ -38,11 +39,11 @@ class GurobiProblemBuildError(ValueError):
 
 
 def model_key(model_variant_id: ModelVariantId) -> str:
-    return model_variant_id.model_dump_json()
+    return model_variant_id_to_json(model_variant_id)
 
 
 def flow_key(flow_id: FlowId) -> str:
-    return flow_id.model_dump_json()
+    return flow_id_to_json(flow_id)
 
 
 def worker_key(worker_id: WorkerId) -> str:

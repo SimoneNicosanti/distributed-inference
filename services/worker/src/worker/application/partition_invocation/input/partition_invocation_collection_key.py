@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 from shared.context.model_pass_context import (
     ModelPassContext,
@@ -6,8 +6,7 @@ from shared.context.model_pass_context import (
 from shared.plan.partition_replica_id import PartitionReplicaId
 
 
-class PartitionInvocationCollectionKey(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class PartitionInvocationCollectionKey:
     model_pass_context: ModelPassContext
     partition_replica_id: PartitionReplicaId

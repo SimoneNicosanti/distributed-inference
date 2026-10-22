@@ -1,3 +1,4 @@
+from dataclasses import replace
 from uuid import UUID
 
 import pytest
@@ -543,9 +544,7 @@ async def test_solves_feasible_single_worker_instance() -> None:
         ValueError,
         match="The first component must be placed on the ingress worker",
     ):
-        type(flow_solution).model_validate(
-            flow_solution.model_dump() | {"ingress_id": _worker(2)}
-        )
+        replace(flow_solution, ingress_id=_worker(2))
 
 
 @pytest.mark.asyncio

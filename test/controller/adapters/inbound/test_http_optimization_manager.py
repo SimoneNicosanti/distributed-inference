@@ -19,8 +19,10 @@ from integration.controller.http.optimization_http_paths import (
     OPTIMIZE_INFERENCE_DISTRIBUTION_PATH,
 )
 from integration.controller.http.optimization_http_schema import (
-    OptimizationRequestDto,
     OptimizeInferenceDistributionRequest,
+)
+from integration.dto.optimization.optimization_dto import (
+    OptimizationRequestDto,
     QoSRequirementsDto,
     StreamInfoDto,
 )
@@ -85,11 +87,19 @@ def test_maps_request_to_domain_and_delegates_to_manager() -> None:
             flow_id: OptimizationRequest(
                 flow_id=flow_id,
                 task=request_dto.task,
-                stream_info=StreamInfo.model_validate(
-                    request_dto.stream_info.model_dump()
+                stream_info=StreamInfo(
+                    arrival_rate=request_dto.stream_info.arrival_rate
                 ),
-                qos_requirements=QoSRequirements.model_validate(
-                    request_dto.qos_requirements.model_dump()
+                qos_requirements=QoSRequirements(
+                    max_mean_response_time=(
+                        request_dto.qos_requirements.max_mean_response_time
+                    ),
+                    min_model_performance=(
+                        request_dto.qos_requirements.min_model_performance
+                    ),
+                    max_energy_consumption=(
+                        request_dto.qos_requirements.max_energy_consumption
+                    ),
                 ),
                 ingress_id=request_dto.ingress_id,
             )

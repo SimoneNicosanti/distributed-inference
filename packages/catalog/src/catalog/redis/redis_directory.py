@@ -1,7 +1,10 @@
 from typing import override
 
 from catalog.api.directory import Directory
-from catalog.redis.key_builder import build_catalog_key, build_service_hset_key
+from catalog.redis.keys_factory import (
+    build_catalog_key,
+    build_service_hset_key,
+)
 from integration.service_instance.service_instance import (
     ServiceInstance,
 )

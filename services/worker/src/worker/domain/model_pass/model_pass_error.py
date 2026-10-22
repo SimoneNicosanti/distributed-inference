@@ -1,8 +1,9 @@
-from pydantic import BaseModel
+from dataclasses import dataclass
 
 from shared.context.model_pass_context import ModelPassContext
 
 
-class ModelPassError(BaseModel):
+@dataclass(frozen=True, slots=True)
+class ModelPassError:
     context: ModelPassContext
     message: str

@@ -1,6 +1,6 @@
-from typing import Self
-
-from pydantic import BaseModel, ConfigDict, PositiveInt, model_validator
+from collections.abc import Mapping
+from dataclasses import dataclass
+from types import MappingProxyType
 
 from shared.model.model import ModelId
 from shared.model.model_variant import (
@@ -12,31 +12,39 @@ from shared.model.model_variant import (
 )
 
 
-class DynamicShapeValues(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class DynamicShapeValues:
+    values: frozenset[int]
 
-    values: frozenset[PositiveInt]
-
-
-class InputInfo(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    shape: tuple[str | PositiveInt, ...]  ## int --> Static ; str --> Dynamic
+    def __post_init__(self) -> None:
+        if any(isinstance(value, bool) or value <= 0 for value in self.values):
+            raise ValueError("Dynamic shape values must be positive integers")
 
 
-class ModelVariantInfo(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class InputInfo:
+    shape: tuple[str | int, ...]  ## int --> Static ; str --> Dynamic
 
+    def __post_init__(self) -> None:
+        if any(
+            isinstance(dimension, bool)
+            or (isinstance(dimension, int) and dimension <= 0)
+            for dimension in self.shape
+        ):
+            raise ValueError("Static input dimensions must be positive integers")
+
+
+@dataclass(frozen=True, slots=True)
+class ModelVariantInfo:
     precision: NumericPrecision
     quantization: QuantizationType
-    accuracies: list[PerformanceMetric]
+    accuracies: tuple[PerformanceMetric, ...]
     format: ModelVariantFormat
 
-    inputs_info: dict[str, InputInfo]
-    dynamic_dimension_values: dict[str, DynamicShapeValues]
+    inputs_info: Mapping[str, InputInfo]
+    dynamic_dimension_values: Mapping[str, DynamicShapeValues]
 
-    @model_validator(mode="after")
-    def validate_input_shapes(self) -> Self:
+    def __post_init__(self) -> None:
         for input_name, input_info in self.inputs_info.items():
             input_shape = input_info.shape
             for shape in input_shape:
@@ -48,12 +56,18 @@ class ModelVariantInfo(BaseModel):
                             f"Unknown dynamic dimension {shape!r} in input {input_name!r}"
                         )
 
-        return self
+        object.__setattr__(
+            self, "inputs_info", MappingProxyType(dict(self.inputs_info))
+        )
+        object.__setattr__(
+            self,
+            "dynamic_dimension_values",
+            MappingProxyType(dict(self.dynamic_dimension_values)),
+        )
 
 
-class ModelVariant(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class ModelVariant:
     model_variant_id: ModelVariantId
     model_variant_info: ModelVariantInfo
 

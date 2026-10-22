@@ -2,24 +2,25 @@ from typing import override
 
 from redis import asyncio as redis_asyncio
 
+from integration.dto.model.profiled_model_variant_dto import (
+    ProfiledModelVariantDto,
+)
 from integration.redis.profiled_model_variant.keys_factory import (
     build_profiled_model_variant_dict_name,
     build_profiled_model_variant_ids_key,
     build_profiled_model_variant_key,
 )
-from integration.redis.profiled_model_variant.profiled_model_variant_dto import (
-    ProfiledModelVariantDto,
-    ShapePointDto,
-)
-from shared.model.keys import LayerKey
+from integration.shared.id_json import model_variant_id_from_json
 from shared.model.model_variant import ModelVariantId
+from worker.adapters.outbound.profiling.model_execution.mappers.model_static_profile_mapper import (
+    ModelStaticProfileMapper,
+)
 from worker.application.ports.outbound.profiling.model_execution.model_static_profile_reader import (
     ModelStaticProfileReader,
 )
 from worker.domain.profiling.model_execution.model_static_profile import (
     ModelStaticProfile,
 )
-from worker.domain.profiling.model_execution.shape_point import ShapePoint
 
 
 class RedisModelStaticProfileReader(ModelStaticProfileReader):
@@ -31,7 +32,7 @@ class RedisModelStaticProfileReader(ModelStaticProfileReader):
         ids_key = build_profiled_model_variant_ids_key()
 
         return [
-            ModelVariantId.model_validate_json(value)
+            model_variant_id_from_json(value)
             async for value in self._redis.sscan_iter(ids_key)
         ]
 
@@ -48,32 +49,4 @@ class RedisModelStaticProfileReader(ModelStaticProfileReader):
             raise ValueError(f"Model static profile {model_variant_id} not found")
 
         dto = ProfiledModelVariantDto.model_validate_json(value)
-        return self._build_model_static_profile_from_dto(dto)
-
-    @staticmethod
-    def _build_model_static_profile_from_dto(
-        dto: ProfiledModelVariantDto,
-    ) -> ModelStaticProfile:
-
-        model_variant_id = dto.model_variant_id
-        artifact_ref = dto.artifact_ref
-
-        shape_point_dtos: list[ShapePointDto] = dto.profile.shape_points
-
-        shape_points = []
-        for shape_point_dto in shape_point_dtos:
-            input_shape_points = {
-                input_shape_point.name: input_shape_point.shape
-                for input_shape_point in shape_point_dto.input_shape_points
-            }
-
-            shape_points.append(ShapePoint(input_shape_points=input_shape_points))
-
-        contractions: list[tuple[LayerKey, ...]] = dto.profile.optimization_contractions
-
-        return ModelStaticProfile(
-            model_variant_id=model_variant_id,
-            artifact_ref=artifact_ref,
-            shape_points=shape_points,
-            contractions=contractions,
-        )
+        return ModelStaticProfileMapper.model_static_profile_from_dto(dto)

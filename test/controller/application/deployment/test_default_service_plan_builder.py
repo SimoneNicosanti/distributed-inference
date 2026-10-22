@@ -119,7 +119,7 @@ async def test_maps_solution_to_all_involved_workers() -> None:
         components=(
             _component(
                 1,
-                compute_one,
+                ingress_two,
                 ("input", "encoder", "output"),
                 ("x",),
                 ("hidden",),
@@ -145,15 +145,17 @@ async def test_maps_solution_to_all_involved_workers() -> None:
     assert set(plans) == {ingress_one, ingress_two, compute_one, compute_two}
     for ingress_id in (ingress_one, ingress_two):
         assert plans[ingress_id].ingress_plan is not None
-        assert plans[ingress_id].worker_plan.deployment_plan.replica_ids == ()
+    assert plans[ingress_one].worker_plan.deployment_plan.replica_ids == ()
+    assert len(plans[ingress_two].worker_plan.deployment_plan.replica_ids) == 1
 
     compute_one_plan = plans[compute_one].worker_plan
     encoder_replicas = compute_one_plan.deployment_plan.replica_ids
-    assert tuple(replica.replica_idx for replica in encoder_replicas) == (0, 1)
+    assert tuple(replica.replica_idx for replica in encoder_replicas) == (0,)
     assert compute_one_plan.partition_execution_plan.partition_ids == (
         encoder_replicas[0].partition_id,
     )
-    assert compute_one_plan.scheduling_plan.priorities == (1, 3)
+    assert compute_one_plan.scheduling_plan.priorities == (1,)
+    assert plans[ingress_two].worker_plan.scheduling_plan.priorities == (3,)
     assert plans[compute_one].ingress_plan is None
 
     compute_two_plan = plans[compute_two].worker_plan

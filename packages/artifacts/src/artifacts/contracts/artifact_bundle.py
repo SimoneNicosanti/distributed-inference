@@ -1,26 +1,24 @@
 from pathlib import Path, PurePosixPath
-from typing import Self
-
-from pydantic import BaseModel, ConfigDict, model_validator
 
 from artifacts.contracts.artifact_manifest import ArtifactFileInfo, ArtifactManifest
 from artifacts.contracts.artifact_workspace import ArtifactWorkspace
 
 
-class ArtifactBundle(BaseModel):
+class ArtifactBundle:
     """Validated local filesystem source for storing or archiving an artifact."""
 
-    model_config = ConfigDict(frozen=True)
+    __slots__ = ("manifest", "root_path")
 
-    manifest: ArtifactManifest
-    root_path: Path
+    def __init__(self, *, manifest: ArtifactManifest, root_path: Path) -> None:
+        self.manifest = manifest
+        self.root_path = root_path
+        self._validate_files()
 
     @property
     def entrypoint_path(self) -> Path:
         return self.root_path.joinpath(*self.manifest.entrypoint_ppp.parts)
 
-    @model_validator(mode="after")
-    def validate_files(self) -> Self:
+    def _validate_files(self) -> None:
         if not self.root_path.is_dir():
             raise ValueError(
                 f"Artifact source root path is not a directory: {self.root_path}"
@@ -36,8 +34,6 @@ class ArtifactBundle(BaseModel):
                 raise ValueError(
                     f"Artifact source file is outside the source root: {file_path}"
                 )
-
-        return self
 
     def to_workspace(self) -> ArtifactWorkspace:
         return ArtifactWorkspace(

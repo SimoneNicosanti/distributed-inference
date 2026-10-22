@@ -1,8 +1,7 @@
 ## A partition invocation can lead to multiple partition executions.
 ## For example in case of fault tolerance.
+from dataclasses import dataclass, field
 from uuid import UUID, uuid4
-
-from pydantic import BaseModel, ConfigDict, Field
 
 from worker.domain.context.partition_invocation_context import (
     PartitionInvocationContext,
@@ -11,7 +10,7 @@ from worker.domain.context.partition_invocation_context import (
 type PartitionExecutionId = UUID
 
 
-class PartitionExecutionContext(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class PartitionExecutionContext:
     partition_invocation_context: PartitionInvocationContext
-    partition_execution_id: PartitionExecutionId = Field(default_factory=uuid4)
+    partition_execution_id: PartitionExecutionId = field(default_factory=uuid4)

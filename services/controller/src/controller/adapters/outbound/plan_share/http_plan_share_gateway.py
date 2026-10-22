@@ -2,6 +2,9 @@ from typing import override
 
 import httpx
 
+from controller.adapters.outbound.plan_share.mappers.service_plan_mapper import (
+    ServicePlanMapper,
+)
 from controller.application.ports.outbound.directory.worker_directory_gateway import (
     WorkerDirectoryGateway,
 )
@@ -13,7 +16,6 @@ from integration.service_instance.service_instance import (
     CapabilityType,
     ServiceInstance,
 )
-from integration.worker.deployment.dto.service_plan_dto import ServicePlanDto
 from integration.worker.deployment.http.service_plan_http_paths import (
     APPLY_SERVICE_PLAN_PATH,
     PREPARE_SERVICE_PLAN_PATH,
@@ -42,7 +44,7 @@ class HttpPlanShareGateway(PlanShareGateway):
     ) -> None:
         base_url = await self._get_plan_actuation_base_url(worker_id)
         plan_version = plan.worker_plan.plan_version
-        plan_dto = ServicePlanDto.model_validate(plan.model_dump())
+        plan_dto = ServicePlanMapper.to_service_plan_dto(plan)
         request = PrepareServicePlanRequest(service_plan=plan_dto)
 
         response = await self._http_client.put(

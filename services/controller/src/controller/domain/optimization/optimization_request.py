@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 from controller.domain.optimization.qos_constraints import QoSRequirements
 from controller.domain.optimization.stream_info import StreamInfo
@@ -7,9 +7,8 @@ from shared.model.model import ModelTask
 from shared.service.service import WorkerId
 
 
-class OptimizationRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class OptimizationRequest:
     flow_id: FlowId
     task: ModelTask
 

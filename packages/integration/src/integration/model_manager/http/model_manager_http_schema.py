@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
-from integration.model_manager.dto.model_dto import ModelDto
-from integration.model_manager.dto.model_variant_dto import ModelVariantDto
+from integration.dto.model.model_dto import ModelDto
+from integration.dto.model.model_variant_dto import ModelVariantDto
 from shared.artifact.artifact_ref import ArtifactRef
 from shared.model.model_partition import ModelPartitionId
 from shared.model.model_variant import (

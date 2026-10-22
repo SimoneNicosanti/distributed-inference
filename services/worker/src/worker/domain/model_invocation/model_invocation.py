@@ -1,18 +1,16 @@
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 from shared.context.model_invocation_context import ModelInvocationContext
 from shared.tensor.tensor_bundle import TensorBundle
 
 
-class ModelInvocationRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class ModelInvocationRequest:
     context: ModelInvocationContext
     bundle: TensorBundle
 
 
-class ModelInvocationResult(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class ModelInvocationResult:
     context: ModelInvocationContext
     bundle: TensorBundle

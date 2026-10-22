@@ -1,16 +1,19 @@
+# mypy: disable-error-code="attr-defined,name-defined,misc"
+
 import asyncio
-import json
 
 import pyarrow as pa
 from pyarrow import flight
 
-from integration.ingress.result_sink.model_pass_result.arrow_model_pass_result_contribution_callback_schema import (
+from integration.ingress.arrow.result_sink.model_pass_result.arrow_model_pass_result_contribution_callback_schema import (
     CALLBACK_CONTRIBUTION_COMMAND,
     CONTEXT_FIELD_NAME,
     validate_contribution_schema,
 )
+from integration.dto.context.context_dto import ModelPassResultContributionMetadataDto
 from shared.tensor.tensor import Tensor
 from shared.tensor.tensor_bundle import TensorBundle
+from worker.adapters.context_mapper import model_pass_context_from_dto
 from worker.application.ports.inbound.ingress.result_contribution_sink import (
     ResultContributionSink,
 )
@@ -108,12 +111,13 @@ class ArrowResultContributionSink(flight.FlightServerBase):
             raise pa.ArrowInvalid("Missing contribution context")
 
         try:
-            contribution_metadata = json.loads(metadata_scalar.as_py())
-        except (TypeError, json.JSONDecodeError) as error:
+            contribution_metadata = (
+                ModelPassResultContributionMetadataDto.model_validate_json(
+                    metadata_scalar.as_py()
+                )
+            )
+        except ValueError as error:
             raise pa.ArrowInvalid(f"Invalid contribution context: {error}") from error
-
-        if not isinstance(contribution_metadata, dict):
-            raise pa.ArrowInvalid("Invalid contribution context: expected an object")
 
         bundle: dict[str, Tensor] = {}
 
@@ -137,11 +141,11 @@ class ArrowResultContributionSink(flight.FlightServerBase):
             bundle[field.name] = Tensor(value=tensor_scalar.to_numpy().copy())
 
         try:
-            return ModelPassResultContribution.model_validate(
-                {
-                    **contribution_metadata,
-                    "bundle": TensorBundle(bundle=bundle),
-                }
+            return ModelPassResultContribution(
+                model_pass_context=model_pass_context_from_dto(
+                    contribution_metadata.model_pass_context
+                ),
+                bundle=TensorBundle(bundle=bundle),
             )
         except ValueError as error:
             raise pa.ArrowInvalid(f"Invalid contribution context: {error}") from error

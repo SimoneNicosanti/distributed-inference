@@ -16,7 +16,7 @@ from integration.worker.profiling.general_network_probe_integration import (
     PAYLOAD_SIZE,
     PROBE_TIMEOUT_S,
 )
-from integration.worker.profiling.protocols.arrow_network_probe_integration import (
+from integration.worker.profiling.arrow.arrow_network_probe_integration import (
     ECHO_ACTION,
     PAYLOAD_SCHEMA,
     UPLOAD_ACK,

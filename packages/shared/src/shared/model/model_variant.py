@@ -1,6 +1,5 @@
+from dataclasses import dataclass
 from enum import StrEnum, auto
-
-from pydantic import BaseModel, ConfigDict
 
 from shared.model.model import (
     ModelId,
@@ -27,9 +26,8 @@ class PerformanceMetricType(StrEnum):
     MAP_AT_75 = auto()
 
 
-class PerformanceMetric(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class PerformanceMetric:
     type: PerformanceMetricType
     dataset: str
     value: float
@@ -40,7 +38,8 @@ class ModelVariantFormat(StrEnum):
     TORCH_EXPORTED_PROGRAM = auto()
 
 
-# class LLMArchitectureInfo(BaseModel):
+# @dataclass(frozen=True, slots=True, kw_only=True)
+# class LLMArchitectureInfo:
 #     kind: Literal[ModelType.LLM] = ModelType.LLM
 #     context_length: int
 #     vocab_size: int
@@ -53,15 +52,14 @@ class StateTensorKind(StrEnum):
     CROSS_ATTENTION = auto()
 
 
-class StateTensorInfo(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class StateTensorInfo:
     input_name: str
     output_name: str
     kind: StateTensorKind
 
 
-class ModelVariantId(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class ModelVariantId:
     model_id: ModelId
     variant_tag: str

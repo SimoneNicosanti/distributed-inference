@@ -1,60 +1,53 @@
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+import math
+from dataclasses import dataclass
 
 from shared.service.service import WorkerId
 
 
-class GpuProfile(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class GpuProfile:
+    device_index: int
+    device_uuid: str
+    name: str
+    total_memory_bytes: int
+    used_memory_bytes: int
+    available_memory_bytes: int
+    compute_utilization_ratio: float | None = None
+    memory_io_utilization_ratio: float | None = None
 
-    device_index: int = Field(ge=0)
-    device_uuid: str = Field(min_length=1)
-    name: str = Field(min_length=1)
-
-    total_memory_bytes: int = Field(gt=0)
-    used_memory_bytes: int = Field(ge=0)
-    available_memory_bytes: int = Field(ge=0)
-
-    compute_utilization_ratio: float | None = Field(
-        default=None,
-        ge=0,
-        le=1,
-        allow_inf_nan=False,
-    )
-    memory_io_utilization_ratio: float | None = Field(
-        default=None,
-        ge=0,
-        le=1,
-        allow_inf_nan=False,
-    )
-
-    @model_validator(mode="after")
-    def validate_memory(self) -> GpuProfile:
+    def __post_init__(self) -> None:
+        if self.device_index < 0:
+            raise ValueError("GPU device index must be non-negative")
+        if not self.device_uuid or not self.name:
+            raise ValueError("GPU identity fields must not be empty")
+        if self.total_memory_bytes <= 0:
+            raise ValueError("GPU total memory must be positive")
+        if self.used_memory_bytes < 0 or self.available_memory_bytes < 0:
+            raise ValueError("GPU memory values must be non-negative")
         if self.used_memory_bytes > self.total_memory_bytes:
             raise ValueError("GPU used memory exceeds total memory")
         if self.available_memory_bytes > self.total_memory_bytes:
             raise ValueError("GPU available memory exceeds total memory")
-        return self
+        for ratio in (
+            self.compute_utilization_ratio,
+            self.memory_io_utilization_ratio,
+        ):
+            if ratio is not None and (not math.isfinite(ratio) or not 0 <= ratio <= 1):
+                raise ValueError("GPU utilization ratios must be between zero and one")
 
 
-class CpuProfile(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class CpuProfile:
+    logical_cpu_count: int
+    capacity_cores: float
+    utilization_ratio: float | None = None
+    sample_duration_s: float | None = None
 
-    logical_cpu_count: int = Field(gt=0)
-    capacity_cores: float = Field(gt=0, allow_inf_nan=False)
-    utilization_ratio: float | None = Field(
-        default=None,
-        ge=0,
-        le=1,
-        allow_inf_nan=False,
-    )
-    sample_duration_s: float | None = Field(
-        default=None,
-        gt=0,
-        allow_inf_nan=False,
-    )
-
-    @model_validator(mode="after")
-    def validate_sample(self) -> CpuProfile:
+    def __post_init__(self) -> None:
+        if self.logical_cpu_count <= 0:
+            raise ValueError("Logical CPU count must be positive")
+        if not math.isfinite(self.capacity_cores) or self.capacity_cores <= 0:
+            raise ValueError("CPU capacity must be finite and positive")
         if (self.utilization_ratio is None) != (self.sample_duration_s is None):
             raise ValueError(
                 "CPU utilization and sample duration must either both be set "
@@ -62,34 +55,44 @@ class CpuProfile(BaseModel):
             )
         if self.capacity_cores > self.logical_cpu_count:
             raise ValueError("CPU capacity exceeds the logical CPU count")
-        return self
+        if self.utilization_ratio is not None and (
+            not math.isfinite(self.utilization_ratio)
+            or not 0 <= self.utilization_ratio <= 1
+        ):
+            raise ValueError("CPU utilization ratio must be between zero and one")
+        if self.sample_duration_s is not None and (
+            not math.isfinite(self.sample_duration_s) or self.sample_duration_s <= 0
+        ):
+            raise ValueError("CPU sample duration must be finite and positive")
 
 
-class RamProfile(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, slots=True)
+class RamProfile:
+    capacity_bytes: int
+    used_bytes: int
+    available_bytes: int
+    worker_rss_bytes: int
 
-    capacity_bytes: int = Field(gt=0)
-    used_bytes: int = Field(ge=0)
-    available_bytes: int = Field(ge=0)
-    worker_rss_bytes: int = Field(ge=0)
-
-    @model_validator(mode="after")
-    def validate_memory(self) -> RamProfile:
+    def __post_init__(self) -> None:
+        if self.capacity_bytes <= 0:
+            raise ValueError("RAM capacity must be positive")
+        if any(
+            value < 0
+            for value in (self.used_bytes, self.available_bytes, self.worker_rss_bytes)
+        ):
+            raise ValueError("RAM usage values must be non-negative")
         if self.available_bytes > self.capacity_bytes:
             raise ValueError("Available RAM exceeds RAM capacity")
-        return self
 
 
-class WorkerResourceProfile(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class WorkerResourceProfile:
     worker_id: WorkerId
     gpu_profiles: tuple[GpuProfile, ...]
     cpu_profile: CpuProfile
     ram_profile: RamProfile
 
-    @model_validator(mode="after")
-    def validate_gpu_identities(self) -> WorkerResourceProfile:
+    def __post_init__(self) -> None:
         device_indices = [profile.device_index for profile in self.gpu_profiles]
         if len(device_indices) != len(set(device_indices)):
             raise ValueError("Duplicate GPU device indices")
@@ -97,4 +100,3 @@ class WorkerResourceProfile(BaseModel):
         device_uuids = [profile.device_uuid for profile in self.gpu_profiles]
         if len(device_uuids) != len(set(device_uuids)):
             raise ValueError("Duplicate GPU device UUIDs")
-        return self

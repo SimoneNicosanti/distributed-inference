@@ -1,8 +1,10 @@
+from dataclasses import asdict
 from typing import override
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from integration.dto.service_plan.service_plan_dto import ServicePlanDto
 from integration.worker.deployment.http.service_plan_http_paths import (
     APPLY_SERVICE_PLAN_PATH,
     PREPARE_SERVICE_PLAN_PATH,
@@ -101,6 +103,10 @@ def _client(
     return TestClient(app)
 
 
+def _plan_json(plan: ServicePlan) -> dict[str, object]:
+    return ServicePlanDto.model_validate(asdict(plan)).model_dump(mode="json")
+
+
 def test_prepares_and_applies_worker_and_ingress_plans() -> None:
     worker_deployer = RecordingPlanDeployer[WorkerPlan]()
     ingress_deployer = RecordingPlanDeployer[IngressPlan]()
@@ -113,7 +119,7 @@ def test_prepares_and_applies_worker_and_ingress_plans() -> None:
 
     prepare_response = client.put(
         PREPARE_SERVICE_PLAN_PATH.format(version_number=1),
-        json={"service_plan": plan.model_dump(mode="json")},
+        json={"service_plan": _plan_json(plan)},
     )
     apply_response = client.put(
         APPLY_SERVICE_PLAN_PATH.format(version_number=1),
@@ -139,7 +145,7 @@ def test_skips_ingress_deployer_when_plan_has_no_ingress_component() -> None:
 
     prepare_response = client.put(
         PREPARE_SERVICE_PLAN_PATH.format(version_number=1),
-        json={"service_plan": plan.model_dump(mode="json")},
+        json={"service_plan": _plan_json(plan)},
     )
     apply_response = client.put(
         APPLY_SERVICE_PLAN_PATH.format(version_number=1),
@@ -163,7 +169,7 @@ def test_rejects_path_and_payload_version_mismatch() -> None:
 
     response = client.put(
         PREPARE_SERVICE_PLAN_PATH.format(version_number=1),
-        json={"service_plan": plan.model_dump(mode="json")},
+        json={"service_plan": _plan_json(plan)},
     )
 
     assert response.status_code == 409

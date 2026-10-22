@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 from shared.model.model import (
     ArchitectureInfo,
@@ -10,9 +10,8 @@ from shared.model.model import (
 from shared.user.user import UserId
 
 
-class ModelInfo(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class ModelInfo:
     model_task: ModelTask
     architecture_info: ArchitectureInfo
 
@@ -30,9 +29,8 @@ class ModelInfo(BaseModel):
 ## - nano, fp32, dynamic batch
 ## - xlarge, quantized int8, static batch size 8
 ## When asking, the user can use all the variants of the models he owns and all the public models
-class Model(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class Model:
     model_id: ModelId
     visibility: ModelVisibility
 

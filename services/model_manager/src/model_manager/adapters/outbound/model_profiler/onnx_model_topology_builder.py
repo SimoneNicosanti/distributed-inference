@@ -50,7 +50,7 @@ class OnnxModelTopologyBuilder(ModelTopologyBuilder):
             OnnxModelTopologyBuilder._clear_topology(topology)
 
         except onnx.checker.ValidationError as e:
-            raise Exception("Invalid ONNX model: " + str(e))
+            raise ValueError("Invalid ONNX model: " + str(e)) from e
 
         return topology
 
@@ -172,9 +172,9 @@ class OnnxModelTopologyBuilder(ModelTopologyBuilder):
 
         first_layer_name: str
         second_layer_name: str
-        for first_layer_name in topology.layers().keys():
+        for first_layer_name in topology.layers():
             first_layer_output_names: set[str] = per_layer_outputs[first_layer_name]
-            for second_layer_name in topology.layers().keys():
+            for second_layer_name in topology.layers():
                 if first_layer_name == second_layer_name:
                     continue
 
@@ -187,7 +187,7 @@ class OnnxModelTopologyBuilder(ModelTopologyBuilder):
                     edge_info = EdgeDescription(
                         source=first_layer_name,
                         target=second_layer_name,
-                        tensors=comm_elements,
+                        tensors=frozenset(comm_elements),
                     )
                     edge_key = (first_layer_name, second_layer_name)
                     topology.add_edge(edge_key=edge_key, edge_descript=edge_info)

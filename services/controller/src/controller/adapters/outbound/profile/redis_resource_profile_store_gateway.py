@@ -3,12 +3,17 @@ from typing import override
 
 from redis import asyncio as redis_asyncio
 
+from controller.adapters.outbound.profile.mappers.worker_resource_profile_mapper import (
+    WorkerResourceProfileMapper,
+)
 from controller.application.ports.outbound.profile.resource_profile_store_gateway import (
     ResourceProfileStoreGateway,
 )
-from controller.domain.profile.resource_profile import WorkerResourceProfile
-from integration.worker.profiling.redis.resource_profile_dto import ResourceProfileDto
-from integration.worker.profiling.redis.resource_profile_keys import (
+from controller.domain.profile.resource_profile import (
+    WorkerResourceProfile,
+)
+from integration.dto.worker_profiles.resource_profile_dto import ResourceProfileDto
+from integration.redis.worker_profiles.resource_profile_keys import (
     build_resource_profile_key_per_worker,
 )
 from shared.service.service import WorkerId
@@ -47,6 +52,8 @@ class RedisResourceProfileStoreGateway(ResourceProfileStoreGateway):
                     "Stored resource profile worker does not match the requested worker"
                 )
 
-            profiles.append(WorkerResourceProfile.model_validate(dto.model_dump()))
+            profiles.append(
+                WorkerResourceProfileMapper.worker_resource_profile_from_dto(dto)
+            )
 
         return profiles

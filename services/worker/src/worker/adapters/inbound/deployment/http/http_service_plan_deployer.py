@@ -1,7 +1,7 @@
 import asyncio
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import PositiveInt, ValidationError
+from pydantic import PositiveInt
 
 from integration.worker.deployment.http.service_plan_http_paths import (
     APPLY_SERVICE_PLAN_PATH,
@@ -11,9 +11,11 @@ from integration.worker.deployment.http.service_plan_http_schema import (
     PrepareServicePlanRequest,
 )
 from shared.plan.plan_version import PlanVersion
+from worker.adapters.inbound.deployment.http.service_plan_mapper import (
+    service_plan_from_dto,
+)
 from worker.application.ports.inbound.deployment.plan_deployer import PlanDeployer
 from worker.domain.plan.ingress.ingress_plan import IngressPlan
-from worker.domain.plan.service_plan import ServicePlan
 from worker.domain.plan.worker.worker_plan import WorkerPlan
 
 
@@ -33,11 +35,11 @@ def build_service_plan_deployment_router(
         request: PrepareServicePlanRequest,
     ) -> None:
         try:
-            plan = ServicePlan.model_validate(request.service_plan.model_dump())
-        except ValidationError as error:
+            plan = service_plan_from_dto(request.service_plan)
+        except ValueError as error:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail=error.errors(),
+                detail=str(error),
             ) from error
 
         plan_version = PlanVersion(version_number=version_number)

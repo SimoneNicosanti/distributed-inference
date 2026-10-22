@@ -14,13 +14,15 @@ from integration.model_manager.http.model_manager_http_schema import (
     StartModelVariantRegistrationRequest,
     StartModelVariantRegistrationResponse,
 )
+from model_manager.adapters.inbound.mappers.model_variant_mapper import (
+    ModelVarianMapper,
+)
 from model_manager.application.ports.inbound.model_partitioner import ModelPartitioner
 from model_manager.application.ports.inbound.model_registry import ModelRegistry
 from model_manager.application.ports.inbound.model_variant_registry import (
     ModelVariantRegistry,
 )
 from model_manager.domain.model import Model, ModelInfo
-from model_manager.domain.model_variant import ModelVariant, ModelVariantInfo
 
 CHUNK_SIZE = 1024 * 1024
 
@@ -65,14 +67,7 @@ def build_model_manager_router(
 
         model_variant_dto = request.model_variant_dto
 
-        model_variant_info = ModelVariantInfo.model_validate(
-            model_variant_dto.model_dump(exclude={"id"})
-        )
-
-        model_variant = ModelVariant(
-            model_variant_id=model_variant_dto.id,
-            model_variant_info=model_variant_info,
-        )
+        model_variant = ModelVarianMapper.to_model_variant_from_dto(model_variant_dto)
 
         artifact_ref = await model_variant_registry.start_model_variant_registration(
             model_variant=model_variant

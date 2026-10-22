@@ -1,3 +1,5 @@
+# mypy: disable-error-code="attr-defined,name-defined"
+
 import asyncio
 from contextlib import closing
 from typing import override
@@ -6,22 +8,24 @@ import numpy as np
 import pyarrow as pa
 from pyarrow import flight
 
-from integration.ingress.result_sink.model_pass_result.arrow_model_pass_result_contribution_callback_schema import (
+from integration.dto.context.context_dto import ModelPassResultContributionMetadataDto
+from integration.ingress.arrow.result_sink.model_pass_result.arrow_model_pass_result_contribution_callback_schema import (
     CALLBACK_CONTRIBUTION_COMMAND,
     build_contribution_schema,
 )
+from integration.service_instance.ingress_instance import ResultSinkInstance
 from integration.service_instance.service_instance import (
     CapabilityInterface,
     CapabilityProtocol,
     CapabilityType,
 )
+from worker.adapters.context_mapper import model_pass_context_to_dto
 from worker.application.ports.outbound.catalog.service.service_directory_gateway import (
     ServiceDirectoryGateway,
 )
 from worker.application.ports.outbound.partition_invocation.sender.contribution_sender import (
     ContributionSender,
 )
-from integration.service_instance.ingress_instance import ResultSinkInstance
 from worker.domain.model_pass.model_pass_result_contribution import (
     ModelPassResultContribution,
 )
@@ -107,10 +111,15 @@ class ArrowModelPassResultContributionSender(
         }
 
         schema = build_contribution_schema(tensor_values)
+        metadata = ModelPassResultContributionMetadataDto(
+            model_pass_context=model_pass_context_to_dto(
+                contribution.model_pass_context
+            )
+        )
 
         arrays: list[pa.Array] = [
             pa.array(
-                [contribution.model_dump_json(exclude={"bundle"})],
+                [metadata.model_dump_json()],
                 type=pa.large_string(),
             )
         ]

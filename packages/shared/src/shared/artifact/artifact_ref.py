@@ -1,9 +1,12 @@
-from pydantic import BaseModel, ConfigDict, Field
+from dataclasses import dataclass
 
 
-class ArtifactRef(BaseModel):
+@dataclass(frozen=True, slots=True)
+class ArtifactRef:
     """Opaque identifier assigned by the artifact owner."""
 
-    model_config = ConfigDict(frozen=True)
+    value: str
 
-    value: str = Field(min_length=1)
+    def __post_init__(self) -> None:
+        if not self.value:
+            raise ValueError("Artifact reference must not be empty")

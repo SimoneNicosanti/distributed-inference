@@ -4,20 +4,20 @@ import httpx
 import pytest
 from pydantic import HttpUrl
 
+from catalog.api.directory import Directory
 from controller.adapters.outbound.partition_builder.http_partition_builder_gateway import (
     HttpPartitionBuilderGateway,
 )
-from directory.api.directory import ServiceDirectory
+from integration.model_manager.http.model_manager_http_schema import (
+    GenerateModelPartitionRequest,
+    GenerateModelPartitionResponse,
+)
 from integration.service_instance.service_instance import (
     Capability,
     CapabilityInterface,
     CapabilityProtocol,
     CapabilityType,
     ServiceInstance,
-)
-from integration.model_manager.http.model_manager_http_schema import (
-    GenerateModelPartitionRequest,
-    GenerateModelPartitionResponse,
 )
 from shared.artifact.artifact_ref import ArtifactRef
 from shared.model.model import ModelId
@@ -27,7 +27,7 @@ from shared.service.service import ServiceId
 from shared.user.user import UserId
 
 
-class StubServiceDirectory(ServiceDirectory):
+class StubServiceDirectory(Directory):
     def __init__(self, service_instances: list[ServiceInstance]) -> None:
         self._service_instances = service_instances
         self.get_all_calls = 0
@@ -46,10 +46,6 @@ class StubServiceDirectory(ServiceDirectory):
     async def get_all_service_instances(self) -> list[ServiceInstance]:
         self.get_all_calls += 1
         return self._service_instances
-
-    @override
-    async def put_service_instance(self, service_instance: ServiceInstance) -> None:
-        self._service_instances.append(service_instance)
 
 
 def _model_manager_instance(endpoint: str) -> ServiceInstance:

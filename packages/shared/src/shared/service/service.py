@@ -1,6 +1,5 @@
+from dataclasses import dataclass, field
 from uuid import UUID, uuid4
-
-from pydantic import BaseModel, ConfigDict, Field
 
 # We can have multiple users.
 # - Each user can define multiple flows.
@@ -10,10 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field
 # - Then we have the artifacts as stored in the model store.
 
 
-class ServiceId(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    service_id: UUID = Field(default_factory=uuid4)
+@dataclass(frozen=True, slots=True)
+class ServiceId:
+    service_id: UUID = field(default_factory=uuid4)
 
 
 type WorkerId = ServiceId

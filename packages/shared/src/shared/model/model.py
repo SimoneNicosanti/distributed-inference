@@ -1,7 +1,6 @@
+from dataclasses import dataclass
 from enum import StrEnum, auto
-from typing import Annotated, Literal
-
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import Literal
 
 from shared.user.user import UserId
 
@@ -20,28 +19,29 @@ class ModelType(StrEnum):
     BERT = auto()
 
 
-class CNNArchitectureInfo(BaseModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CNNArchitectureInfo:
     kind: Literal[ModelType.CNN] = ModelType.CNN
 
 
-class TransformerArchitectureInfo(BaseModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class TransformerArchitectureInfo:
     kind: Literal[ModelType.VIT, ModelType.BERT]
     num_heads: int
     hidden_size: int
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
 class VITArchitectureInfo(TransformerArchitectureInfo):
     kind: Literal[ModelType.VIT] = ModelType.VIT
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
 class BERTArchitectureInfo(TransformerArchitectureInfo):
     kind: Literal[ModelType.BERT] = ModelType.BERT
 
 
-type ArchitectureInfo = Annotated[
-    CNNArchitectureInfo | VITArchitectureInfo | BERTArchitectureInfo,
-    Field(discriminator="kind"),
-]
+type ArchitectureInfo = CNNArchitectureInfo | VITArchitectureInfo | BERTArchitectureInfo
 
 
 class ModelVisibility(StrEnum):
@@ -49,20 +49,15 @@ class ModelVisibility(StrEnum):
     PRIVATE = auto()
 
 
-class ModelId(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class ModelId:
     owner_id: UserId
     model_name: str
 
-    @field_validator("model_name", mode="before")
-    @classmethod
-    def validate_model_name(cls, model_name: str) -> str:
-        if model_name.find("/") != -1:
+    def __post_init__(self) -> None:
+        if self.model_name.find("/") != -1:
             raise ValueError("Model name cannot contain '/'")
-        if model_name.find("\\") != -1:
+        if self.model_name.find("\\") != -1:
             raise ValueError("Model name cannot contain '\\'")
-        if model_name.find("..") != -1:
+        if self.model_name.find("..") != -1:
             raise ValueError("Model name cannot contain '..'")
-
-        return model_name

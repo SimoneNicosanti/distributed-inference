@@ -1,9 +1,9 @@
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
+from shared.tensor.tensor_bundle import TensorBundle
 from worker.domain.context.partition_execution_context import (
     PartitionExecutionContext,
 )
-from shared.tensor.tensor_bundle import TensorBundle
 
 ## NOTE: To handle stateful models, we will need to add a sort of state in the input/output
 ## The state should be handled externally, since an executor might be a replicated model; as such, multiple
@@ -11,18 +11,16 @@ from shared.tensor.tensor_bundle import TensorBundle
 
 
 ## Input for local partition execution.
-class PartitionExecutionInput(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class PartitionExecutionInput:
     partition_execution_context: PartitionExecutionContext
 
     payload: TensorBundle
 
 
 ## Output of local partition execution.
-class PartitionExecutionOutput(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class PartitionExecutionOutput:
     partition_execution_context: PartitionExecutionContext
 
     payload: TensorBundle

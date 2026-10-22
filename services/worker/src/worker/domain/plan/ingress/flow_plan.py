@@ -1,50 +1,39 @@
-from typing import Self
-
-from pydantic import BaseModel, ConfigDict, model_validator
+from dataclasses import dataclass
 
 from shared.model.keys import TensorKey
 from shared.model.model_variant import ModelVariantId
 from shared.plan.partition_replica_id import PartitionReplicaId
 
 
-class IngressInputRoute(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class IngressInputRoute:
     target_replica_id: PartitionReplicaId
     tensors: tuple[TensorKey, ...]
 
-    @model_validator(mode="after")
-    def validate_route(self) -> Self:
+    def __post_init__(self) -> None:
         if not self.tensors:
             raise ValueError("Ingress input route must carry at least one tensor")
 
         if len(self.tensors) != len(set(self.tensors)):
             raise ValueError("Ingress input route tensors must be unique")
 
-        return self
 
-
-class FlowPlan(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class FlowPlan:
     model_variant_id: ModelVariantId
     input_routes: tuple[IngressInputRoute, ...]
     result_tensors: tuple[TensorKey, ...]
 
-    @model_validator(mode="after")
-    def validate_flow_plan(self) -> Self:
+    def __post_init__(self) -> None:
         if not self.input_routes:
             raise ValueError("Flow plan must contain at least one input route")
 
-        target_replica_ids = [
-            route.target_replica_id for route in self.input_routes
-        ]
+        target_replica_ids = [route.target_replica_id for route in self.input_routes]
         if len(target_replica_ids) != len(set(target_replica_ids)):
             raise ValueError("Flow plan input route targets must be unique")
 
         target_partition_ids = [
-            target_replica_id.partition_id
-            for target_replica_id in target_replica_ids
+            target_replica_id.partition_id for target_replica_id in target_replica_ids
         ]
         if len(target_partition_ids) != len(set(target_partition_ids)):
             raise ValueError(
@@ -53,10 +42,7 @@ class FlowPlan(BaseModel):
 
         for input_route in self.input_routes:
             target_replica_id = input_route.target_replica_id
-            if (
-                target_replica_id.partition_id.model_variant_id
-                != self.model_variant_id
-            ):
+            if target_replica_id.partition_id.model_variant_id != self.model_variant_id:
                 raise ValueError(
                     "Flow plan input routes must target the configured model variant"
                 )
@@ -66,8 +52,6 @@ class FlowPlan(BaseModel):
 
         if len(self.result_tensors) != len(set(self.result_tensors)):
             raise ValueError("Flow plan result tensors must be unique")
-
-        return self
 
     def route_input_tensors(
         self,

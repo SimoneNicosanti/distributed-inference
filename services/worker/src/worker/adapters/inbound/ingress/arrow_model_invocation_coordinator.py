@@ -1,13 +1,13 @@
 # mypy: disable-error-code="attr-defined,name-defined"
 
 import asyncio
-import json
 
 import numpy as np
 import pyarrow as pa
 from pyarrow import flight
 
-from integration.worker.ingress.arrow_model_invocation_schema import (
+from integration.shared.id_json import flow_id_from_json
+from integration.worker.ingress.arrow.arrow_model_invocation_schema import (
     FLOW_ID_FIELD_NAME,
     RUN_MODEL_INVOCATION_COMMAND,
     build_model_invocation_result_schema,
@@ -112,9 +112,8 @@ class ArrowModelInvocationCoordinator(
             raise pa.ArrowInvalid("Missing model invocation flow id")
 
         try:
-            flow_id_data = json.loads(flow_id_scalar.as_py())
-            flow_id = FlowId.model_validate(flow_id_data)
-        except (TypeError, json.JSONDecodeError, ValueError) as error:
+            flow_id = flow_id_from_json(flow_id_scalar.as_py())
+        except (TypeError, ValueError) as error:
             raise pa.ArrowInvalid(
                 f"Invalid model invocation flow id: {error}"
             ) from error

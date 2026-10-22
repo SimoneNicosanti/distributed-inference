@@ -1,12 +1,11 @@
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 from shared.context.model_pass_context import ModelPassContext, ModelPassId
 from shared.tensor.tensor_bundle import TensorBundle
 
 
-class ModelPassResultContribution(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+@dataclass(frozen=True, slots=True)
+class ModelPassResultContribution:
     model_pass_context: ModelPassContext
     bundle: TensorBundle
 
