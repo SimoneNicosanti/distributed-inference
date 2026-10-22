@@ -190,7 +190,7 @@ files = ["services", "packages"]
 namespace_packages = true
 explicit_package_bases = true
 mypy_path = [
-  "$MYPY_CONFIG_FILE_DIR/packages/directory/src",
+  "$MYPY_CONFIG_FILE_DIR/packages/catalog/src",
   "$MYPY_CONFIG_FILE_DIR/packages/integration/src",
   "$MYPY_CONFIG_FILE_DIR/packages/shared/src",
   "$MYPY_CONFIG_FILE_DIR/packages/lifecycle/src",
@@ -325,7 +325,7 @@ extraPaths = [
   "services/ingress/src",
   "services/front_end/src",
 
-  "packages/directory/src",
+  "packages/catalog/src",
   "packages/integration/src",
   "packages/shared/src",
   "packages/lifecycle/src",

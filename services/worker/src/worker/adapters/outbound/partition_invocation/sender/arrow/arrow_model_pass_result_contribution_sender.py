@@ -6,22 +6,22 @@ import numpy as np
 import pyarrow as pa
 from pyarrow import flight
 
-from directory.contracts.service_instance import (
-    CapabilityInterface,
-    CapabilityProtocol,
-    CapabilityType,
-)
 from integration.ingress.result_sink.model_pass_result.arrow_model_pass_result_contribution_callback_schema import (
     CALLBACK_CONTRIBUTION_COMMAND,
     build_contribution_schema,
 )
-from worker.application.ports.outbound.directory.service_directory import (
-    ServiceDirectory,
+from integration.service_instance.service_instance import (
+    CapabilityInterface,
+    CapabilityProtocol,
+    CapabilityType,
+)
+from worker.application.ports.outbound.catalog.service.service_directory_gateway import (
+    ServiceDirectoryGateway,
 )
 from worker.application.ports.outbound.partition_invocation.sender.contribution_sender import (
     ContributionSender,
 )
-from worker.domain.directory.ingress_instance import ResultSinkInstance
+from integration.service_instance.ingress_instance import ResultSinkInstance
 from worker.domain.model_pass.model_pass_result_contribution import (
     ModelPassResultContribution,
 )
@@ -32,7 +32,7 @@ class ArrowModelPassResultContributionSender(
 ):
     def __init__(
         self,
-        directory: ServiceDirectory,
+        directory: ServiceDirectoryGateway,
         timeout_s: float = 30.0,
     ) -> None:
         self._directory = directory

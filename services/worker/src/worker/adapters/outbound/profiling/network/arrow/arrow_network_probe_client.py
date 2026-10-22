@@ -7,7 +7,7 @@ from typing import override
 import pyarrow as pa
 import pyarrow.flight as flight
 
-from directory.contracts.service_instance import (
+from integration.service_instance.service_instance import (
     CapabilityInterface,
     CapabilityProtocol,
     CapabilityType,
@@ -25,7 +25,7 @@ from integration.worker.profiling.protocols.arrow_network_probe_integration impo
 from worker.application.ports.outbound.profiling.network.network_probe_client import (
     NetworkProbeClient,
 )
-from worker.domain.directory.worker_instance import WorkerInstance
+from integration.service_instance.worker_instance import WorkerInstance
 from worker.domain.profiling.network_profile import ConnectionInfo
 
 

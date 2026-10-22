@@ -7,7 +7,9 @@ dependencies = [
   "boto3>=1.43.116",
   "botocore>=1.43.116",
   "distributed-inference-artifacts",
+  "distributed-inference-catalog",
   "distributed-inference-integration",
+  "distributed-inference-lifecycle",
   "distributed-inference-shared",
   "distributed-inference-utils",
   "fastapi>=0.139.2",
@@ -30,6 +32,8 @@ packages = ["src/model_manager"]
 
 [tool.uv.sources]
 distributed-inference-artifacts = { path = "../../packages/artifacts", editable = true }
+distributed-inference-catalog = { path = "../../packages/catalog", editable = true }
 distributed-inference-integration = { path = "../../packages/integration", editable = true }
+distributed-inference-lifecycle = { path = "../../packages/lifecycle", editable = true }
 distributed-inference-shared = { path = "../../packages/shared", editable = true }
 distributed-inference-utils = { path = "../../packages/utils", editable = true }

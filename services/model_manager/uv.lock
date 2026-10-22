@@ -114,6 +114,23 @@ test = [
 ]
 
 [[package]]
+name = "distributed-inference-catalog"
+version = "0.1.0"
+source = { editable = "../../packages/catalog" }
+dependencies = [
+    { name = "distributed-inference-integration" },
+    { name = "distributed-inference-shared" },
+    { name = "redis" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "distributed-inference-integration", editable = "../../packages/integration" },
+    { name = "distributed-inference-shared", editable = "../../packages/shared" },
+    { name = "redis", specifier = ">=8.0.1" },
+]
+
+[[package]]
 name = "distributed-inference-integration"
 version = "0.1.0"
 source = { editable = "../../packages/integration" }
@@ -133,6 +150,11 @@ requires-dist = [
 ]
 
 [[package]]
+name = "distributed-inference-lifecycle"
+version = "0.1.0"
+source = { editable = "../../packages/lifecycle" }
+
+[[package]]
 name = "distributed-inference-model-manager"
 version = "0.1.0"
 source = { editable = "." }
@@ -141,7 +163,9 @@ dependencies = [
     { name = "boto3" },
     { name = "botocore" },
     { name = "distributed-inference-artifacts" },
+    { name = "distributed-inference-catalog" },
     { name = "distributed-inference-integration" },
+    { name = "distributed-inference-lifecycle" },
     { name = "distributed-inference-shared" },
     { name = "distributed-inference-utils" },
     { name = "fastapi" },
@@ -161,7 +185,9 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.43.116" },
     { name = "botocore", specifier = ">=1.43.116" },
     { name = "distributed-inference-artifacts", editable = "../../packages/artifacts" },
+    { name = "distributed-inference-catalog", editable = "../../packages/catalog" },
     { name = "distributed-inference-integration", editable = "../../packages/integration" },
+    { name = "distributed-inference-lifecycle", editable = "../../packages/lifecycle" },
     { name = "distributed-inference-shared", editable = "../../packages/shared" },
     { name = "distributed-inference-utils", editable = "../../packages/utils" },
     { name = "fastapi", specifier = ">=0.139.2" },

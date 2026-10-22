@@ -14,7 +14,7 @@ from controller.domain.plan.scheduling_plan import SchedulingPlan
 from controller.domain.plan.service_plan import ServicePlan
 from controller.domain.plan.worker_plan import WorkerPlan
 from directory.api.directory import ServiceDirectory
-from directory.contracts.service_instance import (
+from integration.service_instance.service_instance import (
     Capability,
     CapabilityInterface,
     CapabilityProtocol,

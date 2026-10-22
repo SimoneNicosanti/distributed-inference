@@ -3,13 +3,13 @@ from collections.abc import Iterable
 import pyarrow as pa
 import pyarrow.flight as flight
 
+from integration.worker.profiling.general_network_probe_integration import PAYLOAD_SIZE
 from integration.worker.profiling.protocols.arrow_network_probe_integration import (
     ECHO_ACTION,
     PAYLOAD_SCHEMA,
     UPLOAD_ACK,
     UPLOAD_COMMAND,
 )
-from integration.worker.profiling.general_network_probe_integration import PAYLOAD_SIZE
 
 
 class ArrowNetworkProbeServer(flight.FlightServerBase):

@@ -8,8 +8,8 @@ from worker.application.partition_execution.abc.partition_executor_registry impo
     PartitionExecutorRegistry,
 )
 from worker.application.ports.inbound.deployment.plan_deployer import PlanDeployer
-from worker.application.ports.outbound.directory.partition_deployment_registry import (
-    PartitionDeploymentRegistry,
+from worker.application.ports.outbound.catalog.partition_deployment.partition_deployment_registrar import (
+    PartitionDeploymentRegistrar,
 )
 from worker.application.ports.outbound.model_metadata.model_partition_metadata_reader import (
     ModelPartitionMetadataReader,
@@ -32,7 +32,7 @@ class DefaultWorkerPlanDeployer(PlanDeployer[WorkerPlan]):
         model_partition_metadata_reader: ModelPartitionMetadataReader,
         partition_executor_factory: PartitionExecutorFactory,
         partition_executor_registry: PartitionExecutorRegistry,
-        partition_deployment_registry: PartitionDeploymentRegistry,
+        partition_deployment_registrar: PartitionDeploymentRegistrar,
     ) -> None:
         self._worker_id = worker_id
         self._worker_plan_store = worker_plan_store
@@ -40,7 +40,7 @@ class DefaultWorkerPlanDeployer(PlanDeployer[WorkerPlan]):
         self._model_partition_metadata_reader = model_partition_metadata_reader
         self._partition_executor_factory = partition_executor_factory
         self._partition_executor_registry = partition_executor_registry
-        self._partition_deployment_registry = partition_deployment_registry
+        self._partition_deployment_registrar = partition_deployment_registrar
 
     @override
     async def prepare_plan(self, plan: WorkerPlan) -> None:
@@ -81,7 +81,7 @@ class DefaultWorkerPlanDeployer(PlanDeployer[WorkerPlan]):
                         partition_executor,
                     )
 
-            await self._partition_deployment_registry.register_partition_deployment(
+            await self._partition_deployment_registrar.register_partition_deployment(
                 plan_version=worker_plan.plan_version,
                 deployment_id=deployment_id,
             )

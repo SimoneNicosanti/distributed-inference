@@ -6,7 +6,7 @@ import numpy as np
 import pyarrow as pa
 from pyarrow import flight
 
-from directory.contracts.service_instance import (
+from integration.service_instance.service_instance import (
     CapabilityInterface,
     CapabilityProtocol,
     CapabilityType,
@@ -15,16 +15,16 @@ from integration.worker.partition_invocation.arrow.arrow_partition_invocation_co
     SUBMIT_CONTRIBUTION_COMMAND,
     build_contribution_schema,
 )
-from worker.application.ports.outbound.directory.partition_deployment_registry import (
-    PartitionDeploymentRegistry,
+from worker.application.ports.outbound.catalog.partition_deployment.partition_deployment_directory import (
+    PartitionDeploymentDirectory,
 )
-from worker.application.ports.outbound.directory.service_directory import (
-    ServiceDirectory,
+from worker.application.ports.outbound.catalog.service.service_directory_gateway import (
+    ServiceDirectoryGateway,
 )
 from worker.application.ports.outbound.partition_invocation.sender.contribution_sender import (
     ContributionSender,
 )
-from worker.domain.directory.worker_instance import WorkerInstance
+from integration.service_instance.worker_instance import WorkerInstance
 from worker.domain.partition.partition_invocation_contribution import (
     PartitionInvocationContribution,
     PartitionInvocationContributionAck,
@@ -36,12 +36,12 @@ class ArrowPartitionInvocationContributionSender(
 ):
     def __init__(
         self,
-        directory: ServiceDirectory,
-        partition_deployment_registry: PartitionDeploymentRegistry,
+        directory: ServiceDirectoryGateway,
+        partition_deployment_directory: PartitionDeploymentDirectory,
         timeout_s: float = 30.0,
     ) -> None:
         self._directory = directory
-        self._partition_deployment_registry = partition_deployment_registry
+        self._partition_deployment_directory = partition_deployment_directory
         self._timeout_s = timeout_s
 
     @override
@@ -50,7 +50,7 @@ class ArrowPartitionInvocationContributionSender(
         contribution: PartitionInvocationContribution,
     ) -> None:
         deployment_id = (
-            await self._partition_deployment_registry.get_partition_deployment_id(
+            await self._partition_deployment_directory.get_partition_deployment_id(
                 plan_version=contribution.plan_version,
                 replica_id=contribution.target_replica_id,
             )

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from worker.domain.directory.worker_instance import WorkerInstance
+from integration.service_instance.worker_instance import WorkerInstance
 from worker.domain.profiling.network_profile import ConnectionInfo
 
 

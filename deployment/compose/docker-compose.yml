@@ -37,9 +37,29 @@ services:
   model-manager:
     build:
       context: ../../
-      dockerfile: docker/model_manager.Dockerfile
+      dockerfile: docker/model_manager.dockerfile
     ports:
       - "8000:8000"
+    depends_on:
+      - redis
+      - seaweedfs
+
+  controller:
+    build:
+      context: ../../
+      dockerfile: docker/controller.dockerfile
+    ports:
+      - "8001:8000"
+    depends_on:
+      - redis
+
+  worker:
+    build:
+      context: ../../
+      dockerfile: docker/worker.dockerfile
+    depends_on:
+      - redis
+      - seaweedfs
 
 volumes:
   redis-data:

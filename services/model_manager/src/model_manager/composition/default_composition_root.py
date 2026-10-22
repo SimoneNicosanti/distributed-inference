@@ -13,6 +13,10 @@ from redis import asyncio as redis_asyncio
 from artifacts.storage.artifact_store import ArtifactStore
 from artifacts.storage.s3.s3_artifact_store import S3ArtifactStore
 from artifacts.storage.s3.s3_client import S3Client
+from catalog.api.registrar import Registrar
+from catalog.heartbeat.heartbeat_manager import HeartbeatManager
+from catalog.redis.redis_registrar import RedisRegistrar
+from integration.service_instance.service_instance import ServiceInstance
 from model_manager.adapters.outbound.model_metadata_store.redis_model_metadata_store import (
     RedisModelMetadataStore,
 )
@@ -44,9 +48,6 @@ from model_manager.application.ports.inbound.model_registry import ModelRegistry
 from model_manager.application.ports.inbound.model_variant_registry import (
     ModelVariantRegistry,
 )
-from model_manager.application.ports.outbound.model_metadata_store import (
-    ModelMetadataStore,
-)
 from model_manager.application.ports.outbound.model_partition_extractor import (
     ModelPartitionExtractor,
 )
@@ -59,19 +60,26 @@ class DefaultCompositionRoot(CompositionRoot):
     @override
     async def compose(
         self,
+        service_instance: ServiceInstance,
     ) -> AsyncGenerator[tuple[ModelRegistry, ModelVariantRegistry, ModelPartitioner]]:
 
         async with AsyncExitStack() as stack:
+            redis = await stack.enter_async_context(
+                self.build_redis_connection_context()
+            )
+
+            registrar = RedisRegistrar(redis, entry_ttl_s=60)
+            await stack.enter_async_context(
+                self.build_heartbeat_manager_context(registrar, service_instance)
+            )
+
             model_profiler = self.build_model_profiler()
 
             artifact_store_cm = self.build_artifact_store()
             artifact_store = await stack.enter_async_context(artifact_store_cm)
             artifact_ref_factory = DefaultArtifactRefFactory()
 
-            model_metadata_store_cm = self.build_model_metadata_store()
-            model_metadata_store = await stack.enter_async_context(
-                model_metadata_store_cm
-            )
+            model_metadata_store = RedisModelMetadataStore(redis)
 
             model_splitter = self.build_model_partition_extractor()
 
@@ -84,6 +92,33 @@ class DefaultCompositionRoot(CompositionRoot):
             )
 
             yield model_manager, model_manager, model_manager
+
+    @asynccontextmanager
+    async def build_redis_connection_context(
+        self,
+    ) -> AsyncGenerator[redis_asyncio.Redis]:
+        async with redis_asyncio.Redis(host="redis", port=6379) as redis:
+            await redis.ping()
+            yield redis
+
+    @asynccontextmanager
+    async def build_heartbeat_manager_context(
+        self,
+        registrar: Registrar,
+        service_instance: ServiceInstance,
+    ) -> AsyncGenerator[HeartbeatManager]:
+
+        async with AsyncExitStack() as stack:
+            heartbeat_manager = HeartbeatManager(
+                registrar,
+                service_instance,
+                heartbeat_interval_s=20,
+            )
+
+            stack.push_async_callback(heartbeat_manager.stop)
+            await heartbeat_manager.start()
+
+            yield heartbeat_manager
 
     @staticmethod
     def build_model_profiler() -> ModelProfiler:
@@ -107,12 +142,6 @@ class DefaultCompositionRoot(CompositionRoot):
         )
 
         return model_profiler
-
-    @asynccontextmanager
-    async def build_model_metadata_store(self) -> AsyncGenerator[ModelMetadataStore]:
-        async with redis_asyncio.Redis(host="redis", port=6379) as redis:
-            await redis.ping()
-            yield RedisModelMetadataStore(redis)
 
     @staticmethod
     def build_model_partition_extractor() -> ModelPartitionExtractor:

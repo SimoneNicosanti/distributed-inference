@@ -3,6 +3,9 @@ from typing import override
 from controller.application.optimization.abc.optimization_context_builder import (
     OptimizationContextBuilder,
 )
+from controller.application.ports.outbound.directory.worker_directory_gateway import (
+    WorkerDirectoryGateway,
+)
 from controller.application.ports.outbound.profile.execution_profile_store_gateway import (
     ExecutionProfileStoreGateway,
 )
@@ -15,7 +18,6 @@ from controller.application.ports.outbound.profile.resource_profile_store_gatewa
 from controller.application.ports.outbound.profile.static_profile_store_gateway import (
     StaticProfileStoreGateway,
 )
-from controller.application.ports.outbound.worker_registry import WorkerRegistryGateway
 from controller.domain.optimization.optimization_context import OptimizationContext
 from controller.domain.profile.network_topology import NetworkTopology
 
@@ -23,7 +25,7 @@ from controller.domain.profile.network_topology import NetworkTopology
 class DefaultOptimizationContextBuilder(OptimizationContextBuilder):
     def __init__(
         self,
-        worker_registry_gateway: WorkerRegistryGateway,
+        worker_registry_gateway: WorkerDirectoryGateway,
         static_profile_store_gateway: StaticProfileStoreGateway,
         network_profile_store_gateway: NetworkProfileStoreGateway,
         execution_profile_store_gateway: ExecutionProfileStoreGateway,
@@ -46,7 +48,7 @@ class DefaultOptimizationContextBuilder(OptimizationContextBuilder):
         if len(static_profiles_by_variant) != len(all_static_profiles):
             raise ValueError("Duplicate static profiles for a model variant")
 
-        active_workers = await self._worker_registry_gateway.get_active_workers()
+        active_workers = await self._worker_registry_gateway.get_registered_worker_ids()
 
         network_connections = await (
             self._network_profile_store_gateway.get_network_connections_by_workers(

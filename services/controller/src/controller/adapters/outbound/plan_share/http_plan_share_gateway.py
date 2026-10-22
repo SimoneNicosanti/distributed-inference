@@ -2,10 +2,12 @@ from typing import override
 
 import httpx
 
+from controller.application.ports.outbound.directory.worker_directory_gateway import (
+    WorkerDirectoryGateway,
+)
 from controller.application.ports.outbound.plan_share_gateway import PlanShareGateway
 from controller.domain.plan.service_plan import ServicePlan
-from directory.api.directory import ServiceDirectory
-from directory.contracts.service_instance import (
+from integration.service_instance.service_instance import (
     CapabilityInterface,
     CapabilityProtocol,
     CapabilityType,
@@ -27,10 +29,10 @@ class HttpPlanShareGateway(PlanShareGateway):
     def __init__(
         self,
         http_client: httpx.AsyncClient,
-        service_directory: ServiceDirectory,
+        worker_directory_gateway: WorkerDirectoryGateway,
     ) -> None:
         self._http_client = http_client
-        self._service_directory = service_directory
+        self._worker_directory_gateway = worker_directory_gateway
 
     @override
     async def send_prepare_plan_message(
@@ -70,10 +72,10 @@ class HttpPlanShareGateway(PlanShareGateway):
         response.raise_for_status()
 
     async def _get_plan_actuation_base_url(self, worker_id: WorkerId) -> str:
-        worker = await self._service_directory.get_service_instance_by_service_id(
-            worker_id
+        worker_instance = (
+            await self._worker_directory_gateway.get_worker_instance_by_id(worker_id)
         )
-        interface = self._get_plan_actuation_http_interface(worker)
+        interface = self._get_plan_actuation_http_interface(worker_instance)
         return str(interface.endpoint).rstrip("/")
 
     @staticmethod
