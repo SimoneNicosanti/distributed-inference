@@ -16,6 +16,7 @@ requires-python = ">=3.14"
 dependencies = [
   "aiofiles>=25.1.0",
   "aiorwlock>=1.5.1",
+  "boto3>=1.43.116",
   "fastapi>=0.139.2",
   "httpx>=0.28.1",
   "numpy>=2.0",
@@ -24,6 +25,7 @@ dependencies = [
   "onnxoptimizer>=0.4.2",
   "onnxruntime>=1.27.0",
   "onnxruntime-genai>=0.14.1",
+  "onnxsim>=0.6.5",
   "portalocker>=4.4.0",
   "pyarrow>=25.0.0",
   "pydantic>=2.8",
@@ -34,6 +36,7 @@ dependencies = [
   "scipy-stubs>=1.18.1.1",
   "structlog>=24.0",
   "sysv-ipc>=1.2.0",
+  "torchvision>=0.28.0",
   "transformers==5.17.0",
   "types-networkx>=3.6.1.20260624",
   "types-pexpect>=4.9.0.20260518",

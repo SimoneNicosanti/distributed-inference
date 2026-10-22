@@ -1,0 +1,49 @@
+
+
+
+services:
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    ports:
+      - "127.0.0.1:5540:5540"
+    depends_on:
+      - redis
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    command: mini -dir=/data
+    ports:
+      - "8333:8333"
+      - "8900:8888"
+    volumes:
+      - seaweedfs-data:/data
+
+
+  model-manager:
+    build:
+      context: ../../
+      dockerfile: docker/model_manager.Dockerfile
+    ports:
+      - "8000:8000"
+
+volumes:
+  redis-data:
+    driver: local
+
+  seaweedfs-data:
+    driver: local

@@ -8,14 +8,14 @@ from typing import override
 
 import aiofiles
 
+from artifacts.contracts.artifact_bundle import ArtifactBundle
 from artifacts.contracts.artifact_manifest import (
     MANIFEST_FILE_NAME,
     ArtifactManifest,
 )
-from shared.artifact.artifact_ref import ArtifactRef
 from artifacts.storage.artifact_store import ArtifactStore
 from artifacts.storage.s3.s3_client import S3Client
-from artifacts.contracts.artifact_bundle import ArtifactBundle
+from shared.artifact.artifact_ref import ArtifactRef
 
 
 class S3ArtifactStore(ArtifactStore):

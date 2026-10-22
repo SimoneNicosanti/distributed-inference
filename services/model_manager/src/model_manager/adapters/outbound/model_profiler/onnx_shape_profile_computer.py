@@ -107,6 +107,8 @@ class OnnxShapeProfileComputer(ShapeProfileComputer):
         if not tool_model.valid:
             raise ValueError("onnx-tool could not load the ONNX model")
 
+        print(f"Computing shape profile for {shape_point}")
+
         initializer_names = {
             initializer.name for initializer in model_proto.graph.initializer
         }
@@ -122,6 +124,8 @@ class OnnxShapeProfileComputer(ShapeProfileComputer):
             for value_info in model_proto.graph.input
             if value_info.name not in initializer_names
         }
+
+        print(tool_inputs["images"].shape)
 
         tool_graph = tool_model.graph
         tool_graph.shape_infer(tool_inputs)
