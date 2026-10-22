@@ -11,6 +11,7 @@ from integration.service_instance.service_instance import (
     CapabilityProtocol,
     CapabilityType,
 )
+from integration.service_instance.worker_instance import WorkerInstance
 from integration.worker.partition_invocation.arrow.arrow_partition_invocation_coordinator_schema import (
     SUBMIT_CONTRIBUTION_COMMAND,
     build_contribution_schema,
@@ -24,7 +25,6 @@ from worker.application.ports.outbound.catalog.service.service_directory_gateway
 from worker.application.ports.outbound.partition_invocation.sender.contribution_sender import (
     ContributionSender,
 )
-from integration.service_instance.worker_instance import WorkerInstance
 from worker.domain.partition.partition_invocation_contribution import (
     PartitionInvocationContribution,
     PartitionInvocationContributionAck,
