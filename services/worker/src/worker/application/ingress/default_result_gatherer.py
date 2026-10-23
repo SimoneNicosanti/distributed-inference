@@ -4,7 +4,6 @@ from typing import override
 
 from shared.context.model_pass_context import ModelPassId
 from shared.model.keys import TensorKey
-from shared.tensor.tensor_bundle import TensorBundle
 from worker.application.ingress.abc.result_waiter import ResultWaiter
 from worker.application.ports.inbound.ingress.result_contribution_sink import (
     ResultContributionSink,
@@ -13,6 +12,7 @@ from worker.domain.model_pass.model_pass_error import ModelPassError
 from worker.domain.model_pass.model_pass_result_contribution import (
     ModelPassResultContribution,
 )
+from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
 class DefaultResultGatherer(ResultContributionSink, ResultWaiter):

@@ -5,14 +5,12 @@ import asyncio
 import pyarrow as pa
 from pyarrow import flight
 
+from integration.dto.context.context_dto import ModelPassResultContributionMetadataDto
 from integration.ingress.arrow.result_sink.model_pass_result.arrow_model_pass_result_contribution_callback_schema import (
     CALLBACK_CONTRIBUTION_COMMAND,
     CONTEXT_FIELD_NAME,
     validate_contribution_schema,
 )
-from integration.dto.context.context_dto import ModelPassResultContributionMetadataDto
-from shared.tensor.tensor import Tensor
-from shared.tensor.tensor_bundle import TensorBundle
 from worker.adapters.context_mapper import model_pass_context_from_dto
 from worker.application.ports.inbound.ingress.result_contribution_sink import (
     ResultContributionSink,
@@ -20,6 +18,8 @@ from worker.application.ports.inbound.ingress.result_contribution_sink import (
 from worker.domain.model_pass.model_pass_result_contribution import (
     ModelPassResultContribution,
 )
+from worker.domain.tensor.tensor import Tensor
+from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
 class ArrowResultContributionSink(flight.FlightServerBase):
@@ -138,7 +138,7 @@ class ArrowResultContributionSink(flight.FlightServerBase):
             if not isinstance(tensor_scalar, pa.FixedShapeTensorScalar):
                 raise pa.ArrowInvalid(f"Invalid tensor scalar: {field.name}")
 
-            bundle[field.name] = Tensor(value=tensor_scalar.to_numpy().copy())
+            bundle[field.name] = Tensor.from_numpy(tensor_scalar.to_numpy().copy())
 
         try:
             return ModelPassResultContribution(

@@ -9,9 +9,9 @@ from front_end.application.ports.outbound.worker_gateway import (
     WorkerIngressGateway,
 )
 from front_end.domain.inference_result import InferenceResult
+from front_end.domain.tensor_map import TensorMap
 from shared.flow.flow import FlowId
 from shared.service.service import WorkerId
-from shared.tensor.tensor_bundle import TensorBundle
 
 
 class DefaultInference(InferenceRunner, LocalWorkerIdentityQuery):
@@ -27,7 +27,7 @@ class DefaultInference(InferenceRunner, LocalWorkerIdentityQuery):
     async def run_inference(
         self,
         flow_id: FlowId,
-        bundle: TensorBundle,
+        bundle: TensorMap,
     ) -> InferenceResult:
         return await self._worker_ingress_gateway.run_model_invocation(
             flow_id=flow_id,

@@ -30,8 +30,6 @@ NETWORK_PROFILING_INTERVAL_S = 60 * 5  # 5 minutes
 
 
 class DefaultNetworkProfilingCoordinator(NetworkProfilingCoordinator, AsyncLifecycle):
-    class NetworkProbeClientRegistry: ...
-
     def __init__(
         self,
         worker_id: WorkerId,

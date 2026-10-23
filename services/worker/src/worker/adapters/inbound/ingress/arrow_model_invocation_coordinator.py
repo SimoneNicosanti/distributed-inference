@@ -14,11 +14,11 @@ from integration.worker.ingress.arrow.arrow_model_invocation_schema import (
     validate_model_invocation_request_schema,
 )
 from shared.flow.flow import FlowId
-from shared.tensor.tensor import Tensor
-from shared.tensor.tensor_bundle import TensorBundle
 from worker.application.ports.inbound.ingress.model_invocation_coordinator import (
     ModelInvocationCoordinator,
 )
+from worker.domain.tensor.tensor import Tensor
+from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
 class ArrowModelInvocationCoordinator(
@@ -135,14 +135,14 @@ class ArrowModelInvocationCoordinator(
             if not isinstance(tensor_scalar, pa.FixedShapeTensorScalar):
                 raise pa.ArrowInvalid(f"Invalid tensor scalar: {field.name}")
 
-            tensors[field.name] = Tensor(value=tensor_scalar.to_numpy().copy())
+            tensors[field.name] = Tensor.from_numpy(tensor_scalar.to_numpy().copy())
 
         return flow_id, TensorBundle(bundle=tensors)
 
     @staticmethod
     def _encode_result(bundle: TensorBundle) -> pa.RecordBatch:
         tensor_values = {
-            name: np.ascontiguousarray(tensor.value)
+            name: np.ascontiguousarray(tensor.as_numpy())
             for name, tensor in bundle.bundle.items()
         }
         schema = build_model_invocation_result_schema(tensor_values)

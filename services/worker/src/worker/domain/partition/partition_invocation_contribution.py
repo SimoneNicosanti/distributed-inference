@@ -7,10 +7,10 @@ from shared.context.model_pass_context import (
 from shared.model.model_partition import ModelPartitionId
 from shared.plan.partition_replica_id import PartitionReplicaId
 from shared.plan.plan_version import PlanVersion
-from shared.tensor.tensor_bundle import TensorBundle
 from worker.domain.context.partition_invocation_context import (
     PartitionInvocationContext,
 )
+from worker.domain.tensor.tensor_bundle import TensorBundle
 
 type SourceInvocationContext = PartitionInvocationContext | IngressInvocationContext
 

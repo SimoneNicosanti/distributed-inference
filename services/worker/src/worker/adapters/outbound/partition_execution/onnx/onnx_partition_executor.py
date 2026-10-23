@@ -6,8 +6,6 @@ from typing import override
 import numpy as np
 import onnxruntime as ort
 
-from shared.tensor.tensor import Tensor
-from shared.tensor.tensor_bundle import TensorBundle
 from worker.adapters.outbound.partition_execution.onnx.onnx_partition_executor_options import (
     OnnxDeviceType,
     OnnxPartitionExecutorOptions,
@@ -19,6 +17,8 @@ from worker.domain.partition.partition_execution import (
     PartitionExecutionInput,
     PartitionExecutionOutput,
 )
+from worker.domain.tensor.tensor import Tensor
+from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
 class OnnxPartitionExecutor(PartitionExecutor):
@@ -84,7 +84,7 @@ class OnnxPartitionExecutor(PartitionExecutor):
 
                 raise ValueError(f"Required input is missing: {name}")
 
-            session_inputs[name] = tensor.value
+            session_inputs[name] = tensor.as_numpy()
 
         device_type = self._map_device_type(self._options.device_type)
         device_id = self._options.device_id
@@ -106,7 +106,7 @@ class OnnxPartitionExecutor(PartitionExecutor):
 
         tensor_bundle = TensorBundle(
             bundle={
-                output_name: Tensor(value=session_output[output_name])
+                output_name: Tensor.from_numpy(session_output[output_name])
                 for output_name in self._output_names
             },
         )

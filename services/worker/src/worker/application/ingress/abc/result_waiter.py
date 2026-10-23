@@ -3,7 +3,7 @@ from asyncio import Future
 
 from shared.context.model_pass_context import ModelPassId
 from shared.model.keys import TensorKey
-from shared.tensor.tensor_bundle import TensorBundle
+from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
 class ResultWaiter(ABC):

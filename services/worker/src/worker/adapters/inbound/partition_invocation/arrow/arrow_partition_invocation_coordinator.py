@@ -14,8 +14,6 @@ from integration.worker.partition_invocation.arrow.arrow_partition_invocation_co
     SUBMIT_CONTRIBUTION_COMMAND,
     validate_contribution_schema,
 )
-from shared.tensor.tensor import Tensor
-from shared.tensor.tensor_bundle import TensorBundle
 from worker.adapters.context_mapper import (
     source_context_from_dto,
     source_context_to_dto,
@@ -26,6 +24,8 @@ from worker.application.ports.inbound.partition_invocation.partition_invocation_
 from worker.domain.partition.partition_invocation_contribution import (
     PartitionInvocationContribution,
 )
+from worker.domain.tensor.tensor import Tensor
+from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
 class ArrowPartitionInvocationCoordinator(flight.FlightServerBase):
@@ -157,7 +157,7 @@ class ArrowPartitionInvocationCoordinator(flight.FlightServerBase):
 
             value = tensor_scalar.to_numpy().copy()
 
-            bundle[field.name] = Tensor(value=value)
+            bundle[field.name] = Tensor.from_numpy(value)
 
         try:
             return PartitionInvocationContribution(

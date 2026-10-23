@@ -4,7 +4,6 @@ from shared.context.model_invocation_context import ModelInvocationContext
 from shared.context.model_pass_context import ModelPassType
 from shared.flow.flow import FlowId
 from shared.service.service import ResultSinkId
-from shared.tensor.tensor_bundle import TensorBundle
 from worker.application.ingress.abc.model_pass_coordinator import (
     ModelPassCoordinator,
     ModelPassRequestInfo,
@@ -16,6 +15,7 @@ from worker.application.ports.outbound.plan_store.active_plan_version_reader imp
     ActivePlanVersionReader,
 )
 from worker.domain.model_invocation.model_invocation import ModelInvocationResult
+from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
 class DefaultModelInvocationCoordinator(ModelInvocationCoordinator):

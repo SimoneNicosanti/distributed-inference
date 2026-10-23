@@ -1,6 +1,5 @@
 from typing import override
 
-from shared.tensor.tensor_bundle import TensorBundle
 from worker.application.partition_invocation.output.abc.partition_output_router import (
     PartitionOutputRouter,
 )
@@ -16,6 +15,7 @@ from worker.domain.partition.partition_invocation import (
 from worker.domain.partition.partition_invocation_contribution import (
     PartitionInvocationContribution,
 )
+from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
 class DefaultPartitionOutputRouter(PartitionOutputRouter):

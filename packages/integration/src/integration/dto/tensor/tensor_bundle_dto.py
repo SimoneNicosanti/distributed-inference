@@ -1,7 +1,9 @@
+from collections.abc import Mapping
+
+import numpy as np
 from pydantic import BaseModel, ConfigDict
 
 from integration.dto.tensor.tensor_dto import TensorDto
-from shared.tensor.tensor_bundle import TensorBundle
 
 
 class TensorBundleDto(BaseModel):
@@ -10,17 +12,18 @@ class TensorBundleDto(BaseModel):
     bundle: dict[str, TensorDto]
 
     @classmethod
-    def from_tensor_bundle(cls, bundle: TensorBundle) -> TensorBundleDto:
+    def from_ndarrays(
+        cls,
+        bundle: Mapping[str, np.ndarray],
+    ) -> TensorBundleDto:
         return cls(
             bundle={
-                name: TensorDto.from_tensor(tensor)
-                for name, tensor in bundle.bundle.items()
+                name: TensorDto.from_ndarray(value) for name, value in bundle.items()
             }
         )
 
-    def to_tensor_bundle(self) -> TensorBundle:
-        return TensorBundle(
-            bundle={
-                name: tensor_dto.to_tensor() for name, tensor_dto in self.bundle.items()
-            }
-        )
+    def to_ndarrays(self) -> dict[str, np.ndarray]:
+        return {
+            name: tensor_dto.to_ndarray()
+            for name, tensor_dto in self.bundle.items()
+        }

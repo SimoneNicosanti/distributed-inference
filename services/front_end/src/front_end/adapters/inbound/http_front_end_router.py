@@ -11,7 +11,9 @@ from front_end.application.ports.inbound.inference import (
     LocalWorkerIdentityQuery,
 )
 from front_end.application.ports.inbound.model_loader import ModelLoader
+from integration.dto.model.model_variant_dto import ModelVariantDto
 from integration.dto.tensor.tensor_bundle_dto import TensorBundleDto
+from integration.dto.worker_identity.worker_identity_dto import WorkerIdentityDto
 from integration.front_end.http.front_end_http_paths import (
     FRONT_END_LOAD_MODEL_VARIANT_PATH,
     FRONT_END_LOCAL_WORKER_IDENTITY_PATH,
@@ -23,11 +25,9 @@ from integration.front_end.http.front_end_http_schema import (
     RunInferenceRequest,
     RunInferenceResponse,
 )
-from integration.dto.model.model_variant_dto import ModelVariantDto
 from integration.model_manager.http.model_manager_http_schema import (
     RegisterModelRequest,
 )
-from integration.dto.worker_identity.worker_identity_dto import WorkerIdentityDto
 
 CHUNK_SIZE = 1024 * 1024
 
@@ -56,10 +56,10 @@ def build_front_end_router(
     ) -> RunInferenceResponse:
         result = await inference_runner.run_inference(
             flow_id=request.flow_id,
-            bundle=request.bundle.to_tensor_bundle(),
+            bundle=request.bundle.to_ndarrays(),
         )
         return RunInferenceResponse(
-            bundle=TensorBundleDto.from_tensor_bundle(result.bundle),
+            bundle=TensorBundleDto.from_ndarrays(result.bundle),
         )
 
     @router.post(path=FRONT_END_REGISTER_MODEL_PATH)

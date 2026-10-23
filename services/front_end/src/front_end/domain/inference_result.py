@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-from shared.tensor.tensor_bundle import TensorBundle
+from front_end.domain.tensor_map import TensorMap
 
 
 @dataclass(frozen=True, slots=True)
 class InferenceResult:
-    bundle: TensorBundle
+    bundle: TensorMap

@@ -141,7 +141,7 @@ class ArrowPartitionInvocationContributionSender(
         contribution: PartitionInvocationContribution,
     ) -> pa.RecordBatch:
         tensor_values = {
-            name: np.ascontiguousarray(tensor.value)
+            name: np.ascontiguousarray(tensor.as_numpy())
             for name, tensor in contribution.bundle.bundle.items()
         }
 

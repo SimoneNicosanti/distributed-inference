@@ -1,7 +1,6 @@
 from typing import override
 
 from shared.context.model_pass_context import ModelPassContext
-from shared.tensor.tensor_bundle import TensorBundle
 from worker.application.ingress.abc.ingress_input_router import IngressInputRouter
 from worker.application.ingress.abc.model_pass_coordinator import (
     ModelPassCoordinator,
@@ -16,6 +15,7 @@ from worker.application.ports.outbound.plan_store.ingress_plan_reader import (
 )
 from worker.domain.model_pass.model_pass_request import ModelPassRequest
 from worker.domain.model_pass.model_pass_result import ModelPassResult
+from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
 class DefaultModelPassCoordinator(ModelPassCoordinator):

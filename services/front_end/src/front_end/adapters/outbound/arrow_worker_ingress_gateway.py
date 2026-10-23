@@ -12,6 +12,7 @@ from front_end.application.ports.outbound.worker_gateway import (
     WorkerIngressGateway,
 )
 from front_end.domain.inference_result import InferenceResult
+from front_end.domain.tensor_map import TensorMap
 from integration.shared.id_json import flow_id_to_json
 from integration.worker.ingress.arrow.arrow_model_invocation_schema import (
     RUN_MODEL_INVOCATION_COMMAND,
@@ -19,8 +20,6 @@ from integration.worker.ingress.arrow.arrow_model_invocation_schema import (
     validate_model_invocation_result_schema,
 )
 from shared.flow.flow import FlowId
-from shared.tensor.tensor import Tensor
-from shared.tensor.tensor_bundle import TensorBundle
 
 
 class ArrowWorkerIngressGateway(WorkerIngressGateway):
@@ -36,7 +35,7 @@ class ArrowWorkerIngressGateway(WorkerIngressGateway):
     async def run_model_invocation(
         self,
         flow_id: FlowId,
-        bundle: TensorBundle,
+        bundle: TensorMap,
     ) -> InferenceResult:
         return await asyncio.to_thread(
             self._run_model_invocation_sync,
@@ -47,7 +46,7 @@ class ArrowWorkerIngressGateway(WorkerIngressGateway):
     def _run_model_invocation_sync(
         self,
         flow_id: FlowId,
-        bundle: TensorBundle,
+        bundle: TensorMap,
     ) -> InferenceResult:
         request_batch = self._encode_request(flow_id, bundle)
         descriptor = flight.FlightDescriptor.for_command(RUN_MODEL_INVOCATION_COMMAND)
@@ -74,11 +73,10 @@ class ArrowWorkerIngressGateway(WorkerIngressGateway):
     @staticmethod
     def _encode_request(
         flow_id: FlowId,
-        bundle: TensorBundle,
+        bundle: TensorMap,
     ) -> pa.RecordBatch:
         tensor_values = {
-            name: np.ascontiguousarray(tensor.value)
-            for name, tensor in bundle.bundle.items()
+            name: np.ascontiguousarray(value) for name, value in bundle.items()
         }
         schema = build_model_invocation_request_schema(tensor_values)
 
@@ -103,7 +101,7 @@ class ArrowWorkerIngressGateway(WorkerIngressGateway):
         batch.validate(full=True)
         validate_model_invocation_result_schema(batch.schema)
 
-        tensors: dict[str, Tensor] = {}
+        tensors: TensorMap = {}
 
         for column_index, field in enumerate(batch.schema):
             column = batch.column(column_index)
@@ -117,6 +115,6 @@ class ArrowWorkerIngressGateway(WorkerIngressGateway):
             if not isinstance(tensor_scalar, pa.FixedShapeTensorScalar):
                 raise ValueError(f"Invalid tensor scalar: {field.name}")
 
-            tensors[field.name] = Tensor(value=tensor_scalar.to_numpy().copy())
+            tensors[field.name] = tensor_scalar.to_numpy().copy()
 
-        return InferenceResult(bundle=TensorBundle(bundle=tensors))
+        return InferenceResult(bundle=tensors)
