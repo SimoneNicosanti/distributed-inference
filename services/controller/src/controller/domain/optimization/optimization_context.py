@@ -94,7 +94,7 @@ class OptimizationContext:
         )
         if unknown_workers := indexed_workers - known_workers:
             unknown_worker_ids = sorted(
-                str(worker_id.service_id) for worker_id in unknown_workers
+                str(worker_id.id) for worker_id in unknown_workers
             )
             raise ValueError(
                 f"Profiles reference workers outside the network topology: "

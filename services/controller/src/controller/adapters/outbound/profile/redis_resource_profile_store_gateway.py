@@ -30,7 +30,7 @@ class RedisResourceProfileStoreGateway(ResourceProfileStoreGateway):
     ) -> list[WorkerResourceProfile]:
         ordered_worker_ids = sorted(
             set(worker_ids),
-            key=lambda worker_id: str(worker_id.service_id),
+            key=lambda worker_id: str(worker_id.id),
         )
         if not ordered_worker_ids:
             return []

@@ -36,7 +36,7 @@ class RedisExecutionProfileStoreGateway(ExecutionProfileStoreGateway):
     ) -> list[WorkerExecutionProfiles]:
         ordered_worker_ids = sorted(
             set(worker_ids),
-            key=lambda worker_id: str(worker_id.service_id),
+            key=lambda worker_id: str(worker_id.id),
         )
         ordered_model_variant_ids = sorted(
             set(model_variant_ids),

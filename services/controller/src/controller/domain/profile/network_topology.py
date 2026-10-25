@@ -60,9 +60,7 @@ class NetworkTopology:
             if worker_id not in worker_ids
         }
         if unknown_worker_ids:
-            unknown_ids = sorted(
-                str(worker_id.service_id) for worker_id in unknown_worker_ids
-            )
+            unknown_ids = sorted(str(worker_id.id) for worker_id in unknown_worker_ids)
             raise ValueError(f"Connections reference unknown workers: {unknown_ids!r}")
 
         if any(
@@ -109,4 +107,4 @@ class NetworkTopology:
 
     def _require_worker(self, worker_id: WorkerId) -> None:
         if worker_id not in self._graph:
-            raise ValueError(f"Unknown worker: {worker_id.service_id}")
+            raise ValueError(f"Unknown worker: {worker_id.id}")

@@ -35,9 +35,9 @@ type Formulation = Literal["legacy", "marginal"]
 _USER = UserId(id=UUID(int=1))
 _FLOW_A = FlowId(user_id=_USER, flow_id=UUID(int=2))
 _FLOW_B = FlowId(user_id=_USER, flow_id=UUID(int=3))
-_WORKER_A = ServiceId(service_id=UUID(int=4))
-_WORKER_B = ServiceId(service_id=UUID(int=5))
-_WORKER_C = ServiceId(service_id=UUID(int=6))
+_WORKER_A = ServiceId(id=UUID(int=4))
+_WORKER_B = ServiceId(id=UUID(int=5))
+_WORKER_C = ServiceId(id=UUID(int=6))
 
 
 def _problem(
@@ -56,12 +56,12 @@ def _problem(
         workers=workers,
         workers_by_flow=dict(workers_by_flow),
         models_by_flow=dict.fromkeys(flows, ()),
-        service_arrival_rate={},
-        batch_fill_time={},
+        service_arrival_rate_per_s={},
+        batch_fill_time_s={},
         compute_bin_limits=(0.0, 0.9),
         network_bin_limits=(0.0, 0.9),
-        max_queue_wait_by_worker={},
-        max_queue_wait_by_flow={},
+        max_queue_wait_s_by_worker={},
+        max_queue_wait_s_by_flow={},
         flow_index={flow: index for index, flow in enumerate(flows)},
         worker_index={worker: index for index, worker in enumerate(workers)},
         model_index={},
@@ -70,9 +70,7 @@ def _problem(
     )
 
 
-def _topology(
-    workers: tuple[WorkerId, ...], arcs: frozenset[Arc]
-) -> NetworkTopology:
+def _topology(workers: tuple[WorkerId, ...], arcs: frozenset[Arc]) -> NetworkTopology:
     return NetworkTopology(
         workers=workers,
         connections=(
@@ -138,10 +136,10 @@ def _transition_variables(
         NetworkVariables(
             tensor_crossing_auxiliary={},
             adjacent_component_workers=adjacent_component_workers,
-            transmission_time={},
+            transmission_time_s={},
             network_utilization={},
             network_bin_selected={},
-            component_transmission_response={},
+            component_transmission_response_s={},
         ),
     )
 
@@ -174,8 +172,7 @@ def _add_legacy_constraints(
         allowed_sources = tuple(
             source
             for source in workers
-            if (flow, cut, source, target)
-            in network.adjacent_component_workers
+            if (flow, cut, source, target) in network.adjacent_component_workers
         )
         if len(allowed_sources) < len(workers):
             model.addConstr(
@@ -188,9 +185,7 @@ def _add_legacy_constraints(
 
     for source in workers:
         for target in workers:
-            q = network.adjacent_component_workers.get(
-                (flow, cut, source, target)
-            )
+            q = network.adjacent_component_workers.get((flow, cut, source, target))
             if q is None:
                 continue
             current = assignment.component_worker[flow, cut, source]
@@ -244,9 +239,7 @@ def _solve_fixed_transition(
             frozenset(
                 (source, target)
                 for source, target in arcs
-                if network.adjacent_component_workers[
-                    _FLOW_A, 1, source, target
-                ].X
+                if network.adjacent_component_workers[_FLOW_A, 1, source, target].X
                 > 0.5
             )
             if model.Status == GRB.OPTIMAL
@@ -302,9 +295,7 @@ def test_production_q_indices_are_sparse_binary_and_keep_self_transitions() -> N
         }
         actual_arcs = {
             (source, target)
-            for flow, _cut, source, target in (
-                network.adjacent_component_workers
-            )
+            for flow, _cut, source, target in (network.adjacent_component_workers)
             if flow == _FLOW_A
         }
         assert actual_arcs == expected_arcs
@@ -469,9 +460,7 @@ def test_marginals_cover_multiple_cuts_and_flow_specific_arc_sets() -> None:
 
 def test_dense_marginals_reduce_constraint_count_without_changing_q_count() -> None:
     workers = (_WORKER_A, _WORKER_B, _WORKER_C)
-    arcs = frozenset(
-        (source, target) for source in workers for target in workers
-    )
+    arcs = frozenset((source, target) for source in workers for target in workers)
     cuts = 2
     problem = _problem({_FLOW_A: workers})
     topology = _topology(workers, arcs)
@@ -518,9 +507,7 @@ def test_dense_marginals_reduce_constraint_count_without_changing_q_count() -> N
 
 def test_marginal_continuous_relaxation_dominates_mccormick() -> None:
     workers = (_WORKER_A, _WORKER_B)
-    arcs = frozenset(
-        (source, target) for source in workers for target in workers
-    )
+    arcs = frozenset((source, target) for source in workers for target in workers)
     problem = _problem({_FLOW_A: workers})
     topology = _topology(workers, arcs)
     objectives: dict[Formulation, float] = {}
@@ -537,9 +524,7 @@ def test_marginal_continuous_relaxation_dominates_mccormick() -> None:
             )
             for component in (1, 2):
                 for worker in workers:
-                    variable = assignment.component_worker[
-                        _FLOW_A, component, worker
-                    ]
+                    variable = assignment.component_worker[_FLOW_A, component, worker]
                     variable.LB = 0.5
                     variable.UB = 0.5
             if formulation == "legacy":

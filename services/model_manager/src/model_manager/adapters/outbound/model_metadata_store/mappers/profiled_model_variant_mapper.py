@@ -1,8 +1,10 @@
-from integration.dto.model.model_variant_dto import InputInfoDto
-from integration.dto.model.profiled_model_variant_dto import (
+from integration.dto.model.model_variant_dto import (
     DynamicShapeValuesDto,
+    InputInfoDto,
+    ModelVariantInfoDto,
+)
+from integration.dto.model.profiled_model_variant_dto import (
     EdgeDescriptionDto,
-    InfoDto,
     InputShapePointDto,
     LayerDescriptionDto,
     LayerPropertyDto,
@@ -89,7 +91,7 @@ class ProfiledModelVariantMapper:
 
         return ProfiledModelVariantDto(
             model_variant_id=profiled_model_variant.model_variant_id,
-            info=InfoDto(
+            info=ModelVariantInfoDto(
                 precision=(
                     profiled_model_variant.model_variant.model_variant_info.precision
                 ),

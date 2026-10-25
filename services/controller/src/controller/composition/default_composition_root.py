@@ -117,7 +117,7 @@ class DefaultCompositionRoot(CompositionRoot):
             redis, worker_directory_gateway
         )
         solver_config = SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK,
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK, output_flag=True
         )
 
         problem_config = ProblemConfig(

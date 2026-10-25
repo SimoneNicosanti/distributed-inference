@@ -47,7 +47,7 @@ def flow_key(flow_id: FlowId) -> str:
 
 
 def worker_key(worker_id: WorkerId) -> str:
-    return str(worker_id.service_id)
+    return str(worker_id.id)
 
 
 def _is_metric_satisfied(
@@ -209,16 +209,16 @@ def _build_gurobi_problem(
         for layer in layers:
             layer_weight_size_bytes(profile, layer)
 
-    arrival_rate = {
+    arrival_rate_per_s = {
         flow: float(requests_by_flow[flow].stream_info.arrival_rate) for flow in flows
     }
-    service_arrival_rate = {
-        (flow, model): arrival_rate[flow] / batch_sizes[model]
+    service_arrival_rate_per_s = {
+        (flow, model): arrival_rate_per_s[flow] / batch_sizes[model]
         for flow in flows
         for model in models_by_flow[flow]
     }
-    batch_fill_time = {
-        (flow, model): (batch_sizes[model] - 1) / (2 * arrival_rate[flow])
+    batch_fill_time_s = {
+        (flow, model): (batch_sizes[model] - 1) / (2 * arrival_rate_per_s[flow])
         for flow in flows
         for model in models_by_flow[flow]
     }
@@ -239,7 +239,7 @@ def _build_gurobi_problem(
                 if not math.isfinite(value):
                     raise GurobiProblemBuildError("Execution times must be finite")
 
-    max_queue_wait_by_worker: dict[WorkerId, float] = {}
+    max_queue_wait_s_by_worker: dict[WorkerId, float] = {}
     for worker in workers:
         numerator = 0.0
         for flow in flows:
@@ -248,20 +248,23 @@ def _build_gurobi_problem(
             model_second_moments: list[float] = []
             for model in models_by_flow[flow]:
                 profiles = layer_execution_profiles(context, model, worker) or {}
-                total_execution_time = sum(
+                total_execution_time_s = sum(
                     float(profiles[layer].execution_time_s)
                     for layer in layers_by_model[model]
                     if layer in profiles
                 )
                 model_second_moments.append(
-                    service_arrival_rate[flow, model] * total_execution_time**2
+                    service_arrival_rate_per_s[flow, model]
+                    * total_execution_time_s**2
                 )
             numerator += max(model_second_moments)
-        max_queue_wait_by_worker[worker] = numerator / (
+        max_queue_wait_s_by_worker[worker] = numerator / (
             2 * (1 - compute_utilization_limit) ** 2
         )
-    max_queue_wait_by_flow = {
-        flow: max(max_queue_wait_by_worker[worker] for worker in workers_by_flow[flow])
+    max_queue_wait_s_by_flow = {
+        flow: max(
+            max_queue_wait_s_by_worker[worker] for worker in workers_by_flow[flow]
+        )
         for flow in flows
     }
 
@@ -288,12 +291,12 @@ def _build_gurobi_problem(
         workers=workers,
         workers_by_flow=workers_by_flow,
         models_by_flow=models_by_flow,
-        service_arrival_rate=service_arrival_rate,
-        batch_fill_time=batch_fill_time,
+        service_arrival_rate_per_s=service_arrival_rate_per_s,
+        batch_fill_time_s=batch_fill_time_s,
         compute_bin_limits=_bin_limits(compute_utilization_limit, relative_error),
         network_bin_limits=_bin_limits(network_utilization_limit, relative_error),
-        max_queue_wait_by_worker=max_queue_wait_by_worker,
-        max_queue_wait_by_flow=max_queue_wait_by_flow,
+        max_queue_wait_s_by_worker=max_queue_wait_s_by_worker,
+        max_queue_wait_s_by_flow=max_queue_wait_s_by_flow,
         flow_index=flow_index,
         worker_index=worker_index,
         model_index=model_index,

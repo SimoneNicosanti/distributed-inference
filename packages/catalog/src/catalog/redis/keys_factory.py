@@ -6,4 +6,4 @@ def build_catalog_key() -> str:
 
 
 def build_service_hset_key(service_id: ServiceId) -> str:
-    return str(service_id.service_id)
+    return str(service_id.id)

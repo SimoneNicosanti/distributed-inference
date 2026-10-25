@@ -1,9 +1,9 @@
 from fastapi import APIRouter
 
+from integration.dto.worker_identity.worker_identity_dto import WorkerIdentityDto
 from integration.worker.worker_identity.http_worker_identity_query_paths import (
     WORKER_IDENTITY_PATH,
 )
-from integration.dto.worker_identity.worker_identity_dto import WorkerIdentityDto
 from worker.application.worker_identity.abc.worker_identity_query import (
     WorkerIdentityQuery,
 )
@@ -18,6 +18,6 @@ def build_worker_identity_query_router(
     @router.get(path=WORKER_IDENTITY_PATH, response_model=WorkerIdentityDto)
     async def get_worker_identity() -> WorkerIdentityDto:
         worker_id = await worker_identity_query.get_worker_identity()
-        return WorkerIdentityDto(service_id=worker_id.service_id)
+        return WorkerIdentityDto(service_id=worker_id.id)
 
     return router

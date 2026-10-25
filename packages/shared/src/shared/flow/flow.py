@@ -31,9 +31,3 @@ class FlowInfo:
 class FlowId:
     user_id: UserId
     flow_id: UUID = field(default_factory=uuid4)
-
-
-@dataclass(frozen=True, slots=True)
-class Flow:
-    flow_id: FlowId
-    flow_info: FlowInfo

@@ -1,4 +1,4 @@
-
+name: distributed-inference
 
 
 services:
@@ -48,18 +48,78 @@ services:
     build:
       context: ../../
       dockerfile: docker/controller.dockerfile
+    environment:
+      GRB_LICENSE_FILE: /run/secrets/gurobi_license
+    secrets:
+      - gurobi_license
     ports:
       - "8001:8000"
     depends_on:
       - redis
 
-  worker:
+  first-worker:
     build:
       context: ../../
       dockerfile: docker/worker.dockerfile
     depends_on:
       - redis
       - seaweedfs
+    environment:
+      WORKER_INGRESS_ENABLED: "true"
+      WORKER_ADVERTISED_HOST: first-worker
+
+  worker-1:
+    build:
+      context: ../../
+      dockerfile: docker/worker.dockerfile
+    depends_on:
+      - redis
+      - seaweedfs
+    environment:
+      WORKER_ADVERTISED_HOST: worker-1
+
+  worker-2:
+    build:
+      context: ../../
+      dockerfile: docker/worker.dockerfile
+    depends_on:
+      - redis
+      - seaweedfs
+    environment:
+      WORKER_ADVERTISED_HOST: worker-2
+
+  worker-3:
+    build:
+      context: ../../
+      dockerfile: docker/worker.dockerfile
+    depends_on:
+      - redis
+      - seaweedfs
+    environment:
+      WORKER_ADVERTISED_HOST: worker-3
+
+  front-end:
+    build:
+      context: ../../
+      dockerfile: docker/front_end.dockerfile
+    environment:
+      WORKER_HTTP_BASE_URL: http://first-worker:9000
+      WORKER_MODEL_INVOCATION_LOCATION: grpc+tcp://first-worker:8818
+    depends_on:
+      - model-manager
+      - first-worker
+
+  system-test:
+    build:
+      context: ../../
+      dockerfile: docker/system_test.dockerfile
+    profiles: ["test"]
+    environment:
+      FRONT_END_BASE_URL: http://front-end:8000
+    command: ["sleep", "infinity"]
+    volumes:
+      - ../../assets/models:/app/assets/models
+      - ../../test/system:/app/test/system
 
 volumes:
   redis-data:
@@ -67,3 +127,7 @@ volumes:
 
   seaweedfs-data:
     driver: local
+
+secrets:
+  gurobi_license:
+    file: ../../gurobi.lic

@@ -10,7 +10,7 @@ from shared.service.service import ServiceId
 
 
 def _worker(number: int) -> ServiceId:
-    return ServiceId(service_id=UUID(int=number))
+    return ServiceId(id=UUID(int=number))
 
 
 def test_exposes_directed_adjacency_without_self_connections() -> None:

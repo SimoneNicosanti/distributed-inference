@@ -117,7 +117,7 @@ def extract_solution(
                 > 0.5
             )
             transmission_response = (
-                network.component_transmission_response[flow, component].X
+                network.component_transmission_response_s[flow, component].X
                 if component < max_components
                 else 0.0
             )
@@ -152,12 +152,12 @@ def extract_solution(
                     tensor_contract=topology.component_tensor_contract(layers),
                     priority=selected_priorities[0],
                     mean_execution_time_s=_nonnegative(
-                        execution.execution_time[
+                        execution.execution_time_s[
                             flow, selected_model, component, worker
                         ].X
                     ),
                     mean_execution_queue_time_s=_nonnegative(
-                        compute_queue.component_queue_wait[flow, component].X
+                        compute_queue.component_queue_wait_s[flow, component].X
                     ),
                     mean_transmission_time_s=_nonnegative(transmission_response),
                     transmission_latency_s=_nonnegative(transmission_latency),
@@ -195,8 +195,8 @@ def extract_solution(
                 model_variant_id=selected_model,
                 components=tuple(components),
                 cuts=cuts,
-                mean_batch_fill_time_s=p.batch_fill_time[flow, selected_model],
-                mean_response_time_s=_nonnegative(qos.response_time[flow].X),
+                mean_batch_fill_time_s=p.batch_fill_time_s[flow, selected_model],
+                mean_response_time_s=_nonnegative(qos.response_time_s[flow].X),
             )
         )
 

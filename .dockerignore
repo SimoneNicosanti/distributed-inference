@@ -20,6 +20,9 @@ htmlcov/
 .gitignore
 .github/
 
+# Segreti runtime
+*.lic
+
 # Artefatti pesanti: sono la voce che fa davvero male al tempo di build
 *.onnx
 *.pt

@@ -7,6 +7,7 @@ from controller.adapters.outbound.optimization.gurobi_problem import (
     FlowModel,
     GurobiProblem,
 )
+from controller.adapters.outbound.optimization.gurobi_units import bytes_to_megabytes
 from controller.domain.optimization.optimization_context import OptimizationContext
 from controller.domain.optimization.optimization_request import (
     OptimizationRequestsByFlow,
@@ -38,7 +39,7 @@ class AssignmentVariables:
 @dataclass(slots=True)
 class ExecutionVariables:
     # Its square enters the compute-queue SOC, so it remains explicit.
-    execution_time: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var]
+    execution_time_s: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var]
 
 
 @dataclass(slots=True)
@@ -48,11 +49,11 @@ class ComputeQueueVariables:
     priority_class_utilization: dict[tuple[FlowId, int, WorkerId, int], gp.Var]
     higher_priority_utilization: dict[tuple[WorkerId, int], gp.Var]
     compute_bin_selected: dict[tuple[WorkerId, int, int], gp.Var]
-    queue_wait_bin: dict[tuple[WorkerId, int, int], gp.Var]
-    queue_wait: dict[tuple[WorkerId, int], gp.Var]
-    weighted_queue_wait: dict[tuple[WorkerId, int], gp.Var]
+    queue_wait_bin_s: dict[tuple[WorkerId, int, int], gp.Var]
+    queue_wait_s: dict[tuple[WorkerId, int], gp.Var]
+    weighted_queue_wait_s: dict[tuple[WorkerId, int], gp.Var]
     remaining_compute_capacity: dict[tuple[WorkerId, int], gp.Var]
-    component_queue_wait: dict[tuple[FlowId, int], gp.Var]
+    component_queue_wait_s: dict[tuple[FlowId, int], gp.Var]
 
 
 @dataclass(slots=True)
@@ -61,24 +62,24 @@ class NetworkVariables:
         tuple[FlowId, ModelVariantId, TensorKey, int], gp.Var
     ]
     adjacent_component_workers: dict[tuple[FlowId, int, WorkerId, WorkerId], gp.Var]
-    transmission_time: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var]
+    transmission_time_s: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var]
     network_utilization: dict[WorkerId, gp.Var]
     network_bin_selected: dict[tuple[WorkerId, int], gp.Var]
-    component_transmission_response: dict[tuple[FlowId, int], gp.Var]
+    component_transmission_response_s: dict[tuple[FlowId, int], gp.Var]
 
 
 @dataclass(slots=True)
 class MemoryVariables:
-    component_weight_bytes: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var]
-    component_activation_bytes: dict[
+    component_weight_mb: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var]
+    component_activation_mb: dict[
         tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var
     ]
-    max_activation_bytes: dict[WorkerId, gp.Var]
+    max_activation_mb: dict[WorkerId, gp.Var]
 
 
 @dataclass(slots=True)
 class QoSVariables:
-    response_time: dict[FlowId, gp.Var]
+    response_time_s: dict[FlowId, gp.Var]
 
 
 @dataclass(slots=True)
@@ -161,7 +162,7 @@ def _add_execution_variables(
     *,
     max_components: int,
 ) -> ExecutionVariables:
-    execution_time: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var] = {}
+    execution_time_s: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var] = {}
     for flow in problem.flows:
         flow_index = problem.flow_index[flow]
         for model_variant in problem.models_by_flow[flow]:
@@ -169,7 +170,7 @@ def _add_execution_variables(
             for component in range(1, max_components + 1):
                 for worker in problem.workers_by_flow[flow]:
                     worker_index = problem.worker_index[worker]
-                    execution_time[flow, model_variant, component, worker] = (
+                    execution_time_s[flow, model_variant, component, worker] = (
                         model.addVar(
                             lb=0.0,
                             name=(
@@ -178,7 +179,7 @@ def _add_execution_variables(
                             ),
                         )
                     )
-    return ExecutionVariables(execution_time=execution_time)
+    return ExecutionVariables(execution_time_s=execution_time_s)
 
 
 def _add_compute_queue_variables(
@@ -191,15 +192,15 @@ def _add_compute_queue_variables(
 ) -> ComputeQueueVariables:
     component_priority: dict[tuple[FlowId, int, WorkerId, int], gp.Var] = {}
     priority_class_utilization: dict[tuple[FlowId, int, WorkerId, int], gp.Var] = {}
-    component_queue_wait: dict[tuple[FlowId, int], gp.Var] = {}
+    component_queue_wait_s: dict[tuple[FlowId, int], gp.Var] = {}
     priorities = range(1, priority_count + 1)
 
     for flow in problem.flows:
         flow_index = problem.flow_index[flow]
         for component in range(1, max_components + 1):
-            component_queue_wait[flow, component] = model.addVar(
+            component_queue_wait_s[flow, component] = model.addVar(
                 lb=0.0,
-                ub=problem.max_queue_wait_by_flow[flow],
+                ub=problem.max_queue_wait_s_by_flow[flow],
                 name=f"wex[{flow_index},{component}]",
             )
             for worker in problem.workers_by_flow[flow]:
@@ -227,22 +228,22 @@ def _add_compute_queue_variables(
     priority_used: dict[tuple[WorkerId, int], gp.Var] = {}
     lower_priority_utilization: dict[tuple[WorkerId, int], gp.Var] = {}
     compute_bin_selected: dict[tuple[WorkerId, int, int], gp.Var] = {}
-    queue_wait_bin: dict[tuple[WorkerId, int, int], gp.Var] = {}
-    queue_wait: dict[tuple[WorkerId, int], gp.Var] = {}
-    weighted_queue_wait: dict[tuple[WorkerId, int], gp.Var] = {}
+    queue_wait_bin_s: dict[tuple[WorkerId, int, int], gp.Var] = {}
+    queue_wait_s: dict[tuple[WorkerId, int], gp.Var] = {}
+    weighted_queue_wait_s: dict[tuple[WorkerId, int], gp.Var] = {}
     remaining_compute_capacity: dict[tuple[WorkerId, int], gp.Var] = {}
     compute_bin_count = len(problem.compute_bin_limits) - 1
 
     for worker in problem.workers:
         worker_index = problem.worker_index[worker]
-        max_wait = problem.max_queue_wait_by_worker[worker]
+        max_wait = problem.max_queue_wait_s_by_worker[worker]
         for priority in priorities:
             priority_used[worker, priority] = model.addVar(
                 lb=0.0,
                 ub=1.0,
                 name=f"n[{worker_index},{priority}]",
             )
-            queue_wait[worker, priority] = model.addVar(
+            queue_wait_s[worker, priority] = model.addVar(
                 lb=0.0,
                 ub=max_wait,
                 name=f"h[{worker_index},{priority}]",
@@ -259,7 +260,7 @@ def _add_compute_queue_variables(
                 ub=compute_utilization_limit,
                 name=f"rho_lt[{worker_index},{priority}]",
             )
-            weighted_queue_wait[worker, priority] = model.addVar(
+            weighted_queue_wait_s[worker, priority] = model.addVar(
                 lb=0.0,
                 ub=max_wait,
                 name=f"h_weighted[{worker_index},{priority}]",
@@ -269,7 +270,7 @@ def _add_compute_queue_variables(
                     vtype=GRB.BINARY,
                     name=f"g[{worker_index},{priority},{bin_index}]",
                 )
-                queue_wait_bin[worker, priority, bin_index] = model.addVar(
+                queue_wait_bin_s[worker, priority, bin_index] = model.addVar(
                     lb=0.0,
                     ub=max_wait,
                     name=f"h_bin[{worker_index},{priority},{bin_index}]",
@@ -281,11 +282,11 @@ def _add_compute_queue_variables(
         priority_class_utilization=priority_class_utilization,
         higher_priority_utilization=lower_priority_utilization,
         compute_bin_selected=compute_bin_selected,
-        queue_wait_bin=queue_wait_bin,
-        queue_wait=queue_wait,
-        weighted_queue_wait=weighted_queue_wait,
+        queue_wait_bin_s=queue_wait_bin_s,
+        queue_wait_s=queue_wait_s,
+        weighted_queue_wait_s=weighted_queue_wait_s,
         remaining_compute_capacity=remaining_compute_capacity,
-        component_queue_wait=component_queue_wait,
+        component_queue_wait_s=component_queue_wait_s,
     )
 
 
@@ -304,14 +305,16 @@ def _add_network_variables(
     adjacent_component_workers: dict[
         tuple[FlowId, int, WorkerId, WorkerId], gp.Var
     ] = {}
-    transmission_time: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var] = {}
-    component_transmission_response: dict[tuple[FlowId, int], gp.Var] = {}
+    transmission_time_s: dict[
+        tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var
+    ] = {}
+    component_transmission_response_s: dict[tuple[FlowId, int], gp.Var] = {}
     cuts = range(1, max_components)
     topology = context.network_topology
 
     for flow in problem.flows:
         flow_index = problem.flow_index[flow]
-        max_response = float(
+        max_response_s = float(
             requests_by_flow[flow].qos_requirements.max_mean_response_time
         )
         for model_variant in problem.models_by_flow[flow]:
@@ -332,16 +335,16 @@ def _add_network_variables(
             for cut in cuts:
                 for worker in problem.workers_by_flow[flow]:
                     worker_index = problem.worker_index[worker]
-                    transmission_time[flow, model_variant, cut, worker] = model.addVar(
+                    transmission_time_s[flow, model_variant, cut, worker] = model.addVar(
                         lb=0.0,
-                        ub=max_response,
+                        ub=max_response_s,
                         name=f"ttx[{flow_index},{model_index},{cut},{worker_index}]",
                     )
 
         for cut in cuts:
-            component_transmission_response[flow, cut] = model.addVar(
+            component_transmission_response_s[flow, cut] = model.addVar(
                 lb=0.0,
-                ub=max_response,
+                ub=max_response_s,
                 name=f"rtx[{flow_index},{cut}]",
             )
             for source in problem.workers_by_flow[flow]:
@@ -379,10 +382,10 @@ def _add_network_variables(
     return NetworkVariables(
         tensor_crossing_auxiliary=tensor_crossing_auxiliary,
         adjacent_component_workers=adjacent_component_workers,
-        transmission_time=transmission_time,
+        transmission_time_s=transmission_time_s,
         network_utilization=network_utilization,
         network_bin_selected=network_bin_selected,
-        component_transmission_response=component_transmission_response,
+        component_transmission_response_s=component_transmission_response_s,
     )
 
 
@@ -393,10 +396,10 @@ def _add_memory_variables(
     *,
     max_components: int,
 ) -> MemoryVariables:
-    component_weight_bytes: dict[
+    component_weight_mb: dict[
         tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var
     ] = {}
-    component_activation_bytes: dict[
+    component_activation_mb: dict[
         tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var
     ] = {}
     for flow in problem.flows:
@@ -406,35 +409,39 @@ def _add_memory_variables(
             for component in range(1, max_components + 1):
                 for worker in problem.workers_by_flow[flow]:
                     worker_index = problem.worker_index[worker]
-                    available_bytes = context.resource_profiles_by_worker[
-                        worker
-                    ].ram_profile.available_bytes
+                    available_mb = bytes_to_megabytes(
+                        context.resource_profiles_by_worker[
+                            worker
+                        ].ram_profile.available_bytes
+                    )
                     key = (flow, model_variant, component, worker)
-                    component_weight_bytes[key] = model.addVar(
+                    component_weight_mb[key] = model.addVar(
                         lb=0.0,
-                        ub=available_bytes,
+                        ub=available_mb,
                         name=(
                             f"mem_weight[{flow_index},{model_index},{component},"
                             f"{worker_index}]"
                         ),
                     )
-                    component_activation_bytes[key] = model.addVar(
+                    component_activation_mb[key] = model.addVar(
                         lb=0.0,
-                        ub=available_bytes,
+                        ub=available_mb,
                         name=(
                             f"mem_activation[{flow_index},{model_index},{component},"
                             f"{worker_index}]"
                         ),
                     )
     return MemoryVariables(
-        component_weight_bytes=component_weight_bytes,
-        component_activation_bytes=component_activation_bytes,
-        max_activation_bytes={
+        component_weight_mb=component_weight_mb,
+        component_activation_mb=component_activation_mb,
+        max_activation_mb={
             worker: model.addVar(
                 lb=0.0,
-                ub=context.resource_profiles_by_worker[
-                    worker
-                ].ram_profile.available_bytes,
+                ub=bytes_to_megabytes(
+                    context.resource_profiles_by_worker[
+                        worker
+                    ].ram_profile.available_bytes
+                ),
                 name=f"max_activation[{problem.worker_index[worker]}]",
             )
             for worker in problem.workers
@@ -448,7 +455,7 @@ def _add_qos_variables(
     requests_by_flow: OptimizationRequestsByFlow,
 ) -> QoSVariables:
     return QoSVariables(
-        response_time={
+        response_time_s={
             flow: model.addVar(
                 lb=0.0,
                 ub=float(

@@ -127,3 +127,5 @@ class DefaultModelExecutionProfileCoordinator(
 
         with suppress(asyncio.CancelledError):
             await self._profile_loop_task
+
+        self._profile_loop_task = None

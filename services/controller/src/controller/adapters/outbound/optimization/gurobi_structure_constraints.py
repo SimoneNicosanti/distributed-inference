@@ -5,13 +5,16 @@ from gurobipy import GRB
 
 from controller.adapters.outbound.optimization.gurobi_expressions import (
     destination_crossing_expression,
-    transmitted_data_size_expression,
+    transmitted_data_size_mb_expression,
 )
 from controller.adapters.outbound.optimization.gurobi_problem import (
     GurobiProblem,
 )
 from controller.adapters.outbound.optimization.gurobi_profile_data import (
     layer_execution_profiles,
+)
+from controller.adapters.outbound.optimization.gurobi_units import (
+    bytes_per_second_to_megabytes_per_second,
 )
 from controller.adapters.outbound.optimization.gurobi_variables import (
     AssignmentVariables,
@@ -510,7 +513,9 @@ def _define_model_component_execution_time_on_worker(
         else:
             execution_terms.append(float(layer_profile.execution_time_s) * x)
 
-    execution_time = execution.execution_time[flow, model_variant, component, worker]
+    execution_time = execution.execution_time_s[
+        flow, model_variant, component, worker
+    ]
     model.addGenConstrIndicator(
         e,
         False,
@@ -548,7 +553,7 @@ def add_transmission_constraints(
     for flow in p.flows:
         flow_index = p.flow_index[flow]
         workers = p.workers_by_flow[flow]
-        response_limit = float(
+        response_limit_s = float(
             requests_by_flow[flow].qos_requirements.max_mean_response_time
         )
         for cut in range(1, max_components):
@@ -565,7 +570,7 @@ def add_transmission_constraints(
             for model_variant in p.models_by_flow[flow]:
                 model_index = p.model_index[flow, model_variant]
                 static_profile = context.static_profiles_by_variant[model_variant]
-                delta = transmitted_data_size_expression(
+                delta_mb = transmitted_data_size_mb_expression(
                     assignment,
                     network,
                     static_profile,
@@ -576,7 +581,7 @@ def add_transmission_constraints(
                 for source in workers:
                     source_index = p.worker_index[source]
                     successors = context.network_topology.successors(source)
-                    transmission = network.transmission_time[
+                    transmission = network.transmission_time_s[
                         flow, model_variant, cut, source
                     ]
                     _define_transmission_time_for_model_component_on_source_server(
@@ -587,10 +592,10 @@ def add_transmission_constraints(
                         flow,
                         flow_index,
                         workers,
-                        response_limit,
+                        response_limit_s,
                         cut,
                         model_index,
-                        delta,
+                        delta_mb,
                         source,
                         source_index,
                         successors,
@@ -606,10 +611,10 @@ def _define_transmission_time_for_model_component_on_source_server(
     flow: FlowId,
     flow_index: int,
     workers: tuple[WorkerId, ...],
-    response_limit: float,
+    response_limit_s: float,
     cut: int,
     model_index: int,
-    delta: gp.LinExpr,
+    delta_mb: gp.LinExpr,
     source: WorkerId,
     source_index: int,
     successors: frozenset[WorkerId],
@@ -622,7 +627,7 @@ def _define_transmission_time_for_model_component_on_source_server(
     )
 
     model.addConstr(
-        transmission <= response_limit * outgoing,
+        transmission <= response_limit_s * outgoing,
         name=(f"transmission_active[{flow_index},{model_index},{cut},{source_index}]"),
     )
     for target in workers:
@@ -643,11 +648,13 @@ def _define_transmission_time_for_model_component_on_source_server(
                 ),
             )
         else:
-            throughput = connections[source, target].throughput_bytes_per_sec
+            throughput_mb_per_s = bytes_per_second_to_megabytes_per_second(
+                    connections[source, target].throughput_bytes_per_sec
+            )
             model.addGenConstrIndicator(
                 q,
                 True,
-                throughput * transmission - delta,
+                throughput_mb_per_s * transmission - delta_mb,
                 GRB.EQUAL,
                 0.0,
                 name=(

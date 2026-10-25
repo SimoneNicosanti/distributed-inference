@@ -8,6 +8,7 @@ from controller.adapters.outbound.optimization.gurobi_profile_data import (
     layer_activation_sizes_bytes,
     layer_weight_size_bytes,
 )
+from controller.adapters.outbound.optimization.gurobi_units import bytes_to_megabytes
 from controller.adapters.outbound.optimization.gurobi_variables import (
     AssignmentVariables,
     MemoryVariables,
@@ -37,14 +38,16 @@ def add_memory_constraints(
         for model_variant in selected_models
     }
     weights_by_layer = {
-        (model_variant, layer): layer_weight_size_bytes(
-            context.static_profiles_by_variant[model_variant], layer
+        (model_variant, layer): bytes_to_megabytes(
+            layer_weight_size_bytes(
+                context.static_profiles_by_variant[model_variant], layer
+            )
         )
         for model_variant in selected_models
         for layer in layers_by_model[model_variant]
     }
     activations_by_layer = {
-        (model_variant, layer): size
+        (model_variant, layer): bytes_to_megabytes(size)
         for model_variant in selected_models
         for layer, size in layer_activation_sizes_bytes(
             context.static_profiles_by_variant[model_variant]
@@ -63,8 +66,8 @@ def add_memory_constraints(
                 for component in range(1, max_components + 1):
                     key = (flow, model_variant, component, worker)
                     e = assignment.component_worker[flow, component, worker]
-                    weight_bytes = memory.component_weight_bytes[key]
-                    activation_bytes = memory.component_activation_bytes[key]
+                    weight_mb = memory.component_weight_mb[key]
+                    activation_mb = memory.component_activation_mb[key]
                     weight_expression = gp.quicksum(
                         weights_by_layer[model_variant, layer]
                         * assignment.layer_component[
@@ -82,7 +85,7 @@ def add_memory_constraints(
                     model.addGenConstrIndicator(
                         e,
                         False,
-                        weight_bytes,
+                        weight_mb,
                         GRB.EQUAL,
                         0.0,
                         name=(
@@ -93,7 +96,7 @@ def add_memory_constraints(
                     model.addGenConstrIndicator(
                         e,
                         True,
-                        weight_bytes - weight_expression,
+                        weight_mb - weight_expression,
                         GRB.EQUAL,
                         0.0,
                         name=(
@@ -104,7 +107,7 @@ def add_memory_constraints(
                     model.addGenConstrIndicator(
                         e,
                         False,
-                        activation_bytes,
+                        activation_mb,
                         GRB.EQUAL,
                         0.0,
                         name=(
@@ -115,7 +118,7 @@ def add_memory_constraints(
                     model.addGenConstrIndicator(
                         e,
                         True,
-                        activation_bytes - activation_expression,
+                        activation_mb - activation_expression,
                         GRB.EQUAL,
                         0.0,
                         name=(
@@ -123,16 +126,18 @@ def add_memory_constraints(
                             f"{component},{worker_index}]"
                         ),
                     )
-                    weight_contributions.append(weight_bytes)
+                    weight_contributions.append(weight_mb)
                     model.addConstr(
-                        memory.max_activation_bytes[worker] >= activation_bytes,
+                        memory.max_activation_mb[worker] >= activation_mb,
                         name=(
                             f"max_activation[{worker_index},{flow_index},"
                             f"{model_index},{component}]"
                         ),
                     )
         model.addConstr(
-            gp.quicksum(weight_contributions) + memory.max_activation_bytes[worker]
-            <= context.resource_profiles_by_worker[worker].ram_profile.available_bytes,
+            gp.quicksum(weight_contributions) + memory.max_activation_mb[worker]
+            <= bytes_to_megabytes(
+                context.resource_profiles_by_worker[worker].ram_profile.available_bytes
+            ),
             name=f"memory_capacity[{worker_index}]",
         )

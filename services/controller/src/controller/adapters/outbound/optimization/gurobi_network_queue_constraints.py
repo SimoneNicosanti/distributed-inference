@@ -29,8 +29,8 @@ def add_network_queue_constraints(
         model.addConstr(
             network.network_utilization[worker]
             == gp.quicksum(
-                p.service_arrival_rate[flow, model_variant]
-                * network.transmission_time[flow, model_variant, cut, worker]
+                p.service_arrival_rate_per_s[flow, model_variant]
+                * network.transmission_time_s[flow, model_variant, cut, worker]
                 for flow in relevant_flows
                 for model_variant in p.models_by_flow[flow]
                 for cut in cuts
@@ -71,11 +71,11 @@ def add_network_queue_constraints(
     for flow in p.flows:
         flow_index = p.flow_index[flow]
         for cut in cuts:
-            response = network.component_transmission_response[flow, cut]
+            response = network.component_transmission_response_s[flow, cut]
             for worker in p.workers_by_flow[flow]:
                 worker_index = p.worker_index[worker]
                 nominal = gp.quicksum(
-                    network.transmission_time[flow, model_variant, cut, worker]
+                    network.transmission_time_s[flow, model_variant, cut, worker]
                     for model_variant in p.models_by_flow[flow]
                 )
                 for bin_index in range(1, bin_count + 1):

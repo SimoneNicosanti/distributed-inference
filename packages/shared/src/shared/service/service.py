@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 
 @dataclass(frozen=True, slots=True)
 class ServiceId:
-    service_id: UUID = field(default_factory=uuid4)
+    id: UUID = field(default_factory=uuid4)
 
 
 type WorkerId = ServiceId

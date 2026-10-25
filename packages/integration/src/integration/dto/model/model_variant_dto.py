@@ -17,9 +17,7 @@ class InputInfoDto(BaseModel):
     shape: tuple[str | PositiveInt, ...]
 
 
-class ModelVariantDto(BaseModel):
-    id: ModelVariantId
-
+class ModelVariantInfoDto(BaseModel):
     precision: NumericPrecision
     quantization: QuantizationType
     accuracies: list[PerformanceMetric]
@@ -27,3 +25,9 @@ class ModelVariantDto(BaseModel):
 
     inputs_info: dict[str, InputInfoDto]
     dynamic_dimension_values: dict[str, DynamicShapeValuesDto]
+
+
+class ModelVariantDto(BaseModel):
+    id: ModelVariantId
+
+    info: ModelVariantInfoDto

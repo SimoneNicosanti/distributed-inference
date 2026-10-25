@@ -5,13 +5,13 @@ import httpx
 from front_end.application.ports.outbound.worker_gateway import (
     WorkerIdentityGateway,
 )
+from integration.dto.worker_identity.worker_identity_dto import WorkerIdentityDto
 from integration.worker.http_worker_constants import (
     DEFAULT_LOCAL_WORKER_HTTP_BASE_URL,
 )
 from integration.worker.worker_identity.http_worker_identity_query_paths import (
     WORKER_IDENTITY_PATH,
 )
-from integration.dto.worker_identity.worker_identity_dto import WorkerIdentityDto
 from shared.service.service import ServiceId, WorkerId
 
 
@@ -31,4 +31,4 @@ class HttpWorkerIdentityGateway(WorkerIdentityGateway):
         )
         response.raise_for_status()
         dto = WorkerIdentityDto.model_validate(response.json())
-        return ServiceId(service_id=dto.service_id)
+        return ServiceId(id=dto.service_id)

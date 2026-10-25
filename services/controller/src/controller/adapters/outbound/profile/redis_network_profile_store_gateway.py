@@ -30,7 +30,7 @@ class RedisNetworkProfileStoreGateway(NetworkProfileStoreGateway):
 
         ordered_worker_ids = sorted(
             requested_worker_ids,
-            key=lambda worker_id: str(worker_id.service_id),
+            key=lambda worker_id: str(worker_id.id),
         )
         redis_keys = [
             build_network_profile_key_per_worker(worker_id)

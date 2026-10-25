@@ -28,8 +28,8 @@ def add_execution_queue_constraints(
     compute_bin_count = len(p.compute_bin_limits) - 1
     class_utilization = {
         (flow, component, worker): gp.quicksum(
-            p.service_arrival_rate[flow, model_variant]
-            * execution.execution_time[flow, model_variant, component, worker]
+            p.service_arrival_rate_per_s[flow, model_variant]
+            * execution.execution_time_s[flow, model_variant, component, worker]
             for model_variant in p.models_by_flow[flow]
         )
         for flow in p.flows
@@ -94,7 +94,7 @@ def add_execution_queue_constraints(
         second_moment = _compute_second_moment(
             execution, max_components, p, worker, relevant_flows
         )
-        max_wait = p.max_queue_wait_by_worker[worker]
+        max_wait = p.max_queue_wait_s_by_worker[worker]
         for priority in priorities:
             higher_priority_rho = _compute_higher_priority_rho(
                 compute_queue, max_components, worker, relevant_flows, priority
@@ -112,7 +112,7 @@ def add_execution_queue_constraints(
             )
 
             weighted_queue_wait = gp.quicksum(
-                (compute_queue.queue_wait[worker, priority],)
+                (compute_queue.queue_wait_s[worker, priority],)
             )
             if priority >= 2:
                 model.addConstr(
@@ -131,7 +131,7 @@ def add_execution_queue_constraints(
                     max_wait=max_wait,
                 )
                 weighted_queue_wait = gp.quicksum(
-                    (compute_queue.weighted_queue_wait[worker, priority],)
+                    (compute_queue.weighted_queue_wait_s[worker, priority],)
                 )
 
             # H <= 2 * h_hat * (1-rho_le): rotated SOC, all factors nonnegative.
@@ -145,7 +145,7 @@ def add_execution_queue_constraints(
 
     for flow in p.flows:
         flow_index = p.flow_index[flow]
-        max_flow_wait = p.max_queue_wait_by_flow[flow]
+        max_flow_wait = p.max_queue_wait_s_by_flow[flow]
         for component in range(1, max_components + 1):
             _add_component_execution_wait_activation_constraints(
                 model,
@@ -172,17 +172,17 @@ def _add_component_execution_wait_activation_constraints(
     max_flow_wait: float,
 ) -> None:
     model.addConstr(
-        compute_queue.component_queue_wait[flow, component]
+        compute_queue.component_queue_wait_s[flow, component]
         <= max_flow_wait * assignment.component_active[flow, component],
         name=f"inactive_queue_wait[{flow_index},{component}]",
     )
     for worker in p.workers_by_flow[flow]:
         worker_index = p.worker_index[worker]
-        worker_max_wait = p.max_queue_wait_by_worker[worker]
+        worker_max_wait = p.max_queue_wait_s_by_worker[worker]
         for priority in priorities:
             model.addConstr(
-                compute_queue.component_queue_wait[flow, component]
-                >= compute_queue.queue_wait[worker, priority]
+                compute_queue.component_queue_wait_s[flow, component]
+                >= compute_queue.queue_wait_s[worker, priority]
                 - worker_max_wait
                 * (
                     1
@@ -254,9 +254,9 @@ def _compute_second_moment(
     relevant_flows: tuple[FlowId, ...],
 ) -> gp.QuadExpr:
     return gp.quicksum(
-        p.service_arrival_rate[flow, model_variant]
-        * execution.execution_time[flow, model_variant, component, worker]
-        * execution.execution_time[flow, model_variant, component, worker]
+        p.service_arrival_rate_per_s[flow, model_variant]
+        * execution.execution_time_s[flow, model_variant, component, worker]
+        * execution.execution_time_s[flow, model_variant, component, worker]
         for flow in relevant_flows
         for model_variant in p.models_by_flow[flow]
         for component in range(1, max_components + 1)
@@ -406,24 +406,24 @@ def _add_compute_discretization_constraints(
     )
     for bin_index in range(1, bin_count + 1):
         model.addConstr(
-            compute_queue.queue_wait_bin[worker, priority, bin_index]
+            compute_queue.queue_wait_bin_s[worker, priority, bin_index]
             <= max_wait
             * compute_queue.compute_bin_selected[worker, priority, bin_index],
             name=f"queue_wait_bin_active[{worker_index},{priority},{bin_index}]",
         )
     model.addConstr(
-        compute_queue.queue_wait[worker, priority]
+        compute_queue.queue_wait_s[worker, priority]
         == gp.quicksum(
-            compute_queue.queue_wait_bin[worker, priority, bin_index]
+            compute_queue.queue_wait_bin_s[worker, priority, bin_index]
             for bin_index in range(1, bin_count + 1)
         ),
         name=f"queue_wait_sum[{worker_index},{priority}]",
     )
     model.addConstr(
-        compute_queue.weighted_queue_wait[worker, priority]
+        compute_queue.weighted_queue_wait_s[worker, priority]
         == gp.quicksum(
             (1 - p.compute_bin_limits[bin_index])
-            * compute_queue.queue_wait_bin[worker, priority, bin_index]
+            * compute_queue.queue_wait_bin_s[worker, priority, bin_index]
             for bin_index in range(1, bin_count + 1)
         ),
         name=f"weighted_queue_wait[{worker_index},{priority}]",

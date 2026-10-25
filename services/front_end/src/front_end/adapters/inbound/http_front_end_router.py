@@ -45,7 +45,7 @@ def build_front_end_router(
     )
     async def get_local_worker_identity() -> WorkerIdentityDto:
         worker_id = await local_worker_identity_query.get_local_worker_identity()
-        return WorkerIdentityDto(service_id=worker_id.service_id)
+        return WorkerIdentityDto(service_id=worker_id.id)
 
     @router.post(
         path=FRONT_END_RUN_INFERENCE_PATH,

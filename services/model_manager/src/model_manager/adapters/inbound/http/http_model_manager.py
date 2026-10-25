@@ -15,7 +15,7 @@ from integration.model_manager.http.model_manager_http_schema import (
     StartModelVariantRegistrationResponse,
 )
 from model_manager.adapters.inbound.mappers.model_variant_mapper import (
-    ModelVarianMapper,
+    ModelVariantMapper,
 )
 from model_manager.application.ports.inbound.model_partitioner import ModelPartitioner
 from model_manager.application.ports.inbound.model_registry import ModelRegistry
@@ -67,7 +67,7 @@ def build_model_manager_router(
 
         model_variant_dto = request.model_variant_dto
 
-        model_variant = ModelVarianMapper.to_model_variant_from_dto(model_variant_dto)
+        model_variant = ModelVariantMapper.to_model_variant_from_dto(model_variant_dto)
 
         artifact_ref = await model_variant_registry.start_model_variant_registration(
             model_variant=model_variant

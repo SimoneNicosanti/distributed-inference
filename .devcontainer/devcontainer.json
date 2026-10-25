@@ -98,6 +98,9 @@
         // Riattivalo se lo usi davvero, ma non tenerli entrambi "per sicurezza".
       ],
       "settings": {
+        "workbench.editor.enablePreview": true,
+        "workbench.editor.enablePreviewFromQuickOpen": true,
+
         // ---------------------------------------------------------------
         // Interprete
         // ---------------------------------------------------------------

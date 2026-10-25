@@ -3,6 +3,9 @@ from uuid import UUID
 
 import pytest
 
+from controller.adapters.outbound.optimization.gurobi_profile_data import (
+    layer_execution_profiles,
+)
 from controller.adapters.outbound.optimization.gurobi_solver import (
     GurobiSolver,
     OptimizationInfeasibleError,
@@ -49,6 +52,7 @@ from controller.domain.profile.resource_profile import (
     WorkerResourceProfile,
 )
 from shared.flow.flow import FlowId
+from shared.model.keys import LayerKey
 from shared.model.model import ModelId, ModelTask, ModelVisibility
 from shared.model.model_variant import (
     ModelVariantId,
@@ -117,7 +121,7 @@ _SHAPE_POINT = ShapePoint(
 
 
 def _worker(number: int) -> WorkerId:
-    return ServiceId(service_id=UUID(int=number))
+    return ServiceId(id=UUID(int=number))
 
 
 def _flow(number: int) -> FlowId:
@@ -258,10 +262,7 @@ def _branched_static_profile() -> ModelVariantStaticProfile:
 def _variant_execution_profile(
     compute_time_s: float | None,
 ) -> ModelVariantExecutionProfile:
-    layer_profiles = {
-        _INPUT: LayerExecutionProfile(execution_time_s=0),
-        _OUTPUT: LayerExecutionProfile(execution_time_s=0),
-    }
+    layer_profiles: dict[LayerKey, LayerExecutionProfile] = {}
     if compute_time_s is not None:
         layer_profiles[_COMPUTE] = LayerExecutionProfile(
             execution_time_s=compute_time_s
@@ -508,6 +509,22 @@ async def _solve_requests(
         context,
         problem_config,
     )
+
+
+def test_static_boundary_layers_have_zero_execution_time_on_every_worker() -> None:
+    worker = _worker(1)
+
+    profiles = layer_execution_profiles(
+        _context({worker: None}),
+        _MODEL_VARIANT_ID,
+        worker,
+    )
+
+    assert profiles is not None
+    assert profiles == {
+        _INPUT: LayerExecutionProfile(execution_time_s=0.0),
+        _OUTPUT: LayerExecutionProfile(execution_time_s=0.0),
+    }
 
 
 @pytest.mark.asyncio

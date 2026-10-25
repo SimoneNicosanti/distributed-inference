@@ -52,8 +52,8 @@ _MODEL_B = ModelVariantId(
     variant_tag="b",
 )
 _MODELS = (_MODEL_A, _MODEL_B)
-_WORKER_A = cast(WorkerId, ServiceId(service_id=UUID(int=3)))
-_WORKER_B = cast(WorkerId, ServiceId(service_id=UUID(int=4)))
+_WORKER_A = cast(WorkerId, ServiceId(id=UUID(int=3)))
+_WORKER_B = cast(WorkerId, ServiceId(id=UUID(int=4)))
 _WORKERS = (_WORKER_A, _WORKER_B)
 _MAX_COMPONENTS = 2
 _EXECUTION_TIMES = (1, 2, 3)
@@ -83,12 +83,12 @@ def _problem() -> GurobiProblem:
         workers=_WORKERS,
         workers_by_flow={_FLOW: _WORKERS},
         models_by_flow={_FLOW: _MODELS},
-        service_arrival_rate={},
-        batch_fill_time={},
+        service_arrival_rate_per_s={},
+        batch_fill_time_s={},
         compute_bin_limits=(0.0, 0.9),
         network_bin_limits=(0.0, 0.9),
-        max_queue_wait_by_worker={},
-        max_queue_wait_by_flow={},
+        max_queue_wait_s_by_worker={},
+        max_queue_wait_s_by_flow={},
         flow_index={_FLOW: 0},
         worker_index={worker: index for index, worker in enumerate(_WORKERS)},
         model_index={(_FLOW, model): index for index, model in enumerate(_MODELS)},
@@ -217,9 +217,7 @@ def _legacy_aggregate_values(
                 aggregate
                 == gp.quicksum(
                     coefficient * z[layer]
-                    for layer, coefficient in zip(
-                        _LAYERS, coefficients, strict=True
-                    )
+                    for layer, coefficient in zip(_LAYERS, coefficients, strict=True)
                 )
             )
         model.optimize()
@@ -267,7 +265,7 @@ def test_indicator_aggregates_replace_all_layer_worker_products(
             context=context,
             max_components=_MAX_COMPONENTS,
         )
-        model.setObjective(gp.quicksum(memory.max_activation_bytes.values()))
+        model.setObjective(gp.quicksum(memory.max_activation_mb.values()))
         model.update()
 
         aggregate_count = len(_MODELS) * _MAX_COMPONENTS * len(_WORKERS)
@@ -277,7 +275,9 @@ def test_indicator_aggregates_replace_all_layer_worker_products(
         assert model.NumBinVars == 16
         assert model.NumConstrs == 10
         assert model.NumGenConstrs == 6 * aggregate_count == 48
-        assert all(not variable.VarName.startswith("z[") for variable in model.getVars())
+        assert all(
+            not variable.VarName.startswith("z[") for variable in model.getVars()
+        )
         assert all(
             variable.VType == GRB.BINARY
             for variable in assignment.component_worker.values()
@@ -287,32 +287,39 @@ def test_indicator_aggregates_replace_all_layer_worker_products(
 
         assert model.Status == GRB.OPTIMAL
         active = (_FLOW, _MODEL_A, 1, _WORKER_A)
-        assert pytest.approx(6) == execution.execution_time[active].X
-        assert pytest.approx(60) == memory.component_weight_bytes[active].X
-        assert pytest.approx(15) == memory.component_activation_bytes[active].X
-        assert pytest.approx(15) == memory.max_activation_bytes[_WORKER_A].X
-        assert pytest.approx(0) == memory.max_activation_bytes[_WORKER_B].X
+        assert pytest.approx(6) == execution.execution_time_s[active].X
+        assert pytest.approx(60e-6) == memory.component_weight_mb[active].X
+        assert pytest.approx(15e-6) == memory.component_activation_mb[active].X
+        assert pytest.approx(15e-6) == memory.max_activation_mb[_WORKER_A].X
+        assert pytest.approx(0) == memory.max_activation_mb[_WORKER_B].X
 
         active_values = (
-            execution.execution_time[active].X,
-            memory.component_weight_bytes[active].X,
-            memory.component_activation_bytes[active].X,
+            execution.execution_time_s[active].X,
+            memory.component_weight_mb[active].X * 1_000_000,
+            memory.component_activation_mb[active].X * 1_000_000,
         )
-        assert pytest.approx(
-            _legacy_aggregate_values(layer_selected=True, worker_selected=True)
-        ) == active_values
-        assert _legacy_aggregate_values(
-            layer_selected=True, worker_selected=False
-        ) == (0, 0, 0)
-        assert _legacy_aggregate_values(
-            layer_selected=False, worker_selected=True
-        ) == (0, 0, 0)
+        assert (
+            pytest.approx(
+                _legacy_aggregate_values(layer_selected=True, worker_selected=True)
+            )
+            == active_values
+        )
+        assert _legacy_aggregate_values(layer_selected=True, worker_selected=False) == (
+            0,
+            0,
+            0,
+        )
+        assert _legacy_aggregate_values(layer_selected=False, worker_selected=True) == (
+            0,
+            0,
+            0,
+        )
 
-        for key, execution_time in execution.execution_time.items():
+        for key, execution_time in execution.execution_time_s.items():
             if key != active:
                 assert pytest.approx(0) == execution_time.X
-                assert pytest.approx(0) == memory.component_weight_bytes[key].X
-                assert pytest.approx(0) == memory.component_activation_bytes[key].X
+                assert pytest.approx(0) == memory.component_weight_mb[key].X
+                assert pytest.approx(0) == memory.component_activation_mb[key].X
 
 
 def test_memory_capacity_uses_conditioned_aggregates(
@@ -359,8 +366,7 @@ def test_missing_layer_profile_still_forbids_placement(
         _worker: WorkerId,
     ) -> dict[str, LayerExecutionProfile]:
         return {
-            layer: LayerExecutionProfile(execution_time_s=1)
-            for layer in _LAYERS[:-1]
+            layer: LayerExecutionProfile(execution_time_s=1) for layer in _LAYERS[:-1]
         }
 
     monkeypatch.setattr(

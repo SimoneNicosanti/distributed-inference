@@ -90,16 +90,21 @@ def layer_execution_profiles(
     model_variant: ModelVariantId,
     worker: WorkerId,
 ) -> Mapping[LayerKey, LayerExecutionProfile] | None:
+    static_profile = context.static_profiles_by_variant[model_variant]
+    boundary_layer_profiles = {
+        layer: LayerExecutionProfile(execution_time_s=0.0)
+        for layer, description in static_profile.topology.layers().items()
+        if description.is_input or description.is_output
+    }
+
     worker_profiles = context.execution_profiles_by_worker.get(worker)
     if worker_profiles is None:
-        return None
+        return boundary_layer_profiles or None
     execution_profile = worker_profiles.execution_profiles.get(model_variant)
     if execution_profile is None:
-        return None
+        return boundary_layer_profiles or None
 
-    shape_point = fixed_shape_profile(
-        context.static_profiles_by_variant[model_variant]
-    ).shape_point
+    shape_point = fixed_shape_profile(static_profile).shape_point
     matching_profiles = tuple(
         profile
         for profile in execution_profile.shape_execution_profiles
@@ -107,9 +112,12 @@ def layer_execution_profiles(
     )
     if len(matching_profiles) > 1:
         raise GurobiProfileDataError(
-            f"Duplicate execution profiles for worker {worker.service_id} and model "
+            f"Duplicate execution profiles for worker {worker.id} and model "
             f"{model_variant_id_to_json(model_variant)}"
         )
     if not matching_profiles:
-        return None
-    return matching_profiles[0].layer_profiles
+        return boundary_layer_profiles or None
+    return {
+        **matching_profiles[0].layer_profiles,
+        **boundary_layer_profiles,
+    }

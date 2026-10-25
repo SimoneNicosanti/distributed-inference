@@ -3,6 +3,7 @@ import gurobipy as gp
 from controller.adapters.outbound.optimization.gurobi_profile_data import (
     tensor_size_bytes,
 )
+from controller.adapters.outbound.optimization.gurobi_units import bytes_to_megabytes
 from controller.adapters.outbound.optimization.gurobi_variables import (
     AssignmentVariables,
     NetworkVariables,
@@ -58,7 +59,7 @@ def tensor_crossing_term(
     return network.tensor_crossing_auxiliary[flow, model_variant, tensor, cut]
 
 
-def transmitted_data_size_expression(
+def transmitted_data_size_mb_expression(
     assignment: AssignmentVariables,
     network: NetworkVariables,
     profile: ModelVariantStaticProfile,
@@ -68,7 +69,7 @@ def transmitted_data_size_expression(
     cut: int,
 ) -> gp.LinExpr:
     return gp.quicksum(
-        tensor_size_bytes(profile, tensor)
+        bytes_to_megabytes(tensor_size_bytes(profile, tensor))
         * tensor_crossing_term(
             assignment,
             network,

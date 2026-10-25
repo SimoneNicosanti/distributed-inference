@@ -19,12 +19,12 @@ class GurobiProblem:
     models_by_flow: dict[FlowId, tuple[ModelVariantId, ...]]
 
     # Coefficients derived from multiple domain inputs.
-    service_arrival_rate: dict[FlowModel, float]
-    batch_fill_time: dict[FlowModel, float]
+    service_arrival_rate_per_s: dict[FlowModel, float]
+    batch_fill_time_s: dict[FlowModel, float]
     compute_bin_limits: tuple[float, ...]
     network_bin_limits: tuple[float, ...]
-    max_queue_wait_by_worker: dict[WorkerId, float]
-    max_queue_wait_by_flow: dict[FlowId, float]
+    max_queue_wait_s_by_worker: dict[WorkerId, float]
+    max_queue_wait_s_by_flow: dict[FlowId, float]
 
     # Stable numeric names for Gurobi variables and constraints.
     flow_index: dict[FlowId, int]

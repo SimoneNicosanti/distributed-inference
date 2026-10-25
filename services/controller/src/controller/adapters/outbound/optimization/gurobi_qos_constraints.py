@@ -38,22 +38,22 @@ def add_response_time_constraints(
             source: context.network_topology.successors(source) for source in workers
         }
         batch_fill = gp.quicksum(
-            p.batch_fill_time[flow, model_variant]
+            p.batch_fill_time_s[flow, model_variant]
             * assignment.model_selected[flow, model_variant]
             for model_variant in p.models_by_flow[flow]
         )
         execution_response = gp.quicksum(
-            execution.execution_time[flow, model_variant, component, worker]
+            execution.execution_time_s[flow, model_variant, component, worker]
             for model_variant in p.models_by_flow[flow]
             for component in range(1, max_components + 1)
             for worker in p.workers_by_flow[flow]
         )
         execution_queue = gp.quicksum(
-            compute_queue.component_queue_wait[flow, component]
+            compute_queue.component_queue_wait_s[flow, component]
             for component in range(1, max_components + 1)
         )
         transmission_response = gp.quicksum(
-            network.component_transmission_response[flow, cut]
+            network.component_transmission_response_s[flow, cut]
             for cut in range(1, max_components)
         )
         latency = gp.quicksum(
@@ -69,7 +69,7 @@ def add_response_time_constraints(
             if source == target or target in successors_by_worker[source]
         )
         model.addConstr(
-            qos.response_time[flow]
+            qos.response_time_s[flow]
             == batch_fill
             + execution_response
             + execution_queue
@@ -78,7 +78,7 @@ def add_response_time_constraints(
             name=f"response_definition[{flow_index}]",
         )
         model.addConstr(
-            qos.response_time[flow]
+            qos.response_time_s[flow]
             <= float(requests_by_flow[flow].qos_requirements.max_mean_response_time),
             name=f"response_requirement[{flow_index}]",
         )

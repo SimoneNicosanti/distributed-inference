@@ -8,7 +8,7 @@ from gurobipy import GRB
 from controller.adapters.outbound.optimization.gurobi_expressions import (
     GurobiAffineTerm,
     tensor_crossing_term,
-    transmitted_data_size_expression,
+    transmitted_data_size_mb_expression,
 )
 from controller.adapters.outbound.optimization.gurobi_problem import GurobiProblem
 from controller.adapters.outbound.optimization.gurobi_profile_data import (
@@ -17,6 +17,7 @@ from controller.adapters.outbound.optimization.gurobi_profile_data import (
 from controller.adapters.outbound.optimization.gurobi_structure_constraints import (
     _tensor_crossing_cut,
 )
+from controller.adapters.outbound.optimization.gurobi_units import bytes_to_megabytes
 from controller.adapters.outbound.optimization.gurobi_variables import (
     AssignmentVariables,
     NetworkVariables,
@@ -94,12 +95,12 @@ def _problem(profile: ModelVariantStaticProfile) -> GurobiProblem:
         workers=(),
         workers_by_flow={_FLOW: ()},
         models_by_flow={_FLOW: (_MODEL,)},
-        service_arrival_rate={},
-        batch_fill_time={},
+        service_arrival_rate_per_s={},
+        batch_fill_time_s={},
         compute_bin_limits=(0.0, 0.9),
         network_bin_limits=(0.0, 0.9),
-        max_queue_wait_by_worker={},
-        max_queue_wait_by_flow={},
+        max_queue_wait_s_by_worker={},
+        max_queue_wait_s_by_flow={},
         flow_index={_FLOW: 0},
         worker_index={},
         model_index={(_FLOW, _MODEL): 0},
@@ -152,10 +153,10 @@ def _network(
     return NetworkVariables(
         tensor_crossing_auxiliary=auxiliary,
         adjacent_component_workers={},
-        transmission_time={},
+        transmission_time_s={},
         network_utilization={},
         network_bin_selected={},
-        component_transmission_response={},
+        component_transmission_response_s={},
     )
 
 
@@ -332,7 +333,7 @@ def test_compact_crossings_and_transmitted_volume_match_legacy(
     assert model.NumConstrs - 6 == 32
 
     current_volumes = {
-        cut: transmitted_data_size_expression(
+        cut: transmitted_data_size_mb_expression(
             assignment,
             network,
             profile,
@@ -344,7 +345,8 @@ def test_compact_crossings_and_transmitted_volume_match_legacy(
     }
     legacy_volumes = {
         cut: gp.quicksum(
-            tensor_size_bytes(profile, tensor) * legacy[tensor, cut]
+            bytes_to_megabytes(tensor_size_bytes(profile, tensor))
+            * legacy[tensor, cut]
             for tensor in routes
         )
         for cut in range(1, _MAX_COMPONENTS)
@@ -366,7 +368,7 @@ def test_compact_crossings_and_transmitted_volume_match_legacy(
             )
             assert _value(current) == pytest.approx(legacy[tensor, cut].X)
 
-    expected_volumes = (17.0, 15.0) if selected else (0.0, 0.0)
+    expected_volumes = (17e-6, 15e-6) if selected else (0.0, 0.0)
     for cut, expected in enumerate(expected_volumes, start=1):
         assert current_volumes[cut].getValue() == pytest.approx(expected)
         assert current_volumes[cut].getValue() == pytest.approx(
