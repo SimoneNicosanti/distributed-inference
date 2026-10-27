@@ -49,8 +49,8 @@ from worker.adapters.outbound.plan_store.in_memory_ingress_plan_store import (
 from worker.adapters.outbound.plan_store.in_memory_worker_plan_store import (
     InMemoryPlanStore,
 )
-from worker.adapters.outbound.profiling.model_execution.onnx_model_execution_profiler import (
-    OnnxModelExecutionProfiler,
+from worker.adapters.outbound.profiling.model_execution.ort_engine_model_execution_profiler import (
+    OrtModelExecutionProfiler,
 )
 from worker.adapters.outbound.profiling.model_execution.redis_model_execution_profile_store import (
     RedisModelExecutionProfileStore,
@@ -73,6 +73,9 @@ from worker.adapters.outbound.profiling.resource.cgroup_ram_profiler import (
 from worker.adapters.outbound.profiling.resource.no_gpu_profiler import NoGpuProfiler
 from worker.adapters.outbound.profiling.resource.publisher.redis_resource_profile_publisher import (
     RedisResourceProfilePublisher,
+)
+from worker.adapters.outbound.profiling.utils.nvidia_gpu_availability_checker import (
+    NvidiaGPUAvailabilityChecker,
 )
 from worker.application.activity.default_activity_request_factory import (
     DefaultActivityRequestFactory,
@@ -114,8 +117,11 @@ from worker.application.partition_invocation.output.default_contribution_send_co
 from worker.application.partition_invocation.output.default_partition_output_router import (
     DefaultPartitionOutputRouter,
 )
+from worker.application.profiling.default_model_execution_profiler import (
+    DefaultModelExecutionProfiler,
+)
 from worker.application.profiling.default_model_execution_profiling_coordinator import (
-    DefaultModelExecutionProfileCoordinator,
+    DefaultModelExecutionProfilingCoordinator,
 )
 from worker.application.profiling.default_network_profiling_coordinator import (
     DefaultNetworkProfilingCoordinator,
@@ -134,6 +140,7 @@ from worker.application.worker_identity.default_worker_identity_query import (
 )
 from worker.composition.composition_root import CompositionRoot, WorkerComposition
 from worker.domain.activity.activity_request import ResourceType
+from worker.domain.profiling.model_execution.model_execution_profile import Backend
 
 
 class DefaultCompositionRoot(CompositionRoot):
@@ -294,13 +301,21 @@ class DefaultCompositionRoot(CompositionRoot):
             model_static_profile_reader=static_profile_reader,
             model_execution_profile_reader=execution_profile_store,
         )
-        model_execution_coordinator = DefaultModelExecutionProfileCoordinator(
+
+        backends = [Backend.CPU]
+        if NvidiaGPUAvailabilityChecker.check():
+            backends.append(Backend.GPU)
+
+        model_execution_coordinator = DefaultModelExecutionProfilingCoordinator(
             worker_id=worker_id,
             pending_models_poller=pending_models_poller,
             model_static_profile_reader=static_profile_reader,
-            activity_request_factory=activity_request_factory,
-            activity_manager=activity_manager,
-            model_execution_profiler=OnnxModelExecutionProfiler(),
+            model_execution_profiler=DefaultModelExecutionProfiler(
+                activity_request_factory=activity_request_factory,
+                activity_manager=activity_manager,
+                backends=backends,
+                engine_profiler=OrtModelExecutionProfiler(),
+            ),
             artifact_store=artifact_store,
             model_exec_profile_publisher=execution_profile_store,
         )

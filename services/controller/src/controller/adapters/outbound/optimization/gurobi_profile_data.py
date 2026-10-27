@@ -3,6 +3,7 @@ from collections.abc import Mapping
 
 from controller.domain.optimization.optimization_context import OptimizationContext
 from controller.domain.profile.model_variant_execution_profile import (
+    Backend,
     LayerExecutionProfile,
 )
 from controller.domain.profile.model_variant_static_profile import (
@@ -117,7 +118,20 @@ def layer_execution_profiles(
         )
     if not matching_profiles:
         return boundary_layer_profiles or None
+
+    cpu_profiles = tuple(
+        profile
+        for profile in matching_profiles[0].backend_profiles
+        if profile.backend == Backend.CPU
+    )
+    if len(cpu_profiles) > 1:
+        raise GurobiProfileDataError(
+            f"Duplicate CPU execution profiles for worker {worker.id} and model "
+            f"{model_variant_id_to_json(model_variant)}"
+        )
+    if not cpu_profiles:
+        return boundary_layer_profiles or None
     return {
-        **matching_profiles[0].layer_profiles,
+        **cpu_profiles[0].layer_profiles,
         **boundary_layer_profiles,
     }

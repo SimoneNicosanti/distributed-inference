@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
-FROM python:3.14.8-slim-bookworm AS builder
+ARG ORT_BASE_IMAGE=ghcr.io/simonenicosanti/onnxruntime-cupti:1.31.0-cuda12.9-cupti
+
+FROM ${ORT_BASE_IMAGE} AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.14 /uv /uvx /usr/local/bin/
 
@@ -21,6 +23,7 @@ COPY packages/shared/pyproject.toml packages/shared/pyproject.toml
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync \
+        --python /opt/ort-env-3.14/bin/python \
         --project services/worker \
         --no-dev \
         --no-install-local \
@@ -36,12 +39,20 @@ COPY packages/shared/src packages/shared/src
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync \
+        --python /opt/ort-env-3.14/bin/python \
         --project services/worker \
         --locked \
         --no-dev \
-        --no-editable
+        --no-editable \
+    && uv pip install \
+        --python /opt/venv/bin/python \
+        --reinstall \
+        --no-deps \
+        /opt/wheels/onnxruntime_gpu-1.31.0-cp314-cp314-*.whl \
+    && /opt/venv/bin/python -c \
+        "import onnxruntime as ort; assert ort.__version__ == '1.31.0'; assert 'CUDAExecutionProvider' in ort.get_available_providers(), ort.get_available_providers()"
 
-FROM python:3.14.8-slim-bookworm AS runtime
+FROM ${ORT_BASE_IMAGE} AS runtime
 
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \

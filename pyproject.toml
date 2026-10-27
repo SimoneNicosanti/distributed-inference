@@ -262,9 +262,6 @@ module = [
   "pyroute2.*",
   "pyomo.*",
   "fakeredis.*",
-  "ort.*",
-
-  "onnxruntime.*",
 ]
 ignore_missing_imports = true
 
@@ -285,6 +282,9 @@ module = [
   "pandas.*",
   "kubernetes.*",
 
+  "ort.*",
+
+  "onnxruntime.*",
 ]
 ignore_missing_imports = false
 follow_imports = "normal"

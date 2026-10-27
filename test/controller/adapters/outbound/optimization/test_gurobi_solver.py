@@ -21,6 +21,8 @@ from controller.domain.optimization.solver_config import (
 )
 from controller.domain.optimization.stream_info import StreamInfo
 from controller.domain.profile.model_variant_execution_profile import (
+    Backend,
+    BackendExecutionProfile,
     LayerExecutionProfile,
     ModelVariantExecutionProfile,
     ShapeExecutionProfile,
@@ -271,7 +273,12 @@ def _variant_execution_profile(
         shape_execution_profiles=(
             ShapeExecutionProfile(
                 shape_point=_SHAPE_POINT,
-                layer_profiles=layer_profiles,
+                backend_profiles=(
+                    BackendExecutionProfile(
+                        backend=Backend.CPU,
+                        layer_profiles=layer_profiles,
+                    ),
+                ),
             ),
         )
     )
@@ -284,10 +291,17 @@ def _branched_execution_profile(
         shape_execution_profiles=(
             ShapeExecutionProfile(
                 shape_point=_SHAPE_POINT,
-                layer_profiles={
-                    layer: LayerExecutionProfile(execution_time_s=execution_time)
-                    for layer, execution_time in layer_execution_times.items()
-                },
+                backend_profiles=(
+                    BackendExecutionProfile(
+                        backend=Backend.CPU,
+                        layer_profiles={
+                            layer: LayerExecutionProfile(
+                                execution_time_s=execution_time
+                            )
+                            for layer, execution_time in layer_execution_times.items()
+                        },
+                    ),
+                ),
             ),
         )
     )

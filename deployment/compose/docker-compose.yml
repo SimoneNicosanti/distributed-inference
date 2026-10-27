@@ -87,6 +87,7 @@ services:
       - seaweedfs
     environment:
       WORKER_ADVERTISED_HOST: worker-2
+    gpus: all
 
   worker-3:
     build:

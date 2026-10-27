@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict
 
 from shared.model.keys import LayerKey
@@ -5,19 +7,24 @@ from shared.model.model_variant import ModelVariantId
 from shared.service.service import WorkerId
 
 
-class BackendLayerExecutionProfileDto(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    execution_time: float
-    memory: float
+class BackendDto(StrEnum):
+    CPU = "cpu"
+    GPU = "gpu"
 
 
 class LayerExecutionProfileDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     layer_key: LayerKey
-    cpu_execution_profile: BackendLayerExecutionProfileDto
-    gpu_execution_profile: BackendLayerExecutionProfileDto | None
+    execution_time_s: float
+    memory_bytes: int | None
+
+
+class BackendExecutionProfileDto(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    backend: BackendDto
+    layer_profiles: dict[LayerKey, LayerExecutionProfileDto]
 
 
 class ShapePointDto(BaseModel):
@@ -30,7 +37,7 @@ class ShapeExecutionProfileDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     shape_point: ShapePointDto
-    layer_profiles: dict[LayerKey, LayerExecutionProfileDto]
+    backend_profiles: tuple[BackendExecutionProfileDto, ...]
 
 
 class ModelExecutionProfileDto(BaseModel):

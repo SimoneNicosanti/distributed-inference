@@ -1,5 +1,6 @@
 from integration.dto.worker_profiles.execution_profile_dto import (
-    BackendLayerExecutionProfileDto,
+    BackendDto,
+    BackendExecutionProfileDto,
     LayerExecutionProfileDto,
     ModelExecutionProfileDto,
     ShapeExecutionProfileDto,
@@ -8,7 +9,8 @@ from integration.dto.worker_profiles.execution_profile_dto import (
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import WorkerId
 from worker.domain.profiling.model_execution.model_execution_profile import (
-    BackendLayerExecutionProfile,
+    Backend,
+    BackendExecutionProfile,
     LayerExecutionProfile,
     ModelExecutionProfile,
     ShapeExecutionProfile,
@@ -32,28 +34,22 @@ class ModelExecutionProfileMapper:
                             shape_profile.shape_point.input_shape_points
                         )
                     ),
-                    layer_profiles={
-                        layer_key: LayerExecutionProfileDto(
-                            layer_key=layer_profile.layer_key,
-                            cpu_execution_profile=BackendLayerExecutionProfileDto(
-                                execution_time=(
-                                    layer_profile.cpu_execution_profile.execution_time
-                                ),
-                                memory=layer_profile.cpu_execution_profile.memory,
-                            ),
-                            gpu_execution_profile=(
-                                None
-                                if layer_profile.gpu_execution_profile is None
-                                else BackendLayerExecutionProfileDto(
-                                    execution_time=(
-                                        layer_profile.gpu_execution_profile.execution_time
-                                    ),
-                                    memory=layer_profile.gpu_execution_profile.memory,
+                    backend_profiles=tuple(
+                        BackendExecutionProfileDto(
+                            backend=BackendDto(backend_profile.backend.value),
+                            layer_profiles={
+                                layer_key: LayerExecutionProfileDto(
+                                    layer_key=layer_profile.layer_key,
+                                    execution_time_s=layer_profile.execution_time_s,
+                                    memory_bytes=layer_profile.memory_bytes,
                                 )
-                            ),
+                                for layer_key, layer_profile in (
+                                    backend_profile.layer_profiles.items()
+                                )
+                            },
                         )
-                        for layer_key, layer_profile in shape_profile.layer_profiles.items()
-                    },
+                        for backend_profile in shape_profile.backend_profiles
+                    ),
                 )
                 for shape_profile in profile.shape_execution_profiles
             ),
@@ -70,28 +66,22 @@ class ModelExecutionProfileMapper:
                     shape_point=ShapePoint(
                         input_shape_points=shape_profile.shape_point.input_shape_points
                     ),
-                    layer_profiles={
-                        layer_key: LayerExecutionProfile(
-                            layer_key=layer_profile.layer_key,
-                            cpu_execution_profile=BackendLayerExecutionProfile(
-                                execution_time=(
-                                    layer_profile.cpu_execution_profile.execution_time
-                                ),
-                                memory=layer_profile.cpu_execution_profile.memory,
-                            ),
-                            gpu_execution_profile=(
-                                None
-                                if layer_profile.gpu_execution_profile is None
-                                else BackendLayerExecutionProfile(
-                                    execution_time=(
-                                        layer_profile.gpu_execution_profile.execution_time
-                                    ),
-                                    memory=layer_profile.gpu_execution_profile.memory,
+                    backend_profiles=tuple(
+                        BackendExecutionProfile(
+                            backend=Backend(backend_profile.backend.value),
+                            layer_profiles={
+                                layer_key: LayerExecutionProfile(
+                                    layer_key=layer_profile.layer_key,
+                                    execution_time_s=layer_profile.execution_time_s,
+                                    memory_bytes=layer_profile.memory_bytes,
                                 )
-                            ),
+                                for layer_key, layer_profile in (
+                                    backend_profile.layer_profiles.items()
+                                )
+                            },
                         )
-                        for layer_key, layer_profile in shape_profile.layer_profiles.items()
-                    },
+                        for backend_profile in shape_profile.backend_profiles
+                    ),
                 )
                 for shape_profile in dto.shape_execution_profiles
             ),

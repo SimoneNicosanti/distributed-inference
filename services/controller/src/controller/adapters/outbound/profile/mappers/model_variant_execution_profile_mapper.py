@@ -1,4 +1,6 @@
 from controller.domain.profile.model_variant_execution_profile import (
+    Backend,
+    BackendExecutionProfile,
     LayerExecutionProfile,
     ModelVariantExecutionProfile,
     ShapeExecutionProfile,
@@ -20,15 +22,22 @@ class ModelVariantExecutionProfileMapper:
         shape_execution_profiles: list[ShapeExecutionProfile] = []
 
         for shape_profile in dto.shape_execution_profiles:
-            layer_profiles: dict[str, LayerExecutionProfile] = {}
-            for layer_key, layer_profile in shape_profile.layer_profiles.items():
-                if layer_profile.layer_key != layer_key:
-                    raise ValueError(
-                        "Stored execution profile layer key does not match its index"
+            backend_profiles: list[BackendExecutionProfile] = []
+            for backend_profile in shape_profile.backend_profiles:
+                layer_profiles: dict[str, LayerExecutionProfile] = {}
+                for layer_key, layer_profile in backend_profile.layer_profiles.items():
+                    if layer_profile.layer_key != layer_key:
+                        raise ValueError(
+                            "Stored execution profile layer key does not match its index"
+                        )
+                    layer_profiles[layer_key] = LayerExecutionProfile(
+                        execution_time_s=layer_profile.execution_time_s,
+                        memory_bytes=layer_profile.memory_bytes,
                     )
-                layer_profiles[layer_key] = LayerExecutionProfile(
-                    execution_time_s=(
-                        layer_profile.cpu_execution_profile.execution_time
+                backend_profiles.append(
+                    BackendExecutionProfile(
+                        backend=Backend(backend_profile.backend.value),
+                        layer_profiles=layer_profiles,
                     )
                 )
 
@@ -42,7 +51,7 @@ class ModelVariantExecutionProfileMapper:
                             )
                         )
                     ),
-                    layer_profiles=layer_profiles,
+                    backend_profiles=tuple(backend_profiles),
                 )
             )
 
