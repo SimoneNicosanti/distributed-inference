@@ -71,6 +71,9 @@ from worker.adapters.outbound.profiling.resource.cgroup_ram_profiler import (
     CgroupRamProfiler,
 )
 from worker.adapters.outbound.profiling.resource.no_gpu_profiler import NoGpuProfiler
+from worker.adapters.outbound.profiling.resource.nvidia_gpu_profiler import (
+    NvidiaGpuProfiler,
+)
 from worker.adapters.outbound.profiling.resource.publisher.redis_resource_profile_publisher import (
     RedisResourceProfilePublisher,
 )
@@ -116,6 +119,9 @@ from worker.application.partition_invocation.output.default_contribution_send_co
 )
 from worker.application.partition_invocation.output.default_partition_output_router import (
     DefaultPartitionOutputRouter,
+)
+from worker.application.ports.outbound.profiling.resource.gpu_profiler import (
+    GpuProfiler,
 )
 from worker.application.profiling.default_model_execution_profiler import (
     DefaultModelExecutionProfiler,
@@ -278,9 +284,15 @@ class DefaultCompositionRoot(CompositionRoot):
     ) -> None:
         worker_id = worker_instance.service_id
 
+        gpu_profiler: GpuProfiler
+        if NvidiaGPUAvailabilityChecker.check():
+            gpu_profiler = NvidiaGpuProfiler()
+        else:
+            gpu_profiler = NoGpuProfiler()
+
         resource_coordinator = DefaultResourceProfilingCoordinator(
             worker_id=worker_id,
-            gpu_profiler=NoGpuProfiler(),
+            gpu_profiler=gpu_profiler,
             cpu_profiler=CgroupCpuProfiler(),
             memory_profiler=CgroupRamProfiler(),
             res_profile_publisher=RedisResourceProfilePublisher(worker_id, redis),

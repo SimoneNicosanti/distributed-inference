@@ -18,7 +18,6 @@ from shared.user.user import UserId
 
 def test_maps_all_backend_profiles() -> None:
     layer = LayerExecutionProfileDto(
-        layer_key="layer",
         execution_time_s=0.25,
         memory_bytes=1024,
     )

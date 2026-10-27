@@ -39,7 +39,6 @@ class ModelExecutionProfileMapper:
                             backend=BackendDto(backend_profile.backend.value),
                             layer_profiles={
                                 layer_key: LayerExecutionProfileDto(
-                                    layer_key=layer_profile.layer_key,
                                     execution_time_s=layer_profile.execution_time_s,
                                     memory_bytes=layer_profile.memory_bytes,
                                 )
@@ -71,7 +70,6 @@ class ModelExecutionProfileMapper:
                             backend=Backend(backend_profile.backend.value),
                             layer_profiles={
                                 layer_key: LayerExecutionProfile(
-                                    layer_key=layer_profile.layer_key,
                                     execution_time_s=layer_profile.execution_time_s,
                                     memory_bytes=layer_profile.memory_bytes,
                                 )

@@ -16,8 +16,6 @@ class Backend(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class LayerExecutionProfile:
-    layer_key: LayerKey
-
     execution_time_s: float
     memory_bytes: int | None
 

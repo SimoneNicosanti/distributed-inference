@@ -88,6 +88,44 @@ def test_parse_gpu_profile_sums_kernels_for_each_node_invocation(
     assert profile.layer_profiles["layer"].memory_bytes == 4096
 
 
+def test_parse_gpu_profile_allows_cuda_nodes_without_kernels(tmp_path: Path) -> None:
+    events: list[dict[str, object]] = []
+    for _ in range(10 + PROFILE_ITERATIONS):
+        events.extend(
+            [
+                {
+                    "cat": "Node",
+                    "name": "Flatten_kernel_time",
+                    "dur": 50,
+                    "args": {
+                        "provider": "CUDAExecutionProvider",
+                        "mem_bytes_in_use": "0",
+                    },
+                },
+                {
+                    "cat": "Node",
+                    "name": "cuda_layer_kernel_time",
+                    "dur": 50_000,
+                    "args": {
+                        "provider": "CUDAExecutionProvider",
+                        "mem_bytes_in_use": "4096",
+                    },
+                },
+                {"cat": "Kernel", "name": "cuda_kernel", "dur": 300},
+            ]
+        )
+
+    profile = OrtModelExecutionProfiler._parse_profile_events_for_backend(
+        _write_profile(tmp_path / "gpu-zero-kernel-node.json", events), Backend.GPU
+    )
+
+    assert profile.layer_profiles["Flatten"].execution_time_s == 0.0
+    assert profile.layer_profiles["Flatten"].memory_bytes == 0
+    assert profile.layer_profiles["cuda_layer"].execution_time_s == pytest.approx(
+        0.0003
+    )
+
+
 def test_parse_gpu_profile_includes_cpu_fallback_nodes(tmp_path: Path) -> None:
     events: list[dict[str, object]] = []
     for _ in range(10 + PROFILE_ITERATIONS):

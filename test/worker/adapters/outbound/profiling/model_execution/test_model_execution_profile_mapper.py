@@ -33,7 +33,6 @@ def test_round_trips_backend_execution_profiles() -> None:
                         backend=Backend.CPU,
                         layer_profiles={
                             "layer": LayerExecutionProfile(
-                                layer_key="layer",
                                 execution_time_s=0.25,
                                 memory_bytes=1024,
                             )
@@ -43,7 +42,6 @@ def test_round_trips_backend_execution_profiles() -> None:
                         backend=Backend.GPU,
                         layer_profiles={
                             "layer": LayerExecutionProfile(
-                                layer_key="layer",
                                 execution_time_s=0.05,
                                 memory_bytes=None,
                             )

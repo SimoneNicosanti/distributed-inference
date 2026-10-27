@@ -15,7 +15,6 @@ class BackendDto(StrEnum):
 class LayerExecutionProfileDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    layer_key: LayerKey
     execution_time_s: float
     memory_bytes: int | None
 

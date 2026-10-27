@@ -26,16 +26,21 @@ class NvidiaGPUAvailabilityChecker(GPUAvailabilityChecker):
         try:
             nvml = cast(_NvmlApi, import_module("pynvml"))
         except ImportError:
+            print("Unavailable pynvml")
             return False
 
         try:
             nvml.nvmlInit()
         except nvml.NVMLError:
+            print("No nvml Init")
             return False
 
         try:
-            return nvml.nvmlDeviceGetCount() > 0
+            found = nvml.nvmlDeviceGetCount() > 0
+            print("Found GPU")
+            return found
         except nvml.NVMLError:
+            print("Not Found GPU")
             return False
         finally:
             with suppress(nvml.NVMLError):

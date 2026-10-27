@@ -252,7 +252,6 @@ class OrtModelExecutionProfiler(EngineModelExecutionProfiler):
                 raise ValueError(f"Inconsistent memory samples for layer {layer_key!r}")
 
             layer_profiles[layer_key] = LayerExecutionProfile(
-                layer_key=layer_key,
                 execution_time_s=float(np.mean(measured_durations)),
                 memory_bytes=(
                     max(available_memory_samples) if available_memory_samples else None
@@ -371,17 +370,14 @@ class OrtModelExecutionProfiler(EngineModelExecutionProfiler):
         current_layer_key: LayerKey | None = None
         current_kernel_durations: list[float] = []
         found_cuda_node = False
+        found_kernel_event = False
 
         def append_current_sample() -> None:
             if current_layer_key is None:
                 return
-            if not current_kernel_durations:
-                raise ValueError(
-                    "No GPU kernel profiling events found for "
-                    f"layer {current_layer_key!r}; ONNX Runtime must be built with "
-                    "--enable_cuda_profiling and CUPTI must be available"
-                )
-            durations_by_layer[current_layer_key].append(sum(current_kernel_durations))
+            durations_by_layer[current_layer_key].append(
+                sum(current_kernel_durations, 0.0)
+            )
 
         for event in profile_events:
             if event.get("cat") == NODE_EVENT_CATEGORY:
@@ -407,6 +403,7 @@ class OrtModelExecutionProfiler(EngineModelExecutionProfiler):
                 current_layer_key is not None
                 and event.get("cat") == KERNEL_EVENT_CATEGORY
             ):
+                found_kernel_event = True
                 current_kernel_durations.append(
                     OrtModelExecutionProfiler._event_duration_seconds(event)
                 )
@@ -414,6 +411,11 @@ class OrtModelExecutionProfiler(EngineModelExecutionProfiler):
         append_current_sample()
         if not found_cuda_node:
             raise ValueError("GPU profile contains no CUDA node events")
+        if not found_kernel_event:
+            raise ValueError(
+                "GPU profile contains no kernel events; ONNX Runtime must be built "
+                "with --enable_cuda_profiling and CUPTI must be available"
+            )
 
         return dict(durations_by_layer)
 
