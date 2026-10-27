@@ -1,16 +1,17 @@
-from integration.dto.model.model_variant_dto import ModelVariantDto
+from integration.dto.model.model_variant_dto import ModelVariantInfoDto
 from model_manager.domain.model_variant import (
     DynamicShapeValues,
     InputInfo,
-    ModelVariant,
     ModelVariantInfo,
 )
 
 
-class ModelVariantMapper:
+class ModelVariantInfoMapper:
     @staticmethod
-    def to_model_variant_from_dto(model_variant_dto: ModelVariantDto) -> ModelVariant:
-        dto_info = model_variant_dto.info
+    def to_model_variant_info_from_dto(
+        model_variant_info_dto: ModelVariantInfoDto,
+    ) -> ModelVariantInfo:
+        dto_info = model_variant_info_dto
         model_variant_info = ModelVariantInfo(
             precision=dto_info.precision,
             quantization=dto_info.quantization,
@@ -26,8 +27,4 @@ class ModelVariantMapper:
             },
         )
 
-        model_variant = ModelVariant(
-            model_variant_id=model_variant_dto.id,
-            model_variant_info=model_variant_info,
-        )
-        return model_variant
+        return model_variant_info

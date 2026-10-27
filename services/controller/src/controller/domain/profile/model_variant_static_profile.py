@@ -5,13 +5,12 @@ from types import MappingProxyType
 
 from controller.domain.profile.model_variant_topology import ModelVariantTopology
 from shared.model.keys import LayerKey, TensorKey
-from shared.model.model import ModelTask, ModelVisibility
+from shared.model.model import ModelTask
 from shared.model.model_variant import ModelVariantId, PerformanceMetric
 
 
 @dataclass(frozen=True, slots=True)
 class ModelVariantInfo:
-    visibility: ModelVisibility
     task: ModelTask
 
     accuracies: tuple[PerformanceMetric, ...]

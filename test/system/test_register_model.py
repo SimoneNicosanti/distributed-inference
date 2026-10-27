@@ -15,10 +15,8 @@ def test_register_model() -> None:
     request = {
         "model_dto": {
             "model_id": {
-                "owner_id": {"id": str(unique_id)},
                 "model_name": f"system-test-{unique_id.hex}",
             },
-            "visibility": "private",
             "model_task": "classification",
             "architecture_info": {"kind": "cnn"},
         }

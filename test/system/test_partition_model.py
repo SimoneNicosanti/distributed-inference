@@ -9,7 +9,6 @@ from test.system.test_upload_model import _build_model_archive, _read_model_inpu
 
 from integration.dto.model.model_dto import ModelDto
 from integration.dto.model.model_variant_dto import (
-    ModelVariantDto,
     ModelVariantInfoDto,
 )
 from integration.front_end.http.front_end_http_paths import (
@@ -24,23 +23,21 @@ from integration.model_manager.http.model_manager_http_schema import (
     GenerateModelPartitionRequest,
     GenerateModelPartitionResponse,
     RegisterModelRequest,
+    StartModelVariantRegistrationRequest,
 )
 from shared.model.model import (
     CNNArchitectureInfo,
     ModelId,
     ModelTask,
-    ModelVisibility,
 )
 from shared.model.model_partition import ModelPartitionId
 from shared.model.model_variant import (
     ModelVariantFormat,
-    ModelVariantId,
     NumericPrecision,
     PerformanceMetric,
     PerformanceMetricType,
     QuantizationType,
 )
-from shared.user.user import SYSTEM_USER_ID
 
 
 def _split_topological_layers(
@@ -91,18 +88,16 @@ def test_partition_model(tmp_path: Path) -> None:
 
     unique_id = uuid4()
     model_id = ModelId(
-        owner_id=SYSTEM_USER_ID,
         model_name=f"partition-system-test-{unique_id.hex}",
     )
     model = ModelDto(
         model_id=model_id,
-        visibility=ModelVisibility.PRIVATE,
         model_task=ModelTask.CLASSIFICATION,
         architecture_info=CNNArchitectureInfo(),
     )
-    variant = ModelVariantDto(
-        id=ModelVariantId(model_id=model_id, variant_tag="fp32"),
-        info=ModelVariantInfoDto(
+    registration = StartModelVariantRegistrationRequest(
+        model_id=model_id,
+        model_variant_info_dto=ModelVariantInfoDto(
             precision=NumericPrecision.FP32,
             quantization=QuantizationType.NONE,
             accuracies=[
@@ -128,19 +123,20 @@ def test_partition_model(tmp_path: Path) -> None:
         with archive_path.open("rb") as archive:
             upload_response = client.post(
                 FRONT_END_LOAD_MODEL_VARIANT_PATH,
-                data={"model_variant_json": variant.model_dump_json()},
+                data={"model_variant_json": registration.model_dump_json()},
                 files={"artifact": (archive_path.name, archive, "application/zip")},
             )
 
         assert upload_response.status_code == 200, upload_response.text
         upload = LoadModelVariantResponse.model_validate(upload_response.json())
+        model_variant_id = upload.model_variant_id
         assert upload.artifact_ref.value
 
     artifact_refs: set[str] = set()
     with httpx.Client(base_url=model_manager_base_url, timeout=300.0) as client:
         for layers in partitions:
             request = GenerateModelPartitionRequest(
-                model_variant_id=variant.id,
+                model_variant_id=model_variant_id,
                 layers=list(layers),
             )
             response = client.post(
@@ -151,7 +147,7 @@ def test_partition_model(tmp_path: Path) -> None:
 
             partition = GenerateModelPartitionResponse.model_validate(response.json())
             assert partition.model_partition_id == ModelPartitionId(
-                model_variant_id=variant.id,
+                model_variant_id=model_variant_id,
                 layers=layers,
             )
             assert partition.artifact_ref.value

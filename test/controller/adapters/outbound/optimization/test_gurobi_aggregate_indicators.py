@@ -44,11 +44,11 @@ _LAYERS = ("a", "b", "c")
 _USER = UserId(id=UUID(int=1))
 _FLOW = FlowId(user_id=_USER, flow_id=UUID(int=2))
 _MODEL_A = ModelVariantId(
-    model_id=ModelId(owner_id=_USER, model_name="model"),
+    model_id=ModelId(model_name="model"),
     variant_tag="a",
 )
 _MODEL_B = ModelVariantId(
-    model_id=ModelId(owner_id=_USER, model_name="model"),
+    model_id=ModelId(model_name="model"),
     variant_tag="b",
 )
 _MODELS = (_MODEL_A, _MODEL_B)

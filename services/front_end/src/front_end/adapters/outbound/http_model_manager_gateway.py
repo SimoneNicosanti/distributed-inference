@@ -6,7 +6,7 @@ from front_end.application.ports.outbound.model_loading_gateway import (
     ModelManagerGateway,
 )
 from integration.dto.model.model_dto import ModelDto
-from integration.dto.model.model_variant_dto import ModelVariantDto
+from integration.dto.model.model_variant_dto import ModelVariantInfoDto
 from integration.model_manager.http.model_manager_http_paths import (
     FINALIZE_MODEL_VARIANT_REGISTRATION_PATH,
     REGISTER_MODEL_PATH,
@@ -19,6 +19,7 @@ from integration.model_manager.http.model_manager_http_schema import (
     StartModelVariantRegistrationResponse,
 )
 from shared.artifact.artifact_ref import ArtifactRef
+from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
 
 
@@ -43,9 +44,13 @@ class HttpModelManagerGateway(ModelManagerGateway):
     @override
     async def start_model_variant_registration(
         self,
-        model_variant: ModelVariantDto,
-    ) -> ArtifactRef:
-        request = StartModelVariantRegistrationRequest(model_variant_dto=model_variant)
+        model_id: ModelId,
+        model_variant_info: ModelVariantInfoDto,
+    ) -> tuple[ModelVariantId, ArtifactRef]:
+        request = StartModelVariantRegistrationRequest(
+            model_id=model_id,
+            model_variant_info_dto=model_variant_info,
+        )
         response = await self._http_client.post(
             self._build_url(START_MODEL_VARIANT_REGISTRATION_PATH),
             json=request.model_dump(mode="json"),
@@ -55,7 +60,7 @@ class HttpModelManagerGateway(ModelManagerGateway):
         response_dto = StartModelVariantRegistrationResponse.model_validate(
             response.json()
         )
-        return response_dto.artifact_ref
+        return response_dto.model_variant_id, response_dto.artifact_ref
 
     @override
     async def finalize_model_variant_registration(

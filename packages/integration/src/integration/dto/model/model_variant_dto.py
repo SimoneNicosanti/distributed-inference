@@ -2,7 +2,6 @@ from pydantic import BaseModel, PositiveInt
 
 from shared.model.model_variant import (
     ModelVariantFormat,
-    ModelVariantId,
     NumericPrecision,
     PerformanceMetric,
     QuantizationType,
@@ -25,9 +24,3 @@ class ModelVariantInfoDto(BaseModel):
 
     inputs_info: dict[str, InputInfoDto]
     dynamic_dimension_values: dict[str, DynamicShapeValuesDto]
-
-
-class ModelVariantDto(BaseModel):
-    id: ModelVariantId
-
-    info: ModelVariantInfoDto

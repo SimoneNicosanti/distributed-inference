@@ -12,7 +12,6 @@ from integration.dto.model.model_dto import ModelDto
 from integration.dto.model.model_variant_dto import (
     DynamicShapeValuesDto,
     InputInfoDto,
-    ModelVariantDto,
     ModelVariantInfoDto,
 )
 from integration.front_end.http.front_end_http_paths import (
@@ -22,22 +21,20 @@ from integration.front_end.http.front_end_http_paths import (
 from integration.front_end.http.front_end_http_schema import LoadModelVariantResponse
 from integration.model_manager.http.model_manager_http_schema import (
     RegisterModelRequest,
+    StartModelVariantRegistrationRequest,
 )
 from shared.model.model import (
     CNNArchitectureInfo,
     ModelId,
     ModelTask,
-    ModelVisibility,
 )
 from shared.model.model_variant import (
     ModelVariantFormat,
-    ModelVariantId,
     NumericPrecision,
     PerformanceMetric,
     PerformanceMetricType,
     QuantizationType,
 )
-from shared.user.user import SYSTEM_USER_ID
 
 
 def _read_model_inputs(
@@ -114,18 +111,16 @@ def test_upload_model(tmp_path: Path) -> None:
 
     unique_id = uuid4()
     model_id = ModelId(
-        owner_id=SYSTEM_USER_ID,
         model_name=f"system-test-{unique_id.hex}",
     )
     model = ModelDto(
         model_id=model_id,
-        visibility=ModelVisibility.PRIVATE,
         model_task=ModelTask.CLASSIFICATION,
         architecture_info=CNNArchitectureInfo(),
     )
-    variant = ModelVariantDto(
-        id=ModelVariantId(model_id=model_id, variant_tag="fp32"),
-        info=ModelVariantInfoDto(
+    registration = StartModelVariantRegistrationRequest(
+        model_id=model_id,
+        model_variant_info_dto=ModelVariantInfoDto(
             precision=NumericPrecision.FP32,
             quantization=QuantizationType.NONE,
             accuracies=[
@@ -151,10 +146,11 @@ def test_upload_model(tmp_path: Path) -> None:
         with archive_path.open("rb") as archive:
             upload_response = client.post(
                 FRONT_END_LOAD_MODEL_VARIANT_PATH,
-                data={"model_variant_json": variant.model_dump_json()},
+                data={"model_variant_json": registration.model_dump_json()},
                 files={"artifact": (archive_path.name, archive, "application/zip")},
             )
 
     assert upload_response.status_code == 200, upload_response.text
     response = LoadModelVariantResponse.model_validate(upload_response.json())
+    assert response.model_variant_id.model_id == model_id
     assert response.artifact_ref.value

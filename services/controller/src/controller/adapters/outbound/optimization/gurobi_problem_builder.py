@@ -25,7 +25,6 @@ from controller.domain.profile.model_variant_static_profile import (
 from integration.shared.id_json import flow_id_to_json, model_variant_id_to_json
 from shared.flow.flow import FlowId
 from shared.model.keys import LayerKey, TensorKey
-from shared.model.model import ModelVisibility
 from shared.model.model_variant import (
     ModelVariantId,
     PerformanceMetric,
@@ -75,11 +74,6 @@ def _is_model_eligible(
     profile: ModelVariantStaticProfile,
 ) -> bool:
     if profile.info.task != request.task:
-        return False
-    if (
-        profile.info.visibility == ModelVisibility.PRIVATE
-        and profile.model_variant_id.model_id.owner_id != request.flow_id.user_id
-    ):
         return False
     return any(
         _is_metric_satisfied(metric, request.qos_requirements.min_model_performance)

@@ -43,6 +43,9 @@ from model_manager.application.default_artifact_ref_factory import (
 )
 from model_manager.application.default_model_manager import DefaultModelManager
 from model_manager.application.default_model_profiler import DefaultModelProfiler
+from model_manager.application.default_model_variant_id_factory import (
+    DefaultModelVariantIdFactory,
+)
 from model_manager.application.ports.inbound.model_partitioner import ModelPartitioner
 from model_manager.application.ports.inbound.model_registry import ModelRegistry
 from model_manager.application.ports.inbound.model_variant_registry import (
@@ -86,6 +89,7 @@ class DefaultCompositionRoot(CompositionRoot):
             model_manager = DefaultModelManager(
                 model_profiler,
                 artifact_store,
+                DefaultModelVariantIdFactory(),
                 artifact_ref_factory,
                 model_metadata_store,
                 model_splitter,

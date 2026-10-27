@@ -30,7 +30,6 @@ class ModelVariantStaticProfileMapper:
         return ModelVariantStaticProfile(
             model_variant_id=dto.model_variant_id,
             info=ModelVariantInfo(
-                visibility=model_dto.visibility,
                 task=model_dto.model_task,
                 accuracies=tuple(dto.info.accuracies),
             ),

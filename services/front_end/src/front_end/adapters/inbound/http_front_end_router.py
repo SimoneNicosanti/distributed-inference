@@ -11,7 +11,6 @@ from front_end.application.ports.inbound.inference import (
     LocalWorkerIdentityQuery,
 )
 from front_end.application.ports.inbound.model_loader import ModelLoader
-from integration.dto.model.model_variant_dto import ModelVariantDto
 from integration.dto.tensor.tensor_bundle_dto import TensorBundleDto
 from integration.dto.worker_identity.worker_identity_dto import WorkerIdentityDto
 from integration.front_end.http.front_end_http_paths import (
@@ -27,6 +26,7 @@ from integration.front_end.http.front_end_http_schema import (
 )
 from integration.model_manager.http.model_manager_http_schema import (
     RegisterModelRequest,
+    StartModelVariantRegistrationRequest,
 )
 
 CHUNK_SIZE = 1024 * 1024
@@ -74,7 +74,9 @@ def build_front_end_router(
         model_variant_json: Annotated[str, Form()],
         artifact: Annotated[UploadFile, File()],
     ) -> LoadModelVariantResponse:
-        model_variant = ModelVariantDto.model_validate_json(model_variant_json)
+        registration = StartModelVariantRegistrationRequest.model_validate_json(
+            model_variant_json
+        )
 
         async with aiofiles.tempfile.TemporaryDirectory() as tmp_dir:
             archive_path = Path(tmp_dir) / "artifact.zip"
@@ -83,11 +85,15 @@ def build_front_end_router(
                     await archive_file.write(chunk)
 
             async with decompress_artifact_bundle(archive_path) as artifact_bundle:
-                artifact_ref = await model_loader.load_model_variant(
-                    model_variant=model_variant,
+                model_variant_id, artifact_ref = await model_loader.load_model_variant(
+                    model_id=registration.model_id,
+                    model_variant_info=registration.model_variant_info_dto,
                     artifact_bundle=artifact_bundle,
                 )
 
-        return LoadModelVariantResponse(artifact_ref=artifact_ref)
+        return LoadModelVariantResponse(
+            model_variant_id=model_variant_id,
+            artifact_ref=artifact_ref,
+        )
 
     return router

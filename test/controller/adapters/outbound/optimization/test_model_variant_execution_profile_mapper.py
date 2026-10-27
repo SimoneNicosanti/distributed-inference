@@ -13,7 +13,6 @@ from integration.dto.worker_profiles.execution_profile_dto import (
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 def test_maps_all_backend_profiles() -> None:
@@ -24,7 +23,7 @@ def test_maps_all_backend_profiles() -> None:
     dto = ModelExecutionProfileDto(
         worker_id=ServiceId(),
         model_variant_id=ModelVariantId(
-            model_id=ModelId(owner_id=UserId(), model_name="model"),
+            model_id=ModelId(model_name="model"),
             variant_tag="variant",
         ),
         shape_execution_profiles=(

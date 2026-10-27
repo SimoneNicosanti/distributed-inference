@@ -25,7 +25,6 @@ class DefaultArtifactRefFactory(ArtifactRefFactory):
         model_id = model_variant_id.model_id
         return json.dumps(
             [
-                str(model_id.owner_id.id),
                 model_id.model_name,
                 model_variant_id.variant_tag,
             ],

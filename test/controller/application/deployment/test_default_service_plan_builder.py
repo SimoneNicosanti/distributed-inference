@@ -51,7 +51,7 @@ def _component(
 async def test_maps_solution_to_all_involved_workers() -> None:
     user_id = UserId()
     model_variant_id = ModelVariantId(
-        model_id=ModelId(owner_id=user_id, model_name="model"),
+        model_id=ModelId(model_name="model"),
         variant_tag="variant",
     )
     ingress_one = ServiceId()
@@ -185,7 +185,7 @@ async def test_rejects_flow_without_executable_components() -> None:
     user_id = UserId()
     ingress_id = ServiceId()
     model_variant_id = ModelVariantId(
-        model_id=ModelId(owner_id=user_id, model_name="model"),
+        model_id=ModelId(model_name="model"),
         variant_tag="variant",
     )
     solution = OptimizationSolution(

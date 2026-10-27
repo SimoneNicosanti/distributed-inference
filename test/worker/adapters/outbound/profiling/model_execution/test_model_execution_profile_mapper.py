@@ -5,7 +5,6 @@ from integration.dto.worker_profiles.execution_profile_dto import (
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 from worker.adapters.outbound.profiling.model_execution.mappers.model_execution_profile_mapper import (
     ModelExecutionProfileMapper,
 )
@@ -22,7 +21,7 @@ from worker.domain.profiling.model_execution.shape_point import ShapePoint
 def test_round_trips_backend_execution_profiles() -> None:
     profile = ModelExecutionProfile(
         model_version_id=ModelVariantId(
-            model_id=ModelId(owner_id=UserId(), model_name="model"),
+            model_id=ModelId(model_name="model"),
             variant_tag="variant",
         ),
         shape_execution_profiles=(

@@ -18,7 +18,6 @@ from integration.controller.http.optimization_http_schema import (
 from integration.dto.model.model_dto import ModelDto
 from integration.dto.model.model_variant_dto import (
     DynamicShapeValuesDto,
-    ModelVariantDto,
     ModelVariantInfoDto,
 )
 from integration.dto.optimization.optimization_dto import (
@@ -38,6 +37,7 @@ from integration.front_end.http.front_end_http_paths import (
 from integration.front_end.http.front_end_http_schema import LoadModelVariantResponse
 from integration.model_manager.http.model_manager_http_schema import (
     RegisterModelRequest,
+    StartModelVariantRegistrationRequest,
 )
 from integration.redis.worker_profiles.execution_profile_keys import (
     build_execution_profile_key_per_worker,
@@ -50,7 +50,6 @@ from shared.model.model import (
     CNNArchitectureInfo,
     ModelId,
     ModelTask,
-    ModelVisibility,
 )
 from shared.model.model_variant import (
     ModelVariantFormat,
@@ -137,7 +136,7 @@ def test_optimization_request(
 
     user_id = UserId()
     metric_dataset = f"system-test-{uuid4().hex}"
-    variants: list[ModelVariantDto] = []
+    model_variant_ids: list[ModelVariantId] = []
 
     with httpx.Client(base_url=front_end_base_url, timeout=300.0) as client:
         identity_response = client.get(FRONT_END_LOCAL_WORKER_IDENTITY_PATH)
@@ -145,20 +144,18 @@ def test_optimization_request(
         identity = WorkerIdentityDto.model_validate(identity_response.json())
         ingress_id = ServiceId(id=identity.service_id)
 
-        for index, accuracy in enumerate(MODEL_ACCURACIES, start=1):
+        for accuracy in MODEL_ACCURACIES:
             model_id = ModelId(
-                owner_id=user_id,
                 model_name=f"optimization-system-test-{uuid4().hex}",
             )
             model = ModelDto(
                 model_id=model_id,
-                visibility=ModelVisibility.PRIVATE,
                 model_task=ModelTask.CLASSIFICATION,
                 architecture_info=CNNArchitectureInfo(),
             )
-            variant = ModelVariantDto(
-                id=ModelVariantId(model_id=model_id, variant_tag=f"model-{index}"),
-                info=ModelVariantInfoDto(
+            registration = StartModelVariantRegistrationRequest(
+                model_id=model_id,
+                model_variant_info_dto=ModelVariantInfoDto(
                     precision=NumericPrecision.FP32,
                     quantization=QuantizationType.NONE,
                     accuracies=[
@@ -183,7 +180,7 @@ def test_optimization_request(
             with archive_path.open("rb") as archive:
                 upload_response = client.post(
                     FRONT_END_LOAD_MODEL_VARIANT_PATH,
-                    data={"model_variant_json": variant.model_dump_json()},
+                    data={"model_variant_json": registration.model_dump_json()},
                     files={
                         "artifact": (
                             archive_path.name,
@@ -195,14 +192,14 @@ def test_optimization_request(
             assert upload_response.status_code == 200, upload_response.text
             upload = LoadModelVariantResponse.model_validate(upload_response.json())
             assert upload.artifact_ref.value
-            variants.append(variant)
+            model_variant_ids.append(upload.model_variant_id)
 
     profile_timeout_s = float(os.getenv("WORKER_PROFILE_TIMEOUT_S", "600"))
     with Redis.from_url(redis_url, decode_responses=True) as redis:
         _wait_for_worker_profiles(
             redis,
             ingress_id,
-            {variant.id for variant in variants},
+            set(model_variant_ids),
             profile_timeout_s,
         )
 

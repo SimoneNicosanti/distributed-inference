@@ -8,6 +8,7 @@ from artifacts.contracts.artifact_bundle import ArtifactBundle
 from artifacts.contracts.artifact_workspace import ArtifactWorkspace
 from artifacts.storage.artifact_store import ArtifactStore
 from model_manager.application.abc.artifact_ref_factory import ArtifactRefFactory
+from model_manager.application.abc.model_variant_id_factory import ModelVariantIdFactory
 from model_manager.application.ports.inbound.model_partitioner import ModelPartitioner
 from model_manager.application.ports.inbound.model_registry import ModelRegistry
 from model_manager.application.ports.inbound.model_variant_registry import (
@@ -24,10 +25,11 @@ from model_manager.application.ports.outbound.model_profiler import (
 )
 from model_manager.domain.model import Model
 from model_manager.domain.model_partition import ModelPartition
-from model_manager.domain.model_variant import ModelVariant
+from model_manager.domain.model_variant import ModelVariant, ModelVariantInfo
 from model_manager.domain.profiled_model_variant import ProfiledModelVariant
 from shared.artifact.artifact_ref import ArtifactRef
 from shared.model.keys import LayerKey
+from shared.model.model import ModelId
 from shared.model.model_partition import ModelPartitionId
 from shared.model.model_variant import ModelVariantId
 
@@ -37,12 +39,13 @@ class DefaultModelManager(ModelRegistry, ModelVariantRegistry, ModelPartitioner)
         self,
         model_profiler: ModelProfiler,
         artifact_store: ArtifactStore,
+        model_variant_id_factory: ModelVariantIdFactory,
         artifact_ref_factory: ArtifactRefFactory,
         model_metadata_store: ModelMetadataStore,
         model_splitter: ModelPartitionExtractor,
     ):
         self._model_profiler = model_profiler
-
+        self._model_variant_id_factory = model_variant_id_factory
         self._artifact_store = artifact_store
         self._artifact_ref_factory = artifact_ref_factory
         self._model_metadata_store = model_metadata_store
@@ -59,18 +62,27 @@ class DefaultModelManager(ModelRegistry, ModelVariantRegistry, ModelPartitioner)
 
     @override
     async def start_model_variant_registration(
-        self, model_variant: ModelVariant
-    ) -> ArtifactRef:
+        self, model_id: ModelId, model_variant_info: ModelVariantInfo
+    ) -> tuple[ModelVariantId, ArtifactRef]:
+
+        model_variant_id = await self._model_variant_id_factory.build_model_variant_id(
+            model_id, model_variant_info
+        )
 
         artifact_ref = await self._artifact_ref_factory.build_artifact_ref(
-            model_variant.model_variant_id
+            model_variant_id
         )
-        self._pending_model_variants[model_variant.model_variant_id] = (
-            model_variant,
+
+        pending_variant = ModelVariant(
+            model_variant_id=model_variant_id, model_variant_info=model_variant_info
+        )
+
+        self._pending_model_variants[model_variant_id] = (
+            pending_variant,
             artifact_ref,
         )
 
-        return artifact_ref
+        return model_variant_id, artifact_ref
 
     @override
     async def finalize_model_variant_registration(

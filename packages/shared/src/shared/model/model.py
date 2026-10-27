@@ -2,8 +2,6 @@ from dataclasses import dataclass
 from enum import StrEnum, auto
 from typing import Literal
 
-from shared.user.user import UserId
-
 
 class ModelTask(StrEnum):
     CLASSIFICATION = auto()
@@ -44,14 +42,8 @@ class BERTArchitectureInfo(TransformerArchitectureInfo):
 type ArchitectureInfo = CNNArchitectureInfo | VITArchitectureInfo | BERTArchitectureInfo
 
 
-class ModelVisibility(StrEnum):
-    PUBLIC = auto()
-    PRIVATE = auto()
-
-
 @dataclass(frozen=True, slots=True)
 class ModelId:
-    owner_id: UserId
     model_name: str
 
     def __post_init__(self) -> None:

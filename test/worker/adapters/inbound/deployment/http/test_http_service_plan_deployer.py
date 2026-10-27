@@ -61,7 +61,7 @@ def _ingress_plan(plan_version: PlanVersion) -> IngressPlan:
     user_id = UserId()
     flow_id = FlowId(user_id=user_id)
     model_variant_id = ModelVariantId(
-        model_id=ModelId(owner_id=user_id, model_name="model"),
+        model_id=ModelId(model_name="model"),
         variant_tag="variant",
     )
     replica_id = PartitionReplicaId(

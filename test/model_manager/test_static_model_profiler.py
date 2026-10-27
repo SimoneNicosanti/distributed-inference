@@ -1,8 +1,8 @@
 import asyncio
-import uuid
 from pathlib import Path
 
 import onnx
+from onnx_tool.node import ReshapeNode
 
 from artifacts.contracts.artifact_workspace import ArtifactWorkspace
 from model_manager.adapters.outbound.model_optimizer.onnx_model_optimizer import (
@@ -35,9 +35,6 @@ from shared.model.model_variant import (
     NumericPrecision,
     QuantizationType,
 )
-from shared.user.user import UserId
-
-from onnx_tool.node import ReshapeNode
 
 original_shape_infer = ReshapeNode.shape_infer
 
@@ -145,7 +142,6 @@ async def main() -> None:
 
     model_variant_id = ModelVariantId(
         model_id=ModelId(
-            owner_id=UserId(id=uuid.uuid4()),
             model_name="resnet50",
         ),
         variant_tag="nano",

@@ -55,7 +55,7 @@ from controller.domain.profile.resource_profile import (
 )
 from shared.flow.flow import FlowId
 from shared.model.keys import LayerKey
-from shared.model.model import ModelId, ModelTask, ModelVisibility
+from shared.model.model import ModelId, ModelTask
 from shared.model.model_variant import (
     ModelVariantId,
     PerformanceMetric,
@@ -101,15 +101,15 @@ _BRANCHED_EDGES = (
 
 _USER_ID = UserId(id=UUID("00000000-0000-0000-0000-000000000001"))
 _MODEL_VARIANT_ID = ModelVariantId(
-    model_id=ModelId(owner_id=_USER_ID, model_name="test-model"),
+    model_id=ModelId(model_name="test-model"),
     variant_tag="batch-1",
 )
 _ALTERNATIVE_MODEL_VARIANT_ID = ModelVariantId(
-    model_id=ModelId(owner_id=_USER_ID, model_name="test-model"),
+    model_id=ModelId(model_name="test-model"),
     variant_tag="batch-1-fast",
 )
 _BRANCHED_MODEL_VARIANT_ID = ModelVariantId(
-    model_id=ModelId(owner_id=_USER_ID, model_name="branched-test-model"),
+    model_id=ModelId(model_name="branched-test-model"),
     variant_tag="batch-1",
 )
 _PERFORMANCE = PerformanceMetric(
@@ -156,7 +156,6 @@ def _static_profile(
     return ModelVariantStaticProfile(
         model_variant_id=model_variant_id,
         info=ModelVariantInfo(
-            visibility=ModelVisibility.PUBLIC,
             task=ModelTask.CLASSIFICATION,
             accuracies=(_PERFORMANCE,),
         ),
@@ -220,7 +219,6 @@ def _branched_static_profile() -> ModelVariantStaticProfile:
     return ModelVariantStaticProfile(
         model_variant_id=_BRANCHED_MODEL_VARIANT_ID,
         info=ModelVariantInfo(
-            visibility=ModelVisibility.PUBLIC,
             task=ModelTask.CLASSIFICATION,
             accuracies=(_PERFORMANCE,),
         ),

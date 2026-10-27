@@ -24,7 +24,6 @@ from shared.model.model import ModelId
 from shared.model.model_partition import ModelPartitionId
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 class StubServiceDirectory(Directory):
@@ -66,9 +65,8 @@ def _model_manager_instance(endpoint: str) -> ServiceInstance:
 
 
 def _partition_ids() -> tuple[ModelPartitionId, ModelPartitionId]:
-    user_id = UserId()
     model_variant_id = ModelVariantId(
-        model_id=ModelId(owner_id=user_id, model_name="model"),
+        model_id=ModelId(model_name="model"),
         variant_tag="variant",
     )
     return (

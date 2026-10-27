@@ -7,8 +7,10 @@ from front_end.application.ports.outbound.model_loading_gateway import (
     ModelManagerGateway,
 )
 from integration.dto.model.model_dto import ModelDto
-from integration.dto.model.model_variant_dto import ModelVariantDto
+from integration.dto.model.model_variant_dto import ModelVariantInfoDto
 from shared.artifact.artifact_ref import ArtifactRef
+from shared.model.model import ModelId
+from shared.model.model_variant import ModelVariantId
 
 
 class DefaultModelLoader(ModelLoader):
@@ -27,12 +29,14 @@ class DefaultModelLoader(ModelLoader):
     @override
     async def load_model_variant(
         self,
-        model_variant: ModelVariantDto,
+        model_id: ModelId,
+        model_variant_info: ModelVariantInfoDto,
         artifact_bundle: ArtifactBundle,
-    ) -> ArtifactRef:
-        artifact_ref = (
+    ) -> tuple[ModelVariantId, ArtifactRef]:
+        model_variant_id, artifact_ref = (
             await self._model_manager_gateway.start_model_variant_registration(
-                model_variant
+                model_id,
+                model_variant_info,
             )
         )
         await self._model_artifact_uploader.upload_model_artifact(
@@ -40,7 +44,7 @@ class DefaultModelLoader(ModelLoader):
             artifact_bundle=artifact_bundle,
         )
         await self._model_manager_gateway.finalize_model_variant_registration(
-            model_variant.id
+            model_variant_id
         )
 
-        return artifact_ref
+        return model_variant_id, artifact_ref

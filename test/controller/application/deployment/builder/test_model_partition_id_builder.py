@@ -46,7 +46,7 @@ def _component(
 def test_builds_partitions_only_from_executable_layers() -> None:
     user_id = UserId()
     model_variant_id = ModelVariantId(
-        model_id=ModelId(owner_id=user_id, model_name="model"),
+        model_id=ModelId(model_name="model"),
         variant_tag="variant",
     )
     ingress_id = ServiceId()
