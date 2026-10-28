@@ -33,7 +33,7 @@ def set_objective(
             / total_arrival_rate
             * (
                 qos.response_time_s[flow]
-                - float(requests_by_flow[flow].qos_requirements.max_mean_response_time)
+                # - float(requests_by_flow[flow].qos_requirements.max_mean_response_time)
             )
             for flow in p.flows
         )

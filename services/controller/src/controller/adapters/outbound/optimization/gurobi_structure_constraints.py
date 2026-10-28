@@ -460,6 +460,10 @@ def add_execution_constraints(
                 worker: layer_execution_profiles(context, model_variant, worker)
                 for worker in p.workers_by_flow[flow]
             }
+            minimum_execution_time_by_layer = _minimum_execution_time_by_layer(
+                layers,
+                profiles_by_worker,
+            )
             for component in range(1, max_components + 1):
                 for worker in p.workers_by_flow[flow]:
                     _define_model_component_execution_time_on_worker(
@@ -476,6 +480,44 @@ def add_execution_constraints(
                         component,
                         worker,
                     )
+                model.addConstr(
+                    gp.quicksum(
+                        execution.execution_time_s[
+                            flow, model_variant, component, worker
+                        ]
+                        for worker in p.workers_by_flow[flow]
+                    )
+                    >= gp.quicksum(
+                        minimum_execution_time
+                        * assignment.layer_component[
+                            flow, model_variant, layer, component
+                        ]
+                        for layer, minimum_execution_time in (
+                            minimum_execution_time_by_layer.items()
+                        )
+                    ),
+                    name=(
+                        f"execution_minimum[{flow_index},{model_index},{component}]"
+                    ),
+                )
+
+
+def _minimum_execution_time_by_layer(
+    layers: tuple[LayerKey, ...],
+    profiles_by_worker: dict[
+        WorkerId, Mapping[LayerKey, LayerExecutionProfile] | None
+    ],
+) -> dict[LayerKey, float]:
+    result: dict[LayerKey, float] = {}
+    for layer in layers:
+        compatible_times = tuple(
+            float(profiles[layer].execution_time_s)
+            for profiles in profiles_by_worker.values()
+            if profiles is not None and layer in profiles
+        )
+        if compatible_times:
+            result[layer] = min(compatible_times)
+    return result
 
 
 def _define_model_component_execution_time_on_worker(

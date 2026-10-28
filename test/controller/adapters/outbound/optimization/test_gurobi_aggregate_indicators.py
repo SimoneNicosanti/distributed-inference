@@ -273,8 +273,15 @@ def test_indicator_aggregates_replace_all_layer_worker_products(
         assert eliminated_z_count == 24
         assert model.NumVars == 48
         assert model.NumBinVars == 16
-        assert model.NumConstrs == 10
+        execution_lower_bound_count = len(_MODELS) * _MAX_COMPONENTS
+        assert model.NumConstrs == 10 + execution_lower_bound_count
         assert model.NumGenConstrs == 6 * aggregate_count == 48
+        assert all(
+            model.getConstrByName(f"execution_minimum[0,{model_index},{component}]")
+            is not None
+            for model_index in range(len(_MODELS))
+            for component in range(1, _MAX_COMPONENTS + 1)
+        )
         assert all(
             not variable.VarName.startswith("z[") for variable in model.getVars()
         )
@@ -389,3 +396,86 @@ def test_missing_layer_profile_still_forbids_placement(
         model.optimize()
 
         assert model.Status == GRB.INFEASIBLE
+
+
+def test_minimum_execution_time_uses_only_compatible_workers() -> None:
+    profiles_by_worker = {
+        _WORKER_A: {
+            "a": LayerExecutionProfile(execution_time_s=1),
+            "b": LayerExecutionProfile(execution_time_s=4),
+        },
+        _WORKER_B: {
+            "a": LayerExecutionProfile(execution_time_s=3),
+            "b": LayerExecutionProfile(execution_time_s=2),
+            "c": LayerExecutionProfile(execution_time_s=6),
+        },
+    }
+
+    assert structure_constraints._minimum_execution_time_by_layer(
+        ("a", "b", "c", "unsupported"),
+        profiles_by_worker,
+    ) == {"a": 1, "b": 2, "c": 6}
+    assert structure_constraints._minimum_execution_time_by_layer(
+        ("a",),
+        {_WORKER_A: profiles_by_worker[_WORKER_A]},
+    ) == {"a": 1}
+
+
+def test_execution_minimum_bound_supports_multiple_components_and_workers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    problem = _problem()
+    context = _context()
+
+    def heterogeneous_profiles(
+        _context: OptimizationContext,
+        _model: ModelVariantId,
+        worker: WorkerId,
+    ) -> dict[str, LayerExecutionProfile]:
+        if worker == _WORKER_A:
+            return {
+                "a": LayerExecutionProfile(execution_time_s=1),
+                "b": LayerExecutionProfile(execution_time_s=4),
+            }
+        return {
+            "a": LayerExecutionProfile(execution_time_s=3),
+            "b": LayerExecutionProfile(execution_time_s=2),
+            "c": LayerExecutionProfile(execution_time_s=6),
+        }
+
+    monkeypatch.setattr(
+        structure_constraints,
+        "layer_execution_profiles",
+        heterogeneous_profiles,
+    )
+
+    with gp.Model() as model:
+        model.Params.OutputFlag = 0
+        assignment, execution, _ = _variables(model, problem, context)
+
+        for component, value in ((1, 0), (2, 1)):
+            layer_component = assignment.layer_component[
+                _FLOW, _MODEL_A, "c", component
+            ]
+            layer_component.LB = value
+            layer_component.UB = value
+        for worker, value in ((_WORKER_A, 0), (_WORKER_B, 1)):
+            component_worker = assignment.component_worker[_FLOW, 2, worker]
+            component_worker.LB = value
+            component_worker.UB = value
+
+        add_execution_constraints(
+            model,
+            problem,
+            assignment,
+            execution,
+            context=context,
+            max_components=_MAX_COMPONENTS,
+        )
+        model.optimize()
+
+        assert model.Status == GRB.OPTIMAL
+        assert execution.execution_time_s[_FLOW, _MODEL_A, 1, _WORKER_A].X == 5
+        assert execution.execution_time_s[_FLOW, _MODEL_A, 2, _WORKER_B].X == 6
+        assert model.getConstrByName("execution_minimum[0,0,1]") is not None
+        assert model.getConstrByName("execution_minimum[0,0,2]") is not None

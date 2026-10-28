@@ -72,12 +72,22 @@ def add_network_queue_constraints(
         flow_index = p.flow_index[flow]
         for cut in cuts:
             response = network.component_transmission_response_s[flow, cut]
-            for worker in p.workers_by_flow[flow]:
-                worker_index = p.worker_index[worker]
-                nominal = gp.quicksum(
-                    network.transmission_time_s[flow, model_variant, cut, worker]
+            nominal_by_worker = {
+                worker: gp.quicksum(
+                    network.transmission_time_s[
+                        flow, model_variant, cut, worker
+                    ]
                     for model_variant in p.models_by_flow[flow]
                 )
+                for worker in p.workers_by_flow[flow]
+            }
+            model.addConstr(
+                response >= gp.quicksum(nominal_by_worker.values()),
+                name=f"network_response_nominal[{flow_index},{cut}]",
+            )
+            for worker in p.workers_by_flow[flow]:
+                worker_index = p.worker_index[worker]
+                nominal = nominal_by_worker[worker]
                 for bin_index in range(1, bin_count + 1):
                     model.addGenConstrIndicator(
                         network.network_bin_selected[worker, bin_index],
