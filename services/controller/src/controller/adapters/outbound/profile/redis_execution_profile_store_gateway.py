@@ -17,7 +17,7 @@ from integration.dto.worker_profiles.execution_profile_dto import (
     ModelExecutionProfileDto,
 )
 from integration.redis.worker_profiles.execution_profile_keys import (
-    build_execution_profile_key_per_worker,
+    ExecutionProfileKeyFactory,
 )
 from integration.shared.id_json import model_variant_id_to_json
 from shared.model.model_variant import ModelVariantId
@@ -25,8 +25,13 @@ from shared.service.service import WorkerId
 
 
 class RedisExecutionProfileStoreGateway(ExecutionProfileStoreGateway):
-    def __init__(self, redis: redis_asyncio.Redis) -> None:
+    def __init__(
+        self,
+        redis: redis_asyncio.Redis,
+        execution_profile_key_factory_cls: type[ExecutionProfileKeyFactory],
+    ) -> None:
         self._redis = redis
+        self._execution_profile_key_factory_cls = execution_profile_key_factory_cls
 
     @override
     async def get_execution_profiles_for_workers_and_variants(
@@ -54,7 +59,11 @@ class RedisExecutionProfileStoreGateway(ExecutionProfileStoreGateway):
 
         async with self._redis.pipeline(transaction=False) as pipeline:
             for worker_id in ordered_worker_ids:
-                pipeline.hvals(build_execution_profile_key_per_worker(worker_id))
+                pipeline.hvals(
+                    await self._execution_profile_key_factory_cls.build_execution_profile_key_per_worker(
+                        worker_id
+                    )
+                )
             stored_profiles_by_worker = await pipeline.execute()
 
         return [

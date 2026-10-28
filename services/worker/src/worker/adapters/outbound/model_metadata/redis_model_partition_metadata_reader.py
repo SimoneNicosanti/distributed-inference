@@ -4,8 +4,7 @@ from redis import asyncio as redis_asyncio
 
 from integration.dto.model.model_partition_dto import ModelPartitionDto
 from integration.redis.model_partition.keys_factory import (
-    build_model_partition_dict_name,
-    build_model_partition_key,
+    ModelPartitionKeyFactory,
 )
 from shared.artifact.artifact_ref import ArtifactRef
 from shared.model.model_partition import ModelPartitionId
@@ -15,15 +14,26 @@ from worker.application.ports.outbound.model_metadata.model_partition_metadata_r
 
 
 class RedisModelPartitionMetadataReader(ModelPartitionMetadataReader):
-    def __init__(self, redis: redis_asyncio.Redis) -> None:
+    def __init__(
+        self,
+        redis: redis_asyncio.Redis,
+        model_partition_key_factory_cls: type[ModelPartitionKeyFactory],
+    ) -> None:
         self._redis = redis
+        self._model_partition_key_factory_cls = model_partition_key_factory_cls
 
     @override
     async def get_artifact_ref_by_partition_id(
         self, partition_id: ModelPartitionId
     ) -> ArtifactRef:
-        dict_name = await build_model_partition_dict_name(partition_id)
-        key = await build_model_partition_key(partition_id)
+        dict_name = (
+            await self._model_partition_key_factory_cls.build_model_partition_dict_name(
+                partition_id
+            )
+        )
+        key = await self._model_partition_key_factory_cls.build_model_partition_key(
+            partition_id
+        )
 
         value = await self._redis.hget(dict_name, key)
         if value is None:

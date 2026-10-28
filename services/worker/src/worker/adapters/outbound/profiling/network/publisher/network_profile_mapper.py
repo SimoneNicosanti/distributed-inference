@@ -11,7 +11,7 @@ class NetworkProfileMapper:
     def network_profile_to_dto(
         worker_id: WorkerId,
         network_profile: NetworkProfile,
-    ):
+    ) -> NetworkProfileDto:
         return NetworkProfileDto(
             source_worker_id=worker_id,
             connections=tuple(

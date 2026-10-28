@@ -14,14 +14,19 @@ from controller.domain.profile.resource_profile import (
 )
 from integration.dto.worker_profiles.resource_profile_dto import ResourceProfileDto
 from integration.redis.worker_profiles.resource_profile_keys import (
-    build_resource_profile_key_per_worker,
+    ResourceProfileKeyFactory,
 )
 from shared.service.service import WorkerId
 
 
 class RedisResourceProfileStoreGateway(ResourceProfileStoreGateway):
-    def __init__(self, redis: redis_asyncio.Redis) -> None:
+    def __init__(
+        self,
+        redis: redis_asyncio.Redis,
+        resource_profile_key_factory_cls: type[ResourceProfileKeyFactory],
+    ) -> None:
         self._redis = redis
+        self._resource_profile_key_factory_cls = resource_profile_key_factory_cls
 
     @override
     async def get_resource_profiles_for_workers(
@@ -36,7 +41,9 @@ class RedisResourceProfileStoreGateway(ResourceProfileStoreGateway):
             return []
 
         redis_keys = [
-            build_resource_profile_key_per_worker(worker_id)
+            await self._resource_profile_key_factory_cls.build_resource_profile_key_per_worker(
+                worker_id
+            )
             for worker_id in ordered_worker_ids
         ]
         values = await self._redis.mget(redis_keys)

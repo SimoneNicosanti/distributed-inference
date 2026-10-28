@@ -1,7 +1,8 @@
+import asyncio
 import os
 import time
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import onnx
@@ -40,10 +41,10 @@ from integration.model_manager.http.model_manager_http_schema import (
     StartModelVariantRegistrationRequest,
 )
 from integration.redis.worker_profiles.execution_profile_keys import (
-    build_execution_profile_key_per_worker,
+    StringExecutionProfileKeyFactory,
 )
 from integration.redis.worker_profiles.resource_profile_keys import (
-    build_resource_profile_key_per_worker,
+    StringResourceProfileKeyFactory,
 )
 from shared.flow.flow import FlowId
 from shared.model.model import (
@@ -62,9 +63,28 @@ from shared.model.model_variant import (
 from shared.service.service import ServiceId
 from shared.user.user import UserId
 
-ARRIVAL_RATES = (0.001, 0.002, 0.003, 0.004, 0.005)
-MAX_RESPONSE_TIMES_S = (300.0,) * 5
+ARRIVAL_RATES = (0.01, 0.02, 0.03, 0.04, 0.05)
+MAX_RESPONSE_TIMES_S = (100.0, 150, 200, 250, 300)
 MODEL_ACCURACIES = (0.75, 0.80, 0.85, 0.90)
+OPTIMIZATION_TEST_USER_ID = UserId(id=UUID("00000000-0000-4000-8000-000000000001"))
+OPTIMIZATION_TEST_FLOW_IDS = tuple(
+    FlowId(
+        user_id=OPTIMIZATION_TEST_USER_ID,
+        flow_id=UUID(f"00000000-0000-4000-8000-{index:012d}"),
+    )
+    for index in range(1, len(ARRIVAL_RATES) + 1)
+)
+
+
+async def _build_worker_profile_keys(worker_id: ServiceId) -> tuple[str, str]:
+    return await asyncio.gather(
+        StringExecutionProfileKeyFactory.build_execution_profile_key_per_worker(
+            worker_id
+        ),
+        StringResourceProfileKeyFactory.build_resource_profile_key_per_worker(
+            worker_id
+        ),
+    )
 
 
 def _wait_for_worker_profiles(
@@ -73,8 +93,9 @@ def _wait_for_worker_profiles(
     model_variant_ids: set[ModelVariantId],
     timeout_s: float,
 ) -> None:
-    execution_profile_key = build_execution_profile_key_per_worker(worker_id)
-    resource_profile_key = build_resource_profile_key_per_worker(worker_id)
+    execution_profile_key, resource_profile_key = asyncio.run(
+        _build_worker_profile_keys(worker_id)
+    )
     deadline = time.monotonic() + timeout_s
 
     while True:
@@ -134,7 +155,6 @@ def test_optimization_request(
     archive_path = tmp_path / "artifact.zip"
     _build_model_archive(model_path, archive_path)
 
-    user_id = UserId()
     metric_dataset = f"system-test-{uuid4().hex}"
     model_variant_ids: list[ModelVariantId] = []
 
@@ -205,7 +225,7 @@ def test_optimization_request(
 
     requests = tuple(
         OptimizationRequestDto(
-            flow_id=FlowId(user_id=user_id),
+            flow_id=flow_id,
             task=ModelTask.CLASSIFICATION,
             stream_info=StreamInfoDto(arrival_rate=arrival_rate),
             qos_requirements=QoSRequirementsDto(
@@ -219,7 +239,8 @@ def test_optimization_request(
             ),
             ingress_id=ingress_id,
         )
-        for arrival_rate, max_response_time in zip(
+        for flow_id, arrival_rate, max_response_time in zip(
+            OPTIMIZATION_TEST_FLOW_IDS,
             ARRIVAL_RATES,
             MAX_RESPONSE_TIMES_S,
             strict=True,

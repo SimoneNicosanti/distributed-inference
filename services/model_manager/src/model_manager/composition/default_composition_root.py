@@ -16,6 +16,13 @@ from artifacts.storage.s3.s3_client import S3Client
 from catalog.api.registrar import Registrar
 from catalog.heartbeat.heartbeat_manager import HeartbeatManager
 from catalog.redis.redis_registrar import RedisRegistrar
+from integration.redis.model.keys_factory import StringModelKeyFactory
+from integration.redis.model_partition.keys_factory import (
+    StringModelPartitionKeyFactory,
+)
+from integration.redis.profiled_model_variant.keys_factory import (
+    StringProfiledModelVariantKeyFactory,
+)
 from integration.service_instance.service_instance import ServiceInstance
 from model_manager.adapters.outbound.model_metadata_store.redis_model_metadata_store import (
     RedisModelMetadataStore,
@@ -82,7 +89,12 @@ class DefaultCompositionRoot(CompositionRoot):
             artifact_store = await stack.enter_async_context(artifact_store_cm)
             artifact_ref_factory = DefaultArtifactRefFactory()
 
-            model_metadata_store = RedisModelMetadataStore(redis)
+            model_metadata_store = RedisModelMetadataStore(
+                redis,
+                StringModelKeyFactory,
+                StringProfiledModelVariantKeyFactory,
+                StringModelPartitionKeyFactory,
+            )
 
             model_splitter = self.build_model_partition_extractor()
 

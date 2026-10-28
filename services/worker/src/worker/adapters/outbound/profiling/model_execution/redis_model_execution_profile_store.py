@@ -1,5 +1,3 @@
-import asyncio
-from hashlib import md5
 from typing import override
 
 from redis import asyncio as redis_asyncio
@@ -8,8 +6,7 @@ from integration.dto.worker_profiles.execution_profile_dto import (
     ModelExecutionProfileDto,
 )
 from integration.redis.worker_profiles.execution_profile_keys import (
-    build_execution_profile_ids_key_per_worker,
-    build_execution_profile_key_per_worker,
+    ExecutionProfileKeyFactory,
 )
 from integration.shared.id_json import (
     model_variant_id_from_json,
@@ -34,16 +31,25 @@ from worker.domain.profiling.model_execution.model_execution_profile import (
 class RedisModelExecutionProfileStore(
     ModelExecutionProfilePublisher, ModelExecutionProfileReader
 ):
-    def __init__(self, redis: redis_asyncio.Redis) -> None:
+    def __init__(
+        self,
+        redis: redis_asyncio.Redis,
+        execution_profile_key_factory_cls: type[ExecutionProfileKeyFactory],
+    ) -> None:
         self._redis = redis
+        self._execution_profile_key_factory_cls = execution_profile_key_factory_cls
 
     @override
     async def puplish_model_execution_profile(
         self, worker_id: WorkerId, model_execution_profile: ModelExecutionProfile
     ) -> None:
-        worker_key = build_execution_profile_key_per_worker(worker_id)
-        worker_ids_key = build_execution_profile_ids_key_per_worker(worker_id)
-        profile_id = await self.__compute_model_version_id_hash(
+        worker_key = await self._execution_profile_key_factory_cls.build_execution_profile_key_per_worker(
+            worker_id
+        )
+        worker_ids_key = await self._execution_profile_key_factory_cls.build_execution_profile_ids_key_per_worker(
+            worker_id
+        )
+        profile_id = await self._execution_profile_key_factory_cls.build_model_execution_profile_key(
             model_execution_profile.model_version_id
         )
         profile_json = ModelExecutionProfileMapper.model_execution_profile_to_dto(
@@ -63,8 +69,12 @@ class RedisModelExecutionProfileStore(
     async def get_model_execution_profile_by_worker_id(
         self, worker_id: WorkerId, model_version_id: ModelVariantId
     ) -> ModelExecutionProfile:
-        worker_key = build_execution_profile_key_per_worker(worker_id)
-        profile_id = await self.__compute_model_version_id_hash(model_version_id)
+        worker_key = await self._execution_profile_key_factory_cls.build_execution_profile_key_per_worker(
+            worker_id
+        )
+        profile_id = await self._execution_profile_key_factory_cls.build_model_execution_profile_key(
+            model_version_id
+        )
 
         value = await self._redis.hget(worker_key, profile_id)
 
@@ -84,7 +94,9 @@ class RedisModelExecutionProfileStore(
         return [
             model_variant_id_from_json(value)
             async for value in self._redis.sscan_iter(
-                build_execution_profile_ids_key_per_worker(worker_id)
+                await self._execution_profile_key_factory_cls.build_execution_profile_ids_key_per_worker(
+                    worker_id
+                )
             )
         ]
 
@@ -92,7 +104,9 @@ class RedisModelExecutionProfileStore(
     async def get_all_profiles_by_worker_id(
         self, worker_id: WorkerId
     ) -> list[ModelExecutionProfile]:
-        worker_key = build_execution_profile_key_per_worker(worker_id)
+        worker_key = await self._execution_profile_key_factory_cls.build_execution_profile_key_per_worker(
+            worker_id
+        )
 
         values = await self._redis.hvals(worker_key)
 
@@ -109,16 +123,11 @@ class RedisModelExecutionProfileStore(
     async def check_model_execution_profile_exists(
         self, worker_id: WorkerId, model_version_id: ModelVariantId
     ) -> bool:
-        worker_key = build_execution_profile_key_per_worker(worker_id)
-        profile_id = await self.__compute_model_version_id_hash(model_version_id)
+        worker_key = await self._execution_profile_key_factory_cls.build_execution_profile_key_per_worker(
+            worker_id
+        )
+        profile_id = await self._execution_profile_key_factory_cls.build_model_execution_profile_key(
+            model_version_id
+        )
 
         return await self._redis.hexists(worker_key, profile_id)
-
-    @staticmethod
-    async def __compute_model_version_id_hash(
-        model_version_id: ModelVariantId,
-    ) -> str:
-        md5_value = await asyncio.to_thread(
-            md5, model_variant_id_to_json(model_version_id).encode("utf-8")
-        )
-        return md5_value.hexdigest()

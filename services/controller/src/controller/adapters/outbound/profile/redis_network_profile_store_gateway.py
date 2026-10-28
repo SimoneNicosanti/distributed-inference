@@ -11,14 +11,19 @@ from controller.domain.profile.network_topology import (
 )
 from integration.dto.worker_profiles.network_profile_dto import NetworkProfileDto
 from integration.redis.worker_profiles.network_profile_keys import (
-    build_network_profile_key_per_worker,
+    NetworkProfileKeyFactory,
 )
 from shared.service.service import WorkerId
 
 
 class RedisNetworkProfileStoreGateway(NetworkProfileStoreGateway):
-    def __init__(self, redis: redis_asyncio.Redis) -> None:
+    def __init__(
+        self,
+        redis: redis_asyncio.Redis,
+        network_profile_key_factory_cls: type[NetworkProfileKeyFactory],
+    ) -> None:
         self._redis = redis
+        self._network_profile_key_factory_cls = network_profile_key_factory_cls
 
     @override
     async def get_network_connections_by_workers(
@@ -33,7 +38,9 @@ class RedisNetworkProfileStoreGateway(NetworkProfileStoreGateway):
             key=lambda worker_id: str(worker_id.id),
         )
         redis_keys = [
-            build_network_profile_key_per_worker(worker_id)
+            await self._network_profile_key_factory_cls.build_network_profile_key_per_worker(
+                worker_id
+            )
             for worker_id in ordered_worker_ids
         ]
         values = await self._redis.mget(redis_keys)

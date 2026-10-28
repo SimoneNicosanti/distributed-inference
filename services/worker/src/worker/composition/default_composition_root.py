@@ -16,6 +16,21 @@ from artifacts.storage.s3.s3_client import S3Client
 from catalog.heartbeat.heartbeat_manager import HeartbeatManager
 from catalog.redis.redis_directory import RedisDirectory
 from catalog.redis.redis_registrar import RedisRegistrar
+from integration.redis.model_partition.keys_factory import (
+    StringModelPartitionKeyFactory,
+)
+from integration.redis.profiled_model_variant.keys_factory import (
+    StringProfiledModelVariantKeyFactory,
+)
+from integration.redis.worker_profiles.execution_profile_keys import (
+    StringExecutionProfileKeyFactory,
+)
+from integration.redis.worker_profiles.network_profile_keys import (
+    StringNetworkProfileKeyFactory,
+)
+from integration.redis.worker_profiles.resource_profile_keys import (
+    StringResourceProfileKeyFactory,
+)
 from integration.service_instance.service_instance import CapabilityType
 from integration.service_instance.worker_instance import WorkerInstance
 from lifecycle.async_lifecycle import AsyncLifecycle
@@ -188,7 +203,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 worker_plan_store=worker_plan_store,
                 artifact_store=artifact_store,
                 model_partition_metadata_reader=RedisModelPartitionMetadataReader(
-                    redis
+                    redis, StringModelPartitionKeyFactory
                 ),
                 partition_executor_factory=OnnxPartitionExecutorFactory(),
                 partition_executor_registry=partition_executor_registry,
@@ -295,7 +310,9 @@ class DefaultCompositionRoot(CompositionRoot):
             gpu_profiler=gpu_profiler,
             cpu_profiler=CgroupCpuProfiler(),
             memory_profiler=CgroupRamProfiler(),
-            res_profile_publisher=RedisResourceProfilePublisher(worker_id, redis),
+            res_profile_publisher=RedisResourceProfilePublisher(
+                worker_id, redis, StringResourceProfileKeyFactory
+            ),
         )
         network_coordinator = DefaultNetworkProfilingCoordinator(
             worker_id=worker_id,
@@ -303,11 +320,17 @@ class DefaultCompositionRoot(CompositionRoot):
             activity_manager=activity_manager,
             service_directory=service_directory,
             net_probe_client=ArrowNetworkProbeClient(),
-            net_profile_publisher=RedisNetworkProfilePublisher(worker_id, redis),
+            net_profile_publisher=RedisNetworkProfilePublisher(
+                worker_id, redis, StringNetworkProfileKeyFactory
+            ),
         )
 
-        static_profile_reader = RedisModelStaticProfileReader(redis)
-        execution_profile_store = RedisModelExecutionProfileStore(redis)
+        static_profile_reader = RedisModelStaticProfileReader(
+            redis, StringProfiledModelVariantKeyFactory
+        )
+        execution_profile_store = RedisModelExecutionProfileStore(
+            redis, StringExecutionProfileKeyFactory
+        )
         pending_models_poller = DefaultPendingModelsPoller(
             worker_id=worker_id,
             model_static_profile_reader=static_profile_reader,

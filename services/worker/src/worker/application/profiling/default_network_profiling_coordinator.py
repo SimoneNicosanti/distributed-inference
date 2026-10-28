@@ -26,7 +26,7 @@ from worker.domain.activity.activity_request import (
 )
 from worker.domain.profiling.network_profile import NetworkProfile, WorkerConnection
 
-NETWORK_PROFILING_INTERVAL_S = 60 * 5  # 5 minutes
+NETWORK_PROFILING_INTERVAL_S = 60 * 2  # 5 minutes
 
 
 class DefaultNetworkProfilingCoordinator(NetworkProfilingCoordinator, AsyncLifecycle):
@@ -77,14 +77,17 @@ class DefaultNetworkProfilingCoordinator(NetworkProfilingCoordinator, AsyncLifec
                     activity_request
                 )
                 async with activity_grant:
-                    connection_info = await self._net_probe_client.probe_connection(
-                        worker_instance
-                    )
-                    worker_connection = WorkerConnection(
-                        worker_id=worker_instance.service_id,
-                        connection_info=connection_info,
-                    )
-                    connections.append(worker_connection)
+                    try:
+                        connection_info = await self._net_probe_client.probe_connection(
+                            worker_instance
+                        )
+                        worker_connection = WorkerConnection(
+                            worker_id=worker_instance.service_id,
+                            connection_info=connection_info,
+                        )
+                        connections.append(worker_connection)
+                    except:
+                        pass
 
             return NetworkProfile(connections=tuple(connections))
 

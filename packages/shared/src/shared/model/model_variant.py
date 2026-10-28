@@ -63,3 +63,7 @@ class StateTensorInfo:
 class ModelVariantId:
     model_id: ModelId
     variant_tag: str
+
+    @property
+    def full_variant_tag(self) -> str:
+        return f"{self.model_id.model_name}-{self.variant_tag}"

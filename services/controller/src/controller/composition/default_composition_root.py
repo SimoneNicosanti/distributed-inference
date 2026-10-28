@@ -69,6 +69,19 @@ from controller.domain.optimization.solver_config import (
     ProblemConfig,
     SolverConfig,
 )
+from integration.redis.model.keys_factory import StringModelKeyFactory
+from integration.redis.profiled_model_variant.keys_factory import (
+    StringProfiledModelVariantKeyFactory,
+)
+from integration.redis.worker_profiles.execution_profile_keys import (
+    StringExecutionProfileKeyFactory,
+)
+from integration.redis.worker_profiles.network_profile_keys import (
+    StringNetworkProfileKeyFactory,
+)
+from integration.redis.worker_profiles.resource_profile_keys import (
+    StringResourceProfileKeyFactory,
+)
 from integration.service_instance.service_instance import ServiceInstance
 
 
@@ -117,7 +130,9 @@ class DefaultCompositionRoot(CompositionRoot):
             redis, worker_directory_gateway
         )
         solver_config = SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK, output_flag=True
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK,
+            output_flag=True,
+            time_limit_s=180,
         )
 
         problem_config = ProblemConfig(
@@ -188,10 +203,18 @@ class DefaultCompositionRoot(CompositionRoot):
         worker_directory_gateway: WorkerDirectoryGateway,
     ) -> OptimizationContextBuilder:
 
-        static_profile_store_gateway = RedisStaticProfileStoreGateway(redis)
-        network_profile_store_gateway = RedisNetworkProfileStoreGateway(redis)
-        execution_profile_store_gateway = RedisExecutionProfileStoreGateway(redis)
-        resource_profile_store_gateway = RedisResourceProfileStoreGateway(redis)
+        static_profile_store_gateway = RedisStaticProfileStoreGateway(
+            redis, StringModelKeyFactory, StringProfiledModelVariantKeyFactory
+        )
+        network_profile_store_gateway = RedisNetworkProfileStoreGateway(
+            redis, StringNetworkProfileKeyFactory
+        )
+        execution_profile_store_gateway = RedisExecutionProfileStoreGateway(
+            redis, StringExecutionProfileKeyFactory
+        )
+        resource_profile_store_gateway = RedisResourceProfileStoreGateway(
+            redis, StringResourceProfileKeyFactory
+        )
 
         optimization_context_builder = DefaultOptimizationContextBuilder(
             worker_directory_gateway,

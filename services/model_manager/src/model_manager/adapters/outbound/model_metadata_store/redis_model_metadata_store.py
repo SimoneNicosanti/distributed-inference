@@ -6,15 +6,12 @@ from integration.dto.model.model_dto import ModelDto
 from integration.dto.model.profiled_model_variant_dto import (
     ProfiledModelVariantDto,
 )
-from integration.redis.model.keys_factory import build_model_key
+from integration.redis.model.keys_factory import ModelKeyFactory
 from integration.redis.model_partition.keys_factory import (
-    build_model_partition_dict_name,
-    build_model_partition_key,
+    ModelPartitionKeyFactory,
 )
 from integration.redis.profiled_model_variant.keys_factory import (
-    build_profiled_model_variant_dict_name,
-    build_profiled_model_variant_ids_key,
-    build_profiled_model_variant_key,
+    ProfiledModelVariantKeyFactory,
 )
 from integration.shared.id_json import model_variant_id_to_json
 from model_manager.adapters.outbound.model_metadata_store.mappers.model_mapper import (
@@ -37,19 +34,30 @@ from shared.model.model_variant import ModelVariantId
 
 
 class RedisModelMetadataStore(ModelMetadataStore):
-    def __init__(self, redis: redis_asyncio.Redis) -> None:
+    def __init__(
+        self,
+        redis: redis_asyncio.Redis,
+        model_key_factory_cls: type[ModelKeyFactory],
+        profiled_model_variant_key_factory_cls: type[ProfiledModelVariantKeyFactory],
+        model_partition_key_factory_cls: type[ModelPartitionKeyFactory],
+    ) -> None:
         self._redis = redis
+        self._model_key_factory_cls = model_key_factory_cls
+        self._profiled_model_variant_key_factory_cls = (
+            profiled_model_variant_key_factory_cls
+        )
+        self._model_partition_key_factory_cls = model_partition_key_factory_cls
 
     @override
     async def add_model(self, model: Model) -> None:
-        model_key = await build_model_key(model.model_id)
+        model_key = await self._model_key_factory_cls.build_model_key(model.model_id)
 
         dto = ModelMapper.to_model_dto(model)
         await self._redis.set(model_key, dto.model_dump_json())
 
     @override
     async def get_model(self, model_id: ModelId) -> Model:
-        model_key = await build_model_key(model_id)
+        model_key = await self._model_key_factory_cls.build_model_key(model_id)
 
         value = await self._redis.get(model_key)
         if value is None:
@@ -60,7 +68,7 @@ class RedisModelMetadataStore(ModelMetadataStore):
 
     @override
     async def check_model_existence(self, model_id: ModelId) -> bool:
-        model_key = await build_model_key(model_id)
+        model_key = await self._model_key_factory_cls.build_model_key(model_id)
 
         num_values = await self._redis.exists(model_key)
         return num_values > 0
@@ -70,10 +78,10 @@ class RedisModelMetadataStore(ModelMetadataStore):
         self,
         profiled_model_variant: ProfiledModelVariant,
     ) -> None:
-        set_name = await build_profiled_model_variant_dict_name(
+        set_name = await self._profiled_model_variant_key_factory_cls.build_profiled_model_variant_dict_name(
             profiled_model_variant.model_variant_id
         )
-        profiled_model_variant_key = await build_profiled_model_variant_key(
+        profiled_model_variant_key = await self._profiled_model_variant_key_factory_cls.build_profiled_model_variant_key(
             profiled_model_variant.model_variant_id
         )
         dto = ProfiledModelVariantMapper.to_profiled_model_variant_dto(
@@ -91,7 +99,7 @@ class RedisModelMetadataStore(ModelMetadataStore):
                 dto_json,
             )
             pipeline.sadd(
-                build_profiled_model_variant_ids_key(),
+                self._profiled_model_variant_key_factory_cls.build_profiled_model_variant_ids_key(),
                 model_variant_id_json,
             )
             await pipeline.execute()
@@ -100,8 +108,10 @@ class RedisModelMetadataStore(ModelMetadataStore):
     async def get_profiled_model_variant(
         self, model_variant_id: ModelVariantId
     ) -> ProfiledModelVariant:
-        set_name = await build_profiled_model_variant_dict_name(model_variant_id)
-        profiled_model_variant_key = await build_profiled_model_variant_key(
+        set_name = await self._profiled_model_variant_key_factory_cls.build_profiled_model_variant_dict_name(
+            model_variant_id
+        )
+        profiled_model_variant_key = await self._profiled_model_variant_key_factory_cls.build_profiled_model_variant_key(
             model_variant_id
         )
 
@@ -118,8 +128,10 @@ class RedisModelMetadataStore(ModelMetadataStore):
         self,
         model_variant_id: ModelVariantId,
     ) -> bool:
-        set_name = await build_profiled_model_variant_dict_name(model_variant_id)
-        profiled_model_variant_key = await build_profiled_model_variant_key(
+        set_name = await self._profiled_model_variant_key_factory_cls.build_profiled_model_variant_dict_name(
+            model_variant_id
+        )
+        profiled_model_variant_key = await self._profiled_model_variant_key_factory_cls.build_profiled_model_variant_key(
             model_variant_id
         )
 
@@ -131,11 +143,15 @@ class RedisModelMetadataStore(ModelMetadataStore):
         self,
         model_partition: ModelPartition,
     ) -> None:
-        set_name = await build_model_partition_dict_name(
-            model_partition.model_partition_id
+        set_name = (
+            await self._model_partition_key_factory_cls.build_model_partition_dict_name(
+                model_partition.model_partition_id
+            )
         )
-        partition_key = await build_model_partition_key(
-            model_partition.model_partition_id
+        partition_key = (
+            await self._model_partition_key_factory_cls.build_model_partition_key(
+                model_partition.model_partition_id
+            )
         )
 
         dto = ModelPartitionMapper.to_model_partition_dto(model_partition)

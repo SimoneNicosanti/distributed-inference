@@ -67,6 +67,7 @@ services:
     environment:
       WORKER_INGRESS_ENABLED: "true"
       WORKER_ADVERTISED_HOST: first-worker
+      SERVICE_ID: first-worker
 
   worker-1:
     build:
@@ -77,6 +78,7 @@ services:
       - seaweedfs
     environment:
       WORKER_ADVERTISED_HOST: worker-1
+      SERVICE_ID: worker-1
 
   worker-2:
     build:
@@ -87,6 +89,7 @@ services:
       - seaweedfs
     environment:
       WORKER_ADVERTISED_HOST: worker-2
+      SERVICE_ID: worker-2
     gpus: all
 
   worker-3:
@@ -98,6 +101,7 @@ services:
       - seaweedfs
     environment:
       WORKER_ADVERTISED_HOST: worker-3
+      SERVICE_ID: worker-3
 
   front-end:
     build:
