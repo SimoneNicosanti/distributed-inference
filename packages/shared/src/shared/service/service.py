@@ -23,4 +23,5 @@ class ServiceId:
 
 type WorkerId = ServiceId
 
-type ResultSinkId = ServiceId
+type IngressId = ServiceId
+type SinkId = ServiceId

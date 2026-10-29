@@ -1,9 +1,9 @@
 from typing import override
 
-from worker.application.partition_invocation.input.abc.partition_invocation_request_assembler import (
-    PartitionInvocationRequestAssembler,
+from worker.application.contribution.abc.contribution_assembler import (
+    ContributionAssembler,
 )
-from worker.application.ports.outbound.plan_store.partition_execution_plan_reader import (
+from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import (
     PartitionExecutionPlanReader,
 )
 from worker.domain.context.partition_invocation_context import (
@@ -18,7 +18,9 @@ from worker.domain.partition.partition_invocation_contribution import (
 from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
-class DefaultPartitionInvocationRequestAssembler(PartitionInvocationRequestAssembler):
+class DefaultPartitionInvocationRequestAssembler(
+    ContributionAssembler[PartitionInvocationContribution, PartitionInvocationRequest]
+):
     def __init__(
         self, partition_execution_plan_reader: PartitionExecutionPlanReader
     ) -> None:
@@ -34,11 +36,6 @@ class DefaultPartitionInvocationRequestAssembler(PartitionInvocationRequestAssem
         execution_plan = await self._partition_execution_plan_reader.get_partition_execution_plan_by_version(
             plan_version
         )
-        if execution_plan is None:
-            raise ValueError(
-                f"Partition execution plan for version {plan_version} not found"
-            )
-
         partition_id = contributions[0].partition_id
         execution_scheme = execution_plan.get_scheme_by_partition_id(partition_id)
 

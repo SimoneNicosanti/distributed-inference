@@ -3,7 +3,7 @@ from typing import override
 from worker.application.partition_invocation.output.abc.partition_output_router import (
     PartitionOutputRouter,
 )
-from worker.application.ports.outbound.plan_store.routing_plan_reader import (
+from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import (
     RoutingPlanReader,
 )
 from worker.domain.model_pass.model_pass_result_contribution import (
@@ -36,9 +36,6 @@ class DefaultPartitionOutputRouter(PartitionOutputRouter):
         routing_plan = await self._routing_plan_reader.get_routing_plan_by_version(
             plan_version
         )
-        if routing_plan is None:
-            raise ValueError(f"Routing plan for version {plan_version} not found")
-
         current_replica_id = contributions[0].target_replica_id
         routing = routing_plan.get_routing_by_replica_id(current_replica_id)
         routed_contributions: list[

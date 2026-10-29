@@ -17,8 +17,8 @@ from worker.application.ports.outbound.model_metadata.model_partition_metadata_r
 from worker.application.ports.outbound.partition_execution.partition_executor_factory import (
     PartitionExecutorFactory,
 )
-from worker.application.ports.outbound.plan_store.worker_plan_store import (
-    WorkerPlanStore,
+from worker.application.ports.outbound.plan_store.plan_store_writer import (
+    PlanStoreWriter,
 )
 from worker.domain.plan.worker.worker_plan import WorkerPlan
 
@@ -27,7 +27,7 @@ class DefaultWorkerPlanDeployer(PlanDeployer[WorkerPlan]):
     def __init__(
         self,
         worker_id: WorkerId,
-        worker_plan_store: WorkerPlanStore,
+        worker_plan_store: PlanStoreWriter[WorkerPlan],
         artifact_store: ArtifactStore,
         model_partition_metadata_reader: ModelPartitionMetadataReader,
         partition_executor_factory: PartitionExecutorFactory,
@@ -45,7 +45,7 @@ class DefaultWorkerPlanDeployer(PlanDeployer[WorkerPlan]):
     @override
     async def prepare_plan(self, plan: WorkerPlan) -> None:
         await self._create_partition_executors(plan)
-        await self._worker_plan_store.put_worker_plan(plan)
+        await self._worker_plan_store.put_plan(plan)
 
     async def _create_partition_executors(self, worker_plan: WorkerPlan) -> None:
         deployment_plan = worker_plan.deployment_plan
@@ -88,4 +88,4 @@ class DefaultWorkerPlanDeployer(PlanDeployer[WorkerPlan]):
 
     @override
     async def apply_plan(self, plan_version: PlanVersion) -> None:
-        await self._worker_plan_store.activate_worker_plan(plan_version)
+        await self._worker_plan_store.activate_plan(plan_version)

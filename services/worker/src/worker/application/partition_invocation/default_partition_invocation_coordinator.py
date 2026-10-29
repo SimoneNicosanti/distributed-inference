@@ -3,11 +3,19 @@ from contextlib import suppress
 from typing import override
 
 from lifecycle.async_lifecycle import AsyncLifecycle
+from worker.application.contribution.abc.contribution_assembler import (
+    ContributionAssembler,
+)
+from worker.application.contribution.abc.contribution_pipeline import (
+    ContributionPipeline,
+)
+from worker.application.contribution.abc.inbox import Inbox
 from worker.application.partition_execution.abc.partition_execution_coordinator import (
     PartitionExecutionCoordinator,
 )
-from worker.application.partition_invocation.input.abc.partition_invocation_contribution_inbox import (
-    PartitionInvocationContributionInbox,
+from worker.application.partition_invocation.input.partition_invocation_collection import (
+    PartitionInvocationCollection,
+    PartitionInvocationCollectionKey,
 )
 from worker.application.partition_invocation.output.abc.contribution_send_coordinator import (
     ContributionSendCoordinator,
@@ -18,6 +26,7 @@ from worker.application.partition_invocation.output.abc.partition_output_router 
 from worker.application.ports.inbound.partition_invocation.partition_invocation_coordinator import (
     PartitionInvocationCoordinator,
 )
+from worker.domain.partition.partition_invocation import PartitionInvocationRequest
 from worker.domain.partition.partition_invocation_contribution import (
     PartitionInvocationContribution,
     PartitionInvocationContributionAck,
@@ -29,12 +38,17 @@ class DefaultPartitionInvocationCoordinator(
 ):
     def __init__(
         self,
+        contribution_pipeline: ContributionPipeline[PartitionInvocationContribution],
         max_concurrent_invocations: int,
-        contribution_inbox: PartitionInvocationContributionInbox,
+        inbox: Inbox[PartitionInvocationCollectionKey, PartitionInvocationCollection],
+        assembler: ContributionAssembler[
+            PartitionInvocationContribution, PartitionInvocationRequest
+        ],
         partition_execution_coordinator: PartitionExecutionCoordinator,
         output_router: PartitionOutputRouter,
         contribution_sender_coordinator: ContributionSendCoordinator,
     ):
+        self._contribution_pipeline = contribution_pipeline
 
         if max_concurrent_invocations <= 0:
             raise ValueError(
@@ -42,7 +56,9 @@ class DefaultPartitionInvocationCoordinator(
             )
 
         self._max_concurrent_invocations = max_concurrent_invocations
-        self._contribution_inbox = contribution_inbox
+
+        self._inbox = inbox
+        self._assembler = assembler
         self._partition_execution_coordinator = partition_execution_coordinator
         self._output_router = output_router
         self._contribution_sender_coordinator = contribution_sender_coordinator
@@ -54,10 +70,9 @@ class DefaultPartitionInvocationCoordinator(
         self, contribution: PartitionInvocationContribution
     ) -> PartitionInvocationContributionAck:
 
-        completion_future = await self._contribution_inbox.submit_contribution(
-            contribution
-        )
-        await asyncio.shield(completion_future)
+        handle = await self._contribution_pipeline.submit(contribution)
+
+        await handle.future
 
         return PartitionInvocationContributionAck(
             context=contribution.source_invocation_context
@@ -65,23 +80,13 @@ class DefaultPartitionInvocationCoordinator(
 
     async def _worker_loop(self) -> None:
         while True:
-            ready_request = await self._contribution_inbox.next_ready()
-            (
-                request,
-                future,
-                contributions,
-            ) = (
-                ready_request.request,
-                ready_request.future,
-                ready_request.contributions,
-            )
+            partition_invocation_collection = await self._inbox.extract_next()
+            contributions = list(partition_invocation_collection.contributions)
 
-            ## NOTE: We can move the set_result depending on when we want to notify the completion of the invocation
-            ## We put this here to unlock the future set without waiting for the whole pipeline completion
-            future.set_result(None)
+            partition_invocation_request = await self._assembler.assemble(contributions)
 
             partition_invocation_result = await self._partition_execution_coordinator.process_partition_invocation_request(
-                request
+                partition_invocation_request
             )
 
             routed_contributions = await self._output_router.route(

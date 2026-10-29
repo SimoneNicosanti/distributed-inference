@@ -89,7 +89,7 @@
         "seelog.python-init-generator",
         "gruntfuggly.todo-tree",
         // "anthropic.claude-code",
-        "supermaven.supermaven",
+        // "supermaven.supermaven",
         "openai.chatgpt",
         "trunk.io",
         "darkstyle.codex-token-usage-for-enterprises",

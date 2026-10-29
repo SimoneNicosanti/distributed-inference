@@ -23,14 +23,14 @@ from worker.adapters.inbound.deployment.http.http_service_plan_deployer import (
 from worker.adapters.inbound.ingress.arrow_model_invocation_coordinator import (
     ArrowModelInvocationCoordinator,
 )
-from worker.adapters.inbound.ingress.arrow_result_contribution_sink import (
-    ArrowResultContributionSink,
-)
 from worker.adapters.inbound.partition_invocation.arrow.arrow_partition_invocation_coordinator import (
     ArrowPartitionInvocationCoordinator,
 )
 from worker.adapters.inbound.profiling.arrow.arrow_network_probe_server import (
     ArrowNetworkProbeServer,
+)
+from worker.adapters.inbound.sink.arrow.arrow_result_contribution_sink import (
+    ArrowResultContributionSink,
 )
 from worker.adapters.inbound.worker_identity.http_worker_identity_query import (
     build_worker_identity_query_router,
@@ -146,6 +146,7 @@ def build_http_app(composition: WorkerComposition) -> FastAPI:
         build_service_plan_deployment_router(
             worker_plan_deployer=composition.worker_plan_deployer,
             ingress_plan_deployer=composition.ingress_plan_deployer,
+            sink_plan_deployer=composition.sink_plan_deployer,
         )
     )
     app.include_router(

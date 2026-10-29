@@ -7,7 +7,7 @@ from typing import Any, override
 
 from scheduling.queue_request import QueueRequest
 from shared.plan.plan_version import PlanVersion
-from worker.application.ports.outbound.plan_store.scheduling_plan_reader import (
+from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import (
     SchedulingPlanReader,
 )
 from worker.application.scheduling.abc.partition_invocation_request_scheduler import (
@@ -83,9 +83,6 @@ class PlanBasedPartitionInvocationRequestScheduler(PartitionInvocationRequestSch
                 plan_version
             )
         )
-        if scheduling_plan is None:
-            raise ValueError(f"Scheduling plan for version {plan_version} not found")
-
         priority_key = PriorityKey(
             flow_id=request.flow_id,
             partition_replica_id=request.partition_replica_id,

@@ -23,6 +23,7 @@ from worker.application.ports.inbound.deployment.plan_deployer import PlanDeploy
 from worker.domain.plan.ingress.flow_plan import FlowPlan, IngressInputRoute
 from worker.domain.plan.ingress.ingress_plan import IngressPlan
 from worker.domain.plan.service_plan import ServicePlan
+from worker.domain.plan.sink.sink_plan import SinkPlan
 from worker.domain.plan.worker.deployment_plan import DeploymentPlan
 from worker.domain.plan.worker.partition_execution_plan import PartitionExecutionPlan
 from worker.domain.plan.worker.routing_plan import RoutingPlan
@@ -92,12 +93,14 @@ def _ingress_plan(plan_version: PlanVersion) -> IngressPlan:
 def _client(
     worker_deployer: PlanDeployer[WorkerPlan],
     ingress_deployer: PlanDeployer[IngressPlan] | None,
+    sink_deployer: PlanDeployer[SinkPlan] | None,
 ) -> TestClient:
     app = FastAPI()
     app.include_router(
         build_service_plan_deployment_router(
             worker_deployer,
             ingress_deployer,
+            sink_deployer,
         )
     )
     return TestClient(app)
@@ -107,14 +110,23 @@ def _plan_json(plan: ServicePlan) -> dict[str, object]:
     return ServicePlanDto.model_validate(asdict(plan)).model_dump(mode="json")
 
 
-def test_prepares_and_applies_worker_and_ingress_plans() -> None:
+def test_prepares_and_applies_worker_ingress_and_sink_plans() -> None:
     worker_deployer = RecordingPlanDeployer[WorkerPlan]()
     ingress_deployer = RecordingPlanDeployer[IngressPlan]()
-    client = _client(worker_deployer, ingress_deployer)
+    sink_deployer = RecordingPlanDeployer[SinkPlan]()
+    client = _client(worker_deployer, ingress_deployer, sink_deployer)
     plan_version = PlanVersion(version_number=1)
+    ingress_plan = _ingress_plan(plan_version)
     plan = ServicePlan(
         worker_plan=_empty_worker_plan(plan_version),
-        ingress_plan=_ingress_plan(plan_version),
+        ingress_plan=ingress_plan,
+        sink_plan=SinkPlan(
+            plan_version=plan_version,
+            flow_ids=ingress_plan.flow_ids,
+            result_tensors_by_flow=tuple(
+                flow_plan.result_tensors for flow_plan in ingress_plan.flow_plans
+            ),
+        ),
     )
 
     prepare_response = client.put(
@@ -131,12 +143,15 @@ def test_prepares_and_applies_worker_and_ingress_plans() -> None:
     assert worker_deployer.applied == [plan_version]
     assert ingress_deployer.prepared == [plan.ingress_plan]
     assert ingress_deployer.applied == [plan_version]
+    assert sink_deployer.prepared == [plan.sink_plan]
+    assert sink_deployer.applied == [plan_version]
 
 
 def test_skips_ingress_deployer_when_plan_has_no_ingress_component() -> None:
     worker_deployer = RecordingPlanDeployer[WorkerPlan]()
     ingress_deployer = RecordingPlanDeployer[IngressPlan]()
-    client = _client(worker_deployer, ingress_deployer)
+    sink_deployer = RecordingPlanDeployer[SinkPlan]()
+    client = _client(worker_deployer, ingress_deployer, sink_deployer)
     plan_version = PlanVersion(version_number=1)
     plan = ServicePlan(
         worker_plan=_empty_worker_plan(plan_version),
@@ -157,11 +172,13 @@ def test_skips_ingress_deployer_when_plan_has_no_ingress_component() -> None:
     assert worker_deployer.applied == [plan_version]
     assert ingress_deployer.prepared == []
     assert ingress_deployer.applied == []
+    assert sink_deployer.prepared == []
+    assert sink_deployer.applied == []
 
 
 def test_rejects_path_and_payload_version_mismatch() -> None:
     worker_deployer = RecordingPlanDeployer[WorkerPlan]()
-    client = _client(worker_deployer, None)
+    client = _client(worker_deployer, None, None)
     plan = ServicePlan(
         worker_plan=_empty_worker_plan(PlanVersion(version_number=2)),
         ingress_plan=None,

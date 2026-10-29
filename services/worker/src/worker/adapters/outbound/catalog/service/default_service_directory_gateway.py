@@ -3,12 +3,12 @@ from typing import override
 from pydantic import ValidationError
 
 from catalog.api.directory import Directory
-from shared.service.service import ResultSinkId, WorkerId
+from integration.service_instance.ingress_instance import ResultSinkInstance
+from integration.service_instance.worker_instance import WorkerInstance
+from shared.service.service import SinkId, WorkerId
 from worker.application.ports.outbound.catalog.service.service_directory_gateway import (
     ServiceDirectoryGateway,
 )
-from integration.service_instance.ingress_instance import ResultSinkInstance
-from integration.service_instance.worker_instance import WorkerInstance
 
 
 class DefaultServiceDirectoryGateway(ServiceDirectoryGateway):
@@ -50,7 +50,7 @@ class DefaultServiceDirectoryGateway(ServiceDirectoryGateway):
 
     @override
     async def get_result_sink_instance_by_id(
-        self, result_sink_id: ResultSinkId
+        self, result_sink_id: SinkId
     ) -> ResultSinkInstance:
         service_instance = await self._directory.get_service_instance_by_service_id(
             result_sink_id

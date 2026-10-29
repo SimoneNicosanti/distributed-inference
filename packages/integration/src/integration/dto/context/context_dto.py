@@ -6,14 +6,14 @@ from shared.context.model_pass_context import ModelPassType
 from shared.flow.flow import FlowId
 from shared.plan.partition_replica_id import PartitionReplicaId
 from shared.plan.plan_version import PlanVersion
-from shared.service.service import ResultSinkId
+from shared.service.service import SinkId
 
 
 class ModelInvocationContextDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     flow_id: FlowId
-    result_sink: ResultSinkId
+    result_sink: SinkId
     model_invocation_id: UUID
 
 

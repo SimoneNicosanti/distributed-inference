@@ -2,6 +2,7 @@ from integration.dto.service_plan.service_plan_dto import ServicePlanDto
 from worker.domain.plan.ingress.flow_plan import FlowPlan, IngressInputRoute
 from worker.domain.plan.ingress.ingress_plan import IngressPlan
 from worker.domain.plan.service_plan import ServicePlan
+from worker.domain.plan.sink.sink_plan import SinkPlan
 from worker.domain.plan.worker.deployment_plan import DeploymentPlan, ResourceAllocation
 from worker.domain.plan.worker.partition_execution_plan import (
     PartitionExecutionPlan,
@@ -93,6 +94,17 @@ def service_plan_from_dto(dto: ServicePlanDto) -> ServicePlan:
                         result_tensors=flow_plan.result_tensors,
                     )
                     for flow_plan in ingress.flow_plans
+                ),
+            )
+        ),
+        sink_plan=(
+            None
+            if ingress is None
+            else SinkPlan(
+                plan_version=ingress.plan_version,
+                flow_ids=ingress.flow_ids,
+                result_tensors_by_flow=tuple(
+                    flow_plan.result_tensors for flow_plan in ingress.flow_plans
                 ),
             )
         ),

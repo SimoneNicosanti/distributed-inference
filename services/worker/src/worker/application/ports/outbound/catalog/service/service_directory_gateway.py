@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 from integration.service_instance.ingress_instance import ResultSinkInstance
 from integration.service_instance.worker_instance import WorkerInstance
-from shared.service.service import ResultSinkId, WorkerId
+from shared.service.service import SinkId, WorkerId
 
 
 class ServiceDirectoryGateway(ABC):
@@ -16,5 +16,5 @@ class ServiceDirectoryGateway(ABC):
 
     @abstractmethod
     async def get_result_sink_instance_by_id(
-        self, result_sink_id: ResultSinkId
+        self, result_sink_id: SinkId
     ) -> ResultSinkInstance: ...
