@@ -29,8 +29,8 @@ from worker.adapters.inbound.partition_invocation.arrow.arrow_partition_invocati
 from worker.adapters.inbound.profiling.arrow.arrow_network_probe_server import (
     ArrowNetworkProbeServer,
 )
-from worker.adapters.inbound.sink.arrow.arrow_result_contribution_sink import (
-    ArrowResultContributionSink,
+from worker.adapters.inbound.sink.arrow.arrow_model_pass_result_contribution_sink import (
+    ArrowModelPassResultContributionSink,
 )
 from worker.adapters.inbound.worker_identity.http_worker_identity_query import (
     build_worker_identity_query_router,
@@ -200,7 +200,7 @@ def build_flight_servers(
 
     if composition.result_contribution_sink is not None:
         servers.append(
-            ArrowResultContributionSink(
+            ArrowModelPassResultContributionSink(
                 _arrow_url(
                     bind_host,
                     _get_port(

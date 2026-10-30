@@ -14,6 +14,9 @@ from worker.application.ports.inbound.partition_invocation.partition_invocation_
 from worker.application.ports.inbound.sink.model_pass_result_contribution_sink import (
     ModelPassResultContributionSink,
 )
+from worker.application.ports.inbound.sink.model_pass_result_retriever import (
+    ModelPassResultRetriever,
+)
 from worker.application.worker_identity.abc.worker_identity_query import (
     WorkerIdentityQuery,
 )
@@ -31,6 +34,7 @@ class WorkerComposition:
     sink_plan_deployer: PlanDeployer[SinkPlan] | None = None
     model_invocation_coordinator: ModelInvocationCoordinator | None = None
     result_contribution_sink: ModelPassResultContributionSink | None = None
+    model_pass_result_retriever: ModelPassResultRetriever | None = None
 
 
 class CompositionRoot(ABC):

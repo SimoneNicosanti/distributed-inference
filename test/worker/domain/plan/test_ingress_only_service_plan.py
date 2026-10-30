@@ -4,6 +4,7 @@ from shared.model.model_partition import ModelPartitionId
 from shared.model.model_variant import ModelVariantId
 from shared.plan.partition_replica_id import PartitionReplicaId
 from shared.plan.plan_version import PlanVersion
+from shared.service.service import ServiceId
 from shared.user.user import UserId
 from worker.domain.plan.ingress.flow_plan import FlowPlan, IngressInputRoute
 from worker.domain.plan.ingress.ingress_plan import IngressPlan
@@ -54,7 +55,7 @@ def test_ingress_only_service_plan_accepts_empty_worker_plan() -> None:
                             tensors=("input",),
                         ),
                     ),
-                    result_tensors=("result",),
+                    sink_id=ServiceId(id="sink"),
                 ),
             ),
         ),

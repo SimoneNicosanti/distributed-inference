@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from shared.model.keys import TensorKey
 from shared.model.model_variant import ModelVariantId
 from shared.plan.partition_replica_id import PartitionReplicaId
+from shared.service.service import SinkId
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,7 +23,7 @@ class IngressInputRoute:
 class FlowPlan:
     model_variant_id: ModelVariantId
     input_routes: tuple[IngressInputRoute, ...]
-    result_tensors: tuple[TensorKey, ...]
+    sink_id: SinkId
 
     def __post_init__(self) -> None:
         if not self.input_routes:
@@ -46,12 +47,6 @@ class FlowPlan:
                 raise ValueError(
                     "Flow plan input routes must target the configured model variant"
                 )
-
-        if not self.result_tensors:
-            raise ValueError("Flow plan must contain at least one result tensor")
-
-        if len(self.result_tensors) != len(set(self.result_tensors)):
-            raise ValueError("Flow plan result tensors must be unique")
 
     def route_input_tensors(
         self,

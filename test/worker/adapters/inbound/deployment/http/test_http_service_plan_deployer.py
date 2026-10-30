@@ -15,6 +15,7 @@ from shared.model.model_partition import ModelPartitionId
 from shared.model.model_variant import ModelVariantId
 from shared.plan.partition_replica_id import PartitionReplicaId
 from shared.plan.plan_version import PlanVersion
+from shared.service.service import ServiceId
 from shared.user.user import UserId
 from worker.adapters.inbound.deployment.http.http_service_plan_deployer import (
     build_service_plan_deployment_router,
@@ -84,7 +85,7 @@ def _ingress_plan(plan_version: PlanVersion) -> IngressPlan:
                         tensors=("input",),
                     ),
                 ),
-                result_tensors=("result",),
+                sink_id=ServiceId(id="sink"),
             ),
         ),
     )
@@ -123,9 +124,7 @@ def test_prepares_and_applies_worker_ingress_and_sink_plans() -> None:
         sink_plan=SinkPlan(
             plan_version=plan_version,
             flow_ids=ingress_plan.flow_ids,
-            result_tensors_by_flow=tuple(
-                flow_plan.result_tensors for flow_plan in ingress_plan.flow_plans
-            ),
+            result_tensors_by_flow=(("result",),),
         ),
     )
 

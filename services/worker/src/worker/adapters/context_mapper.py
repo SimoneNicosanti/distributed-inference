@@ -21,7 +21,6 @@ def model_pass_context_to_dto(context: ModelPassContext) -> ModelPassContextDto:
     return ModelPassContextDto(
         model_invocation_context=ModelInvocationContextDto(
             flow_id=invocation.flow_id,
-            result_sink=invocation.result_sink,
             model_invocation_id=invocation.model_invocation_id,
         ),
         plan_version=context.plan_version,
@@ -35,7 +34,6 @@ def model_pass_context_from_dto(context: ModelPassContextDto) -> ModelPassContex
     return ModelPassContext(
         model_invocation_context=ModelInvocationContext(
             flow_id=invocation.flow_id,
-            result_sink=invocation.result_sink,
             model_invocation_id=invocation.model_invocation_id,
         ),
         plan_version=context.plan_version,

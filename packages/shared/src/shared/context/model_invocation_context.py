@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
 from shared.flow.flow import FlowId
-from shared.service.service import SinkId
 
 # @dataclass(frozen=True, slots=True)
 # class InferenceRequestId:
@@ -24,5 +23,4 @@ type ModelInvocationId = UUID
 class ModelInvocationContext:
     # inference_run_context: InferenceRunContext
     flow_id: FlowId
-    result_sink: SinkId
     model_invocation_id: ModelInvocationId = field(default_factory=uuid4)

@@ -9,11 +9,11 @@ from worker.application.ingress.abc.model_pass_coordinator import (
 from worker.application.partition_invocation.output.abc.contribution_send_coordinator import (
     ContributionSendCoordinator,
 )
-from worker.application.ports.inbound.sink.model_pass_result_waiter import (
-    ModelPassResultWaiter,
-)
 from worker.application.ports.outbound.plan_store.plan_store_reader import (
     PlanStoreReader,
+)
+from worker.application.ports.outbound.sink.model_pass_result_gateway import (
+    ModelPassResultRetrieverGateway,
 )
 from worker.domain.model_pass.model_pass_request import ModelPassRequest
 from worker.domain.model_pass.model_pass_result import ModelPassResult
@@ -27,12 +27,12 @@ class DefaultModelPassCoordinator(ModelPassCoordinator):
         input_router: IngressInputRouter,
         ingress_plan_reader: PlanStoreReader[IngressPlan],
         contribution_sender_coordinator: ContributionSendCoordinator,
-        result_waiter: ModelPassResultWaiter,
+        result_retriever_gateway: ModelPassResultRetrieverGateway,
     ) -> None:
         self._input_router = input_router
         self._ingress_plan_reader = ingress_plan_reader
         self._contribution_sender_coordinator = contribution_sender_coordinator
-        self._result_waiter = result_waiter
+        self._result_retriever_gateway = result_retriever_gateway
 
     @override
     async def run_model_pass(
@@ -67,6 +67,7 @@ class DefaultModelPassCoordinator(ModelPassCoordinator):
             routed_contributions
         )
 
-        return await self._result_waiter.wait_result(
+        return await self._result_retriever_gateway.retrieve_result(
             request_id=model_pass_context.model_pass_id,
+            result_sink_id=flow_plan.sink_id,
         )

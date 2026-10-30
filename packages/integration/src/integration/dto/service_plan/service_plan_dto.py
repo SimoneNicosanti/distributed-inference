@@ -6,6 +6,7 @@ from shared.model.model_partition import ModelPartitionId
 from shared.model.model_variant import ModelVariantId
 from shared.plan.partition_replica_id import PartitionReplicaId
 from shared.plan.plan_version import PlanVersion
+from shared.service.service import SinkId
 
 
 class ResourceAllocationDto(BaseModel):
@@ -99,7 +100,7 @@ class FlowPlanDto(BaseModel):
 
     model_variant_id: ModelVariantId
     input_routes: tuple[IngressInputRouteDto, ...]
-    result_tensors: tuple[TensorKey, ...]
+    sink_id: SinkId
 
 
 class IngressPlanDto(BaseModel):
@@ -110,8 +111,17 @@ class IngressPlanDto(BaseModel):
     flow_plans: tuple[FlowPlanDto, ...]
 
 
+class SinkPlanDto(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    plan_version: PlanVersion
+    flow_ids: tuple[FlowId, ...]
+    result_tensors_by_flow: tuple[tuple[TensorKey, ...], ...]
+
+
 class ServicePlanDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     worker_plan: WorkerPlanDto
     ingress_plan: IngressPlanDto | None
+    sink_plan: SinkPlanDto | None = None

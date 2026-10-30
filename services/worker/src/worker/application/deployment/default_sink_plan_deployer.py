@@ -13,8 +13,8 @@ class DefaultSinkPlanDeployer(PlanDeployer[SinkPlan]):
         self,
         sink_plan_store: PlanStoreWriter[SinkPlan],
     ) -> None:
-        self._sink_plan_store = sink_plan_store
         super().__init__()
+        self._sink_plan_store = sink_plan_store
 
     @override
     async def prepare_plan(self, plan: SinkPlan) -> None:

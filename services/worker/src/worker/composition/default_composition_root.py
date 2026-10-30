@@ -96,6 +96,9 @@ from worker.adapters.outbound.profiling.resource.publisher.redis_resource_profil
 from worker.adapters.outbound.profiling.utils.nvidia_gpu_availability_checker import (
     NvidiaGPUAvailabilityChecker,
 )
+from worker.adapters.outbound.sink.arrow.arrow_model_pass_result_retriever_gateway import (
+    ArrowModelPassResultRetrieverGateway,
+)
 from worker.application.activity.default_activity_request_factory import (
     DefaultActivityRequestFactory,
 )
@@ -170,8 +173,8 @@ from worker.application.scheduling.plan_based_partition_invocation_request_sched
 from worker.application.sink.default_model_pass_result_contribution_sink import (
     DefaultModelPassResultContributionSink,
 )
-from worker.application.sink.default_model_pass_result_waiter import (
-    DefaultModelPassResultWaiter,
+from worker.application.sink.default_model_pass_result_retriever import (
+    DefaultModelPassResultRetriever,
 )
 from worker.application.sink.model_pass_result_assembler import (
     ModelPassResultAssembler,
@@ -313,6 +316,7 @@ class DefaultCompositionRoot(CompositionRoot):
             sink_plan_deployer = None
             model_invocation_coordinator = None
             result_contribution_sink = None
+            model_pass_result_retriever = None
 
             if service_instance.get_capabilities_by_type(CapabilityType.RESULT_SINKER):
                 ingress_plan_deployer = DefaultIngressPlanDeployer(ingress_plan_store)
@@ -338,7 +342,7 @@ class DefaultCompositionRoot(CompositionRoot):
                     ](),
                     outbox=result_collection_postbox,
                 )
-                result_waiter = DefaultModelPassResultWaiter(
+                model_pass_result_retriever = DefaultModelPassResultRetriever(
                     inbox=result_collection_postbox,
                     error_inbox=result_error_postbox,
                     assembler=ModelPassResultAssembler(),
@@ -347,10 +351,11 @@ class DefaultCompositionRoot(CompositionRoot):
                     input_router=DefaultIngressInputRouter(),
                     ingress_plan_reader=ingress_plan_store,
                     contribution_sender_coordinator=contribution_send_coordinator,
-                    result_waiter=result_waiter,
+                    result_retriever_gateway=ArrowModelPassResultRetrieverGateway(
+                        service_directory
+                    ),
                 )
                 model_invocation_coordinator = DefaultModelInvocationCoordinator(
-                    result_sink_id=worker_id,
                     active_plan_version_reader=ingress_plan_store,
                     model_pass_coordinator=model_pass_coordinator,
                 )
@@ -367,6 +372,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 sink_plan_deployer=sink_plan_deployer,
                 model_invocation_coordinator=model_invocation_coordinator,
                 result_contribution_sink=result_contribution_sink,
+                model_pass_result_retriever=model_pass_result_retriever,
             )
 
     async def start_profiling_lifecycles(

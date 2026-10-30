@@ -69,7 +69,7 @@ class CapabilityType(StrEnum):
     EXECUTION_PROFILING = auto()
     RESOURCE_PROFILING = auto()
 
-    # Declared by ingress
+    # Declared by sink
     RESULT_SINKER = auto()
 
 

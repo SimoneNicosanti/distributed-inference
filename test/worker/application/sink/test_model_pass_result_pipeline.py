@@ -11,7 +11,6 @@ from shared.context.model_pass_context import (
 )
 from shared.flow.flow import FlowId
 from shared.plan.plan_version import PlanVersion
-from shared.service.service import ServiceId
 from shared.user.user import UserId
 from worker.adapters.outbound.contribution.in_memory_contribution_store import (
     InMemoryContributionStore,
@@ -24,8 +23,8 @@ from worker.application.contribution.default_postbox import DefaultPostbox
 from worker.application.sink.default_model_pass_result_contribution_sink import (
     DefaultModelPassResultContributionSink,
 )
-from worker.application.sink.default_model_pass_result_waiter import (
-    DefaultModelPassResultWaiter,
+from worker.application.sink.default_model_pass_result_retriever import (
+    DefaultModelPassResultRetriever,
 )
 from worker.application.sink.model_pass_result_assembler import (
     ModelPassResultAssembler,
@@ -52,7 +51,6 @@ async def test_collects_and_waits_for_a_model_pass_result() -> None:
     context = ModelPassContext(
         model_invocation_context=ModelInvocationContext(
             flow_id=flow_id,
-            result_sink=ServiceId(),
         ),
         plan_version=plan_version,
         model_pass_type=ModelPassType.FORWARD,
@@ -82,13 +80,15 @@ async def test_collects_and_waits_for_a_model_pass_result() -> None:
         outbox=result_postbox,
     )
     sink = DefaultModelPassResultContributionSink(pipeline, error_postbox)
-    waiter = DefaultModelPassResultWaiter(
+    retriever = DefaultModelPassResultRetriever(
         inbox=result_postbox,
         error_inbox=error_postbox,
         assembler=ModelPassResultAssembler(),
     )
 
-    wait_task = asyncio.create_task(waiter.wait_result(context.model_pass_id))
+    retrieve_task = asyncio.create_task(
+        retriever.retrieve_result(context.model_pass_id)
+    )
     await sink.sink_model_pass_contribution(
         ModelPassResultContribution(
             model_pass_context=context,
@@ -98,17 +98,16 @@ async def test_collects_and_waits_for_a_model_pass_result() -> None:
         )
     )
 
-    result = await wait_task
+    result = await retrieve_task
     assert result.context == context
     assert result.bundle.get_tensor_names() == {"output"}
 
 
 @pytest.mark.asyncio
-async def test_propagates_a_model_pass_error_to_the_waiter() -> None:
+async def test_propagates_a_model_pass_error_to_the_retriever() -> None:
     context = ModelPassContext(
         model_invocation_context=ModelInvocationContext(
             flow_id=FlowId(user_id=UserId()),
-            result_sink=ServiceId(),
         ),
         plan_version=PlanVersion(version_number=1),
         model_pass_type=ModelPassType.FORWARD,
@@ -120,7 +119,7 @@ async def test_propagates_a_model_pass_error_to_the_waiter() -> None:
     error_postbox = DefaultPostbox[ModelPassId, ModelPassError](
         key_compute_callable=lambda error: error.context.model_pass_id
     )
-    waiter = DefaultModelPassResultWaiter(
+    retriever = DefaultModelPassResultRetriever(
         inbox=result_postbox,
         error_inbox=error_postbox,
         assembler=ModelPassResultAssembler(),
@@ -137,8 +136,10 @@ async def test_propagates_a_model_pass_error_to_the_waiter() -> None:
     )
     sink = DefaultModelPassResultContributionSink(pipeline, error_postbox)
 
-    wait_task = asyncio.create_task(waiter.wait_result(context.model_pass_id))
+    retrieve_task = asyncio.create_task(
+        retriever.retrieve_result(context.model_pass_id)
+    )
     await sink.notify_error(ModelPassError(context=context, message="failed"))
 
     with pytest.raises(RuntimeError, match="failed"):
-        await wait_task
+        await retrieve_task

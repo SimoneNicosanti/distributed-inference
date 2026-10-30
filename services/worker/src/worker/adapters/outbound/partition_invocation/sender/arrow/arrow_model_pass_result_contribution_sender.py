@@ -9,15 +9,15 @@ import pyarrow as pa
 from pyarrow import flight
 
 from integration.dto.context.context_dto import ModelPassResultContributionMetadataDto
-from integration.ingress.arrow.result_sink.model_pass_result.arrow_model_pass_result_contribution_callback_schema import (
-    CALLBACK_CONTRIBUTION_COMMAND,
-    build_contribution_schema,
-)
 from integration.service_instance.ingress_instance import ResultSinkInstance
 from integration.service_instance.service_instance import (
     CapabilityInterface,
     CapabilityProtocol,
     CapabilityType,
+)
+from integration.sink.arrow.model_pass_result.arrow_model_pass_result_schema import (
+    SUBMIT_CONTRIBUTION_COMMAND,
+    build_result_payload_schema,
 )
 from worker.adapters.context_mapper import model_pass_context_to_dto
 from worker.application.ports.outbound.catalog.service.service_directory_gateway import (
@@ -85,7 +85,7 @@ class ArrowModelPassResultContributionSender(
     ) -> None:
         batch = self._encode_contribution(contribution)
 
-        descriptor = flight.FlightDescriptor.for_command(CALLBACK_CONTRIBUTION_COMMAND)
+        descriptor = flight.FlightDescriptor.for_command(SUBMIT_CONTRIBUTION_COMMAND)
         options = flight.FlightCallOptions(timeout=self._timeout_s)
 
         endpoint = interface.endpoint.unicode_string()
@@ -110,7 +110,7 @@ class ArrowModelPassResultContributionSender(
             for name, tensor in contribution.bundle.bundle.items()
         }
 
-        schema = build_contribution_schema(tensor_values)
+        schema = build_result_payload_schema(tensor_values)
         metadata = ModelPassResultContributionMetadataDto(
             model_pass_context=model_pass_context_to_dto(
                 contribution.model_pass_context

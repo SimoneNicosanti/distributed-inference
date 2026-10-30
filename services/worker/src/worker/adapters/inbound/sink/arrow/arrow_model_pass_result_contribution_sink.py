@@ -1,4 +1,4 @@
-# mypy: disable-error-code="attr-defined,name-defined,misc"
+# mypy: disable-error-code="attr-defined,name-defined"
 
 import asyncio
 
@@ -6,10 +6,10 @@ import pyarrow as pa
 from pyarrow import flight
 
 from integration.dto.context.context_dto import ModelPassResultContributionMetadataDto
-from integration.ingress.arrow.result_sink.model_pass_result.arrow_model_pass_result_contribution_callback_schema import (
-    CALLBACK_CONTRIBUTION_COMMAND,
+from integration.sink.arrow.model_pass_result.arrow_model_pass_result_schema import (
     CONTEXT_FIELD_NAME,
-    validate_contribution_schema,
+    SUBMIT_CONTRIBUTION_COMMAND,
+    validate_result_payload_schema,
 )
 from worker.adapters.context_mapper import model_pass_context_from_dto
 from worker.application.ports.inbound.sink.model_pass_result_contribution_sink import (
@@ -22,16 +22,14 @@ from worker.domain.tensor.tensor import Tensor
 from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
-class ArrowResultContributionSink(flight.FlightServerBase):
+class ArrowModelPassResultContributionSink:
     def __init__(
         self,
-        location: str,
         contribution_sink: ModelPassResultContributionSink,
         event_loop: asyncio.AbstractEventLoop,
     ) -> None:
         self._contribution_sink = contribution_sink
         self._event_loop = event_loop
-        super().__init__(location)
 
     def do_put(
         self,
@@ -43,16 +41,16 @@ class ArrowResultContributionSink(flight.FlightServerBase):
         if descriptor.descriptor_type != flight.DescriptorType.CMD:
             raise pa.ArrowInvalid("Expected command descriptor")
 
-        if descriptor.command != CALLBACK_CONTRIBUTION_COMMAND:
+        if descriptor.command != SUBMIT_CONTRIBUTION_COMMAND:
             raise pa.ArrowInvalid("Unsupported result contribution command")
 
         try:
-            validate_contribution_schema(reader.schema)
+            validate_result_payload_schema(reader.schema)
         except ValueError as error:
             raise pa.ArrowInvalid(f"Invalid contribution schema: {error}") from error
 
         if not self._event_loop.is_running():
-            raise flight.FlightUnavailableError("Ingress event loop is not running")
+            raise flight.FlightUnavailableError("Sink event loop is not running")
 
         received_batch: pa.RecordBatch | None = None
 
@@ -100,7 +98,7 @@ class ArrowResultContributionSink(flight.FlightServerBase):
 
         try:
             batch.validate(full=True)
-            validate_contribution_schema(batch.schema)
+            validate_result_payload_schema(batch.schema)
         except (pa.ArrowInvalid, ValueError) as error:
             raise pa.ArrowInvalid(f"Invalid contribution batch: {error}") from error
 

@@ -24,6 +24,7 @@ from worker.domain.plan.worker.worker_plan import WorkerPlan
 def service_plan_from_dto(dto: ServicePlanDto) -> ServicePlan:
     worker = dto.worker_plan
     ingress = dto.ingress_plan
+    sink = dto.sink_plan
 
     return ServicePlan(
         worker_plan=WorkerPlan(
@@ -91,7 +92,7 @@ def service_plan_from_dto(dto: ServicePlanDto) -> ServicePlan:
                             )
                             for route in flow_plan.input_routes
                         ),
-                        result_tensors=flow_plan.result_tensors,
+                        sink_id=flow_plan.sink_id,
                     )
                     for flow_plan in ingress.flow_plans
                 ),
@@ -99,13 +100,11 @@ def service_plan_from_dto(dto: ServicePlanDto) -> ServicePlan:
         ),
         sink_plan=(
             None
-            if ingress is None
+            if sink is None
             else SinkPlan(
-                plan_version=ingress.plan_version,
-                flow_ids=ingress.flow_ids,
-                result_tensors_by_flow=tuple(
-                    flow_plan.result_tensors for flow_plan in ingress.flow_plans
-                ),
+                plan_version=sink.plan_version,
+                flow_ids=sink.flow_ids,
+                result_tensors_by_flow=sink.result_tensors_by_flow,
             )
         ),
     )

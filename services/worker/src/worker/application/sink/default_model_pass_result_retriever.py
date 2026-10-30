@@ -6,8 +6,8 @@ from worker.application.contribution.abc.contribution_assembler import (
     ContributionAssembler,
 )
 from worker.application.contribution.abc.inbox import Inbox
-from worker.application.ports.inbound.sink.model_pass_result_waiter import (
-    ModelPassResultWaiter,
+from worker.application.ports.inbound.sink.model_pass_result_retriever import (
+    ModelPassResultRetriever,
 )
 from worker.application.sink.model_pass_result_collection import (
     ModelPassResultCollection,
@@ -19,7 +19,7 @@ from worker.domain.model_pass.model_pass_result_contribution import (
 )
 
 
-class DefaultModelPassResultWaiter(ModelPassResultWaiter):
+class DefaultModelPassResultRetriever(ModelPassResultRetriever):
     def __init__(
         self,
         inbox: Inbox[ModelPassId, ModelPassResultCollection],
@@ -31,7 +31,7 @@ class DefaultModelPassResultWaiter(ModelPassResultWaiter):
         self._assembler = assembler
 
     @override
-    async def wait_result(
+    async def retrieve_result(
         self,
         request_id: ModelPassId,
     ) -> ModelPassResult:

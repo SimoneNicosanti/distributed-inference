@@ -3,7 +3,6 @@ from typing import override
 from shared.context.model_invocation_context import ModelInvocationContext
 from shared.context.model_pass_context import ModelPassType
 from shared.flow.flow import FlowId
-from shared.service.service import SinkId
 from worker.application.ingress.abc.model_pass_coordinator import (
     ModelPassCoordinator,
     ModelPassRequestInfo,
@@ -22,13 +21,11 @@ from worker.domain.tensor.tensor_bundle import TensorBundle
 class DefaultModelInvocationCoordinator(ModelInvocationCoordinator):
     def __init__(
         self,
-        result_sink_id: SinkId,
         active_plan_version_reader: PlanStoreReader[IngressPlan],
         model_pass_coordinator: ModelPassCoordinator,
     ) -> None:
 
         super().__init__()
-        self._result_sink_id = result_sink_id
         self._active_plan_version_reader = active_plan_version_reader
         self._model_pass_coordinator = model_pass_coordinator
 
@@ -37,13 +34,12 @@ class DefaultModelInvocationCoordinator(ModelInvocationCoordinator):
         self, flow_id: FlowId, bundle: TensorBundle
     ) -> ModelInvocationResult:
 
-        ## Build request from request data
+        plan_version = await self._active_plan_version_reader.get_active_plan_version()
+
         model_invocation_context = ModelInvocationContext(
             flow_id=flow_id,
-            result_sink=self._result_sink_id,
         )
 
-        plan_version = await self._active_plan_version_reader.get_active_plan_version()
         model_pass_request_info = ModelPassRequestInfo(
             model_invocation_context=model_invocation_context,
             plan_version=plan_version,

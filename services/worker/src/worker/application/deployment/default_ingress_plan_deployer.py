@@ -13,8 +13,8 @@ class DefaultIngressPlanDeployer(PlanDeployer[IngressPlan]):
         self,
         ingress_plan_store: PlanStoreWriter[IngressPlan],
     ) -> None:
-        self._ingress_plan_store = ingress_plan_store
         super().__init__()
+        self._ingress_plan_store = ingress_plan_store
 
     @override
     async def prepare_plan(self, plan: IngressPlan) -> None:
