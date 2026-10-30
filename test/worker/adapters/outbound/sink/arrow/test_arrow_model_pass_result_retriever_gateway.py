@@ -13,8 +13,8 @@ from integration.service_instance.service_instance import (
     CapabilityProtocol,
     CapabilityType,
 )
-from shared.context.model_invocation_context import ModelInvocationContext
-from shared.context.model_pass_context import ModelPassContext, ModelPassType
+from worker.domain.context.model_invocation_context import ModelInvocationContext
+from worker.domain.context.model_pass_context import ModelPassContext, ModelPassType
 from shared.flow.flow import FlowId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId

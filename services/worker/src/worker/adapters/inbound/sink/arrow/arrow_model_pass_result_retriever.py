@@ -14,7 +14,7 @@ from integration.sink.arrow.model_pass_result.arrow_model_pass_result_schema imp
     build_result_payload_schema,
     validate_retrieve_request_schema,
 )
-from shared.context.model_pass_context import ModelPassId
+from worker.domain.context.model_pass_context import ModelPassId
 from worker.adapters.context_mapper import model_pass_context_to_dto
 from worker.application.ports.inbound.sink.model_pass_result_retriever import (
     ModelPassResultRetriever,

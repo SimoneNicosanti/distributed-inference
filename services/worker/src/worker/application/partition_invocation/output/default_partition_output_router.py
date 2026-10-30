@@ -15,6 +15,7 @@ from worker.domain.partition.partition_invocation import (
 from worker.domain.partition.partition_invocation_contribution import (
     PartitionInvocationContribution,
 )
+from worker.domain.plan.hop.hop import SinkHop
 from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
@@ -48,7 +49,7 @@ class DefaultPartitionOutputRouter(PartitionOutputRouter):
 
         output_tensors_by_replica = routing.route_output_tensors(available_tensor_names)
 
-        for next_replica_id, routed_tensor_names in output_tensors_by_replica.items():
+        for route_destination, routed_tensor_names in output_tensors_by_replica.items():
             tensor_names = list(routed_tensor_names)
             payload = TensorBundle(bundle={})
 
@@ -62,15 +63,16 @@ class DefaultPartitionOutputRouter(PartitionOutputRouter):
             routed_contribution: (
                 PartitionInvocationContribution | ModelPassResultContribution
             )
-            if next_replica_id is None:
+
+            if isinstance(route_destination, SinkHop):
                 routed_contribution = ModelPassResultContribution(
                     model_pass_context=partition_invocation_result.model_pass_context,
                     bundle=payload,
                 )
             else:
                 routed_contribution = PartitionInvocationContribution(
-                    source_invocation_context=partition_invocation_result.context,
-                    target_replica_id=next_replica_id,
+                    source_hop_invocation_context=partition_invocation_result.context,
+                    target_replica_id=route_destination.replica_id,
                     bundle=payload,
                 )
 

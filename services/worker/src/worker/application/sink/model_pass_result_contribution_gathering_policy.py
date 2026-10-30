@@ -1,6 +1,6 @@
 from typing import override
 
-from shared.context.model_pass_context import ModelPassId
+from worker.domain.context.model_pass_context import ModelPassId
 from shared.model.keys import TensorKey
 from worker.application.contribution.abc.contribution_gathering_policy import (
     ContributionGatheringPolicy,

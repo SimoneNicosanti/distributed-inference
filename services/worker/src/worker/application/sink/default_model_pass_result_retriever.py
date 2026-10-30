@@ -1,7 +1,7 @@
 import asyncio
 from typing import override
 
-from shared.context.model_pass_context import ModelPassId
+from worker.domain.context.model_pass_context import ModelPassId
 from worker.application.contribution.abc.contribution_assembler import (
     ContributionAssembler,
 )

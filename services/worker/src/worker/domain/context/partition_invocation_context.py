@@ -2,10 +2,10 @@
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
-from shared.context.model_pass_context import (
+from shared.plan.partition_replica_id import PartitionReplicaId
+from worker.domain.context.model_pass_context import (
     ModelPassContext,
 )
-from shared.plan.partition_replica_id import PartitionReplicaId
 
 type PartitionInvocationId = UUID
 

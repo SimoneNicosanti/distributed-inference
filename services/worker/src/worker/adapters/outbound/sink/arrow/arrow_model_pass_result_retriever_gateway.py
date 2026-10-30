@@ -21,7 +21,7 @@ from integration.sink.arrow.model_pass_result.arrow_model_pass_result_schema imp
     build_retrieve_request_schema,
     validate_result_payload_schema,
 )
-from shared.context.model_pass_context import ModelPassId
+from worker.domain.context.model_pass_context import ModelPassId
 from shared.service.service import SinkId
 from worker.adapters.context_mapper import model_pass_context_from_dto
 from worker.application.ports.outbound.catalog.service.service_directory_gateway import (

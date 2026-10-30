@@ -133,7 +133,7 @@ class ArrowPartitionInvocationContributionSender(
             context=source_context_from_dto(ack_dto.context)
         )
 
-        if ack.context != contribution.source_invocation_context:
+        if ack.context != contribution.source_hop_invocation_context:
             raise RuntimeError("Partition invocation acknowledgement context mismatch")
 
     @staticmethod
@@ -148,7 +148,7 @@ class ArrowPartitionInvocationContributionSender(
         schema = build_contribution_schema(tensor_values)
         metadata = PartitionInvocationContributionMetadataDto(
             source_invocation_context=source_context_to_dto(
-                contribution.source_invocation_context
+                contribution.source_hop_invocation_context
             ),
             target_replica_id=contribution.target_replica_id,
         )

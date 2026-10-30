@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from shared.context.model_pass_context import ModelPassContext
 from shared.plan.partition_replica_id import PartitionReplicaId
+from worker.domain.context.model_pass_context import ModelPassContext
 from worker.domain.partition.partition_invocation_contribution import (
     PartitionInvocationContribution,
 )

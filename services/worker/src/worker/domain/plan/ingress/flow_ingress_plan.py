@@ -20,7 +20,7 @@ class IngressInputRoute:
 
 
 @dataclass(frozen=True, slots=True)
-class FlowPlan:
+class FlowIngressPlan:
     model_variant_id: ModelVariantId
     input_routes: tuple[IngressInputRoute, ...]
     sink_id: SinkId

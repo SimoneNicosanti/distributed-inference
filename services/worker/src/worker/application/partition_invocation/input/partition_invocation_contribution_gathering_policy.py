@@ -1,7 +1,6 @@
 from typing import override
 
 from shared.model.keys import TensorKey
-from shared.plan.partition_replica_id import PartitionReplicaId
 from worker.application.contribution.abc.contribution_gathering_policy import (
     ContributionGatheringPolicy,
 )
@@ -15,6 +14,7 @@ from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import
 from worker.domain.partition.partition_invocation_contribution import (
     PartitionInvocationContribution,
 )
+from worker.domain.plan.worker.routing_plan import SourceHop
 
 
 class PartitionInvocationContributionGatheringPolicy(
@@ -44,11 +44,11 @@ class PartitionInvocationContributionGatheringPolicy(
             plan_version
         )
         routing = routing_plan.get_routing_by_replica_id(replica_id)
-        arrived_tensors_by_source: dict[PartitionReplicaId | None, set[TensorKey]] = {}
+        arrived_tensors_by_source: dict[SourceHop, set[TensorKey]] = {}
 
         for contribution in contributions:
             arrived_tensors_by_source.setdefault(
-                contribution.source_replica_id,
+                contribution.source_hop,
                 set(),
             ).update(contribution.bundle.get_tensor_names())
 

@@ -1,5 +1,8 @@
 from integration.dto.service_plan.service_plan_dto import ServicePlanDto
-from worker.domain.plan.ingress.flow_plan import FlowPlan, IngressInputRoute
+from worker.domain.plan.ingress.flow_ingress_plan import (
+    FlowIngressPlan,
+    IngressInputRoute,
+)
 from worker.domain.plan.ingress.ingress_plan import IngressPlan
 from worker.domain.plan.service_plan import ServicePlan
 from worker.domain.plan.sink.sink_plan import SinkPlan
@@ -59,14 +62,14 @@ def service_plan_from_dto(dto: ServicePlanDto) -> ServicePlan:
                     ReplicaRouting(
                         input_bindings=tuple(
                             ReplicaInputBinding(
-                                prev_replica_id=binding.prev_replica_id,
+                                source=binding.prev_replica_id,
                                 tensors=binding.tensors,
                             )
                             for binding in routing.input_bindings
                         ),
                         output_routes=tuple(
                             ReplicaOutputRoute(
-                                next_replica_id=route.next_replica_id,
+                                destination=route.next_replica_id,
                                 tensors=route.tensors,
                             )
                             for route in routing.output_routes
@@ -82,8 +85,8 @@ def service_plan_from_dto(dto: ServicePlanDto) -> ServicePlan:
             else IngressPlan(
                 plan_version=ingress.plan_version,
                 flow_ids=ingress.flow_ids,
-                flow_plans=tuple(
-                    FlowPlan(
+                flow_ingress_plans=tuple(
+                    FlowIngressPlan(
                         model_variant_id=flow_plan.model_variant_id,
                         input_routes=tuple(
                             IngressInputRoute(

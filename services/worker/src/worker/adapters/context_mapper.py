@@ -5,9 +5,9 @@ from integration.dto.context.context_dto import (
     PartitionInvocationContextDto,
     SourceInvocationContextDto,
 )
-from shared.context.ingress_invocation_context import IngressInvocationContext
-from shared.context.model_invocation_context import ModelInvocationContext
-from shared.context.model_pass_context import ModelPassContext
+from worker.domain.context.ingress_invocation_context import IngressInvocationContext
+from worker.domain.context.model_invocation_context import ModelInvocationContext
+from worker.domain.context.model_pass_context import ModelPassContext
 from worker.domain.context.partition_invocation_context import (
     PartitionInvocationContext,
 )

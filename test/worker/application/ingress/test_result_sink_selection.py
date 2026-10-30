@@ -3,8 +3,6 @@ from unittest.mock import AsyncMock
 import numpy as np
 import pytest
 
-from shared.context.model_invocation_context import ModelInvocationContext
-from shared.context.model_pass_context import ModelPassContext, ModelPassType
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_partition import ModelPartitionId
@@ -24,9 +22,14 @@ from worker.application.ingress.default_model_pass_coordinator import (
 from worker.application.ports.outbound.sink.model_pass_result_gateway import (
     ModelPassResultRetrieverGateway,
 )
+from worker.domain.context.model_invocation_context import ModelInvocationContext
+from worker.domain.context.model_pass_context import ModelPassContext, ModelPassType
 from worker.domain.model_invocation.model_invocation import ModelInvocationResult
 from worker.domain.model_pass.model_pass_result import ModelPassResult
-from worker.domain.plan.ingress.flow_plan import FlowPlan, IngressInputRoute
+from worker.domain.plan.ingress.flow_ingress_plan import (
+    FlowIngressPlan,
+    IngressInputRoute,
+)
 from worker.domain.plan.ingress.ingress_plan import IngressPlan
 from worker.domain.tensor.tensor import Tensor
 from worker.domain.tensor.tensor_bundle import TensorBundle
@@ -50,8 +53,8 @@ def _plan() -> tuple[IngressPlan, FlowId, ServiceId]:
         IngressPlan(
             plan_version=PlanVersion(version_number=1),
             flow_ids=(flow_id,),
-            flow_plans=(
-                FlowPlan(
+            flow_ingress_plans=(
+                FlowIngressPlan(
                     model_variant_id=model_variant_id,
                     input_routes=(
                         IngressInputRoute(

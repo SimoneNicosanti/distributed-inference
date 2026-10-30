@@ -2,7 +2,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from shared.context.model_pass_context import ModelPassType
+from worker.domain.context.model_pass_context import ModelPassType
 from shared.flow.flow import FlowId
 from shared.plan.partition_replica_id import PartitionReplicaId
 from shared.plan.plan_version import PlanVersion

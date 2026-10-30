@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from shared.context.model_pass_context import ModelPassContext
+from worker.domain.context.model_pass_context import ModelPassContext
 from worker.domain.tensor.tensor_bundle import TensorBundle
 
 

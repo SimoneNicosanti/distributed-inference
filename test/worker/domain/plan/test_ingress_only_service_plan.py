@@ -6,7 +6,10 @@ from shared.plan.partition_replica_id import PartitionReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
 from shared.user.user import UserId
-from worker.domain.plan.ingress.flow_plan import FlowPlan, IngressInputRoute
+from worker.domain.plan.ingress.flow_ingress_plan import (
+    FlowIngressPlan,
+    IngressInputRoute,
+)
 from worker.domain.plan.ingress.ingress_plan import IngressPlan
 from worker.domain.plan.service_plan import ServicePlan
 from worker.domain.plan.worker.deployment_plan import DeploymentPlan
@@ -46,8 +49,8 @@ def test_ingress_only_service_plan_accepts_empty_worker_plan() -> None:
         ingress_plan=IngressPlan(
             plan_version=plan_version,
             flow_ids=(flow_id,),
-            flow_plans=(
-                FlowPlan(
+            flow_ingress_plans=(
+                FlowIngressPlan(
                     model_variant_id=model_variant_id,
                     input_routes=(
                         IngressInputRoute(

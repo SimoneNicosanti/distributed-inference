@@ -1,6 +1,5 @@
 from typing import override
 
-from shared.context.model_pass_context import ModelPassContext
 from worker.application.ingress.abc.ingress_input_router import IngressInputRouter
 from worker.application.ingress.abc.model_pass_coordinator import (
     ModelPassCoordinator,
@@ -15,6 +14,8 @@ from worker.application.ports.outbound.plan_store.plan_store_reader import (
 from worker.application.ports.outbound.sink.model_pass_result_gateway import (
     ModelPassResultRetrieverGateway,
 )
+from worker.domain.context.ingress_invocation_context import IngressInvocationContext
+from worker.domain.context.model_pass_context import ModelPassContext
 from worker.domain.model_pass.model_pass_request import ModelPassRequest
 from worker.domain.model_pass.model_pass_result import ModelPassResult
 from worker.domain.plan.ingress.ingress_plan import IngressPlan
@@ -46,6 +47,9 @@ class DefaultModelPassCoordinator(ModelPassCoordinator):
             plan_version=model_pass_request_info.plan_version,
             model_pass_type=model_pass_request_info.model_pass_type,
         )
+        ingress_context = IngressInvocationContext(
+            model_pass_context=model_pass_context
+        )
 
         model_pass_request = ModelPassRequest(
             context=model_pass_context,
@@ -55,12 +59,13 @@ class DefaultModelPassCoordinator(ModelPassCoordinator):
         plan = await self._ingress_plan_reader.get_plan_by_version(
             model_pass_request_info.plan_version
         )
-        flow_plan = plan.get_flow_plan_by_flow_id(
+        flow_plan = plan.get_flow_ingress_plan_by_flow_id(
             flow_id=model_pass_request_info.flow_id
         )
 
         routed_contributions = await self._input_router.route(
             model_pass_request=model_pass_request,
+            ingress_context=ingress_context,
             flow_plan=flow_plan,
         )
         await self._contribution_sender_coordinator.send_all_contributions(

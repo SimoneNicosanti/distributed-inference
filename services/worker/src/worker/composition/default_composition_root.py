@@ -34,7 +34,7 @@ from integration.redis.worker_profiles.resource_profile_keys import (
 from integration.service_instance.service_instance import CapabilityType
 from integration.service_instance.worker_instance import WorkerInstance
 from lifecycle.async_lifecycle import AsyncLifecycle
-from shared.context.model_pass_context import ModelPassId
+from worker.domain.context.model_pass_context import ModelPassId
 from worker.adapters.outbound.activity_manager.local_activity_manager import (
     LocalActivityManagerAdapter,
 )

@@ -161,7 +161,7 @@ class ArrowPartitionInvocationCoordinator(flight.FlightServerBase):
 
         try:
             return PartitionInvocationContribution(
-                source_invocation_context=source_context_from_dto(
+                source_hop_invocation_context=source_context_from_dto(
                     contribution_metadata.source_invocation_context
                 ),
                 target_replica_id=contribution_metadata.target_replica_id,

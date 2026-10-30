@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from shared.context.model_invocation_context import ModelInvocationContext
-from shared.context.model_pass_context import ModelPassType
+from worker.domain.context.model_invocation_context import ModelInvocationContext
+from worker.domain.context.model_pass_context import ModelPassType
 from shared.flow.flow import FlowId
 from shared.plan.plan_version import PlanVersion
 from worker.domain.model_pass.model_pass_result import ModelPassResult

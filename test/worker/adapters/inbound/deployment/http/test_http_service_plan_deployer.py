@@ -21,7 +21,10 @@ from worker.adapters.inbound.deployment.http.http_service_plan_deployer import (
     build_service_plan_deployment_router,
 )
 from worker.application.ports.inbound.deployment.plan_deployer import PlanDeployer
-from worker.domain.plan.ingress.flow_plan import FlowPlan, IngressInputRoute
+from worker.domain.plan.ingress.flow_ingress_plan import (
+    FlowIngressPlan,
+    IngressInputRoute,
+)
 from worker.domain.plan.ingress.ingress_plan import IngressPlan
 from worker.domain.plan.service_plan import ServicePlan
 from worker.domain.plan.sink.sink_plan import SinkPlan
@@ -76,8 +79,8 @@ def _ingress_plan(plan_version: PlanVersion) -> IngressPlan:
     return IngressPlan(
         plan_version=plan_version,
         flow_ids=(flow_id,),
-        flow_plans=(
-            FlowPlan(
+        flow_ingress_plans=(
+            FlowIngressPlan(
                 model_variant_id=model_variant_id,
                 input_routes=(
                     IngressInputRoute(

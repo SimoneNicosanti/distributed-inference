@@ -75,7 +75,7 @@ class DefaultPartitionInvocationCoordinator(
         await handle.future
 
         return PartitionInvocationContributionAck(
-            context=contribution.source_invocation_context
+            context=contribution.source_hop_invocation_context
         )
 
     async def _worker_loop(self) -> None:

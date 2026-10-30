@@ -2,10 +2,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum, auto
 from uuid import UUID, uuid4
 
-from shared.context.model_invocation_context import (
-    ModelInvocationContext,
-)
 from shared.plan.plan_version import PlanVersion
+from worker.domain.context.model_invocation_context import ModelInvocationContext
 
 type ModelPassId = UUID
 

@@ -3,8 +3,8 @@ import asyncio
 import numpy as np
 import pytest
 
-from shared.context.model_invocation_context import ModelInvocationContext
-from shared.context.model_pass_context import (
+from worker.domain.context.model_invocation_context import ModelInvocationContext
+from worker.domain.context.model_pass_context import (
     ModelPassContext,
     ModelPassId,
     ModelPassType,

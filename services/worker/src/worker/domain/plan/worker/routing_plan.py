@@ -2,11 +2,15 @@ from dataclasses import dataclass
 
 from shared.model.keys import TensorKey
 from shared.plan.partition_replica_id import PartitionReplicaId
+from worker.domain.plan.hop.hop import (
+    DestinationHop,
+    SourceHop,
+)
 
 
 @dataclass(frozen=True, slots=True)
 class ReplicaInputBinding:
-    prev_replica_id: PartitionReplicaId | None
+    source: SourceHop
     tensors: tuple[TensorKey, ...]
 
     def __post_init__(self) -> None:
@@ -19,7 +23,7 @@ class ReplicaInputBinding:
 
 @dataclass(frozen=True, slots=True)
 class ReplicaOutputRoute:
-    next_replica_id: PartitionReplicaId | None
+    destination: DestinationHop
     tensors: tuple[TensorKey, ...]
 
     def __post_init__(self) -> None:
@@ -36,11 +40,11 @@ class ReplicaRouting:
     output_routes: tuple[ReplicaOutputRoute, ...]
 
     def __post_init__(self) -> None:
-        prev_replica_ids = [binding.prev_replica_id for binding in self.input_bindings]
+        prev_replica_ids = [binding.source for binding in self.input_bindings]
         if len(prev_replica_ids) != len(set(prev_replica_ids)):
             raise ValueError("Input binding sources must be unique")
 
-        next_replica_ids = [route.next_replica_id for route in self.output_routes]
+        next_replica_ids = [route.destination for route in self.output_routes]
         if len(next_replica_ids) != len(set(next_replica_ids)):
             raise ValueError("Output route destinations must be unique")
 
@@ -53,13 +57,12 @@ class ReplicaRouting:
     def check_inputs_ready(
         self,
         arrived: dict[
-            PartitionReplicaId | None,
+            SourceHop,
             set[TensorKey],
         ],
     ) -> bool:
         expected = {
-            binding.prev_replica_id: set(binding.tensors)
-            for binding in self.input_bindings
+            binding.source: set(binding.tensors) for binding in self.input_bindings
         }
 
         unexpected_sources = arrived.keys() - expected.keys()
@@ -78,10 +81,8 @@ class ReplicaRouting:
     def route_output_tensors(
         self,
         available_tensors: set[TensorKey],
-    ) -> dict[PartitionReplicaId | None, set[TensorKey]]:
-        routed = {
-            route.next_replica_id: set(route.tensors) for route in self.output_routes
-        }
+    ) -> dict[DestinationHop, set[TensorKey]]:
+        routed = {route.destination: set(route.tensors) for route in self.output_routes}
 
         missing = {
             replica_id: tensors - available_tensors

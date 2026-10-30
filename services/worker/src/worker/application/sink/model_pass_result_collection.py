@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from shared.context.model_pass_context import ModelPassId
+from worker.domain.context.model_pass_context import ModelPassId
 from worker.domain.model_pass.model_pass_result_contribution import (
     ModelPassResultContribution,
 )

@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 
-from shared.context.model_pass_context import ModelPassContext
 from shared.flow.flow import FlowId
 from shared.model.model_partition import ModelPartitionId
 from shared.plan.partition_replica_id import PartitionReplicaId
 from shared.plan.plan_version import PlanVersion
+from worker.domain.context.model_pass_context import ModelPassContext
 from worker.domain.context.partition_invocation_context import (
     PartitionInvocationContext,
 )
