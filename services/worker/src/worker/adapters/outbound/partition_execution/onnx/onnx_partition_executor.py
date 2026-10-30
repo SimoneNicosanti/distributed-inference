@@ -13,9 +13,10 @@ from worker.adapters.outbound.partition_execution.onnx.onnx_partition_executor_o
 from worker.application.ports.outbound.partition_execution.partition_executor import (
     PartitionExecutor,
 )
-from worker.domain.partition.partition_execution import (
-    PartitionExecutionInput,
-    PartitionExecutionOutput,
+from worker.domain.hop.hop import PartitionReplicaHop
+from worker.domain.hop.hop_execution import (
+    HopExecutionInput,
+    HopExecutionOutput,
 )
 from worker.domain.tensor.tensor import Tensor
 from worker.domain.tensor.tensor_bundle import TensorBundle
@@ -47,8 +48,8 @@ class OnnxPartitionExecutor(PartitionExecutor):
 
     @override
     async def execute(
-        self, partition_execution_input: PartitionExecutionInput
-    ) -> PartitionExecutionOutput:
+        self, partition_execution_input: HopExecutionInput[PartitionReplicaHop]
+    ) -> HopExecutionOutput[PartitionReplicaHop]:
 
         ## Three ways to run inference
         ## Using a thread in the same process
@@ -69,8 +70,8 @@ class OnnxPartitionExecutor(PartitionExecutor):
         return partition_execution_output
 
     def _execute_sync(
-        self, partition_execution_input: PartitionExecutionInput
-    ) -> PartitionExecutionOutput:
+        self, partition_execution_input: HopExecutionInput[PartitionReplicaHop]
+    ) -> HopExecutionOutput[PartitionReplicaHop]:
 
         ## TODO: With this management we are managing only numerical types input
         session_inputs: dict[str, np.ndarray] = {}
@@ -111,8 +112,8 @@ class OnnxPartitionExecutor(PartitionExecutor):
             },
         )
 
-        partition_execution_output = PartitionExecutionOutput(
-            partition_execution_context=partition_execution_input.partition_execution_context,
+        partition_execution_output = HopExecutionOutput(
+            context=partition_execution_input.context,
             payload=tensor_bundle,
         )
 

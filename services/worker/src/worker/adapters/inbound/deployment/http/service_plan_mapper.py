@@ -1,113 +1,92 @@
-from integration.dto.service_plan.service_plan_dto import ServicePlanDto
-from worker.domain.plan.ingress.flow_ingress_plan import (
-    FlowIngressPlan,
-    IngressInputRoute,
+from integration.dto.service_plan.service_plan_dto import WorkerPlanDto
+from worker.adapters.context_mapper import (
+    destination_hop_from_dto,
+    invocable_hop_from_dto,
+    source_hop_from_dto,
 )
-from worker.domain.plan.ingress.ingress_plan import IngressPlan
-from worker.domain.plan.service_plan import ServicePlan
-from worker.domain.plan.sink.sink_plan import SinkPlan
-from worker.domain.plan.worker.deployment_plan import DeploymentPlan, ResourceAllocation
-from worker.domain.plan.worker.partition_execution_plan import (
+from worker.domain.hop.hop import PartitionReplicaHop
+from worker.domain.plan.deployment_plan import DeploymentPlan, ResourceAllocation
+from worker.domain.plan.hop_routing_plan import (
+    HopAddress,
+    HopInputRouting,
+    HopOutputRouting,
+    HopRoutingPlan,
+    HopRoutings,
+)
+from worker.domain.plan.partition_execution_plan import (
     PartitionExecutionPlan,
     PartitionIOScheme,
 )
-from worker.domain.plan.worker.routing_plan import (
-    ReplicaInputBinding,
-    ReplicaOutputRoute,
-    ReplicaRouting,
-    RoutingPlan,
-)
-from worker.domain.plan.worker.scheduling_plan import (
+from worker.domain.plan.scheduling_plan import (
     PriorityKey,
     SchedulingPlan,
 )
-from worker.domain.plan.worker.worker_plan import WorkerPlan
+from worker.domain.plan.worker_plan import WorkerPlan
 
 
-def service_plan_from_dto(dto: ServicePlanDto) -> ServicePlan:
-    worker = dto.worker_plan
-    ingress = dto.ingress_plan
-    sink = dto.sink_plan
-
-    return ServicePlan(
-        worker_plan=WorkerPlan(
-            plan_version=worker.plan_version,
-            deployment_plan=DeploymentPlan(
-                replica_ids=worker.deployment_plan.replica_ids,
-                allocations=tuple(
-                    ResourceAllocation(use_gpu=allocation.use_gpu)
-                    for allocation in worker.deployment_plan.allocations
-                ),
-            ),
-            scheduling_plan=SchedulingPlan(
-                priority_keys=tuple(
-                    PriorityKey(
-                        flow_id=key.flow_id,
-                        partition_replica_id=key.partition_replica_id,
-                    )
-                    for key in worker.scheduling_plan.priority_keys
-                ),
-                priorities=tuple(worker.scheduling_plan.priorities),
-            ),
-            partition_execution_plan=PartitionExecutionPlan(
-                partition_ids=worker.partition_execution_plan.partition_ids,
-                schemes=tuple(
-                    PartitionIOScheme(inputs=scheme.inputs, outputs=scheme.outputs)
-                    for scheme in worker.partition_execution_plan.schemes
-                ),
-            ),
-            routing_plan=RoutingPlan(
-                replica_ids=worker.routing_plan.replica_ids,
-                routings=tuple(
-                    ReplicaRouting(
-                        input_bindings=tuple(
-                            ReplicaInputBinding(
-                                source=binding.prev_replica_id,
-                                tensors=binding.tensors,
-                            )
-                            for binding in routing.input_bindings
-                        ),
-                        output_routes=tuple(
-                            ReplicaOutputRoute(
-                                destination=route.next_replica_id,
-                                tensors=route.tensors,
-                            )
-                            for route in routing.output_routes
-                        ),
-                    )
-                    for routing in worker.routing_plan.routings
-                ),
+def worker_plan_from_dto(dto: WorkerPlanDto) -> WorkerPlan:
+    return WorkerPlan(
+        plan_version=dto.plan_version,
+        deployment_plan=DeploymentPlan(
+            replica_ids=dto.deployment_plan.replica_ids,
+            allocations=tuple(
+                ResourceAllocation(use_gpu=allocation.use_gpu)
+                for allocation in dto.deployment_plan.allocations
             ),
         ),
-        ingress_plan=(
-            None
-            if ingress is None
-            else IngressPlan(
-                plan_version=ingress.plan_version,
-                flow_ids=ingress.flow_ids,
-                flow_ingress_plans=tuple(
-                    FlowIngressPlan(
-                        model_variant_id=flow_plan.model_variant_id,
-                        input_routes=tuple(
-                            IngressInputRoute(
-                                target_replica_id=route.target_replica_id,
-                                tensors=route.tensors,
-                            )
-                            for route in flow_plan.input_routes
-                        ),
-                        sink_id=flow_plan.sink_id,
-                    )
-                    for flow_plan in ingress.flow_plans
-                ),
-            )
+        scheduling_plan=SchedulingPlan(
+            priority_keys=tuple(
+                PriorityKey(
+                    flow_id=key.flow_id,
+                    executable_hop=PartitionReplicaHop(
+                        partition_replica_id=key.executable_hop.partition_replica_id
+                    ),
+                )
+                for key in dto.scheduling_plan.priority_keys
+            ),
+            priorities=tuple(dto.scheduling_plan.priorities),
         ),
-        sink_plan=(
-            None
-            if sink is None
-            else SinkPlan(
-                plan_version=sink.plan_version,
-                flow_ids=sink.flow_ids,
-                result_tensors_by_flow=sink.result_tensors_by_flow,
-            )
+        partition_execution_plan=PartitionExecutionPlan(
+            partition_ids=dto.partition_execution_plan.partition_ids,
+            schemes=tuple(
+                PartitionIOScheme(inputs=scheme.inputs, outputs=scheme.outputs)
+                for scheme in dto.partition_execution_plan.schemes
+            ),
+        ),
+        hop_routing_plan=HopRoutingPlan(
+            hop_addresses=tuple(
+                HopAddress(
+                    flow_id=address.flow_id,
+                    hop=invocable_hop_from_dto(address.hop),
+                )
+                for address in dto.hop_routing_plan.hop_addresses
+            ),
+            routings=tuple(
+                HopRoutings(
+                    input_routings=tuple(
+                        HopInputRouting(
+                            source=HopAddress(
+                                flow_id=binding.source.flow_id,
+                                hop=source_hop_from_dto(binding.source.hop),
+                            ),
+                            tensors=binding.tensors,
+                        )
+                        for binding in routing.input_routings
+                    ),
+                    output_routings=tuple(
+                        HopOutputRouting(
+                            destination=HopAddress(
+                                flow_id=route.destination.flow_id,
+                                hop=destination_hop_from_dto(
+                                    route.destination.hop
+                                ),
+                            ),
+                            tensors=route.tensors,
+                        )
+                        for route in routing.output_routings
+                    ),
+                )
+                for routing in dto.hop_routing_plan.routings
+            ),
         ),
     )

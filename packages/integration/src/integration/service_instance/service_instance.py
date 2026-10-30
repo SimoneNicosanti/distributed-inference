@@ -63,7 +63,8 @@ class CapabilityType(StrEnum):
     PROFILE_STORAGE = auto()
 
     ## Declared by worker
-    PARTITION_INFERENCE = auto()
+    HOP_INVOCATION = auto()
+    PARTITION_INFERENCE = HOP_INVOCATION
     PLAN_ACTUATION = auto()
     NETWORK_PROFILING = auto()
     EXECUTION_PROFILING = auto()

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from worker.domain.context.model_pass_context import ModelPassId
-from worker.domain.model_pass.model_pass_result import ModelPassResult
+from worker.domain.model.model_pass import ModelPassResult
 
 
 class ModelPassResultRetriever(ABC):

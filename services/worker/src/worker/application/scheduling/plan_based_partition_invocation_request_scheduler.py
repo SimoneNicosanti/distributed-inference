@@ -11,16 +11,17 @@ from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import
     SchedulingPlanReader,
 )
 from worker.application.scheduling.abc.partition_invocation_request_scheduler import (
-    PartitionInvocationRequestScheduler,
+    HopInvocationRequestScheduler,
 )
-from worker.domain.partition.partition_invocation import (
-    PartitionInvocationRequest,
+from worker.domain.hop.hop import ExecutableHop
+from worker.domain.hop.hop_invocation import (
+    HopInvocationRequest,
 )
-from worker.domain.plan.worker.scheduling_plan import PriorityKey
+from worker.domain.plan.scheduling_plan import PriorityKey
 
 
 @dataclass
-class QueuedPartitionInvocationRequest(QueueRequest[PartitionInvocationRequest, Any]):
+class QueuedPartitionInvocationRequest(QueueRequest[HopInvocationRequest, Any]):
     plan_version: PlanVersion
     per_plan_priority: int
     sequence: int
@@ -42,7 +43,7 @@ class QueuedPartitionInvocationRequest(QueueRequest[PartitionInvocationRequest, 
         )
 
 
-class PlanBasedPartitionInvocationRequestScheduler(PartitionInvocationRequestScheduler):
+class PlanBasedPartitionInvocationRequestScheduler(HopInvocationRequestScheduler):
     def __init__(self, scheduling_plan_reader: SchedulingPlanReader) -> None:
         self._lock = asyncio.Lock()
         self._priority_queue: asyncio.PriorityQueue[
@@ -53,7 +54,7 @@ class PlanBasedPartitionInvocationRequestScheduler(PartitionInvocationRequestSch
 
     @override
     async def enqueue(
-        self, request: PartitionInvocationRequest, future: Future[Any]
+        self, request: HopInvocationRequest[ExecutableHop], future: Future[Any]
     ) -> None:
         async with self._lock:
             request_priority = await self._assign_priority(request)
@@ -68,7 +69,7 @@ class PlanBasedPartitionInvocationRequestScheduler(PartitionInvocationRequestSch
             self._priority_queue.put_nowait(queued_request)
 
     @override
-    async def dequeue(self) -> tuple[PartitionInvocationRequest, Future[Any]]:
+    async def dequeue(self) -> tuple[HopInvocationRequest[ExecutableHop], Future[Any]]:
         queued_request = await self._priority_queue.get()
         return queued_request.request, queued_request.future
 
@@ -76,7 +77,9 @@ class PlanBasedPartitionInvocationRequestScheduler(PartitionInvocationRequestSch
     async def length(self) -> int:
         return self._priority_queue.qsize()
 
-    async def _assign_priority(self, request: PartitionInvocationRequest) -> int:
+    async def _assign_priority(
+        self, request: HopInvocationRequest[ExecutableHop]
+    ) -> int:
         plan_version = request.plan_version
         scheduling_plan = (
             await self._scheduling_plan_reader.get_scheduling_plan_by_version(
@@ -85,6 +88,6 @@ class PlanBasedPartitionInvocationRequestScheduler(PartitionInvocationRequestSch
         )
         priority_key = PriorityKey(
             flow_id=request.flow_id,
-            partition_replica_id=request.partition_replica_id,
+            executable_hop=request.hop,
         )
         return scheduling_plan.get_priority_by_key(priority_key)

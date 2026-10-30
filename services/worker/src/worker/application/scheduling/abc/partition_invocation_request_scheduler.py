@@ -3,23 +3,26 @@ from asyncio import Future
 from typing import Any, override
 
 from scheduling.request_scheduler import RequestScheduler
-from worker.domain.partition.partition_invocation import (
-    PartitionInvocationRequest,
+from worker.domain.hop.hop import ExecutableHop
+from worker.domain.hop.hop_invocation import (
+    HopInvocationRequest,
 )
 
 
-class PartitionInvocationRequestScheduler(
-    RequestScheduler[PartitionInvocationRequest, Any], ABC
+class HopInvocationRequestScheduler(
+    RequestScheduler[HopInvocationRequest[ExecutableHop], Any], ABC
 ):
     @abstractmethod
     @override
     async def enqueue(
-        self, request: PartitionInvocationRequest, future: Future[Any]
+        self, request: HopInvocationRequest[ExecutableHop], future: Future[Any]
     ) -> None: ...
 
     @abstractmethod
     @override
-    async def dequeue(self) -> tuple[PartitionInvocationRequest, Future[Any]]: ...
+    async def dequeue(
+        self,
+    ) -> tuple[HopInvocationRequest[ExecutableHop], Future[Any]]: ...
 
     @abstractmethod
     @override

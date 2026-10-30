@@ -18,19 +18,19 @@ from integration.service_instance.worker_instance import WorkerInstance
 from integration.worker.http_worker_constants import DEFAULT_LOCAL_WORKER_HTTP_PORT
 from shared.service.service import ServiceId
 from worker.adapters.inbound.deployment.http.http_service_plan_deployer import (
-    build_service_plan_deployment_router,
+    build_worker_plan_deployment_router,
 )
-from worker.adapters.inbound.ingress.arrow_model_invocation_coordinator import (
-    ArrowModelInvocationCoordinator,
-)
-from worker.adapters.inbound.partition_invocation.arrow.arrow_partition_invocation_coordinator import (
-    ArrowPartitionInvocationCoordinator,
+from worker.adapters.inbound.hop_contribution.arrow.arrow_hop_invocation_contribution_server import (
+    ArrowHopInvocationContributionServer,
 )
 from worker.adapters.inbound.profiling.arrow.arrow_network_probe_server import (
     ArrowNetworkProbeServer,
 )
-from worker.adapters.inbound.sink.arrow.arrow_model_pass_result_contribution_sink import (
-    ArrowModelPassResultContributionSink,
+from worker.adapters.inbound.sink.arrow.arrow_model_pass_result_retriever import (
+    ArrowModelPassResultRetriever,
+)
+from worker.adapters.inbound.sink.arrow.arrow_model_pass_result_server import (
+    ArrowModelPassResultServer,
 )
 from worker.adapters.inbound.worker_identity.http_worker_identity_query import (
     build_worker_identity_query_router,
@@ -40,10 +40,9 @@ from worker.composition.default_composition_root import DefaultCompositionRoot
 
 DEFAULT_BIND_HOST = "0.0.0.0"
 DEFAULT_ADVERTISED_HOST = "worker"
-DEFAULT_PARTITION_INFERENCE_PORT = 8815
+DEFAULT_HOP_INVOCATION_PORT = 8815
 DEFAULT_NETWORK_PROFILING_PORT = 8816
 DEFAULT_RESULT_SINK_PORT = 8817
-DEFAULT_MODEL_INVOCATION_PORT = 8818
 
 
 class FlightServer(Protocol):
@@ -57,15 +56,6 @@ def _get_port(variable_name: str, default: int) -> int:
     if not 1 <= port <= 65535:
         raise ValueError(f"{variable_name} must be between 1 and 65535")
     return port
-
-
-def _ingress_enabled() -> bool:
-    value = os.environ.get("WORKER_INGRESS_ENABLED", "false").lower()
-    if value in {"1", "true", "yes"}:
-        return True
-    if value in {"0", "false", "no"}:
-        return False
-    raise ValueError("WORKER_INGRESS_ENABLED must be a boolean")
 
 
 def _arrow_url(host: str, port: int) -> ArrowUrl:
@@ -85,9 +75,14 @@ def build_worker_instance() -> WorkerInstance:
         DEFAULT_ADVERTISED_HOST,
     )
     http_port = _get_port("WORKER_HTTP_PORT", DEFAULT_LOCAL_WORKER_HTTP_PORT)
-    partition_port = _get_port(
-        "WORKER_PARTITION_INFERENCE_PORT",
-        DEFAULT_PARTITION_INFERENCE_PORT,
+    hop_invocation_port = _get_port(
+        "WORKER_HOP_INVOCATION_PORT",
+        int(
+            os.environ.get(
+                "WORKER_PARTITION_INFERENCE_PORT",
+                DEFAULT_HOP_INVOCATION_PORT,
+            )
+        ),
     )
     network_port = _get_port(
         "WORKER_NETWORK_PROFILING_PORT",
@@ -96,8 +91,8 @@ def build_worker_instance() -> WorkerInstance:
 
     capabilities = [
         Capability(
-            type=CapabilityType.PARTITION_INFERENCE,
-            interfaces=[_arrow_interface(advertised_host, partition_port)],
+            type=CapabilityType.HOP_INVOCATION,
+            interfaces=[_arrow_interface(advertised_host, hop_invocation_port)],
         ),
         Capability(
             type=CapabilityType.PLAN_ACTUATION,
@@ -120,19 +115,16 @@ def build_worker_instance() -> WorkerInstance:
             type=CapabilityType.RESOURCE_PROFILING,
             interfaces=[],
         ),
+        Capability(
+            type=CapabilityType.RESULT_SINKER,
+            interfaces=[
+                _arrow_interface(
+                    advertised_host,
+                    _get_port("WORKER_RESULT_SINK_PORT", DEFAULT_RESULT_SINK_PORT),
+                )
+            ],
+        ),
     ]
-
-    if _ingress_enabled():
-        result_sink_port = _get_port(
-            "WORKER_RESULT_SINK_PORT",
-            DEFAULT_RESULT_SINK_PORT,
-        )
-        capabilities.append(
-            Capability(
-                type=CapabilityType.RESULT_SINKER,
-                interfaces=[_arrow_interface(advertised_host, result_sink_port)],
-            )
-        )
 
     return WorkerInstance(
         service_id=ServiceId(),
@@ -143,11 +135,7 @@ def build_worker_instance() -> WorkerInstance:
 def build_http_app(composition: WorkerComposition) -> FastAPI:
     app = FastAPI(title="Worker")
     app.include_router(
-        build_service_plan_deployment_router(
-            worker_plan_deployer=composition.worker_plan_deployer,
-            ingress_plan_deployer=composition.ingress_plan_deployer,
-            sink_plan_deployer=composition.sink_plan_deployer,
-        )
+        build_worker_plan_deployment_router(composition.worker_plan_deployer)
     )
     app.include_router(
         build_worker_identity_query_router(composition.worker_identity_query)
@@ -161,15 +149,20 @@ def build_flight_servers(
 ) -> list[FlightServer]:
     bind_host = os.environ.get("WORKER_BIND_HOST", DEFAULT_BIND_HOST)
     servers: list[FlightServer] = [
-        ArrowPartitionInvocationCoordinator(
+        ArrowHopInvocationContributionServer(
             _arrow_url(
                 bind_host,
                 _get_port(
-                    "WORKER_PARTITION_INFERENCE_PORT",
-                    DEFAULT_PARTITION_INFERENCE_PORT,
+                    "WORKER_HOP_INVOCATION_PORT",
+                    int(
+                        os.environ.get(
+                            "WORKER_PARTITION_INFERENCE_PORT",
+                            DEFAULT_HOP_INVOCATION_PORT,
+                        )
+                    ),
                 ),
             ).unicode_string(),
-            composition.partition_invocation_coordinator,
+            composition.hop_contribution_receiver,
             event_loop,
         ),
         ArrowNetworkProbeServer(
@@ -183,35 +176,18 @@ def build_flight_servers(
         ),
     ]
 
-    if composition.model_invocation_coordinator is not None:
-        servers.append(
-            ArrowModelInvocationCoordinator(
-                _arrow_url(
-                    bind_host,
-                    _get_port(
-                        "WORKER_MODEL_INVOCATION_PORT",
-                        DEFAULT_MODEL_INVOCATION_PORT,
-                    ),
-                ).unicode_string(),
-                composition.model_invocation_coordinator,
+    servers.append(
+        ArrowModelPassResultServer(
+            _arrow_url(
+                bind_host,
+                _get_port("WORKER_RESULT_SINK_PORT", DEFAULT_RESULT_SINK_PORT),
+            ).unicode_string(),
+            ArrowModelPassResultRetriever(
+                composition.model_pass_result_retriever,
                 event_loop,
-            )
+            ),
         )
-
-    if composition.result_contribution_sink is not None:
-        servers.append(
-            ArrowModelPassResultContributionSink(
-                _arrow_url(
-                    bind_host,
-                    _get_port(
-                        "WORKER_RESULT_SINK_PORT",
-                        DEFAULT_RESULT_SINK_PORT,
-                    ),
-                ).unicode_string(),
-                composition.result_contribution_sink,
-                event_loop,
-            )
-        )
+    )
 
     return servers
 

@@ -18,7 +18,7 @@ class WorkerInstance(ServiceInstance):
             raise ValueError("Worker instance must have at least one capability")
 
         required_capabilities = {
-            CapabilityType.PARTITION_INFERENCE,
+            CapabilityType.HOP_INVOCATION,
             CapabilityType.PLAN_ACTUATION,
             CapabilityType.NETWORK_PROFILING,
             CapabilityType.EXECUTION_PROFILING,

@@ -7,7 +7,6 @@ import pyarrow as pa
 
 PROTOCOL_VERSION = 1
 
-SUBMIT_CONTRIBUTION_COMMAND = b"model-pass-result.v1.submit-contribution"
 RETRIEVE_RESULT_COMMAND = b"model-pass-result.v1.retrieve"
 
 CONTEXT_FIELD_NAME = "__context_json"

@@ -1,9 +1,9 @@
 from pydantic import BaseModel, ConfigDict
 
-from integration.dto.service_plan.service_plan_dto import ServicePlanDto
+from integration.dto.service_plan.service_plan_dto import WorkerPlanDto
 
 
-class PrepareServicePlanRequest(BaseModel):
+class PrepareWorkerPlanRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    service_plan: ServicePlanDto
+    worker_plan: WorkerPlanDto

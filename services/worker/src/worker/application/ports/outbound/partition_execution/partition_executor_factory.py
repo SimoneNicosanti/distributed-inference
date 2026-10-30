@@ -4,7 +4,7 @@ from artifacts.contracts.artifact_bundle import ArtifactBundle
 from worker.application.ports.outbound.partition_execution.partition_executor import (
     PartitionExecutor,
 )
-from worker.domain.plan.worker.deployment_plan import ResourceAllocation
+from worker.domain.plan.deployment_plan import ResourceAllocation
 
 
 class PartitionExecutorFactory(ABC):

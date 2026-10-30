@@ -31,10 +31,8 @@ from integration.redis.worker_profiles.network_profile_keys import (
 from integration.redis.worker_profiles.resource_profile_keys import (
     StringResourceProfileKeyFactory,
 )
-from integration.service_instance.service_instance import CapabilityType
 from integration.service_instance.worker_instance import WorkerInstance
 from lifecycle.async_lifecycle import AsyncLifecycle
-from worker.domain.context.model_pass_context import ModelPassId
 from worker.adapters.outbound.activity_manager.local_activity_manager import (
     LocalActivityManagerAdapter,
 )
@@ -47,20 +45,14 @@ from worker.adapters.outbound.catalog.service.default_service_directory_gateway 
 from worker.adapters.outbound.contribution.in_memory_contribution_store import (
     InMemoryContributionStore,
 )
+from worker.adapters.outbound.hop_contribution.arrow.arrow_hop_invocation_contribution_sender import (
+    ArrowHopInvocationContributionSender,
+)
 from worker.adapters.outbound.model_metadata.redis_model_partition_metadata_reader import (
     RedisModelPartitionMetadataReader,
 )
 from worker.adapters.outbound.partition_execution.onnx.onnx_partition_executor_factory import (
     OnnxPartitionExecutorFactory,
-)
-from worker.adapters.outbound.partition_invocation.sender.arrow.arrow_model_pass_result_contribution_sender import (
-    ArrowModelPassResultContributionSender,
-)
-from worker.adapters.outbound.partition_invocation.sender.arrow.arrow_partition_invocation_contribution_sender import (
-    ArrowPartitionInvocationContributionSender,
-)
-from worker.adapters.outbound.plan_store.in_memory_plan_store import (
-    InMemoryPlanStore,
 )
 from worker.adapters.outbound.plan_store.in_memory_worker_plan_store import (
     InMemoryWorkerPlanStore,
@@ -96,62 +88,56 @@ from worker.adapters.outbound.profiling.resource.publisher.redis_resource_profil
 from worker.adapters.outbound.profiling.utils.nvidia_gpu_availability_checker import (
     NvidiaGPUAvailabilityChecker,
 )
-from worker.adapters.outbound.sink.arrow.arrow_model_pass_result_retriever_gateway import (
-    ArrowModelPassResultRetrieverGateway,
-)
 from worker.application.activity.default_activity_request_factory import (
     DefaultActivityRequestFactory,
-)
-from worker.application.contribution.default_contribution_pipeline import (
-    DefaultContributionPipeline,
-)
-from worker.application.contribution.default_postbox import DefaultPostbox
-from worker.application.deployment.default_ingress_plan_deployer import (
-    DefaultIngressPlanDeployer,
-)
-from worker.application.deployment.default_sink_plan_deployer import (
-    DefaultSinkPlanDeployer,
 )
 from worker.application.deployment.default_worker_plan_deployer import (
     DefaultWorkerPlanDeployer,
 )
-from worker.application.ingress.default_ingress_input_router import (
-    DefaultIngressInputRouter,
+from worker.application.hop_contribution_rcv.abc.contribution_gathering_policy import (
+    HopContributionCollection,
+    HopContributionCollectionKey,
 )
-from worker.application.ingress.default_model_invocation_coordinator import (
-    DefaultModelInvocationCoordinator,
+from worker.application.hop_contribution_rcv.default_contribution_gathering_policy import (
+    DefaultContributionGatheringPolicy,
 )
-from worker.application.ingress.default_model_pass_coordinator import (
-    DefaultModelPassCoordinator,
+from worker.application.hop_contribution_rcv.default_contribution_pipeline import (
+    DefaultContributionPipeline,
 )
-from worker.application.partition_execution.default_partition_execution_coordinator import (
-    DefaultPartitionExecutionCoordinator,
+from worker.application.hop_contribution_rcv.default_hop_invocation_contribution_receive_coordinator import (
+    DefaultHopInvocationContributionReceiveCoordinator,
 )
-from worker.application.partition_execution.default_partition_executor_registry import (
+from worker.application.hop_contribution_snd.default_hop_contribution_propagator import (
+    DefaultHopContributionPropagator,
+)
+from worker.application.hop_contribution_snd.default_hop_contribution_send_coordinator import (
+    DefaultHopContributionDispatcher,
+)
+from worker.application.hop_contribution_snd.default_hop_output_router import (
+    DefaultHopOutputRouter,
+)
+from worker.application.hop_handler.default_ingress_hop_handler import (
+    DefaultIngressHopHandler,
+)
+from worker.application.hop_handler.default_partition_executor_registry import (
     DefaultPartitionExecutorRegistry,
 )
-from worker.application.partition_invocation.default_partition_invocation_coordinator import (
-    DefaultPartitionInvocationCoordinator,
+from worker.application.hop_handler.default_partition_replica_hop_handler import (
+    DefaultPartitionReplicaHopHandler,
 )
-from worker.application.partition_invocation.input.default_partition_invocation_request_assembler import (
-    DefaultPartitionInvocationRequestAssembler,
+from worker.application.hop_handler.default_sink_hop_handler import (
+    DefaultSinkHopHandler,
 )
-from worker.application.partition_invocation.input.partition_invocation_collection import (
-    PartitionInvocationCollection,
-    PartitionInvocationCollectionKey,
+from worker.application.hop_invocation.default_hop_invocation_request_assembler import (
+    DefaultHopInvocationRequestAssembler,
 )
-from worker.application.partition_invocation.input.partition_invocation_contribution_gathering_policy import (
-    PartitionInvocationContributionGatheringPolicy,
-)
-from worker.application.partition_invocation.output.default_contribution_send_coordinator import (
-    DefaultContributionSendCoordinator,
-)
-from worker.application.partition_invocation.output.default_partition_output_router import (
-    DefaultPartitionOutputRouter,
+from worker.application.hop_invocation.hop_invocation_coordinator import (
+    HopInvocationCoordinator,
 )
 from worker.application.ports.outbound.profiling.resource.gpu_profiler import (
     GpuProfiler,
 )
+from worker.application.postbox.default_postbox import DefaultPostbox
 from worker.application.profiling.default_model_execution_profiler import (
     DefaultModelExecutionProfiler,
 )
@@ -170,35 +156,19 @@ from worker.application.profiling.default_resource_profiling_coordinator import 
 from worker.application.scheduling.plan_based_partition_invocation_request_scheduler import (
     PlanBasedPartitionInvocationRequestScheduler,
 )
-from worker.application.sink.default_model_pass_result_contribution_sink import (
-    DefaultModelPassResultContributionSink,
-)
 from worker.application.sink.default_model_pass_result_retriever import (
     DefaultModelPassResultRetriever,
-)
-from worker.application.sink.model_pass_result_assembler import (
-    ModelPassResultAssembler,
-)
-from worker.application.sink.model_pass_result_collection import (
-    ModelPassResultCollection,
-)
-from worker.application.sink.model_pass_result_contribution_gathering_policy import (
-    ModelPassResultContributionGatheringPolicy,
 )
 from worker.application.worker_identity.default_worker_identity_query import (
     DefaultWorkerIdentityQuery,
 )
 from worker.composition.composition_root import CompositionRoot, WorkerComposition
 from worker.domain.activity.activity_request import ResourceType
-from worker.domain.model_pass.model_pass_error import ModelPassError
-from worker.domain.model_pass.model_pass_result_contribution import (
-    ModelPassResultContribution,
+from worker.domain.context.model_pass_context import ModelPassId
+from worker.domain.hop.hop_invocation_contribution import (
+    HopInvocationContribution,
 )
-from worker.domain.partition.partition_invocation_contribution import (
-    PartitionInvocationContribution,
-)
-from worker.domain.plan.ingress.ingress_plan import IngressPlan
-from worker.domain.plan.sink.sink_plan import SinkPlan
+from worker.domain.model.model_pass import ModelPassError, ModelPassResult
 from worker.domain.profiling.model_execution.model_execution_profile import Backend
 
 
@@ -226,8 +196,6 @@ class DefaultCompositionRoot(CompositionRoot):
             service_directory = DefaultServiceDirectoryGateway(directory)
             deployment_catalog = RedisPartitionDeploymentCatalog(redis)
             worker_plan_store = InMemoryWorkerPlanStore()
-            ingress_plan_store = InMemoryPlanStore[IngressPlan]()
-            sink_plan_store = InMemoryPlanStore[SinkPlan]()
             activity_request_factory = DefaultActivityRequestFactory()
             activity_manager = LocalActivityManagerAdapter(
                 {
@@ -249,58 +217,66 @@ class DefaultCompositionRoot(CompositionRoot):
                 partition_deployment_registrar=deployment_catalog,
             )
 
-            contribution_send_coordinator = DefaultContributionSendCoordinator(
+            contribution_dispatcher = DefaultHopContributionDispatcher(
                 activity_request_factory=activity_request_factory,
                 activity_manager=activity_manager,
-                partition_invocation_contribution_sender=ArrowPartitionInvocationContributionSender(
+                contribution_sender=ArrowHopInvocationContributionSender(
                     service_directory,
                     deployment_catalog,
                 ),
-                model_pass_result_contribution_sender=ArrowModelPassResultContributionSender(
-                    service_directory
-                ),
             )
 
-            request_assembler = DefaultPartitionInvocationRequestAssembler(
-                worker_plan_store
-            )
+            request_assembler = DefaultHopInvocationRequestAssembler(worker_plan_store)
 
-            partition_invocation_collection_postbox = DefaultPostbox[
-                PartitionInvocationCollectionKey,
-                PartitionInvocationCollection,
+            hop_contribution_collection_postbox = DefaultPostbox[
+                HopContributionCollectionKey,
+                HopContributionCollection,
             ](
                 key_compute_callable=lambda collection: collection.key,
             )
             contribution_pipeline = DefaultContributionPipeline(
-                gathering_policy=PartitionInvocationContributionGatheringPolicy(
-                    worker_plan_store
-                ),
+                gathering_policy=DefaultContributionGatheringPolicy(worker_plan_store),
                 contribution_store=InMemoryContributionStore[
-                    PartitionInvocationCollectionKey,
-                    PartitionInvocationContribution,
+                    HopContributionCollectionKey,
+                    HopInvocationContribution,
                 ](),
-                outbox=partition_invocation_collection_postbox,
+                outbox=hop_contribution_collection_postbox,
             )
 
-            execution_coordinator = DefaultPartitionExecutionCoordinator(
+            partition_replica_handler = DefaultPartitionReplicaHopHandler(
                 activity_request_factory=activity_request_factory,
                 activity_manager=activity_manager,
-                partition_invocation_request_scheduler=PlanBasedPartitionInvocationRequestScheduler(
+                hop_invocation_request_scheduler=PlanBasedPartitionInvocationRequestScheduler(
                     worker_plan_store
                 ),
                 partition_executor_registry=partition_executor_registry,
             )
-            invocation_coordinator = DefaultPartitionInvocationCoordinator(
-                max_concurrent_invocations=4,
-                contribution_pipeline=contribution_pipeline,
-                inbox=partition_invocation_collection_postbox,
-                assembler=request_assembler,
-                partition_execution_coordinator=execution_coordinator,
-                output_router=DefaultPartitionOutputRouter(worker_plan_store),
-                contribution_sender_coordinator=contribution_send_coordinator,
+
+            result_postbox = DefaultPostbox[ModelPassId, ModelPassResult](
+                key_compute_callable=lambda result: result.context.model_pass_id
+            )
+            result_error_postbox = DefaultPostbox[ModelPassId, ModelPassError](
+                key_compute_callable=lambda error: error.context.model_pass_id
+            )
+            model_pass_result_retriever = DefaultModelPassResultRetriever(
+                result_inbox=result_postbox,
+                error_inbox=result_error_postbox,
             )
 
-            await self.start_lifecycle(stack, execution_coordinator)
+            invocation_coordinator = HopInvocationCoordinator(
+                max_concurrent_invocations=4,
+                inbox=hop_contribution_collection_postbox,
+                assembler=request_assembler,
+                ingress_hop_handler=DefaultIngressHopHandler(),
+                partition_replica_hop_handler=partition_replica_handler,
+                sink_hop_handler=DefaultSinkHopHandler(result_postbox),
+                contribution_propagator=DefaultHopContributionPropagator(
+                    router=DefaultHopOutputRouter(worker_plan_store),
+                    dispatcher=contribution_dispatcher,
+                ),
+            )
+
+            await self.start_lifecycle(stack, partition_replica_handler)
             await self.start_lifecycle(stack, invocation_coordinator)
             await self.start_profiling_lifecycles(
                 stack=stack,
@@ -312,67 +288,13 @@ class DefaultCompositionRoot(CompositionRoot):
                 activity_manager=activity_manager,
             )
 
-            ingress_plan_deployer = None
-            sink_plan_deployer = None
-            model_invocation_coordinator = None
-            result_contribution_sink = None
-            model_pass_result_retriever = None
-
-            if service_instance.get_capabilities_by_type(CapabilityType.RESULT_SINKER):
-                ingress_plan_deployer = DefaultIngressPlanDeployer(ingress_plan_store)
-                sink_plan_deployer = DefaultSinkPlanDeployer(sink_plan_store)
-
-                result_collection_postbox = DefaultPostbox[
-                    ModelPassId,
-                    ModelPassResultCollection,
-                ](key_compute_callable=lambda collection: collection.key)
-                result_error_postbox = DefaultPostbox[
-                    ModelPassId,
-                    ModelPassError,
-                ](
-                    key_compute_callable=lambda error: error.context.model_pass_id,
-                )
-                result_contribution_pipeline = DefaultContributionPipeline(
-                    gathering_policy=ModelPassResultContributionGatheringPolicy(
-                        sink_plan_store
-                    ),
-                    contribution_store=InMemoryContributionStore[
-                        ModelPassId,
-                        ModelPassResultContribution,
-                    ](),
-                    outbox=result_collection_postbox,
-                )
-                model_pass_result_retriever = DefaultModelPassResultRetriever(
-                    inbox=result_collection_postbox,
-                    error_inbox=result_error_postbox,
-                    assembler=ModelPassResultAssembler(),
-                )
-                model_pass_coordinator = DefaultModelPassCoordinator(
-                    input_router=DefaultIngressInputRouter(),
-                    ingress_plan_reader=ingress_plan_store,
-                    contribution_sender_coordinator=contribution_send_coordinator,
-                    result_retriever_gateway=ArrowModelPassResultRetrieverGateway(
-                        service_directory
-                    ),
-                )
-                model_invocation_coordinator = DefaultModelInvocationCoordinator(
-                    active_plan_version_reader=ingress_plan_store,
-                    model_pass_coordinator=model_pass_coordinator,
-                )
-                result_contribution_sink = DefaultModelPassResultContributionSink(
-                    contribution_pipeline=result_contribution_pipeline,
-                    error_outbox=result_error_postbox,
-                )
-
             yield WorkerComposition(
                 worker_plan_deployer=worker_plan_deployer,
-                partition_invocation_coordinator=invocation_coordinator,
-                worker_identity_query=DefaultWorkerIdentityQuery(worker_id),
-                ingress_plan_deployer=ingress_plan_deployer,
-                sink_plan_deployer=sink_plan_deployer,
-                model_invocation_coordinator=model_invocation_coordinator,
-                result_contribution_sink=result_contribution_sink,
+                hop_contribution_receiver=DefaultHopInvocationContributionReceiveCoordinator(
+                    contribution_pipeline
+                ),
                 model_pass_result_retriever=model_pass_result_retriever,
+                worker_identity_query=DefaultWorkerIdentityQuery(worker_id),
             )
 
     async def start_profiling_lifecycles(

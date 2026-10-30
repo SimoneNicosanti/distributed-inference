@@ -1,12 +1,16 @@
 from pydantic import BaseModel, ConfigDict, NonNegativeInt
 
+from integration.dto.context.context_dto import (
+    DestinationHopDto,
+    InvocableHopDto,
+    PartitionReplicaHopDto,
+    SourceHopDto,
+)
 from shared.flow.flow import FlowId
 from shared.model.keys import TensorKey
 from shared.model.model_partition import ModelPartitionId
-from shared.model.model_variant import ModelVariantId
 from shared.plan.partition_replica_id import PartitionReplicaId
 from shared.plan.plan_version import PlanVersion
-from shared.service.service import SinkId
 
 
 class ResourceAllocationDto(BaseModel):
@@ -36,39 +40,60 @@ class PartitionExecutionPlanDto(BaseModel):
     schemes: tuple[PartitionIOSchemeDto, ...]
 
 
-class ReplicaInputBindingDto(BaseModel):
+class SourceHopAddressDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    prev_replica_id: PartitionReplicaId | None
+    flow_id: FlowId
+    hop: SourceHopDto
+
+
+class DestinationHopAddressDto(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    flow_id: FlowId
+    hop: DestinationHopDto
+
+
+class InvocableHopAddressDto(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    flow_id: FlowId
+    hop: InvocableHopDto
+
+
+class HopInputRoutingDto(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    source: SourceHopAddressDto
     tensors: tuple[TensorKey, ...]
 
 
-class ReplicaOutputRouteDto(BaseModel):
+class HopOutputRoutingDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    next_replica_id: PartitionReplicaId | None
+    destination: DestinationHopAddressDto
     tensors: tuple[TensorKey, ...]
 
 
-class ReplicaRoutingDto(BaseModel):
+class HopRoutingsDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    input_bindings: tuple[ReplicaInputBindingDto, ...]
-    output_routes: tuple[ReplicaOutputRouteDto, ...]
+    input_routings: tuple[HopInputRoutingDto, ...]
+    output_routings: tuple[HopOutputRoutingDto, ...]
 
 
-class RoutingPlanDto(BaseModel):
+class HopRoutingPlanDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    replica_ids: tuple[PartitionReplicaId, ...]
-    routings: tuple[ReplicaRoutingDto, ...]
+    hop_addresses: tuple[InvocableHopAddressDto, ...]
+    routings: tuple[HopRoutingsDto, ...]
 
 
 class PriorityKeyDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     flow_id: FlowId
-    partition_replica_id: PartitionReplicaId
+    executable_hop: PartitionReplicaHopDto
 
 
 class SchedulingPlanDto(BaseModel):
@@ -85,43 +110,4 @@ class WorkerPlanDto(BaseModel):
     deployment_plan: DeploymentPlanDto
     scheduling_plan: SchedulingPlanDto
     partition_execution_plan: PartitionExecutionPlanDto
-    routing_plan: RoutingPlanDto
-
-
-class IngressInputRouteDto(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    target_replica_id: PartitionReplicaId
-    tensors: tuple[TensorKey, ...]
-
-
-class FlowPlanDto(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    model_variant_id: ModelVariantId
-    input_routes: tuple[IngressInputRouteDto, ...]
-    sink_id: SinkId
-
-
-class IngressPlanDto(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    plan_version: PlanVersion
-    flow_ids: tuple[FlowId, ...]
-    flow_plans: tuple[FlowPlanDto, ...]
-
-
-class SinkPlanDto(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    plan_version: PlanVersion
-    flow_ids: tuple[FlowId, ...]
-    result_tensors_by_flow: tuple[tuple[TensorKey, ...], ...]
-
-
-class ServicePlanDto(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    worker_plan: WorkerPlanDto
-    ingress_plan: IngressPlanDto | None
-    sink_plan: SinkPlanDto | None = None
+    hop_routing_plan: HopRoutingPlanDto

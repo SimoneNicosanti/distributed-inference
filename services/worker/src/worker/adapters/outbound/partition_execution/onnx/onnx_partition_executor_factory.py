@@ -17,7 +17,7 @@ from worker.application.ports.outbound.partition_execution.partition_executor im
 from worker.application.ports.outbound.partition_execution.partition_executor_factory import (
     PartitionExecutorFactory,
 )
-from worker.domain.plan.worker.deployment_plan import ResourceAllocation
+from worker.domain.plan.deployment_plan import ResourceAllocation
 
 
 class OnnxInferenceSessionBuilder:

@@ -4,7 +4,7 @@ from artifacts.storage.artifact_store import ArtifactStore
 from shared.plan.partition_deployment_id import PartitionDeploymentId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import WorkerId
-from worker.application.partition_execution.abc.partition_executor_registry import (
+from worker.application.hop_handler.abc.partition_executor_registry import (
     PartitionExecutorRegistry,
 )
 from worker.application.ports.inbound.deployment.plan_deployer import PlanDeployer
@@ -20,7 +20,7 @@ from worker.application.ports.outbound.partition_execution.partition_executor_fa
 from worker.application.ports.outbound.plan_store.plan_store_writer import (
     PlanStoreWriter,
 )
-from worker.domain.plan.worker.worker_plan import WorkerPlan
+from worker.domain.plan.worker_plan import WorkerPlan
 
 
 class DefaultWorkerPlanDeployer(PlanDeployer[WorkerPlan]):
