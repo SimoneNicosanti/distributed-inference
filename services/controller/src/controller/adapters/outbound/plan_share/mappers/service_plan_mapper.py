@@ -1,5 +1,5 @@
 from controller.domain.plan.service_plan import ServicePlan
-from integration.dto.service_plan.service_plan_dto import (
+from integration.dto.worker_plan.service_plan_dto import (
     DeploymentPlanDto,
     FlowPlanDto,
     IngressInputRouteDto,

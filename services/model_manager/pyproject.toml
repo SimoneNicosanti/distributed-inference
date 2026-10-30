@@ -6,6 +6,7 @@ dependencies = [
   "aiofiles>=25.1.0",
   "boto3>=1.43.116",
   "botocore>=1.43.116",
+  "distributed-inference-advertisement[http]",
   "distributed-inference-artifacts",
   "distributed-inference-catalog",
   "distributed-inference-integration",
@@ -13,6 +14,7 @@ dependencies = [
   "distributed-inference-shared",
   "distributed-inference-utils",
   "fastapi>=0.139.2",
+  "httpx>=0.28.1",
   "networkx>=3.4",
   "numpy>=2.0",
   "onnx>=1.23",
@@ -31,6 +33,7 @@ build-backend = "hatchling.build"
 packages = ["src/model_manager"]
 
 [tool.uv.sources]
+distributed-inference-advertisement = { path = "../../packages/advertisement", editable = true }
 distributed-inference-artifacts = { path = "../../packages/artifacts", editable = true }
 distributed-inference-catalog = { path = "../../packages/catalog", editable = true }
 distributed-inference-integration = { path = "../../packages/integration", editable = true }

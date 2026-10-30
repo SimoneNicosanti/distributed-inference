@@ -34,7 +34,7 @@ class ArrowNetworkProbeClient(NetworkProbeClient):
     async def probe_connection(self, worker_instance: WorkerInstance) -> ConnectionInfo:
 
         network_probe_capabilities = worker_instance.get_capabilities_by_type(
-            CapabilityType.NETWORK_PROFILING
+            CapabilityType.IN_NETWORK_PROFILING
         )
 
         if len(network_probe_capabilities) == 0:

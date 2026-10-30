@@ -119,16 +119,13 @@ async def test_sender_reaches_generic_hop_server() -> None:
                 interfaces=[
                     CapabilityInterface(
                         protocol=CapabilityProtocol.ARROW,
-                        endpoint=ArrowUrl(
-                            f"grpc+tcp://127.0.0.1:{server.port}"
-                        ),
+                        endpoint=ArrowUrl(f"grpc+tcp://127.0.0.1:{server.port}"),
                     )
                 ],
             ),
             Capability(type=CapabilityType.PLAN_ACTUATION, interfaces=[]),
-            Capability(type=CapabilityType.NETWORK_PROFILING, interfaces=[]),
-            Capability(type=CapabilityType.EXECUTION_PROFILING, interfaces=[]),
-            Capability(type=CapabilityType.RESOURCE_PROFILING, interfaces=[]),
+            Capability(type=CapabilityType.IN_NETWORK_PROFILING, interfaces=[]),
+            Capability(type=CapabilityType.RESULT_RETRIEVE, interfaces=[]),
         ],
     )
     sender = ArrowHopInvocationContributionSender(

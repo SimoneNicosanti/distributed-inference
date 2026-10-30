@@ -5,15 +5,22 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from typing import cast, override
 
 import boto3  # type: ignore[import-untyped]
+import httpx
 from botocore import UNSIGNED  # type: ignore[import-untyped]
 from botocore.config import Config  # type: ignore[import-untyped]
 from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 from redis import asyncio as redis_asyncio
 
+from advertisement.advertising_manager import AdvertisingManager
+from advertisement.arrow.arrow_capability_life_checker import (
+    build_arrow_capability_life_checkers,
+)
+from advertisement.http.http_capability_life_checker import (
+    build_http_capability_life_checkers,
+)
 from artifacts.storage.artifact_store import ArtifactStore
 from artifacts.storage.s3.s3_artifact_store import S3ArtifactStore
 from artifacts.storage.s3.s3_client import S3Client
-from catalog.heartbeat.heartbeat_manager import HeartbeatManager
 from catalog.redis.redis_directory import RedisDirectory
 from catalog.redis.redis_registrar import RedisRegistrar
 from integration.redis.model_partition.keys_factory import (
@@ -186,7 +193,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 self.build_redis_connection_context()
             )
             await stack.enter_async_context(
-                self.build_heartbeat_manager_context(redis, service_instance)
+                self.build_advertising_manager_context(redis, service_instance)
             )
             artifact_store = await stack.enter_async_context(
                 self.build_artifact_store_context()
@@ -387,21 +394,30 @@ class DefaultCompositionRoot(CompositionRoot):
             yield redis
 
     @asynccontextmanager
-    async def build_heartbeat_manager_context(
+    async def build_advertising_manager_context(
         self,
         redis: redis_asyncio.Redis,
         service_instance: WorkerInstance,
-    ) -> AsyncGenerator[HeartbeatManager]:
-        heartbeat_manager = HeartbeatManager(
-            RedisRegistrar(redis, entry_ttl_s=60),
-            service_instance,
-            heartbeat_interval_s=20,
-        )
-        await heartbeat_manager.start()
-        try:
-            yield heartbeat_manager
-        finally:
-            await heartbeat_manager.stop()
+    ) -> AsyncGenerator[AdvertisingManager]:
+        async with httpx.AsyncClient() as http_client:
+            capability_life_checkers = [
+                *build_http_capability_life_checkers(
+                    service_instance,
+                    http_client,
+                ),
+                *build_arrow_capability_life_checkers(service_instance),
+            ]
+            advertising_manager = AdvertisingManager(
+                RedisRegistrar(redis, entry_ttl_s=60),
+                service_instance.service_id,
+                capability_life_checkers,
+                heartbeat_interval_s=20,
+            )
+            await advertising_manager.start()
+            try:
+                yield advertising_manager
+            finally:
+                await advertising_manager.stop()
 
     @asynccontextmanager
     async def build_artifact_store_context(self) -> AsyncGenerator[ArtifactStore]:

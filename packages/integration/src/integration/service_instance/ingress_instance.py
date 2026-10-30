@@ -18,7 +18,7 @@ class ResultSinkInstance(ServiceInstance):
             raise ValueError("Worker instance must have at least one capability")
 
         required_capabilities = {
-            CapabilityType.RESULT_SINKER,
+            CapabilityType.RESULT_RETRIEVE,
         }
 
         actual_capabilities = {capability.type for capability in self.capabilities}

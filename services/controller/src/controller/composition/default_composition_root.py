@@ -5,8 +5,11 @@ from typing import override
 import httpx
 from redis import asyncio as redis_asyncio
 
+from advertisement.advertising_manager import AdvertisingManager
+from advertisement.http.http_capability_life_checker import (
+    build_http_capability_life_checkers,
+)
 from catalog.api.directory import Directory
-from catalog.heartbeat.heartbeat_manager import HeartbeatManager
 from catalog.redis.redis_directory import RedisDirectory
 from catalog.redis.redis_registrar import RedisRegistrar
 from controller.adapters.outbound.directory.default_worker_directory_gateway import (
@@ -101,7 +104,7 @@ class DefaultCompositionRoot(CompositionRoot):
             )
 
             await stack.enter_async_context(
-                self.build_heartbeat_manager_context(redis, service_instance)
+                self.build_advertising_manager_context(redis, service_instance)
             )
 
             directory = RedisDirectory(redis)
@@ -235,19 +238,22 @@ class DefaultCompositionRoot(CompositionRoot):
             yield redis
 
     @asynccontextmanager
-    async def build_heartbeat_manager_context(
+    async def build_advertising_manager_context(
         self, redis: redis_asyncio.Redis, service_instance: ServiceInstance
-    ) -> AsyncGenerator[HeartbeatManager]:
-        async with AsyncExitStack() as stack:
+    ) -> AsyncGenerator[AdvertisingManager]:
+        async with httpx.AsyncClient() as http_client:
             registrar = RedisRegistrar(redis, entry_ttl_s=60)
-
-            heartbeat_manager = HeartbeatManager(
+            advertising_manager = AdvertisingManager(
                 registrar,
-                service_instance,
+                service_instance.service_id,
+                build_http_capability_life_checkers(
+                    service_instance,
+                    http_client,
+                ),
                 heartbeat_interval_s=20,
             )
-
-            stack.push_async_callback(heartbeat_manager.stop)
-            await heartbeat_manager.start()
-
-            yield heartbeat_manager
+            await advertising_manager.start()
+            try:
+                yield advertising_manager
+            finally:
+                await advertising_manager.stop()

@@ -1,9 +1,12 @@
 import asyncio
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from pydantic import HttpUrl
 
+from advertisement.http.http_capability_life_checker import (
+    DEFAULT_HTTP_READINESS_PATH,
+)
 from controller.adapters.inbound.http_optimization_manager import (
     build_optimization_manager_router,
 )
@@ -16,6 +19,10 @@ from integration.service_instance.service_instance import (
     ServiceInstance,
 )
 from shared.service.service import ServiceId
+
+
+async def readiness() -> Response:
+    return Response(status_code=204)
 
 
 def build_service_instance() -> ServiceInstance:
@@ -45,6 +52,12 @@ async def main() -> None:
 
     async with composition_root.compose(service_instance) as optimization_manager:
         app = FastAPI(title="Model Manager")
+        app.add_api_route(
+            DEFAULT_HTTP_READINESS_PATH,
+            readiness,
+            methods=["GET"],
+            status_code=204,
+        )
 
         app.include_router(
             build_optimization_manager_router(

@@ -20,9 +20,8 @@ class WorkerInstance(ServiceInstance):
         required_capabilities = {
             CapabilityType.HOP_INVOCATION,
             CapabilityType.PLAN_ACTUATION,
-            CapabilityType.NETWORK_PROFILING,
-            CapabilityType.EXECUTION_PROFILING,
-            CapabilityType.RESOURCE_PROFILING,
+            CapabilityType.IN_NETWORK_PROFILING,
+            CapabilityType.RESULT_RETRIEVE,
         }
 
         actual_capabilities = {capability.type for capability in self.capabilities}

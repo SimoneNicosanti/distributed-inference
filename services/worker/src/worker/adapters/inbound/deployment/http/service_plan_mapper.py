@@ -1,4 +1,4 @@
-from integration.dto.service_plan.service_plan_dto import WorkerPlanDto
+from integration.dto.worker_plan.worker_plan_dto import WorkerPlanDto
 from worker.adapters.context_mapper import (
     destination_hop_from_dto,
     invocable_hop_from_dto,
@@ -77,9 +77,7 @@ def worker_plan_from_dto(dto: WorkerPlanDto) -> WorkerPlan:
                         HopOutputRouting(
                             destination=HopAddress(
                                 flow_id=route.destination.flow_id,
-                                hop=destination_hop_from_dto(
-                                    route.destination.hop
-                                ),
+                                hop=destination_hop_from_dto(route.destination.hop),
                             ),
                             tensors=route.tensors,
                         )

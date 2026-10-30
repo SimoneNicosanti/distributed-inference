@@ -14,6 +14,7 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /app
 
 COPY services/worker/pyproject.toml services/worker/pyproject.toml
+COPY packages/advertisement/pyproject.toml packages/advertisement/pyproject.toml
 COPY packages/artifacts/pyproject.toml packages/artifacts/pyproject.toml
 COPY packages/catalog/pyproject.toml packages/catalog/pyproject.toml
 COPY packages/integration/pyproject.toml packages/integration/pyproject.toml
@@ -30,6 +31,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         --no-install-project
 
 COPY services/worker/src services/worker/src
+COPY packages/advertisement/src packages/advertisement/src
 COPY packages/artifacts/src packages/artifacts/src
 COPY packages/catalog/src packages/catalog/src
 COPY packages/integration/src packages/integration/src

@@ -3,6 +3,7 @@ name = "distributed-inference-controller"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
+  "distributed-inference-advertisement[http]",
   "distributed-inference-catalog",
   "distributed-inference-integration",
   "distributed-inference-lifecycle",
@@ -24,6 +25,7 @@ build-backend = "hatchling.build"
 packages = ["src/controller"]
 
 [tool.uv.sources]
+distributed-inference-advertisement = { path = "../../packages/advertisement", editable = true }
 distributed-inference-catalog = { path = "../../packages/catalog", editable = true }
 distributed-inference-integration = { path = "../../packages/integration", editable = true }
 distributed-inference-lifecycle = { path = "../../packages/lifecycle", editable = true }

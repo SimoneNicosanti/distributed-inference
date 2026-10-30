@@ -5,6 +5,7 @@ requires-python = ">=3.14"
 dependencies = [
   "boto3>=1.43.116",
   "botocore>=1.43.116",
+  "distributed-inference-advertisement[arrow,http]",
   "distributed-inference-artifacts",
   "distributed-inference-catalog",
   "distributed-inference-integration",
@@ -12,6 +13,7 @@ dependencies = [
   "distributed-inference-scheduling",
   "distributed-inference-shared",
   "fastapi>=0.139.2",
+  "httpx>=0.28.1",
   "numpy>=2.0",
   "nvidia-ml-py>=13.580",
   "onnxruntime-gpu==1.31.0",
@@ -29,6 +31,7 @@ build-backend = "hatchling.build"
 packages = ["src/worker"]
 
 [tool.uv.sources]
+distributed-inference-advertisement = { path = "../../packages/advertisement", editable = true }
 distributed-inference-artifacts = { path = "../../packages/artifacts", editable = true }
 distributed-inference-catalog = { path = "../../packages/catalog", editable = true }
 distributed-inference-integration = { path = "../../packages/integration", editable = true }

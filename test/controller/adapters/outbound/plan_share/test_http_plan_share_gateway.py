@@ -71,10 +71,9 @@ def _worker_instance(
     capabilities = [
         Capability(type=capability_type, interfaces=[])
         for capability_type in (
-            CapabilityType.PARTITION_INFERENCE,
-            CapabilityType.NETWORK_PROFILING,
-            CapabilityType.EXECUTION_PROFILING,
-            CapabilityType.RESOURCE_PROFILING,
+            CapabilityType.HOP_INVOCATION,
+            CapabilityType.IN_NETWORK_PROFILING,
+            CapabilityType.RESULT_RETRIEVE,
         )
     ]
     capabilities.append(

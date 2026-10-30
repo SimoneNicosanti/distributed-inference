@@ -13,6 +13,7 @@ WORKDIR /app
 
 # Copy manifests first to preserve the dependency layer when source changes.
 COPY services/controller/pyproject.toml services/controller/pyproject.toml
+COPY packages/advertisement/pyproject.toml packages/advertisement/pyproject.toml
 COPY packages/catalog/pyproject.toml packages/catalog/pyproject.toml
 COPY packages/integration/pyproject.toml packages/integration/pyproject.toml
 COPY packages/lifecycle/pyproject.toml packages/lifecycle/pyproject.toml
@@ -26,6 +27,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         --no-install-project
 
 COPY services/controller/src services/controller/src
+COPY packages/advertisement/src packages/advertisement/src
 COPY packages/catalog/src packages/catalog/src
 COPY packages/integration/src packages/integration/src
 COPY packages/lifecycle/src packages/lifecycle/src

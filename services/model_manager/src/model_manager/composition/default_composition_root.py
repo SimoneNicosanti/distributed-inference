@@ -5,16 +5,20 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from typing import cast, override
 
 import boto3
+import httpx
 from botocore import UNSIGNED
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from redis import asyncio as redis_asyncio
 
+from advertisement.advertising_manager import AdvertisingManager
+from advertisement.http.http_capability_life_checker import (
+    build_http_capability_life_checkers,
+)
 from artifacts.storage.artifact_store import ArtifactStore
 from artifacts.storage.s3.s3_artifact_store import S3ArtifactStore
 from artifacts.storage.s3.s3_client import S3Client
 from catalog.api.registrar import Registrar
-from catalog.heartbeat.heartbeat_manager import HeartbeatManager
 from catalog.redis.redis_registrar import RedisRegistrar
 from integration.redis.model.keys_factory import StringModelKeyFactory
 from integration.redis.model_partition.keys_factory import (
@@ -80,7 +84,7 @@ class DefaultCompositionRoot(CompositionRoot):
 
             registrar = RedisRegistrar(redis, entry_ttl_s=60)
             await stack.enter_async_context(
-                self.build_heartbeat_manager_context(registrar, service_instance)
+                self.build_advertising_manager_context(registrar, service_instance)
             )
 
             model_profiler = self.build_model_profiler()
@@ -118,23 +122,26 @@ class DefaultCompositionRoot(CompositionRoot):
             yield redis
 
     @asynccontextmanager
-    async def build_heartbeat_manager_context(
+    async def build_advertising_manager_context(
         self,
         registrar: Registrar,
         service_instance: ServiceInstance,
-    ) -> AsyncGenerator[HeartbeatManager]:
-
-        async with AsyncExitStack() as stack:
-            heartbeat_manager = HeartbeatManager(
+    ) -> AsyncGenerator[AdvertisingManager]:
+        async with httpx.AsyncClient() as http_client:
+            advertising_manager = AdvertisingManager(
                 registrar,
-                service_instance,
+                service_instance.service_id,
+                build_http_capability_life_checkers(
+                    service_instance,
+                    http_client,
+                ),
                 heartbeat_interval_s=20,
             )
-
-            stack.push_async_callback(heartbeat_manager.stop)
-            await heartbeat_manager.start()
-
-            yield heartbeat_manager
+            await advertising_manager.start()
+            try:
+                yield advertising_manager
+            finally:
+                await advertising_manager.stop()
 
     @staticmethod
     def build_model_profiler() -> ModelProfiler:

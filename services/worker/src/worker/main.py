@@ -4,9 +4,12 @@ from collections.abc import Sequence
 from typing import Protocol
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from pydantic import HttpUrl
 
+from advertisement.http.http_capability_life_checker import (
+    DEFAULT_HTTP_READINESS_PATH,
+)
 from integration.service_instance.service_instance import (
     ArrowUrl,
     Capability,
@@ -49,6 +52,10 @@ class FlightServer(Protocol):
     def serve(self) -> None: ...
 
     def shutdown(self) -> None: ...
+
+
+async def readiness() -> Response:
+    return Response(status_code=204)
 
 
 def _get_port(variable_name: str, default: int) -> int:
@@ -104,19 +111,11 @@ def build_worker_instance() -> WorkerInstance:
             ],
         ),
         Capability(
-            type=CapabilityType.NETWORK_PROFILING,
+            type=CapabilityType.IN_NETWORK_PROFILING,
             interfaces=[_arrow_interface(advertised_host, network_port)],
         ),
         Capability(
-            type=CapabilityType.EXECUTION_PROFILING,
-            interfaces=[],
-        ),
-        Capability(
-            type=CapabilityType.RESOURCE_PROFILING,
-            interfaces=[],
-        ),
-        Capability(
-            type=CapabilityType.RESULT_SINKER,
+            type=CapabilityType.RESULT_RETRIEVE,
             interfaces=[
                 _arrow_interface(
                     advertised_host,
@@ -134,6 +133,12 @@ def build_worker_instance() -> WorkerInstance:
 
 def build_http_app(composition: WorkerComposition) -> FastAPI:
     app = FastAPI(title="Worker")
+    app.add_api_route(
+        DEFAULT_HTTP_READINESS_PATH,
+        readiness,
+        methods=["GET"],
+        status_code=204,
+    )
     app.include_router(
         build_worker_plan_deployment_router(composition.worker_plan_deployer)
     )

@@ -8,7 +8,7 @@ from integration.dto.context.context_dto import (
     IngressHopDto,
     SinkHopDto,
 )
-from integration.dto.service_plan.service_plan_dto import (
+from integration.dto.worker_plan.worker_plan_dto import (
     DeploymentPlanDto,
     DestinationHopAddressDto,
     HopInputRoutingDto,

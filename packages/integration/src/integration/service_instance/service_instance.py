@@ -7,6 +7,7 @@ from pydantic import (
     ConfigDict,
     HttpUrl,
     TypeAdapter,
+    UrlConstraints,
     model_validator,
 )
 
@@ -19,15 +20,14 @@ class CapabilityProtocol(StrEnum):
     ...
 
 
-## TODO: Do actual validation
 class ArrowUrl(AnyUrl):
-    @classmethod
-    def validate(cls, v: AnyUrl) -> AnyUrl:
-        return v
+    _constraints = UrlConstraints(
+        allowed_schemes=["grpc+tcp"],
+        host_required=True,
+    )
 
 
 class CapabilityInterface(BaseModel):
-    ## TODO: Add validation for host and port
     model_config = ConfigDict(frozen=True)
 
     protocol: CapabilityProtocol
@@ -64,14 +64,16 @@ class CapabilityType(StrEnum):
 
     ## Declared by worker
     HOP_INVOCATION = auto()
-    PARTITION_INFERENCE = HOP_INVOCATION
     PLAN_ACTUATION = auto()
-    NETWORK_PROFILING = auto()
-    EXECUTION_PROFILING = auto()
-    RESOURCE_PROFILING = auto()
+    IN_NETWORK_PROFILING = auto()
+    RESULT_RETRIEVE = auto()
 
-    # Declared by sink
-    RESULT_SINKER = auto()
+
+class CapabilityCouple(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    type: CapabilityType
+    interface: CapabilityInterface
 
 
 class Capability(BaseModel):
