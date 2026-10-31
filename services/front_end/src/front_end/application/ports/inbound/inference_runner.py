@@ -1,19 +1,16 @@
 from abc import ABC, abstractmethod
 
 from front_end.domain.inference_result import InferenceRequest, InferenceResult
+from front_end.domain.model_contract import ModelContract
 from shared.flow.flow import FlowId
-from shared.service.service import WorkerId
 
 
-class InferenceRunner(ABC):
+class InferenceCoordinator(ABC):
     @abstractmethod
-    async def run_inference(
+    async def get_current_contract_for_flow(self, flow_id: FlowId) -> ModelContract: ...
+
+    @abstractmethod
+    async def run_inference_for_request(
         self,
-        flow_id: FlowId,
         request: InferenceRequest,
     ) -> InferenceResult: ...
-
-
-class LocalWorkerIdentityQuery(ABC):
-    @abstractmethod
-    async def get_local_worker_identity(self) -> WorkerId: ...

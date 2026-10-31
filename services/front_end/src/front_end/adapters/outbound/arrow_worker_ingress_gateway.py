@@ -8,8 +8,8 @@ import numpy as np
 import pyarrow as pa
 from pyarrow import flight
 
-from front_end.application.ports.outbound.worker_gateway import (
-    WorkerIngressGateway,
+from front_end.application.ports.outbound.ingress_gateway import (
+    IngressGateway,
 )
 from front_end.domain.inference_result import InferenceResult
 from front_end.domain.tensor_map import TensorMap
@@ -22,7 +22,7 @@ from integration.worker.ingress.arrow.arrow_model_invocation_schema import (
 from shared.flow.flow import FlowId
 
 
-class ArrowWorkerIngressGateway(WorkerIngressGateway):
+class ArrowWorkerIngressGateway(IngressGateway):
     def __init__(
         self,
         location: str,
@@ -32,7 +32,7 @@ class ArrowWorkerIngressGateway(WorkerIngressGateway):
         self._timeout_s = timeout_s
 
     @override
-    async def run_model_invocation(
+    async def invoke_model(
         self,
         flow_id: FlowId,
         bundle: TensorMap,

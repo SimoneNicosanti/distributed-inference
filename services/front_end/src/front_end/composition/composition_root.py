@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from front_end.application.ports.inbound.inference_runner import (
-    InferenceRunner,
+    InferenceCoordinator,
     LocalWorkerIdentityQuery,
 )
 from front_end.application.ports.inbound.model_loader import ModelLoader
@@ -12,7 +12,7 @@ from front_end.application.ports.inbound.model_loader import ModelLoader
 
 @dataclass(frozen=True)
 class FrontEndComposition:
-    inference_runner: InferenceRunner
+    inference_runner: InferenceCoordinator
     local_worker_identity_query: LocalWorkerIdentityQuery
     model_loader: ModelLoader
 

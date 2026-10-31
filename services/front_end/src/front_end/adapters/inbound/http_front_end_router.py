@@ -7,7 +7,7 @@ from fastapi import APIRouter, File, Form, UploadFile
 
 from artifacts.archive.zip_archive import decompress_artifact_bundle
 from front_end.application.ports.inbound.inference_runner import (
-    InferenceRunner,
+    InferenceCoordinator,
     LocalWorkerIdentityQuery,
 )
 from front_end.application.ports.inbound.model_loader import ModelLoader
@@ -33,7 +33,7 @@ CHUNK_SIZE = 1024 * 1024
 
 
 def build_front_end_router(
-    inference_runner: InferenceRunner,
+    inference_runner: InferenceCoordinator,
     local_worker_identity_query: LocalWorkerIdentityQuery,
     model_loader: ModelLoader,
 ) -> APIRouter:
@@ -54,7 +54,7 @@ def build_front_end_router(
     async def run_inference(
         request: RunInferenceRequest,
     ) -> RunInferenceResponse:
-        result = await inference_runner.run_inference(
+        result = await inference_runner.run_inference_for_request(
             flow_id=request.flow_id,
             bundle=request.bundle.to_ndarrays(),
         )

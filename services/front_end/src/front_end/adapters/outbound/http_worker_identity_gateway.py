@@ -2,7 +2,7 @@ from typing import override
 
 import httpx
 
-from front_end.application.ports.outbound.worker_gateway import (
+from front_end.application.ports.outbound.worker_identity_gateway import (
     WorkerIdentityGateway,
 )
 from integration.dto.worker_identity.worker_identity_dto import WorkerIdentityDto

@@ -54,7 +54,7 @@ class DefaultCompositionRoot(CompositionRoot):
             )
 
             inference = DefaultInferenceRunner(
-                worker_ingress_gateway=ArrowWorkerIngressGateway(
+                ingress_gateway=ArrowWorkerIngressGateway(
                     os.environ.get(
                         "WORKER_MODEL_INVOCATION_LOCATION",
                         DEFAULT_LOCAL_WORKER_MODEL_INVOCATION_LOCATION,

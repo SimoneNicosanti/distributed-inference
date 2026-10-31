@@ -31,7 +31,7 @@ from worker.application.ports.inbound.hop_contribution_rcv.hop_invocation_contri
     HopInvocationContributionReceiveCoordinator,
 )
 from worker.domain.context.hop_invocation_context import HopInvocationContext
-from worker.domain.context.model_invocation_context import ModelInvocationContext
+from shared.context.model_invocation_context import ModelInvocationContext
 from worker.domain.context.model_pass_context import ModelPassContext, ModelPassType
 from worker.domain.hop.hop import ExternalHop
 from worker.domain.hop.hop_invocation_contribution import (
