@@ -4,5 +4,10 @@ from front_end.domain.tensor_map import TensorMap
 
 
 @dataclass(frozen=True, slots=True)
+class InferenceRequest:
+    bundle: TensorMap
+
+
+@dataclass(frozen=True, slots=True)
 class InferenceResult:
     bundle: TensorMap

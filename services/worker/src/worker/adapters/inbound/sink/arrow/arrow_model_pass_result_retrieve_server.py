@@ -1,6 +1,8 @@
-# mypy: disable-error-code="attr-defined,name-defined"
+# mypy: disable-error-code="attr-defined,name-defined,misc"
 
 import asyncio
+
+# mypy: disable-error-code="attr-defined,name-defined"
 from uuid import UUID
 
 import numpy as np
@@ -22,14 +24,17 @@ from worker.domain.context.model_pass_context import ModelPassId
 from worker.domain.model.model_pass import ModelPassResult
 
 
-class ArrowModelPassResultRetriever:
+class ArrowModelPassResultRetrieveServer(flight.FlightServerBase):
     def __init__(
         self,
+        location: str,
         result_retriever: ModelPassResultRetriever,
         event_loop: asyncio.AbstractEventLoop,
     ) -> None:
+        super().__init__(location)
         self._result_retriever = result_retriever
         self._event_loop = event_loop
+        self._result_retriever = result_retriever
 
     def do_exchange(
         self,

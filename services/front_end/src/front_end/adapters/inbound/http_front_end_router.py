@@ -6,7 +6,7 @@ import aiofiles.tempfile
 from fastapi import APIRouter, File, Form, UploadFile
 
 from artifacts.archive.zip_archive import decompress_artifact_bundle
-from front_end.application.ports.inbound.inference import (
+from front_end.application.ports.inbound.inference_runner import (
     InferenceRunner,
     LocalWorkerIdentityQuery,
 )

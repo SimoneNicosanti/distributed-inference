@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
-from front_end.application.ports.inbound.inference import (
+from front_end.application.ports.inbound.inference_runner import (
     InferenceRunner,
     LocalWorkerIdentityQuery,
 )

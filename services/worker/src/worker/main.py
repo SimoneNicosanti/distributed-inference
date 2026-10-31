@@ -29,11 +29,8 @@ from worker.adapters.inbound.hop_contribution.arrow.arrow_hop_invocation_contrib
 from worker.adapters.inbound.profiling.arrow.arrow_network_probe_server import (
     ArrowNetworkProbeServer,
 )
-from worker.adapters.inbound.sink.arrow.arrow_model_pass_result_retriever import (
-    ArrowModelPassResultRetriever,
-)
-from worker.adapters.inbound.sink.arrow.arrow_model_pass_result_server import (
-    ArrowModelPassResultServer,
+from worker.adapters.inbound.sink.arrow.arrow_model_pass_result_retrieve_server import (
+    ArrowModelPassResultRetrieveServer,
 )
 from worker.adapters.inbound.worker_identity.http_worker_identity_query import (
     build_worker_identity_query_router,
@@ -182,15 +179,13 @@ def build_flight_servers(
     ]
 
     servers.append(
-        ArrowModelPassResultServer(
+        ArrowModelPassResultRetrieveServer(
             _arrow_url(
                 bind_host,
                 _get_port("WORKER_RESULT_SINK_PORT", DEFAULT_RESULT_SINK_PORT),
             ).unicode_string(),
-            ArrowModelPassResultRetriever(
-                composition.model_pass_result_retriever,
-                event_loop,
-            ),
+            composition.model_pass_result_retriever,
+            event_loop,
         )
     )
 

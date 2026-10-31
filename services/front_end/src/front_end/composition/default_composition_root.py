@@ -25,7 +25,9 @@ from front_end.adapters.outbound.http_model_manager_gateway import (
 from front_end.adapters.outbound.http_worker_identity_gateway import (
     HttpWorkerIdentityGateway,
 )
-from front_end.application.inference.default_inference import DefaultInference
+from front_end.application.inference.default_inference_runner import (
+    DefaultInferenceRunner,
+)
 from front_end.application.loading.default_model_loader import DefaultModelLoader
 from front_end.composition.composition_root import (
     CompositionRoot,
@@ -51,7 +53,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 self.build_artifact_store_context()
             )
 
-            inference = DefaultInference(
+            inference = DefaultInferenceRunner(
                 worker_ingress_gateway=ArrowWorkerIngressGateway(
                     os.environ.get(
                         "WORKER_MODEL_INVOCATION_LOCATION",
