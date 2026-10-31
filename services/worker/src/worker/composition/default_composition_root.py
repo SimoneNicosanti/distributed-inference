@@ -23,6 +23,9 @@ from artifacts.storage.s3.s3_artifact_store import S3ArtifactStore
 from artifacts.storage.s3.s3_client import S3Client
 from catalog.redis.redis_directory import RedisDirectory
 from catalog.redis.redis_registrar import RedisRegistrar
+from integration.redis.hop_deployment.keys_factory import (
+    StringHopDeploymentKeyFactory,
+)
 from integration.redis.model_partition.keys_factory import (
     StringModelPartitionKeyFactory,
 )
@@ -43,8 +46,8 @@ from lifecycle.async_lifecycle import AsyncLifecycle
 from worker.adapters.outbound.activity_manager.local_activity_manager import (
     LocalActivityManagerAdapter,
 )
-from worker.adapters.outbound.catalog.partition_deployment.redis_partition_deployment_catalog import (
-    RedisPartitionDeploymentCatalog,
+from worker.adapters.outbound.catalog.hop_deployment.redis_hop_deployment_catalog import (
+    RedisHopDeploymentCatalog,
 )
 from worker.adapters.outbound.catalog.service.default_service_directory_gateway import (
     DefaultServiceDirectoryGateway,
@@ -201,7 +204,10 @@ class DefaultCompositionRoot(CompositionRoot):
 
             directory = RedisDirectory(redis)
             service_directory = DefaultServiceDirectoryGateway(directory)
-            deployment_catalog = RedisPartitionDeploymentCatalog(redis)
+            deployment_catalog = RedisHopDeploymentCatalog(
+                redis,
+                StringHopDeploymentKeyFactory,
+            )
             worker_plan_store = InMemoryWorkerPlanStore()
             activity_request_factory = DefaultActivityRequestFactory()
             activity_manager = LocalActivityManagerAdapter(
@@ -221,7 +227,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 ),
                 partition_executor_factory=OnnxPartitionExecutorFactory(),
                 partition_executor_registry=partition_executor_registry,
-                partition_deployment_registrar=deployment_catalog,
+                hop_deployment_registrar=deployment_catalog,
             )
 
             contribution_dispatcher = DefaultHopContributionDispatcher(

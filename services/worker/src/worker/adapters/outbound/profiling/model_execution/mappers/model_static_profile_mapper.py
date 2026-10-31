@@ -1,5 +1,7 @@
-from integration.dto.model.profiled_model_variant_dto import ProfiledModelVariantDto
-from integration.dto.worker_profiles.execution_profile_dto import ShapePointDto
+from integration.dto.model.profiled_model_variant_dto import (
+    ProfiledModelVariantDto,
+    ShapePointDto,
+)
 from shared.model.keys import LayerKey
 from worker.domain.profiling.model_execution.model_static_profile import (
     ModelStaticProfile,

@@ -21,7 +21,9 @@ from worker.domain.plan.scheduling_plan import PriorityKey
 
 
 @dataclass
-class QueuedPartitionInvocationRequest(QueueRequest[HopInvocationRequest, Any]):
+class QueuedPartitionInvocationRequest(
+    QueueRequest[HopInvocationRequest[ExecutableHop], Any]
+):
     plan_version: PlanVersion
     per_plan_priority: int
     sequence: int

@@ -16,10 +16,10 @@ class WorkerPlan:
     hop_routing_plan: HopRoutingPlan
 
     def __post_init__(self) -> None:
-        deployed_replica_ids = set(self.deployment_plan.replica_ids)
+        deployed_executable_hops = set(self.deployment_plan.executable_hops)
 
         deployed_partition_ids = {
-            replica_id.partition_id for replica_id in deployed_replica_ids
+            executable_hop.partition_id for executable_hop in deployed_executable_hops
         }
         if deployed_partition_ids != set(self.partition_execution_plan.partition_ids):
             raise ValueError("Each deployed partition must have an execution scheme")

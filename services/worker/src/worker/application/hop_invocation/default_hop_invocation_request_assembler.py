@@ -1,5 +1,10 @@
 from typing import override
 
+from shared.plan.hop_logical_id import (
+    IngressReplicaId,
+    PartitionReplicaId,
+    SinkReplicaId,
+)
 from worker.application.hop_invocation.abc.contribution_assembler import (
     ContributionAssembler,
 )
@@ -7,12 +12,7 @@ from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import
     PartitionExecutionPlanReader,
 )
 from worker.domain.context.hop_invocation_context import HopInvocationContext
-from worker.domain.hop.hop import (
-    DestinationHop,
-    IngressHop,
-    PartitionReplicaHop,
-    SinkHop,
-)
+from worker.domain.hop.hop import DestinationHop
 from worker.domain.hop.hop_invocation import (
     HopInvocationRequest,
 )
@@ -53,7 +53,7 @@ class DefaultHopInvocationRequestAssembler(ContributionAssembler):
             full_payload = full_payload.merge(contribution.bundle)
 
         match destination_hop:
-            case PartitionReplicaHop(partition_replica_id=replica_id):
+            case PartitionReplicaId() as replica_id:
                 execution_plan = await self._partition_execution_plan_reader.get_partition_execution_plan_by_version(
                     first.plan_version
                 )
@@ -67,7 +67,7 @@ class DefaultHopInvocationRequestAssembler(ContributionAssembler):
                     raise ValueError(f"Missing partition inputs: {missing_inputs}")
                 payload = full_payload.filter(list(execution_scheme.inputs))
 
-            case IngressHop() | SinkHop():
+            case IngressReplicaId() | SinkReplicaId():
                 payload = full_payload
 
             case hop:

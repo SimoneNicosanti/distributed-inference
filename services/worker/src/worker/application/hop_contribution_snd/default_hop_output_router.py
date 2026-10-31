@@ -1,5 +1,6 @@
 from typing import cast, override
 
+from shared.plan.hop_logical_id import SinkReplicaId
 from worker.application.hop_contribution_snd.abc.hop_output_router import (
     HopOutputRouter,
 )
@@ -7,7 +8,7 @@ from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import
     HopRoutingPlanReader,
 )
 from worker.domain.context.hop_invocation_context import HopInvocationContext
-from worker.domain.hop.hop import InvocableHop, SinkHop, SourceHop
+from worker.domain.hop.hop import InvocableHop, SourceHop
 from worker.domain.hop.hop_invocation import (
     HopInvocationResult,
 )
@@ -53,7 +54,7 @@ class DefaultHopOutputRouter(HopOutputRouter):
             available_payload.get_tensor_names()
         )
 
-        if isinstance(hop_invocation_result.context.hop, SinkHop):
+        if isinstance(hop_invocation_result.context.hop, SinkReplicaId):
             if output_tensors_by_destination:
                 raise ValueError("Sink hop cannot have output routes")
             return []

@@ -6,6 +6,7 @@ from typing import override
 import numpy as np
 import onnxruntime as ort
 
+from shared.plan.hop_logical_id import PartitionReplicaId
 from worker.adapters.outbound.partition_execution.onnx.onnx_partition_executor_options import (
     OnnxDeviceType,
     OnnxPartitionExecutorOptions,
@@ -13,7 +14,6 @@ from worker.adapters.outbound.partition_execution.onnx.onnx_partition_executor_o
 from worker.application.ports.outbound.partition_execution.partition_executor import (
     PartitionExecutor,
 )
-from worker.domain.hop.hop import PartitionReplicaHop
 from worker.domain.hop.hop_execution import (
     HopExecutionInput,
     HopExecutionOutput,
@@ -48,8 +48,8 @@ class OnnxPartitionExecutor(PartitionExecutor):
 
     @override
     async def execute(
-        self, partition_execution_input: HopExecutionInput[PartitionReplicaHop]
-    ) -> HopExecutionOutput[PartitionReplicaHop]:
+        self, partition_execution_input: HopExecutionInput[PartitionReplicaId]
+    ) -> HopExecutionOutput[PartitionReplicaId]:
 
         ## Three ways to run inference
         ## Using a thread in the same process
@@ -70,8 +70,8 @@ class OnnxPartitionExecutor(PartitionExecutor):
         return partition_execution_output
 
     def _execute_sync(
-        self, partition_execution_input: HopExecutionInput[PartitionReplicaHop]
-    ) -> HopExecutionOutput[PartitionReplicaHop]:
+        self, partition_execution_input: HopExecutionInput[PartitionReplicaId]
+    ) -> HopExecutionOutput[PartitionReplicaId]:
 
         ## TODO: With this management we are managing only numerical types input
         session_inputs: dict[str, np.ndarray] = {}

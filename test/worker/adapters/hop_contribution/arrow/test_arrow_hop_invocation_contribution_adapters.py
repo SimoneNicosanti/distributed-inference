@@ -14,6 +14,10 @@ from integration.service_instance.service_instance import (
 )
 from integration.service_instance.worker_instance import WorkerInstance
 from shared.flow.flow import FlowId
+from shared.model.model import ModelId
+from shared.model.model_variant import ModelVariantId
+from shared.plan.hop_deployment_id import HopDeploymentId
+from shared.plan.hop_logical_id import IngressReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
 from shared.user.user import UserId
@@ -29,7 +33,7 @@ from worker.application.ports.inbound.hop_contribution_rcv.hop_invocation_contri
 from worker.domain.context.hop_invocation_context import HopInvocationContext
 from worker.domain.context.model_invocation_context import ModelInvocationContext
 from worker.domain.context.model_pass_context import ModelPassContext, ModelPassType
-from worker.domain.hop.hop import ExternalHop, IngressHop
+from worker.domain.hop.hop import ExternalHop
 from worker.domain.hop.hop_invocation_contribution import (
     HopInvocationContribution,
     HopInvocationContributionAck,
@@ -38,7 +42,17 @@ from worker.domain.tensor.tensor import Tensor
 from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
-def _contribution(destination_id: ServiceId) -> HopInvocationContribution:
+def _ingress_replica_id() -> IngressReplicaId:
+    return IngressReplicaId(
+        model_variant_id=ModelVariantId(
+            model_id=ModelId("test-model"),
+            variant_tag="test-variant",
+        ),
+        replica_idx=0,
+    )
+
+
+def _contribution(destination_id: IngressReplicaId) -> HopInvocationContribution:
     return HopInvocationContribution(
         source_context=HopInvocationContext(
             model_pass_context=ModelPassContext(
@@ -50,7 +64,7 @@ def _contribution(destination_id: ServiceId) -> HopInvocationContribution:
             ),
             hop=ExternalHop(),
         ),
-        destination_hop=IngressHop(ingress_id=destination_id),
+        destination_hop=destination_id,
         bundle=TensorBundle(
             {"input": Tensor.from_numpy(np.array([[1, 2]], dtype=np.float32))}
         ),
@@ -58,7 +72,7 @@ def _contribution(destination_id: ServiceId) -> HopInvocationContribution:
 
 
 def test_contribution_wire_round_trip() -> None:
-    contribution = _contribution(ServiceId())
+    contribution = _contribution(_ingress_replica_id())
 
     batch = ArrowHopInvocationContributionSender._encode_contribution(contribution)
     decoded = ArrowHopInvocationContributionServer._decode_contribution(
@@ -99,10 +113,23 @@ class _Directory:
         return self.worker
 
 
+class _HopDeploymentDirectory:
+    def __init__(self, worker_id: ServiceId) -> None:
+        self.worker_id = worker_id
+
+    async def get_hop_deployment_id(
+        self,
+        plan_version: PlanVersion,
+        replica_id: IngressReplicaId,
+    ) -> HopDeploymentId[IngressReplicaId]:
+        assert plan_version == PlanVersion(version_number=1)
+        return HopDeploymentId(replica_id=replica_id, worker_id=self.worker_id)
+
+
 @pytest.mark.asyncio
 async def test_sender_reaches_generic_hop_server() -> None:
     worker_id = ServiceId()
-    contribution = _contribution(worker_id)
+    contribution = _contribution(_ingress_replica_id())
     coordinator = _Coordinator()
     server = ArrowHopInvocationContributionServer(
         "grpc+tcp://127.0.0.1:0",
@@ -130,7 +157,7 @@ async def test_sender_reaches_generic_hop_server() -> None:
     )
     sender = ArrowHopInvocationContributionSender(
         _Directory(worker),  # type: ignore[arg-type]
-        object(),  # type: ignore[arg-type]
+        _HopDeploymentDirectory(worker_id),  # type: ignore[arg-type]
     )
 
     try:

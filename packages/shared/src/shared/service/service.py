@@ -1,5 +1,4 @@
-# We can have multiple users.
-# - Each user can define multiple flows.
+# We can have multiple flows:
 # - Each flow can specify the model (or task type) to be executed.
 # - Each model has multiple versions.
 # - Each model version can be divided in multiple components after the optimization
@@ -22,5 +21,3 @@ class ServiceId:
 
 
 type WorkerId = ServiceId
-type IngressId = ServiceId
-type SinkId = ServiceId

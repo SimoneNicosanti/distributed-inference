@@ -54,7 +54,7 @@ def build_http_capability_life_checkers(
     if not readiness_path.startswith("/"):
         raise ValueError("Readiness path must start with '/'")
 
-    checkers = []
+    checkers: list[CapabilityLifeChecker] = []
     for capability in service_instance.capabilities:
         for interface in capability.interfaces:
             if interface.protocol != CapabilityProtocol.HTTP:

@@ -28,7 +28,7 @@ from controller.domain.plan.routing_plan import (
 from controller.domain.plan.scheduling_plan import PriorityKey, SchedulingPlan
 from controller.domain.plan.worker_plan import WorkerPlan
 from shared.model.model_partition import ModelPartitionId
-from shared.plan.partition_replica_id import PartitionReplicaId
+from shared.plan.hop_logical_id import PartitionReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import WorkerId
 

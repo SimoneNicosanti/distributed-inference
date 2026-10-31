@@ -28,8 +28,8 @@ from worker.adapters.context_mapper import (
     hop_invocation_context_from_dto,
     hop_invocation_context_to_dto,
 )
-from worker.application.ports.outbound.catalog.partition_deployment.partition_deployment_directory import (
-    PartitionDeploymentDirectory,
+from worker.application.ports.outbound.catalog.hop_deployment.hop_deployment_directory import (
+    HopDeploymentDirectory,
 )
 from worker.application.ports.outbound.catalog.service.service_directory_gateway import (
     ServiceDirectoryGateway,
@@ -37,7 +37,6 @@ from worker.application.ports.outbound.catalog.service.service_directory_gateway
 from worker.application.ports.outbound.hop_contribution_snd.contribution_sender import (
     ContributionSender,
 )
-from worker.domain.hop.hop import IngressHop, PartitionReplicaHop, SinkHop
 from worker.domain.hop.hop_invocation_contribution import HopInvocationContribution
 
 
@@ -45,11 +44,11 @@ class ArrowHopInvocationContributionSender(ContributionSender):
     def __init__(
         self,
         directory: ServiceDirectoryGateway,
-        partition_deployment_directory: PartitionDeploymentDirectory,
+        hop_deployment_directory: HopDeploymentDirectory,
         timeout_s: float = 30.0,
     ) -> None:
         self._directory = directory
-        self._partition_deployment_directory = partition_deployment_directory
+        self._hop_deployment_directory = hop_deployment_directory
         self._timeout_s = timeout_s
 
     @override
@@ -63,19 +62,11 @@ class ArrowHopInvocationContributionSender(ContributionSender):
     async def _resolve_worker_id(
         self, contribution: HopInvocationContribution
     ) -> WorkerId:
-        match contribution.destination_hop:
-            case PartitionReplicaHop(partition_replica_id=replica_id):
-                deployment_id = await self._partition_deployment_directory.get_partition_deployment_id(
-                    plan_version=contribution.plan_version,
-                    replica_id=replica_id,
-                )
-                return deployment_id.worker_id
-            case IngressHop(ingress_id=ingress_id):
-                return ingress_id
-            case SinkHop(sink_id=sink_id):
-                return sink_id
-            case hop:
-                raise TypeError(f"Unsupported destination hop: {hop!r}")
+        deployment_id = await self._hop_deployment_directory.get_hop_deployment_id(
+            plan_version=contribution.plan_version,
+            replica_id=contribution.destination_hop,
+        )
+        return deployment_id.worker_id
 
     @staticmethod
     def _select_arrow_interface(
@@ -139,9 +130,7 @@ class ArrowHopInvocationContributionSender(ContributionSender):
         }
         schema = build_contribution_schema(tensor_values)
         metadata = HopInvocationContributionMetadataDto(
-            source_context=hop_invocation_context_to_dto(
-                contribution.source_context
-            ),
+            source_context=hop_invocation_context_to_dto(contribution.source_context),
             destination_hop=destination_hop_to_dto(contribution.destination_hop),
         )
 

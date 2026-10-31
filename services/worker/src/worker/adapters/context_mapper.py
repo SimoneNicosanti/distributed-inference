@@ -10,6 +10,11 @@ from integration.dto.context.context_dto import (
     SinkHopDto,
     SourceHopDto,
 )
+from shared.plan.hop_logical_id import (
+    IngressReplicaId,
+    PartitionReplicaId,
+    SinkReplicaId,
+)
 from worker.domain.context.hop_invocation_context import HopInvocationContext
 from worker.domain.context.model_invocation_context import ModelInvocationContext
 from worker.domain.context.model_pass_context import ModelPassContext, ModelPassType
@@ -17,10 +22,7 @@ from worker.domain.hop.hop import (
     DestinationHop,
     ExternalHop,
     Hop,
-    IngressHop,
     InvocableHop,
-    PartitionReplicaHop,
-    SinkHop,
     SourceHop,
 )
 
@@ -33,7 +35,7 @@ def model_pass_context_to_dto(context: ModelPassContext) -> ModelPassContextDto:
             model_invocation_id=invocation.model_invocation_id,
         ),
         plan_version=context.plan_version,
-        model_pass_type=context.model_pass_type.value,
+        model_pass_type="forward",
         model_pass_id=context.model_pass_id,
     )
 
@@ -55,12 +57,12 @@ def hop_to_dto(hop: Hop) -> ExternalHopDto | InvocableHopDto:
     match hop:
         case ExternalHop():
             return ExternalHopDto()
-        case IngressHop(ingress_id=ingress_id):
-            return IngressHopDto(ingress_id=ingress_id)
-        case PartitionReplicaHop(partition_replica_id=replica_id):
-            return PartitionReplicaHopDto(partition_replica_id=replica_id)
-        case SinkHop(sink_id=sink_id):
-            return SinkHopDto(sink_id=sink_id)
+        case IngressReplicaId():
+            return IngressHopDto(ingress_replica_id=hop)
+        case PartitionReplicaId():
+            return PartitionReplicaHopDto(partition_replica_id=hop)
+        case SinkReplicaId():
+            return SinkHopDto(sink_replica_id=hop)
         case _:
             raise TypeError(f"Unsupported hop: {hop!r}")
 
@@ -69,22 +71,22 @@ def source_hop_from_dto(hop: SourceHopDto) -> SourceHop:
     match hop:
         case ExternalHopDto():
             return ExternalHop()
-        case IngressHopDto(ingress_id=ingress_id):
-            return IngressHop(ingress_id=ingress_id)
+        case IngressHopDto(ingress_replica_id=ingress_replica_id):
+            return ingress_replica_id
         case PartitionReplicaHopDto(partition_replica_id=replica_id):
-            return PartitionReplicaHop(partition_replica_id=replica_id)
+            return replica_id
         case _:
             raise TypeError(f"Unsupported source hop DTO: {hop!r}")
 
 
 def destination_hop_from_dto(hop: DestinationHopDto) -> DestinationHop:
     match hop:
-        case IngressHopDto(ingress_id=ingress_id):
-            return IngressHop(ingress_id=ingress_id)
+        case IngressHopDto(ingress_replica_id=ingress_replica_id):
+            return ingress_replica_id
         case PartitionReplicaHopDto(partition_replica_id=replica_id):
-            return PartitionReplicaHop(partition_replica_id=replica_id)
-        case SinkHopDto(sink_id=sink_id):
-            return SinkHop(sink_id=sink_id)
+            return replica_id
+        case SinkHopDto(sink_replica_id=sink_replica_id):
+            return sink_replica_id
         case _:
             raise TypeError(f"Unsupported destination hop DTO: {hop!r}")
 

@@ -3,9 +3,8 @@ from typing import override
 from pydantic import ValidationError
 
 from catalog.api.directory import Directory
-from integration.service_instance.ingress_instance import ResultSinkInstance
 from integration.service_instance.worker_instance import WorkerInstance
-from shared.service.service import SinkId, WorkerId
+from shared.service.service import WorkerId
 from worker.application.ports.outbound.catalog.service.service_directory_gateway import (
     ServiceDirectoryGateway,
 )
@@ -46,23 +45,4 @@ class DefaultServiceDirectoryGateway(ServiceDirectoryGateway):
         except ValidationError as e:
             raise ValueError(
                 f"Could not find worker instance for worker id {worker_id}"
-            ) from e
-
-    @override
-    async def get_result_sink_instance_by_id(
-        self, result_sink_id: SinkId
-    ) -> ResultSinkInstance:
-        service_instance = await self._directory.get_service_instance_by_service_id(
-            result_sink_id
-        )
-
-        try:
-            service_instance_dump = service_instance.model_dump()
-            result_sink_instance = ResultSinkInstance.model_validate(
-                service_instance_dump
-            )
-            return result_sink_instance
-        except ValidationError as e:
-            raise ValueError(
-                f"Could not find result sink instance for result sink id {result_sink_id}"
             ) from e

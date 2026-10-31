@@ -3,13 +3,16 @@ from pydantic import BaseModel, ConfigDict, NonNegativeInt
 from integration.dto.context.context_dto import (
     DestinationHopDto,
     InvocableHopDto,
-    PartitionReplicaHopDto,
     SourceHopDto,
 )
 from shared.flow.flow import FlowId
 from shared.model.keys import TensorKey
 from shared.model.model_partition import ModelPartitionId
-from shared.plan.partition_replica_id import PartitionReplicaId
+from shared.plan.hop_logical_id import (
+    IngressReplicaId,
+    PartitionReplicaId,
+    SinkReplicaId,
+)
 from shared.plan.plan_version import PlanVersion
 
 
@@ -22,8 +25,10 @@ class ResourceAllocationDto(BaseModel):
 class DeploymentPlanDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    replica_ids: tuple[PartitionReplicaId, ...]
+    executable_hops: tuple[PartitionReplicaId, ...]
     allocations: tuple[ResourceAllocationDto, ...]
+    ingress_hops: tuple[IngressReplicaId, ...]
+    sink_hops: tuple[SinkReplicaId, ...]
 
 
 class PartitionIOSchemeDto(BaseModel):
@@ -93,7 +98,7 @@ class PriorityKeyDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     flow_id: FlowId
-    executable_hop: PartitionReplicaHopDto
+    executable_hop: PartitionReplicaId
 
 
 class SchedulingPlanDto(BaseModel):

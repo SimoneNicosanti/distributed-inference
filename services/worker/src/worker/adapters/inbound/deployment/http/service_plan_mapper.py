@@ -4,7 +4,6 @@ from worker.adapters.context_mapper import (
     invocable_hop_from_dto,
     source_hop_from_dto,
 )
-from worker.domain.hop.hop import PartitionReplicaHop
 from worker.domain.plan.deployment_plan import DeploymentPlan, ResourceAllocation
 from worker.domain.plan.hop_routing_plan import (
     HopAddress,
@@ -28,19 +27,19 @@ def worker_plan_from_dto(dto: WorkerPlanDto) -> WorkerPlan:
     return WorkerPlan(
         plan_version=dto.plan_version,
         deployment_plan=DeploymentPlan(
-            replica_ids=dto.deployment_plan.replica_ids,
+            executable_hops=dto.deployment_plan.executable_hops,
             allocations=tuple(
                 ResourceAllocation(use_gpu=allocation.use_gpu)
                 for allocation in dto.deployment_plan.allocations
             ),
+            ingress_hops=dto.deployment_plan.ingress_hops,
+            sink_hops=dto.deployment_plan.sink_hops,
         ),
         scheduling_plan=SchedulingPlan(
             priority_keys=tuple(
                 PriorityKey(
                     flow_id=key.flow_id,
-                    executable_hop=PartitionReplicaHop(
-                        partition_replica_id=key.executable_hop.partition_replica_id
-                    ),
+                    executable_hop=key.executable_hop,
                 )
                 for key in dto.scheduling_plan.priority_keys
             ),

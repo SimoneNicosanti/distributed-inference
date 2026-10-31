@@ -4,13 +4,13 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
-from shared.plan.partition_replica_id import PartitionReplicaId
 from worker.application.hop_handler.abc.partition_executor_registry import (
     PartitionExecutorRegistry,
 )
 from worker.application.ports.outbound.partition_execution.partition_executor import (
     PartitionExecutor,
 )
+from worker.domain.hop.hop import ExecutableHop
 
 
 class DefaultPartitionExecutorRegistry(PartitionExecutorRegistry):
@@ -21,46 +21,45 @@ class DefaultPartitionExecutorRegistry(PartitionExecutorRegistry):
 
     def __init__(self) -> None:
         self._partition_executors: dict[
-            PartitionReplicaId,
+            ExecutableHop,
             DefaultPartitionExecutorRegistry._PartitionExecutorBundle,
         ] = {}
 
     @override
     async def register_partition_executor(
         self,
-        replica_id: PartitionReplicaId,
+        executable_hop: ExecutableHop,
         partition_executor: PartitionExecutor,
     ) -> None:
-
-        if replica_id in self._partition_executors:
+        if executable_hop in self._partition_executors:
             raise ValueError(
-                f"Partition executor already present for replica {replica_id}"
+                f"Partition executor already present for hop {executable_hop}"
             )
 
         bundle = DefaultPartitionExecutorRegistry._PartitionExecutorBundle(
             partition_executor, asyncio.Lock()
         )
-        self._partition_executors[replica_id] = bundle
+        self._partition_executors[executable_hop] = bundle
 
     @override
     async def unregister_partition_executor(
         self,
-        replica_id: PartitionReplicaId,
+        executable_hop: ExecutableHop,
     ) -> PartitionExecutor:
-        if replica_id not in self._partition_executors:
-            raise KeyError(f"Partition executor not found for replica {replica_id}")
-        bundle = self._partition_executors.pop(replica_id)
+        if executable_hop not in self._partition_executors:
+            raise KeyError(f"Partition executor not found for hop {executable_hop}")
+        bundle = self._partition_executors.pop(executable_hop)
         async with bundle.lock:
             return bundle.partition_executor
 
     @override
     @asynccontextmanager
     async def acquire_partition_executor(
-        self, replica_id: PartitionReplicaId
+        self, executable_hop: ExecutableHop
     ) -> AsyncGenerator[PartitionExecutor]:
-        if replica_id not in self._partition_executors:
-            raise KeyError(f"Partition executor not found for replica {replica_id}")
-        bundle = self._partition_executors[replica_id]
+        if executable_hop not in self._partition_executors:
+            raise KeyError(f"Partition executor not found for hop {executable_hop}")
+        bundle = self._partition_executors[executable_hop]
 
         ## We do a yield while keeping the lock -> No other task can acquire the lock
         async with bundle.lock:
@@ -68,6 +67,6 @@ class DefaultPartitionExecutorRegistry(PartitionExecutorRegistry):
 
     @override
     async def check_partition_executor_exists(
-        self, replica_id: PartitionReplicaId
+        self, executable_hop: ExecutableHop
     ) -> bool:
-        return replica_id in self._partition_executors
+        return executable_hop in self._partition_executors

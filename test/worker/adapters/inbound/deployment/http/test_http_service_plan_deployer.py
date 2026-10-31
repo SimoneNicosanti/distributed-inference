@@ -26,14 +26,16 @@ from integration.worker.deployment.http.service_plan_http_paths import (
     PREPARE_SERVICE_PLAN_PATH,
 )
 from shared.flow.flow import FlowId
+from shared.model.model import ModelId
+from shared.model.model_variant import ModelVariantId
+from shared.plan.hop_logical_id import IngressReplicaId, SinkReplicaId
 from shared.plan.plan_version import PlanVersion
-from shared.service.service import ServiceId
 from shared.user.user import UserId
 from worker.adapters.inbound.deployment.http.http_service_plan_deployer import (
     build_worker_plan_deployment_router,
 )
 from worker.application.ports.inbound.deployment.plan_deployer import PlanDeployer
-from worker.domain.hop.hop import ExternalHop, IngressHop, SinkHop
+from worker.domain.hop.hop import ExternalHop
 from worker.domain.plan.worker_plan import WorkerPlan
 
 
@@ -54,7 +56,12 @@ class RecordingPlanDeployer(PlanDeployer[WorkerPlan]):
 def _empty_worker_plan(version_number: int) -> WorkerPlanDto:
     return WorkerPlanDto(
         plan_version=PlanVersion(version_number=version_number),
-        deployment_plan=DeploymentPlanDto(replica_ids=(), allocations=()),
+        deployment_plan=DeploymentPlanDto(
+            executable_hops=(),
+            allocations=(),
+            ingress_hops=(),
+            sink_hops=(),
+        ),
         scheduling_plan=SchedulingPlanDto(priority_keys=(), priorities=()),
         partition_execution_plan=PartitionExecutionPlanDto(
             partition_ids=(),
@@ -121,15 +128,25 @@ def test_maps_hop_routing_plan() -> None:
     client = _client(deployer)
     plan = _empty_worker_plan(version_number=1)
     flow_id = FlowId(user_id=UserId())
-    ingress_id = ServiceId()
-    sink_id = ServiceId()
+    model_variant_id = ModelVariantId(
+        model_id=ModelId("test-model"),
+        variant_tag="test-variant",
+    )
+    ingress_id = IngressReplicaId(model_variant_id=model_variant_id, replica_idx=0)
+    sink_id = SinkReplicaId(model_variant_id=model_variant_id, replica_idx=0)
     plan = plan.model_copy(
         update={
+            "deployment_plan": DeploymentPlanDto(
+                executable_hops=(),
+                allocations=(),
+                ingress_hops=(ingress_id,),
+                sink_hops=(sink_id,),
+            ),
             "hop_routing_plan": HopRoutingPlanDto(
                 hop_addresses=(
                     InvocableHopAddressDto(
                         flow_id=flow_id,
-                        hop=IngressHopDto(ingress_id=ingress_id),
+                        hop=IngressHopDto(ingress_replica_id=ingress_id),
                     ),
                 ),
                 routings=(
@@ -147,14 +164,14 @@ def test_maps_hop_routing_plan() -> None:
                             HopOutputRoutingDto(
                                 destination=DestinationHopAddressDto(
                                     flow_id=flow_id,
-                                    hop=SinkHopDto(sink_id=sink_id),
+                                    hop=SinkHopDto(sink_replica_id=sink_id),
                                 ),
                                 tensors=("output",),
                             ),
                         ),
                     ),
                 ),
-            )
+            ),
         }
     )
 
@@ -164,9 +181,10 @@ def test_maps_hop_routing_plan() -> None:
     )
 
     assert response.status_code == 204
-    routing_plan = deployer.prepared[0].hop_routing_plan
-    assert routing_plan.hop_addresses[0].hop == IngressHop(ingress_id)
+    prepared_plan = deployer.prepared[0]
+    assert prepared_plan.deployment_plan.ingress_hops == (ingress_id,)
+    assert prepared_plan.deployment_plan.sink_hops == (sink_id,)
+    routing_plan = prepared_plan.hop_routing_plan
+    assert routing_plan.hop_addresses[0].hop == ingress_id
     assert routing_plan.routings[0].input_routings[0].source.hop == ExternalHop()
-    assert routing_plan.routings[0].output_routings[0].destination.hop == SinkHop(
-        sink_id
-    )
+    assert routing_plan.routings[0].output_routings[0].destination.hop == sink_id

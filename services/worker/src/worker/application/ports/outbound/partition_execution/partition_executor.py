@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from worker.domain.hop.hop import PartitionReplicaHop
+from shared.plan.hop_logical_id import PartitionReplicaId
 from worker.domain.hop.hop_execution import (
     HopExecutionInput,
     HopExecutionOutput,
@@ -11,8 +11,8 @@ from worker.domain.hop.hop_execution import (
 class PartitionExecutor(ABC):
     @abstractmethod
     async def execute(
-        self, partition_execution_input: HopExecutionInput[PartitionReplicaHop]
-    ) -> HopExecutionOutput[PartitionReplicaHop]: ...
+        self, partition_execution_input: HopExecutionInput[PartitionReplicaId]
+    ) -> HopExecutionOutput[PartitionReplicaId]: ...
 
     ## close method can be useful for cleaning up resources
     @abstractmethod

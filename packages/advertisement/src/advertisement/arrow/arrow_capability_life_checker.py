@@ -47,7 +47,7 @@ def build_arrow_capability_life_checkers(
     service_instance: ServiceInstance,
     probe_host: str = "127.0.0.1",
 ) -> list[CapabilityLifeChecker]:
-    checkers = []
+    checkers: list[CapabilityLifeChecker] = []
     for capability in service_instance.capabilities:
         for interface in capability.interfaces:
             if interface.protocol != CapabilityProtocol.ARROW:

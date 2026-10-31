@@ -9,7 +9,12 @@ from worker.domain.plan.worker_plan import WorkerPlan
 def test_worker_plan_accepts_empty_subplans() -> None:
     plan = WorkerPlan(
         plan_version=PlanVersion(version_number=1),
-        deployment_plan=DeploymentPlan(replica_ids=(), allocations=()),
+        deployment_plan=DeploymentPlan(
+            executable_hops=(),
+            allocations=(),
+            ingress_hops=(),
+            sink_hops=(),
+        ),
         scheduling_plan=SchedulingPlan(priority_keys=(), priorities=()),
         partition_execution_plan=PartitionExecutionPlan(
             partition_ids=(),
@@ -18,5 +23,5 @@ def test_worker_plan_accepts_empty_subplans() -> None:
         hop_routing_plan=HopRoutingPlan(hop_addresses=(), routings=()),
     )
 
-    assert plan.deployment_plan.replica_ids == ()
+    assert plan.deployment_plan.executable_hops == ()
     assert plan.hop_routing_plan.hop_addresses == ()

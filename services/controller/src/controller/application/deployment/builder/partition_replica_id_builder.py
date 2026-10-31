@@ -7,7 +7,7 @@ from controller.application.deployment.builder.flow_solution_routes import (
 from controller.domain.optimization.optimization_solution import OptimizationSolution
 from shared.flow.flow import FlowId
 from shared.model.model_partition import ModelPartitionId
-from shared.plan.partition_replica_id import PartitionReplicaId
+from shared.plan.hop_logical_id import PartitionReplicaId
 
 type ReplicaIdsByComponentIndex = Mapping[int, PartitionReplicaId]
 type ReplicaIdsByFlow = Mapping[FlowId, ReplicaIdsByComponentIndex]

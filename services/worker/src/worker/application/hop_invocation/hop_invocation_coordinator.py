@@ -3,6 +3,11 @@ from contextlib import suppress
 from typing import cast, override
 
 from lifecycle.async_lifecycle import AsyncLifecycle
+from shared.plan.hop_logical_id import (
+    IngressReplicaId,
+    PartitionReplicaId,
+    SinkReplicaId,
+)
 from worker.application.hop_contribution_rcv.abc.contribution_gathering_policy import (
     HopContributionCollection,
     HopContributionCollectionKey,
@@ -17,12 +22,7 @@ from worker.application.hop_invocation.abc.contribution_assembler import (
     ContributionAssembler,
 )
 from worker.application.postbox.abc.inbox import Inbox
-from worker.domain.hop.hop import (
-    IngressHop,
-    InvocableHop,
-    PartitionReplicaHop,
-    SinkHop,
-)
+from worker.domain.hop.hop import InvocableHop
 from worker.domain.hop.hop_invocation import HopInvocationRequest, HopInvocationResult
 
 
@@ -32,9 +32,9 @@ class HopInvocationCoordinator(AsyncLifecycle):
         max_concurrent_invocations: int,
         inbox: Inbox[HopContributionCollectionKey, HopContributionCollection],
         assembler: ContributionAssembler,
-        ingress_hop_handler: HopHandler[IngressHop],
-        partition_replica_hop_handler: HopHandler[PartitionReplicaHop],
-        sink_hop_handler: HopHandler[SinkHop],
+        ingress_hop_handler: HopHandler[IngressReplicaId],
+        partition_replica_hop_handler: HopHandler[PartitionReplicaId],
+        sink_hop_handler: HopHandler[SinkReplicaId],
         contribution_propagator: HopContributionPropagator,
     ) -> None:
 
@@ -61,36 +61,33 @@ class HopInvocationCoordinator(AsyncLifecycle):
 
             hop_invocation_request = await self._assembler.assemble(contributions)
 
-            # hop_invocation_result: (
-            #     HopInvocationResult[PartitionReplicaHop]
-            #     | HopInvocationResult[IngressHop]
-            #     | HopInvocationResult[SinkHop]
-            # )
-
             hop_invocation_result: (
-                HopInvocationResult[PartitionReplicaHop]
-                | HopInvocationResult[IngressHop]
-                | HopInvocationResult[SinkHop]
+                HopInvocationResult[PartitionReplicaId]
+                | HopInvocationResult[IngressReplicaId]
+                | HopInvocationResult[SinkReplicaId]
             )
             match hop_invocation_request.hop:
-                case PartitionReplicaHop():
+                case PartitionReplicaId():
                     hop_invocation_result = (
                         await self._partition_replica_hop_handler.handle(
                             cast(
-                                HopInvocationRequest[PartitionReplicaHop],
+                                HopInvocationRequest[PartitionReplicaId],
                                 hop_invocation_request,
                             )
                         )
                     )
 
-                case IngressHop():
+                case IngressReplicaId():
                     hop_invocation_result = await self._ingress_hop_handler.handle(
-                        cast(HopInvocationRequest[IngressHop], hop_invocation_request)
+                        cast(
+                            HopInvocationRequest[IngressReplicaId],
+                            hop_invocation_request,
+                        )
                     )
 
-                case SinkHop():
+                case SinkReplicaId():
                     hop_invocation_result = await self._sink_hop_handler.handle(
-                        cast(HopInvocationRequest[SinkHop], hop_invocation_request)
+                        cast(HopInvocationRequest[SinkReplicaId], hop_invocation_request)
                     )
 
                 case hop:

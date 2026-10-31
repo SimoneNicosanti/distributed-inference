@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from shared.model.keys import TensorKey
 from shared.model.model_variant import ModelVariantId
-from shared.plan.partition_replica_id import PartitionReplicaId
+from shared.plan.hop_logical_id import PartitionReplicaId
 from shared.service.service import SinkId
 
 

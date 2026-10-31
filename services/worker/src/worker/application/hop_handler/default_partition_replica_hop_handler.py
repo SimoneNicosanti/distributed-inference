@@ -3,6 +3,7 @@ from contextlib import suppress
 from typing import override
 
 from lifecycle.async_lifecycle import AsyncLifecycle
+from shared.plan.hop_logical_id import PartitionReplicaId
 from worker.application.activity.abc.activity_request_factory import (
     ActivityRequestFactory,
 )
@@ -22,7 +23,6 @@ from worker.domain.activity.activity_request import ActivityType
 from worker.domain.context.hop_execution_context import (
     HopExecutionContext,
 )
-from worker.domain.hop.hop import PartitionReplicaHop
 from worker.domain.hop.hop_execution import (
     HopExecutionInput,
     HopExecutionOutput,
@@ -34,7 +34,7 @@ from worker.domain.hop.hop_invocation import (
 
 
 class DefaultPartitionReplicaHopHandler(
-    HopHandler[PartitionReplicaHop], AsyncLifecycle
+    HopHandler[PartitionReplicaId], AsyncLifecycle
 ):
     def __init__(
         self,
@@ -52,14 +52,14 @@ class DefaultPartitionReplicaHopHandler(
 
     @override
     async def handle(
-        self, hop_invocation_request: HopInvocationRequest[PartitionReplicaHop]
-    ) -> HopInvocationResult[PartitionReplicaHop]:
+        self, hop_invocation_request: HopInvocationRequest[PartitionReplicaId]
+    ) -> HopInvocationResult[PartitionReplicaId]:
 
         ## Here we can only enqueue the request
         ## The request will then be extracted in the loop of the coordinator
         ## and sent to the worker to be processed
         hop_invocation_result_future: asyncio.Future[
-            HopInvocationResult[PartitionReplicaHop]
+            HopInvocationResult[PartitionReplicaId]
         ] = asyncio.get_running_loop().create_future()
 
         await self._hop_invocation_request_scheduler.enqueue(
@@ -116,10 +116,10 @@ class DefaultPartitionReplicaHopHandler(
         self._controller_task = None
 
     async def _execute_partition_invocation(
-        self, hop_invocation_request: HopInvocationRequest[PartitionReplicaHop]
-    ) -> HopInvocationResult[PartitionReplicaHop]:
+        self, hop_invocation_request: HopInvocationRequest[PartitionReplicaId]
+    ) -> HopInvocationResult[PartitionReplicaId]:
 
-        replica_id = hop_invocation_request.hop.partition_replica_id
+        replica_id = hop_invocation_request.hop
         partition_execution_input = await self._build_partition_execution_input(
             hop_invocation_request
         )
@@ -141,9 +141,9 @@ class DefaultPartitionReplicaHopHandler(
     ## In case of stateful models, we need to extract the output from the combined state + output
     async def _build_partition_invocation_result(
         self,
-        partition_invocation_request: HopInvocationRequest[PartitionReplicaHop],
-        partition_execution_output: HopExecutionOutput[PartitionReplicaHop],
-    ) -> HopInvocationResult[PartitionReplicaHop]:
+        partition_invocation_request: HopInvocationRequest[PartitionReplicaId],
+        partition_execution_output: HopExecutionOutput[PartitionReplicaId],
+    ) -> HopInvocationResult[PartitionReplicaId]:
 
         partition_invocation_result = HopInvocationResult(
             context=partition_invocation_request.context,
@@ -155,8 +155,8 @@ class DefaultPartitionReplicaHopHandler(
     ## Right now we are considering only stateless models: this means that the payload of the input is the same as the invocation
     ## In case of stateful models, we need to add the state to the input as well
     async def _build_partition_execution_input(
-        self, partition_invocation_request: HopInvocationRequest[PartitionReplicaHop]
-    ) -> HopExecutionInput[PartitionReplicaHop]:
+        self, partition_invocation_request: HopInvocationRequest[PartitionReplicaId]
+    ) -> HopExecutionInput[PartitionReplicaId]:
         partition_execution_context = HopExecutionContext(
             hop_invocation_context=partition_invocation_request.context
         )

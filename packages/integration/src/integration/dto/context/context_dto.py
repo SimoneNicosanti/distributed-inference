@@ -1,34 +1,15 @@
-from contextlib import suppress
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from shared.flow.flow import FlowId
-from shared.plan.partition_replica_id import PartitionReplicaId
+from shared.plan.hop_logical_id import (
+    IngressReplicaId,
+    PartitionReplicaId,
+    SinkReplicaId,
+)
 from shared.plan.plan_version import PlanVersion
-from shared.service.service import ServiceId
-
-
-def _canonical_service_id(value: object) -> object:
-    if isinstance(value, ServiceId):
-        raw_id = value.id
-    elif isinstance(value, dict) and "id" in value:
-        raw_id = value["id"]
-    else:
-        return value
-
-    if isinstance(raw_id, str):
-        with suppress(ValueError):
-            raw_id = UUID(raw_id)
-
-    return ServiceId(id=raw_id)
-
-
-type HopServiceIdDto = Annotated[
-    ServiceId,
-    BeforeValidator(_canonical_service_id),
-]
 
 
 class ModelInvocationContextDto(BaseModel):
@@ -57,7 +38,7 @@ class IngressHopDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     kind: Literal["ingress"] = "ingress"
-    ingress_id: HopServiceIdDto
+    ingress_replica_id: IngressReplicaId
 
 
 class PartitionReplicaHopDto(BaseModel):
@@ -71,7 +52,7 @@ class SinkHopDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     kind: Literal["sink"] = "sink"
-    sink_id: HopServiceIdDto
+    sink_replica_id: SinkReplicaId
 
 
 type SourceHopDto = Annotated[

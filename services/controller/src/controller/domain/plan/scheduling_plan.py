@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from shared.flow.flow import FlowId
-from shared.plan.partition_replica_id import PartitionReplicaId
+from shared.plan.hop_logical_id import PartitionReplicaId
 
 
 @dataclass(frozen=True, slots=True)
