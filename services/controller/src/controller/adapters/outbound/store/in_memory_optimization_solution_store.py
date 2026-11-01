@@ -5,7 +5,9 @@ from controller.application.deployment.abc.solution_observer import SolutionObse
 from controller.application.ports.outbound.store.optimization_solution_store import (
     OptimizationSolutionStore,
 )
-from controller.domain.optimization.optimization_solution import OptimizationSolution
+from controller.domain.optimization.solving.optimization_solution import (
+    OptimizationSolution,
+)
 
 
 class InMemoryOptimizationSolutionStore(OptimizationSolutionStore, SolutionObserver):

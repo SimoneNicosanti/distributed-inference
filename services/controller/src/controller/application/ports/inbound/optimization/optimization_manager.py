@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from controller.domain.optimization.optimization_request import (
+from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
 )
 

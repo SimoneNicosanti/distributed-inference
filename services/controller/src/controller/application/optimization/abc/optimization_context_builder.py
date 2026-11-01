@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 
-from controller.domain.optimization.optimization_context import OptimizationContext
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
 
 
 class OptimizationContextBuilder(ABC):

@@ -1,7 +1,9 @@
 import math
 from collections.abc import Mapping
 
-from controller.domain.optimization.optimization_context import OptimizationContext
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
 from controller.domain.profile.model_variant_execution_profile import (
     Backend,
     LayerExecutionProfile,

@@ -7,10 +7,10 @@ from controller.adapters.outbound.optimization.gurobi_problem import (
 from controller.adapters.outbound.optimization.gurobi_variables import (
     QoSVariables,
 )
-from controller.domain.optimization.optimization_request import (
+from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
 )
-from controller.domain.optimization.solver_config import ObjectiveKind
+from controller.domain.optimization.solving.solver_config import ObjectiveKind
 
 
 def set_objective(

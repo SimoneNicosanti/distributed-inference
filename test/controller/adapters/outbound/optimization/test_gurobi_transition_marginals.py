@@ -17,8 +17,10 @@ from controller.adapters.outbound.optimization.gurobi_variables import (
     NetworkVariables,
     _add_network_variables,
 )
-from controller.domain.optimization.optimization_context import OptimizationContext
-from controller.domain.optimization.optimization_request import (
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
+from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
 )
 from controller.domain.profile.network_topology import (

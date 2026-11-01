@@ -21,8 +21,10 @@ from controller.adapters.outbound.optimization.gurobi_variables import (
     ExecutionVariables,
     NetworkVariables,
 )
-from controller.domain.optimization.optimization_context import OptimizationContext
-from controller.domain.optimization.optimization_request import (
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
+from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
 )
 from controller.domain.profile.model_variant_execution_profile import (
@@ -496,17 +498,13 @@ def add_execution_constraints(
                             minimum_execution_time_by_layer.items()
                         )
                     ),
-                    name=(
-                        f"execution_minimum[{flow_index},{model_index},{component}]"
-                    ),
+                    name=(f"execution_minimum[{flow_index},{model_index},{component}]"),
                 )
 
 
 def _minimum_execution_time_by_layer(
     layers: tuple[LayerKey, ...],
-    profiles_by_worker: dict[
-        WorkerId, Mapping[LayerKey, LayerExecutionProfile] | None
-    ],
+    profiles_by_worker: dict[WorkerId, Mapping[LayerKey, LayerExecutionProfile] | None],
 ) -> dict[LayerKey, float]:
     result: dict[LayerKey, float] = {}
     for layer in layers:
@@ -555,9 +553,7 @@ def _define_model_component_execution_time_on_worker(
         else:
             execution_terms.append(float(layer_profile.execution_time_s) * x)
 
-    execution_time = execution.execution_time_s[
-        flow, model_variant, component, worker
-    ]
+    execution_time = execution.execution_time_s[flow, model_variant, component, worker]
     model.addGenConstrIndicator(
         e,
         False,
@@ -691,7 +687,7 @@ def _define_transmission_time_for_model_component_on_source_server(
             )
         else:
             throughput_mb_per_s = bytes_per_second_to_megabytes_per_second(
-                    connections[source, target].throughput_bytes_per_sec
+                connections[source, target].throughput_bytes_per_sec
             )
             model.addGenConstrIndicator(
                 q,

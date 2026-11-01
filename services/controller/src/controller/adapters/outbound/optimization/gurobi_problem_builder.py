@@ -13,12 +13,14 @@ from controller.adapters.outbound.optimization.gurobi_profile_data import (
     layer_weight_size_bytes,
     tensor_size_bytes,
 )
-from controller.domain.optimization.optimization_context import OptimizationContext
-from controller.domain.optimization.optimization_request import (
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
+from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
     OptimizationRequestsByFlow,
 )
-from controller.domain.optimization.solver_config import ProblemConfig
+from controller.domain.optimization.solving.solver_config import ProblemConfig
 from controller.domain.profile.model_variant_static_profile import (
     ModelVariantStaticProfile,
 )
@@ -248,8 +250,7 @@ def _build_gurobi_problem(
                     if layer in profiles
                 )
                 model_second_moments.append(
-                    service_arrival_rate_per_s[flow, model]
-                    * total_execution_time_s**2
+                    service_arrival_rate_per_s[flow, model] * total_execution_time_s**2
                 )
             numerator += max(model_second_moments)
         max_queue_wait_s_by_worker[worker] = numerator / (

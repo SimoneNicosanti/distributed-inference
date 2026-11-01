@@ -10,7 +10,7 @@ from controller.application.deployment.builder.flow_solution_routes import (
 from controller.application.deployment.builder.partition_replica_id_builder import (
     ReplicaIdsByFlow,
 )
-from controller.domain.optimization.optimization_solution import (
+from controller.domain.optimization.solving.optimization_solution import (
     ComponentSolution,
     OptimizationSolution,
 )

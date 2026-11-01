@@ -9,12 +9,12 @@ from controller.adapters.inbound.http_optimization_manager import (
 from controller.application.ports.inbound.optimization.optimization_manager import (
     OptimizationManager,
 )
-from controller.domain.optimization.optimization_request import (
+from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
     OptimizationRequestsByFlow,
 )
-from controller.domain.optimization.qos_constraints import QoSRequirements
-from controller.domain.optimization.stream_info import StreamInfo
+from controller.domain.optimization.request.qos_constraints import QoSRequirements
+from controller.domain.optimization.request.stream_info import StreamInfo
 from integration.controller.http.optimization_http_paths import (
     OPTIMIZE_INFERENCE_DISTRIBUTION_PATH,
 )

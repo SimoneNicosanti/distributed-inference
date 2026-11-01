@@ -10,10 +10,10 @@ from controller.application.ports.inbound.optimization.optimization_manager impo
 from controller.application.ports.outbound.store.optimization_solution_store import (
     OptimizationSolutionStore,
 )
-from controller.domain.optimization.optimization_request import (
+from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
 )
-from controller.domain.optimization.solver_config import ProblemConfig
+from controller.domain.optimization.solving.solver_config import ProblemConfig
 
 
 class DefaultOptimizationManager(OptimizationManager):

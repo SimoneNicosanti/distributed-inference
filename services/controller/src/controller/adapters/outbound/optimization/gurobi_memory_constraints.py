@@ -13,7 +13,9 @@ from controller.adapters.outbound.optimization.gurobi_variables import (
     AssignmentVariables,
     MemoryVariables,
 )
-from controller.domain.optimization.optimization_context import OptimizationContext
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
 
 
 def add_memory_constraints(

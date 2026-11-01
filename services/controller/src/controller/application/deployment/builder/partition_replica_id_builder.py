@@ -4,7 +4,9 @@ from collections.abc import Mapping
 from controller.application.deployment.builder.flow_solution_routes import (
     executable_components,
 )
-from controller.domain.optimization.optimization_solution import OptimizationSolution
+from controller.domain.optimization.solving.optimization_solution import (
+    OptimizationSolution,
+)
 from shared.flow.flow import FlowId
 from shared.model.model_partition import ModelPartitionId
 from shared.plan.hop_logical_id import PartitionReplicaId

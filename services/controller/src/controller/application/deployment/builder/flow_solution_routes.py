@@ -1,4 +1,4 @@
-from controller.domain.optimization.optimization_solution import (
+from controller.domain.optimization.solving.optimization_solution import (
     ComponentSolution,
     FlowOptimizationSolution,
 )

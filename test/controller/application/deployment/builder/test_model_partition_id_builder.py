@@ -3,7 +3,7 @@ import pytest
 from controller.application.deployment.builder.model_partition_id_builder import (
     ModelPartitionIdBuilder,
 )
-from controller.domain.optimization.optimization_solution import (
+from controller.domain.optimization.solving.optimization_solution import (
     ComponentSolution,
     FlowOptimizationSolution,
     OptimizationSolution,

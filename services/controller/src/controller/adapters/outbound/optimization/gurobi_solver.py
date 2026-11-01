@@ -37,12 +37,19 @@ from controller.adapters.outbound.optimization.gurobi_variables import (
     add_gurobi_variables,
 )
 from controller.application.optimization.abc.solver import Solver
-from controller.domain.optimization.optimization_context import OptimizationContext
-from controller.domain.optimization.optimization_request import (
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
+from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
 )
-from controller.domain.optimization.optimization_solution import OptimizationSolution
-from controller.domain.optimization.solver_config import ProblemConfig, SolverConfig
+from controller.domain.optimization.solving.optimization_solution import (
+    OptimizationSolution,
+)
+from controller.domain.optimization.solving.solver_config import (
+    ProblemConfig,
+    SolverConfig,
+)
 
 
 class OptimizationInfeasibleError(RuntimeError):

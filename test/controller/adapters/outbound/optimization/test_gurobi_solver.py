@@ -10,16 +10,22 @@ from controller.adapters.outbound.optimization.gurobi_solver import (
     GurobiSolver,
     OptimizationInfeasibleError,
 )
-from controller.domain.optimization.optimization_context import OptimizationContext
-from controller.domain.optimization.optimization_request import OptimizationRequest
-from controller.domain.optimization.optimization_solution import OptimizationSolution
-from controller.domain.optimization.qos_constraints import QoSRequirements
-from controller.domain.optimization.solver_config import (
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
+from controller.domain.optimization.request.optimization_request import (
+    OptimizationRequest,
+)
+from controller.domain.optimization.solving.optimization_solution import (
+    OptimizationSolution,
+)
+from controller.domain.optimization.request.qos_constraints import QoSRequirements
+from controller.domain.optimization.solving.solver_config import (
     ObjectiveKind,
     ProblemConfig,
     SolverConfig,
 )
-from controller.domain.optimization.stream_info import StreamInfo
+from controller.domain.optimization.request.stream_info import StreamInfo
 from controller.domain.profile.model_variant_execution_profile import (
     Backend,
     BackendExecutionProfile,

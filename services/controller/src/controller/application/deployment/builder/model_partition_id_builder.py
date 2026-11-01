@@ -1,4 +1,6 @@
-from controller.domain.optimization.optimization_solution import OptimizationSolution
+from controller.domain.optimization.solving.optimization_solution import (
+    OptimizationSolution,
+)
 from shared.model.model_partition import ModelPartitionId
 
 

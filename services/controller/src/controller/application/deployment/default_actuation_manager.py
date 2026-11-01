@@ -17,7 +17,9 @@ from controller.application.ports.outbound.partition.partition_builder_gateway i
     PartitionBuilderGateway,
 )
 from controller.application.ports.outbound.plan_share_gateway import PlanShareGateway
-from controller.domain.optimization.optimization_solution import OptimizationSolution
+from controller.domain.optimization.solving.optimization_solution import (
+    OptimizationSolution,
+)
 from lifecycle.async_lifecycle import AsyncLifecycle
 
 

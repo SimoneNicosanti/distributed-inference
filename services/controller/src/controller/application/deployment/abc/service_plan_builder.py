@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 
-from controller.domain.optimization.optimization_solution import OptimizationSolution
+from controller.domain.optimization.solving.optimization_solution import (
+    OptimizationSolution,
+)
 from controller.domain.plan.service_plan import ServicePlan
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import WorkerId

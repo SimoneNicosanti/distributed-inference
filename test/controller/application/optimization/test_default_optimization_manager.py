@@ -13,13 +13,17 @@ from controller.application.optimization.default_optimization_manager import (
 from controller.application.ports.outbound.store.optimization_solution_store import (
     OptimizationSolutionStore,
 )
-from controller.domain.optimization.optimization_context import OptimizationContext
-from controller.domain.optimization.optimization_request import (
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
+from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
     OptimizationRequestsByFlow,
 )
-from controller.domain.optimization.optimization_solution import OptimizationSolution
-from controller.domain.optimization.solver_config import ProblemConfig
+from controller.domain.optimization.solving.optimization_solution import (
+    OptimizationSolution,
+)
+from controller.domain.optimization.solving.solver_config import ProblemConfig
 from shared.flow.flow import FlowId
 
 

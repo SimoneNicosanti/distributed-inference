@@ -1,8 +1,7 @@
 # mypy: disable-error-code="attr-defined,name-defined"
 
-import asyncio
 from contextlib import closing
-from typing import override
+from typing import Any, override
 
 import numpy as np
 import pyarrow as pa
@@ -11,15 +10,18 @@ from pyarrow import flight
 from front_end.application.ports.outbound.ingress_gateway import (
     IngressGateway,
 )
+from front_end.domain.context.external_source_context import (
+    ExternalSourceInvocationContext,
+)
 from front_end.domain.inference_result import InferenceResult
 from front_end.domain.tensor_map import TensorMap
-from integration.shared.id_json import flow_id_to_json
 from integration.worker.ingress.arrow.arrow_model_invocation_schema import (
     RUN_MODEL_INVOCATION_COMMAND,
-    build_model_invocation_request_schema,
     validate_model_invocation_result_schema,
 )
 from shared.flow.flow import FlowId
+from shared.plan.hop_deployment_id import HopDeploymentId
+from shared.plan.hop_logical_id import IngressReplicaId
 
 
 class ArrowWorkerIngressGateway(IngressGateway):
@@ -32,17 +34,17 @@ class ArrowWorkerIngressGateway(IngressGateway):
         self._timeout_s = timeout_s
 
     @override
-    async def invoke_model(
+    async def submit_model_pass(
         self,
-        flow_id: FlowId,
-        bundle: TensorMap,
-    ) -> InferenceResult:
-        return await asyncio.to_thread(
-            self._run_model_invocation_sync,
-            flow_id,
-            bundle,
+        external_source_invocation_context: ExternalSourceInvocationContext,
+        bundle: TensorMap[str, np.ndarray[tuple[Any, ...], np.dtype[Any]]],
+        ingress_deployment_id: HopDeploymentId[IngressReplicaId],
+    ) -> None:
+        return await super().submit_model_pass(
+            external_source_invocation_context, bundle, ingress_deployment_id
         )
 
+    @override
     def _run_model_invocation_sync(
         self,
         flow_id: FlowId,
@@ -72,23 +74,14 @@ class ArrowWorkerIngressGateway(IngressGateway):
 
     @staticmethod
     def _encode_request(
-        flow_id: FlowId,
-        bundle: TensorMap,
+        model_invocation_request: ModelInvocationRequest,
     ) -> pa.RecordBatch:
-        tensor_values = {
-            name: np.ascontiguousarray(value) for name, value in bundle.items()
-        }
-        schema = build_model_invocation_request_schema(tensor_values)
+        validate_model_invocation_request_schema(model_invocation_request.schema)
 
-        arrays: list[pa.Array] = [
-            pa.array([flow_id_to_json(flow_id)], type=pa.large_string())
-        ]
-        arrays.extend(
-            pa.FixedShapeTensorArray.from_numpy_ndarray(np.expand_dims(value, axis=0))
-            for value in tensor_values.values()
-        )
+        batch = pa.RecordBatch.from_arrays([[model_invocation_request.model_name]])
+        batch.validate(full=True)
 
-        return pa.RecordBatch.from_arrays(arrays, schema=schema)
+        return batch
 
     @staticmethod
     def _decode_response(

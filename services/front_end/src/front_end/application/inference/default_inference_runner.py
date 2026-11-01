@@ -6,6 +6,9 @@ from front_end.application.ports.inbound.inference_runner import (
 from front_end.application.ports.outbound.front_end_plan_reader import (
     FrontEndPlanReader,
 )
+from front_end.application.ports.outbound.hop_deployment_directory import (
+    HopDeploymentDirectory,
+)
 from front_end.application.ports.outbound.ingress_gateway import (
     IngressGateway,
 )
@@ -24,10 +27,12 @@ class DefaultInferenceRunner(InferenceCoordinator):
     def __init__(
         self,
         front_end_plan_reader: FrontEndPlanReader,
+        hop_deployment_directory: HopDeploymentDirectory,
         ingress_gateway: IngressGateway,
         sink_gateway: SinkGateway,
     ) -> None:
         self._front_end_plan_reader = front_end_plan_reader
+        self._hop_deployment_directory = hop_deployment_directory
         self._ingress_gateway = ingress_gateway
         self._sink_gateway = sink_gateway
 
@@ -61,7 +66,7 @@ class DefaultInferenceRunner(InferenceCoordinator):
         flow_plan.validate_tensor_map(request.bundle)
 
         model_invocation_context = ModelInvocationContext(
-            flow_id=request.flow_id,
+            flow_id=request.flow_id, model_invocation_id=request.request_id
         )
 
         ## NOTE: Here we should create a while loop for autoregression and use result yielding
@@ -75,11 +80,24 @@ class DefaultInferenceRunner(InferenceCoordinator):
             model_pass_context,
         )
 
-        await self._ingress_gateway.invoke_model(
-            external_source_invocation_context,
-            bundle=request.bundle,
+        ingress_deployment_id = (
+            await self._hop_deployment_directory.get_hop_deployment_id(
+                curr_plan_version, flow_plan.ingress_replica_id
+            )
         )
 
-        result_map = await self._sink_gateway.retrieve_result(model_pass_context)
+        sink_deployment_id = await self._hop_deployment_directory.get_hop_deployment_id(
+            curr_plan_version, flow_plan.sink_replica_id
+        )
+
+        await self._ingress_gateway.submit_model_pass(
+            external_source_invocation_context,
+            bundle=request.bundle,
+            ingress_deployment_id=ingress_deployment_id,
+        )
+
+        result_map = await self._sink_gateway.retrieve_result(
+            model_pass_context, sink_deployment_id
+        )
 
         return InferenceResult(result_map, request.request_id)

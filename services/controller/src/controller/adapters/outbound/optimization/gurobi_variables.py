@@ -8,8 +8,10 @@ from controller.adapters.outbound.optimization.gurobi_problem import (
     GurobiProblem,
 )
 from controller.adapters.outbound.optimization.gurobi_units import bytes_to_megabytes
-from controller.domain.optimization.optimization_context import OptimizationContext
-from controller.domain.optimization.optimization_request import (
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
+from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
 )
 from shared.flow.flow import FlowId
@@ -71,9 +73,7 @@ class NetworkVariables:
 @dataclass(slots=True)
 class MemoryVariables:
     component_weight_mb: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var]
-    component_activation_mb: dict[
-        tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var
-    ]
+    component_activation_mb: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var]
     max_activation_mb: dict[WorkerId, gp.Var]
 
 
@@ -305,9 +305,7 @@ def _add_network_variables(
     adjacent_component_workers: dict[
         tuple[FlowId, int, WorkerId, WorkerId], gp.Var
     ] = {}
-    transmission_time_s: dict[
-        tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var
-    ] = {}
+    transmission_time_s: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var] = {}
     component_transmission_response_s: dict[tuple[FlowId, int], gp.Var] = {}
     cuts = range(1, max_components)
     topology = context.network_topology
@@ -335,10 +333,12 @@ def _add_network_variables(
             for cut in cuts:
                 for worker in problem.workers_by_flow[flow]:
                     worker_index = problem.worker_index[worker]
-                    transmission_time_s[flow, model_variant, cut, worker] = model.addVar(
-                        lb=0.0,
-                        ub=max_response_s,
-                        name=f"ttx[{flow_index},{model_index},{cut},{worker_index}]",
+                    transmission_time_s[flow, model_variant, cut, worker] = (
+                        model.addVar(
+                            lb=0.0,
+                            ub=max_response_s,
+                            name=f"ttx[{flow_index},{model_index},{cut},{worker_index}]",
+                        )
                     )
 
         for cut in cuts:
@@ -396,9 +396,7 @@ def _add_memory_variables(
     *,
     max_components: int,
 ) -> MemoryVariables:
-    component_weight_mb: dict[
-        tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var
-    ] = {}
+    component_weight_mb: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var] = {}
     component_activation_mb: dict[
         tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var
     ] = {}

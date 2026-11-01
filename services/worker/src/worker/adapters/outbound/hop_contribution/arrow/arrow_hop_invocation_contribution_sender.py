@@ -22,14 +22,11 @@ from integration.worker.hop_contribution.arrow.arrow_hop_invocation_contribution
     SUBMIT_CONTRIBUTION_COMMAND,
     build_contribution_schema,
 )
-from shared.service.service import WorkerId
+from shared.plan.hop_deployment_id import HopDeploymentId
 from worker.adapters.context_mapper import (
     destination_hop_to_dto,
     hop_invocation_context_from_dto,
     hop_invocation_context_to_dto,
-)
-from worker.application.ports.outbound.catalog.hop_deployment.hop_deployment_directory import (
-    HopDeploymentDirectory,
 )
 from worker.application.ports.outbound.catalog.service.service_directory_gateway import (
     ServiceDirectoryGateway,
@@ -37,6 +34,7 @@ from worker.application.ports.outbound.catalog.service.service_directory_gateway
 from worker.application.ports.outbound.hop_contribution_snd.contribution_sender import (
     ContributionSender,
 )
+from worker.domain.hop.hop import DestinationHop
 from worker.domain.hop.hop_invocation_contribution import HopInvocationContribution
 
 
@@ -44,29 +42,23 @@ class ArrowHopInvocationContributionSender(ContributionSender):
     def __init__(
         self,
         directory: ServiceDirectoryGateway,
-        hop_deployment_directory: HopDeploymentDirectory,
         timeout_s: float = 30.0,
     ) -> None:
         self._directory = directory
-        self._hop_deployment_directory = hop_deployment_directory
         self._timeout_s = timeout_s
 
     @override
-    async def send(self, contribution: HopInvocationContribution) -> None:
-        worker_id = await self._resolve_worker_id(contribution)
-        worker_instance = await self._directory.get_worker_instance_by_id(worker_id)
+    async def send(
+        self,
+        contribution: HopInvocationContribution,
+        destination_deployment_id: HopDeploymentId[DestinationHop],
+    ) -> None:
+        worker_instance = await self._directory.get_worker_instance_by_id(
+            destination_deployment_id.worker_id
+        )
         interface = self._select_arrow_interface(worker_instance)
 
         await asyncio.to_thread(self._send_sync, interface, contribution)
-
-    async def _resolve_worker_id(
-        self, contribution: HopInvocationContribution
-    ) -> WorkerId:
-        deployment_id = await self._hop_deployment_directory.get_hop_deployment_id(
-            plan_version=contribution.plan_version,
-            replica_id=contribution.destination_hop,
-        )
-        return deployment_id.worker_id
 
     @staticmethod
     def _select_arrow_interface(

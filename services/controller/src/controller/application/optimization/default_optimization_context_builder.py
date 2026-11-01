@@ -18,7 +18,9 @@ from controller.application.ports.outbound.profile.resource_profile_store_gatewa
 from controller.application.ports.outbound.profile.static_profile_store_gateway import (
     StaticProfileStoreGateway,
 )
-from controller.domain.optimization.optimization_context import OptimizationContext
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
 from controller.domain.profile.network_topology import NetworkTopology
 
 

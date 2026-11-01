@@ -67,7 +67,7 @@ from controller.application.ports.outbound.store.optimization_solution_store imp
     OptimizationSolutionStore,
 )
 from controller.composition.composition_root import CompositionRoot
-from controller.domain.optimization.solver_config import (
+from controller.domain.optimization.solving.solver_config import (
     ObjectiveKind,
     ProblemConfig,
     SolverConfig,

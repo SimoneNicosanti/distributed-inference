@@ -23,7 +23,9 @@ from controller.adapters.outbound.optimization.gurobi_variables import (
     _add_execution_variables,
     _add_memory_variables,
 )
-from controller.domain.optimization.optimization_context import OptimizationContext
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
 from controller.domain.profile.model_variant_execution_profile import (
     LayerExecutionProfile,
 )

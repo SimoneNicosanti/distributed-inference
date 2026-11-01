@@ -117,11 +117,11 @@ from worker.application.hop_contribution_rcv.default_contribution_pipeline impor
 from worker.application.hop_contribution_rcv.default_hop_invocation_contribution_receive_coordinator import (
     DefaultHopInvocationContributionReceiveCoordinator,
 )
+from worker.application.hop_contribution_snd.default_hop_contribution_dispatcher import (
+    DefaultHopContributionDispatcher,
+)
 from worker.application.hop_contribution_snd.default_hop_contribution_propagator import (
     DefaultHopContributionPropagator,
-)
-from worker.application.hop_contribution_snd.default_hop_contribution_send_coordinator import (
-    DefaultHopContributionDispatcher,
 )
 from worker.application.hop_contribution_snd.default_hop_output_router import (
     DefaultHopOutputRouter,
@@ -233,9 +233,9 @@ class DefaultCompositionRoot(CompositionRoot):
             contribution_dispatcher = DefaultHopContributionDispatcher(
                 activity_request_factory=activity_request_factory,
                 activity_manager=activity_manager,
+                hop_deployment_directory=deployment_catalog,
                 contribution_sender=ArrowHopInvocationContributionSender(
                     service_directory,
-                    deployment_catalog,
                 ),
             )
 

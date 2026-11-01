@@ -3,7 +3,7 @@ import pytest
 from controller.application.deployment.default_service_plan_builder import (
     DefaultServicePlanBuilder,
 )
-from controller.domain.optimization.optimization_solution import (
+from controller.domain.optimization.solving.optimization_solution import (
     ComponentSolution,
     CutSolution,
     FlowOptimizationSolution,

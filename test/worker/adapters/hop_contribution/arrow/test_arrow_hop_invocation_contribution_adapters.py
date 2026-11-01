@@ -5,6 +5,7 @@ from typing import override
 import numpy as np
 import pytest
 
+from front_end.domain.context.model_invocation_context import ModelInvocationContext
 from integration.service_instance.service_instance import (
     ArrowUrl,
     Capability,
@@ -16,7 +17,6 @@ from integration.service_instance.worker_instance import WorkerInstance
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
-from shared.plan.hop_deployment_id import HopDeploymentId
 from shared.plan.hop_logical_id import IngressReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
@@ -31,7 +31,6 @@ from worker.application.ports.inbound.hop_contribution_rcv.hop_invocation_contri
     HopInvocationContributionReceiveCoordinator,
 )
 from worker.domain.context.hop_invocation_context import HopInvocationContext
-from shared.context.model_invocation_context import ModelInvocationContext
 from worker.domain.context.model_pass_context import ModelPassContext, ModelPassType
 from worker.domain.hop.hop import ExternalHop
 from worker.domain.hop.hop_invocation_contribution import (
@@ -113,19 +112,6 @@ class _Directory:
         return self.worker
 
 
-class _HopDeploymentDirectory:
-    def __init__(self, worker_id: ServiceId) -> None:
-        self.worker_id = worker_id
-
-    async def get_hop_deployment_id(
-        self,
-        plan_version: PlanVersion,
-        replica_id: IngressReplicaId,
-    ) -> HopDeploymentId[IngressReplicaId]:
-        assert plan_version == PlanVersion(version_number=1)
-        return HopDeploymentId(replica_id=replica_id, worker_id=self.worker_id)
-
-
 @pytest.mark.asyncio
 async def test_sender_reaches_generic_hop_server() -> None:
     worker_id = ServiceId()
@@ -157,11 +143,10 @@ async def test_sender_reaches_generic_hop_server() -> None:
     )
     sender = ArrowHopInvocationContributionSender(
         _Directory(worker),  # type: ignore[arg-type]
-        _HopDeploymentDirectory(worker_id),  # type: ignore[arg-type]
     )
 
     try:
-        await sender.send(contribution)
+        await sender.send(contribution, worker_id)
     finally:
         server.shutdown()
         server_thread.join(timeout=1)

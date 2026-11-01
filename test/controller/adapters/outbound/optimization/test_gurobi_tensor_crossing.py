@@ -23,8 +23,10 @@ from controller.adapters.outbound.optimization.gurobi_variables import (
     NetworkVariables,
     _add_network_variables,
 )
-from controller.domain.optimization.optimization_context import OptimizationContext
-from controller.domain.optimization.optimization_request import (
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
+from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
 )
 from controller.domain.profile.model_variant_static_profile import (
@@ -345,8 +347,7 @@ def test_compact_crossings_and_transmitted_volume_match_legacy(
     }
     legacy_volumes = {
         cut: gp.quicksum(
-            bytes_to_megabytes(tensor_size_bytes(profile, tensor))
-            * legacy[tensor, cut]
+            bytes_to_megabytes(tensor_size_bytes(profile, tensor)) * legacy[tensor, cut]
             for tensor in routes
         )
         for cut in range(1, _MAX_COMPONENTS)
