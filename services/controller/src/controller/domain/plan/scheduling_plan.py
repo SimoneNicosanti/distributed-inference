@@ -7,7 +7,7 @@ from shared.plan.hop_logical_id import PartitionReplicaId
 @dataclass(frozen=True, slots=True)
 class PriorityKey:
     flow_id: FlowId
-    partition_replica_id: PartitionReplicaId
+    executable_hop: PartitionReplicaId
 
 
 type PriorityValue = int

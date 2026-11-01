@@ -2,14 +2,14 @@ from typing import override
 
 import httpx
 
-from controller.adapters.outbound.plan_share.mappers.service_plan_mapper import (
-    ServicePlanMapper,
+from controller.adapters.outbound.plan_share.mappers.worker_plan_mapper import (
+    WorkerPlanMapper,
 )
 from controller.application.ports.outbound.directory.worker_directory_gateway import (
     WorkerDirectoryGateway,
 )
 from controller.application.ports.outbound.plan_share_gateway import PlanShareGateway
-from controller.domain.plan.service_plan import ServicePlan
+from controller.domain.plan.worker_plan import WorkerPlan
 from integration.service_instance.service_instance import (
     CapabilityInterface,
     CapabilityProtocol,
@@ -21,7 +21,7 @@ from integration.worker.deployment.http.service_plan_http_paths import (
     PREPARE_SERVICE_PLAN_PATH,
 )
 from integration.worker.deployment.http.service_plan_http_schema import (
-    PrepareServicePlanRequest,
+    PrepareWorkerPlanRequest,
 )
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import WorkerId
@@ -40,12 +40,12 @@ class HttpPlanShareGateway(PlanShareGateway):
     async def send_prepare_plan_message(
         self,
         worker_id: WorkerId,
-        plan: ServicePlan,
+        plan: WorkerPlan,
     ) -> None:
         base_url = await self._get_plan_actuation_base_url(worker_id)
-        plan_version = plan.worker_plan.plan_version
-        plan_dto = ServicePlanMapper.to_service_plan_dto(plan)
-        request = PrepareServicePlanRequest(service_plan=plan_dto)
+        plan_version = plan.plan_version
+        plan_dto = WorkerPlanMapper.to_worker_plan_dto(plan)
+        request = PrepareWorkerPlanRequest(worker_plan=plan_dto)
 
         response = await self._http_client.put(
             self._build_url(

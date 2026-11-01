@@ -13,12 +13,15 @@ from controller.adapters.outbound.optimization.gurobi_profile_data import (
     layer_weight_size_bytes,
     tensor_size_bytes,
 )
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
+from controller.domain.optimization.request.flow_endpoint_placement import (
+    FixedPlacement,
 )
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
     OptimizationRequestsByFlow,
+)
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
 )
 from controller.domain.optimization.solving.solver_config import ProblemConfig
 from controller.domain.profile.model_variant_static_profile import (
@@ -138,20 +141,22 @@ def _workers_by_flow(
     if not workers:
         raise GurobiProblemBuildError("No active worker has a resource profile")
 
-    private_devices = {request.ingress_id for request in requests_by_flow.values()}
     result: dict[FlowId, tuple[WorkerId, ...]] = {}
     for flow in flows:
-        ingress = requests_by_flow[flow].ingress_id
-        if ingress not in workers:
-            raise GurobiProblemBuildError(
-                f"Ingress worker {worker_key(ingress)} is inactive or lacks a "
-                "resource profile"
-            )
-        result[flow] = tuple(
-            worker
-            for worker in workers
-            if worker == ingress or worker not in private_devices
-        )
+        placement = requests_by_flow[flow].flow_endpoint_placement
+        for endpoint, endpoint_placement in (
+            ("Ingress", placement.ingress_placement),
+            ("Sink", placement.sink_placement),
+        ):
+            if (
+                isinstance(endpoint_placement, FixedPlacement)
+                and endpoint_placement.worker_id not in workers
+            ):
+                raise GurobiProblemBuildError(
+                    f"{endpoint} worker {worker_key(endpoint_placement.worker_id)} "
+                    f"for flow {flow_key(flow)} is inactive or lacks a resource profile"
+                )
+        result[flow] = workers
     return workers, result
 
 

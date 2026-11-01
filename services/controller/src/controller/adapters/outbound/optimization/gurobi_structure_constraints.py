@@ -21,11 +21,17 @@ from controller.adapters.outbound.optimization.gurobi_variables import (
     ExecutionVariables,
     NetworkVariables,
 )
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
+from controller.domain.optimization.request.flow_endpoint_placement import (
+    FixedPlacement,
+)
+from controller.domain.optimization.request.local_worker_config import (
+    ValidLocalWorkerConfig,
 )
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
+)
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
 )
 from controller.domain.profile.model_variant_execution_profile import (
     LayerExecutionProfile,
@@ -75,7 +81,7 @@ def add_assignment_constraints(
                 model, assignment, flow, flow_index, component
             )
 
-        _first_and_last_component_on_device(
+        _endpoint_placement_constraints(
             model, assignment, requests_by_flow, components, flow, flow_index
         )
 
@@ -97,7 +103,7 @@ def add_assignment_constraints(
             )
 
 
-def _first_and_last_component_on_device(
+def _endpoint_placement_constraints(
     model: gp.Model,
     assignment: AssignmentVariables,
     requests_by_flow: OptimizationRequestsByFlow,
@@ -105,17 +111,21 @@ def _first_and_last_component_on_device(
     flow: FlowId,
     flow_index: int,
 ) -> None:
-    ingress = requests_by_flow[flow].ingress_id
-    model.addConstr(
-        assignment.component_worker[flow, 1, ingress] == 1,
-        name=f"first_on_device[{flow_index}]",
-    )
-    for component in components:
+    placement = requests_by_flow[flow].flow_endpoint_placement
+    if isinstance(placement.ingress_placement, FixedPlacement):
+        ingress = placement.ingress_placement.worker_id
         model.addConstr(
-            assignment.component_worker[flow, component, ingress]
-            >= assignment.component_last[flow, component],
-            name=f"last_on_device[{flow_index},{component}]",
+            assignment.component_worker[flow, 1, ingress] == 1,
+            name=f"first_on_device[{flow_index}]",
         )
+    if isinstance(placement.sink_placement, FixedPlacement):
+        sink = placement.sink_placement.worker_id
+        for component in components:
+            model.addConstr(
+                assignment.component_worker[flow, component, sink]
+                >= assignment.component_last[flow, component],
+                name=f"last_on_device[{flow_index},{component}]",
+            )
 
 
 def _component_sequence_is_prefix(
@@ -449,11 +459,13 @@ def add_execution_constraints(
     execution: ExecutionVariables,
     *,
     context: OptimizationContext,
+    requests_by_flow: OptimizationRequestsByFlow,
     max_components: int,
 ) -> None:
     p = problem
     for flow in p.flows:
         flow_index = p.flow_index[flow]
+        local_worker = requests_by_flow[flow].local_worker_config
         for model_variant in p.models_by_flow[flow]:
             model_index = p.model_index[flow, model_variant]
             static_profile = context.static_profiles_by_variant[model_variant]
@@ -462,6 +474,23 @@ def add_execution_constraints(
                 worker: layer_execution_profiles(context, model_variant, worker)
                 for worker in p.workers_by_flow[flow]
             }
+            if (
+                isinstance(local_worker, ValidLocalWorkerConfig)
+                and not local_worker.is_inference_runner
+            ):
+                local_profiles = profiles_by_worker.get(local_worker.worker_id)
+                if local_profiles is not None:
+                    boundary_layers = {
+                        layer
+                        for layer, description in static_profile.topology.layers().items()
+                        if description.is_input or description.is_output
+                    }
+                    # Reuse unsupported x + e <= 1 constraints for this flow only.
+                    profiles_by_worker[local_worker.worker_id] = {
+                        layer: profile
+                        for layer, profile in local_profiles.items()
+                        if layer in boundary_layers
+                    }
             minimum_execution_time_by_layer = _minimum_execution_time_by_layer(
                 layers,
                 profiles_by_worker,

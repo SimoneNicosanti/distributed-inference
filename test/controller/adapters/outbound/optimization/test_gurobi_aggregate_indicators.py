@@ -23,6 +23,13 @@ from controller.adapters.outbound.optimization.gurobi_variables import (
     _add_execution_variables,
     _add_memory_variables,
 )
+from controller.domain.optimization.request.local_worker_config import (
+    NoLocalWorkerConfig,
+)
+from controller.domain.optimization.request.optimization_request import (
+    OptimizationRequest,
+    OptimizationRequestsByFlow,
+)
 from controller.domain.optimization.solving.optimization_context import (
     OptimizationContext,
 )
@@ -61,6 +68,15 @@ _MAX_COMPONENTS = 2
 _EXECUTION_TIMES = (1, 2, 3)
 _WEIGHT_BYTES = (10, 20, 30)
 _ACTIVATION_BYTES = (4, 5, 6)
+
+
+def _requests_by_flow() -> OptimizationRequestsByFlow:
+    return {
+        _FLOW: cast(
+            OptimizationRequest,
+            SimpleNamespace(local_worker_config=NoLocalWorkerConfig()),
+        )
+    }
 
 
 def _profile() -> ModelVariantStaticProfile:
@@ -257,6 +273,7 @@ def test_indicator_aggregates_replace_all_layer_worker_products(
             assignment,
             execution,
             context=context,
+            requests_by_flow=_requests_by_flow(),
             max_components=_MAX_COMPONENTS,
         )
         add_memory_constraints(
@@ -393,6 +410,7 @@ def test_missing_layer_profile_still_forbids_placement(
             assignment,
             execution,
             context=context,
+            requests_by_flow=_requests_by_flow(),
             max_components=_MAX_COMPONENTS,
         )
         model.optimize()
@@ -472,6 +490,7 @@ def test_execution_minimum_bound_supports_multiple_components_and_workers(
             assignment,
             execution,
             context=context,
+            requests_by_flow=_requests_by_flow(),
             max_components=_MAX_COMPONENTS,
         )
         model.optimize()

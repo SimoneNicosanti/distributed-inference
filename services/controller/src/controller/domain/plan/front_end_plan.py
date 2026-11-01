@@ -17,8 +17,13 @@ class IngressInputRoute:
             raise ValueError("Ingress input route tensors must be unique")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass
 class FlowPlan:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class FrontEndPlan:
     model_variant_id: ModelVariantId
     input_routes: tuple[IngressInputRoute, ...]
     result_tensors: tuple[TensorKey, ...]

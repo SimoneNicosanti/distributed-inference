@@ -2,7 +2,6 @@ import math
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
-from controller.domain.profile.model_variant_topology import ComponentTensorContract
 from shared.flow.flow import FlowId
 from shared.model.keys import LayerKey, TensorKey
 from shared.model.model_variant import ModelVariantId
@@ -12,6 +11,19 @@ from shared.service.service import WorkerId
 @dataclass(frozen=True, slots=True)
 class OptimizationSolutionId:
     value: UUID = field(default_factory=uuid4)
+
+
+@dataclass(frozen=True, slots=True)
+class ComponentTensorContract:
+    input_tensor_keys: tuple[TensorKey, ...]
+    output_tensor_keys: tuple[TensorKey, ...]
+
+    def __post_init__(self) -> None:
+        for field_name in ("input_tensor_keys", "output_tensor_keys"):
+            tensor_keys = tuple(getattr(self, field_name))
+            if len(tensor_keys) != len(set(tensor_keys)):
+                raise ValueError("Component tensor keys must be unique")
+            object.__setattr__(self, field_name, tuple(sorted(tensor_keys)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,7 +103,8 @@ class CutSolution:
 @dataclass(frozen=True, slots=True)
 class FlowOptimizationSolution:
     flow_id: FlowId
-    ingress_id: WorkerId
+    ingress_worker_id: WorkerId
+    sink_worker_id: WorkerId
     model_variant_id: ModelVariantId
     components: tuple[ComponentSolution, ...]
     cuts: tuple[CutSolution, ...]
@@ -102,8 +115,10 @@ class FlowOptimizationSolution:
     def __post_init__(self) -> None:
         if not self.components:
             raise ValueError("A flow solution must contain at least one component")
-        if self.components[0].worker_id != self.ingress_id:
+        if self.components[0].worker_id != self.ingress_worker_id:
             raise ValueError("The first component must be placed on the ingress worker")
+        if self.components[-1].worker_id != self.sink_worker_id:
+            raise ValueError("The last component must be placed on the sink worker")
         times = self.mean_batch_fill_time_s, self.mean_response_time_s
         if any(not math.isfinite(value) or value < 0 for value in times):
             raise ValueError("Flow times must be finite and non-negative")

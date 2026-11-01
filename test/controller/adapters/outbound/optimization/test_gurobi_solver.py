@@ -10,22 +10,29 @@ from controller.adapters.outbound.optimization.gurobi_solver import (
     GurobiSolver,
     OptimizationInfeasibleError,
 )
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
+from controller.domain.optimization.request.flow_endpoint_placement import (
+    FixedPlacement,
+    FlowEndpointPlacement,
+)
+from controller.domain.optimization.request.local_worker_config import (
+    ValidLocalWorkerConfig,
 )
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
 )
+from controller.domain.optimization.request.qos_constraints import QoSRequirements
+from controller.domain.optimization.request.stream_info import StreamInfo
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
 from controller.domain.optimization.solving.optimization_solution import (
     OptimizationSolution,
 )
-from controller.domain.optimization.request.qos_constraints import QoSRequirements
 from controller.domain.optimization.solving.solver_config import (
     ObjectiveKind,
     ProblemConfig,
     SolverConfig,
 )
-from controller.domain.optimization.request.stream_info import StreamInfo
 from controller.domain.profile.model_variant_execution_profile import (
     Backend,
     BackendExecutionProfile,
@@ -469,7 +476,14 @@ def _request(
             ),
             max_energy_consumption=1,
         ),
-        ingress_id=ingress,
+        flow_endpoint_placement=FlowEndpointPlacement(
+            ingress_placement=FixedPlacement(worker_id=ingress),
+            sink_placement=FixedPlacement(worker_id=ingress),
+        ),
+        local_worker_config=ValidLocalWorkerConfig(
+            worker_id=ingress,
+            is_inference_runner=True,
+        ),
     )
 
 
@@ -558,7 +572,7 @@ async def test_solves_feasible_single_worker_instance() -> None:
     assert solution.is_optimal
     assert len(solution.flow_solutions) == 1
     flow_solution = solution.flow_solutions[0]
-    assert flow_solution.ingress_id == device
+    assert flow_solution.ingress_worker_id == device
     assert flow_solution.mean_response_time_s <= 1
     assert len(flow_solution.components) == 1
     assert flow_solution.components[0].worker_id == device
@@ -825,7 +839,7 @@ async def test_solves_branched_dag_on_sparse_asymmetric_network() -> None:
 
     assert solution.is_optimal
     flow_solution = solution.flow_solutions[0]
-    assert flow_solution.ingress_id == device
+    assert flow_solution.ingress_worker_id == device
     assert flow_solution.model_variant_id == _BRANCHED_MODEL_VARIANT_ID
     assert tuple(component.worker_id for component in flow_solution.components) == (
         device,

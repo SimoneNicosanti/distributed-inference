@@ -22,9 +22,12 @@ from integration.dto.model.model_variant_dto import (
     ModelVariantInfoDto,
 )
 from integration.dto.optimization.optimization_dto import (
+    FixedPlacementDto,
+    FlowEndpointPlacementDto,
     OptimizationRequestDto,
     QoSRequirementsDto,
     StreamInfoDto,
+    ValidLocalWorkerConfigDto,
 )
 from integration.dto.worker_identity.worker_identity_dto import WorkerIdentityDto
 from integration.dto.worker_profiles.execution_profile_dto import (
@@ -237,7 +240,14 @@ def test_optimization_request(
                 ),
                 max_energy_consumption=1_000_000.0,
             ),
-            ingress_id=ingress_id,
+            flow_endpoint_placement=FlowEndpointPlacementDto(
+                ingress_placement=FixedPlacementDto(worker_id=ingress_id),
+                sink_placement=FixedPlacementDto(worker_id=ingress_id),
+            ),
+            local_worker_config=ValidLocalWorkerConfigDto(
+                worker_id=ingress_id,
+                is_inference_runner=True,
+            ),
         )
         for flow_id, arrival_rate, max_response_time in zip(
             OPTIMIZATION_TEST_FLOW_IDS,

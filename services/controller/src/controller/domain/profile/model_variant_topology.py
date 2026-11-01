@@ -4,6 +4,9 @@ from typing import Any, TypedDict, cast
 
 import networkx as nx
 
+from controller.domain.optimization.solving.optimization_solution import (
+    ComponentTensorContract,
+)
 from shared.model.keys import EdgeKey, LayerKey, TensorKey
 
 
@@ -30,19 +33,6 @@ class TensorRoute:
     source: LayerKey
     destinations: tuple[LayerKey, ...]
     maximal_destinations: tuple[LayerKey, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ComponentTensorContract:
-    input_tensor_keys: tuple[TensorKey, ...]
-    output_tensor_keys: tuple[TensorKey, ...]
-
-    def __post_init__(self) -> None:
-        for field_name in ("input_tensor_keys", "output_tensor_keys"):
-            tensor_keys = tuple(getattr(self, field_name))
-            if len(tensor_keys) != len(set(tensor_keys)):
-                raise ValueError("Component tensor keys must be unique")
-            object.__setattr__(self, field_name, tuple(sorted(tensor_keys)))
 
 
 class _LayerAttributes(TypedDict):

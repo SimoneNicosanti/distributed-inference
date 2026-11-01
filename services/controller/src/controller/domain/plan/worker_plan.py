@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
 from controller.domain.plan.deployment_plan import DeploymentPlan
+from controller.domain.plan.hop_routing_plan import HopRoutingPlan
 from controller.domain.plan.partition_execution_plan import PartitionExecutionPlan
-from controller.domain.plan.routing_plan import RoutingPlan
 from controller.domain.plan.scheduling_plan import SchedulingPlan
 from shared.plan.plan_version import PlanVersion
 
@@ -13,21 +13,20 @@ class WorkerPlan:
     deployment_plan: DeploymentPlan
     scheduling_plan: SchedulingPlan
     partition_execution_plan: PartitionExecutionPlan
-    routing_plan: RoutingPlan
+    hop_routing_plan: HopRoutingPlan
 
     def __post_init__(self) -> None:
-        deployed_replicas = set(self.deployment_plan.replica_ids)
-        if deployed_replicas != set(self.routing_plan.replica_ids):
-            raise ValueError(
-                "Deployment and routing plans must contain the same replicas"
-            )
+        deployed_replicas = set(self.deployment_plan.executable_hops)
+        routed_hops = {address.hop for address in self.hop_routing_plan.hop_addresses}
+        if set(self.deployment_plan.deployed_hops) != routed_hops:
+            raise ValueError("Deployment and routing plans must contain the same hops")
 
         deployed_partitions = {replica.partition_id for replica in deployed_replicas}
         if deployed_partitions != set(self.partition_execution_plan.partition_ids):
             raise ValueError("Each deployed partition must have an execution scheme")
 
         scheduled_replicas = {
-            key.partition_replica_id for key in self.scheduling_plan.priority_keys
+            key.executable_hop for key in self.scheduling_plan.priority_keys
         }
         if not scheduled_replicas.issubset(deployed_replicas):
             raise ValueError("Scheduling plan references undeployed replicas")

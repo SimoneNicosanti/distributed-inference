@@ -3,10 +3,10 @@ from contextlib import suppress
 from typing import override
 
 from controller.application.deployment.abc.actuation_manager import ActuationManager
-from controller.application.deployment.abc.service_plan_builder import (
-    ServicePlanBuilder,
-)
 from controller.application.deployment.abc.solution_observer import SolutionObserver
+from controller.application.deployment.abc.solution_to_plan_converter import (
+    SolutionToPlanConverter,
+)
 from controller.application.deployment.builder.model_partition_id_builder import (
     ModelPartitionIdBuilder,
 )
@@ -29,7 +29,7 @@ class DefaultActuationManager(ActuationManager, AsyncLifecycle):
         solution_observer: SolutionObserver,
         partition_builder_gateway: PartitionBuilderGateway,
         plan_version_builder: PlanVersionBuilder,
-        service_plan_builder: ServicePlanBuilder,
+        worker_plan_builder: SolutionToPlanConverter,
         plan_share_gateway: PlanShareGateway,
     ) -> None:
         self._solution_observer = solution_observer
@@ -37,7 +37,7 @@ class DefaultActuationManager(ActuationManager, AsyncLifecycle):
         self._partition_builder_gateway = partition_builder_gateway
 
         self._plan_version_builder = plan_version_builder
-        self._service_plan_builder = service_plan_builder
+        self._worker_plan_builder = worker_plan_builder
 
         self._plan_share_gateway = plan_share_gateway
 
@@ -58,8 +58,8 @@ class DefaultActuationManager(ActuationManager, AsyncLifecycle):
 
         plan_version = self._plan_version_builder.build_next_plan_version()
 
-        service_plan_by_worker_id = (
-            await self._service_plan_builder.build_all_plans_from_solution(
+        worker_plans_by_worker_id = (
+            await self._worker_plan_builder.convert_solution_to_plans(
                 plan_version,
                 solution,
             )
@@ -68,7 +68,7 @@ class DefaultActuationManager(ActuationManager, AsyncLifecycle):
         await asyncio.gather(
             *[
                 self._plan_share_gateway.send_prepare_plan_message(worker_id, plan)
-                for worker_id, plan in service_plan_by_worker_id.items()
+                for worker_id, plan in worker_plans_by_worker_id.items()
             ]
         )
 
@@ -77,7 +77,7 @@ class DefaultActuationManager(ActuationManager, AsyncLifecycle):
                 self._plan_share_gateway.send_apply_plan_message(
                     worker_id, plan_version
                 )
-                for worker_id, plan in service_plan_by_worker_id.items()
+                for worker_id in worker_plans_by_worker_id
             ]
         )
 

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-from shared.plan.hop_logical_id import PartitionReplicaId
+from controller.domain.hop.hop import ExecutableHop, InvocableHop
+from shared.plan.hop_logical_id import IngressReplicaId, SinkReplicaId
 
 
 @dataclass(frozen=True, slots=True)
@@ -10,12 +11,22 @@ class ResourceAllocation:
 
 @dataclass(frozen=True, slots=True)
 class DeploymentPlan:
-    replica_ids: tuple[PartitionReplicaId, ...]
+    executable_hops: tuple[ExecutableHop, ...]
     allocations: tuple[ResourceAllocation, ...]
+    ingress_hops: tuple[IngressReplicaId, ...]
+    sink_hops: tuple[SinkReplicaId, ...]
 
     def __post_init__(self) -> None:
-        if len(self.replica_ids) != len(set(self.replica_ids)):
-            raise ValueError("Replicas must be unique")
+        if len(self.executable_hops) != len(set(self.executable_hops)):
+            raise ValueError("Executable hops must be unique")
 
-        if len(self.replica_ids) != len(self.allocations):
-            raise ValueError("Each replica must have an allocation")
+        if len(self.executable_hops) != len(self.allocations):
+            raise ValueError("Each executable hop must have an allocation")
+        if len(self.ingress_hops) != len(set(self.ingress_hops)):
+            raise ValueError("Ingress hops must be unique")
+        if len(self.sink_hops) != len(set(self.sink_hops)):
+            raise ValueError("Sink hops must be unique")
+
+    @property
+    def deployed_hops(self) -> tuple[InvocableHop, ...]:
+        return (*self.executable_hops, *self.ingress_hops, *self.sink_hops)

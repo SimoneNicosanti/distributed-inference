@@ -3,8 +3,8 @@ from typing import override
 from front_end.application.ports.inbound.inference_runner import (
     InferenceCoordinator,
 )
-from front_end.application.ports.outbound.front_end_plan_reader import (
-    FrontEndPlanReader,
+from front_end.application.ports.outbound.flow_plan_reader import (
+    FlowPlanReader,
 )
 from front_end.application.ports.outbound.hop_deployment_directory import (
     HopDeploymentDirectory,
@@ -26,12 +26,12 @@ from shared.flow.flow import FlowId
 class DefaultInferenceRunner(InferenceCoordinator):
     def __init__(
         self,
-        front_end_plan_reader: FrontEndPlanReader,
+        flow_plan_reader: FlowPlanReader,
         hop_deployment_directory: HopDeploymentDirectory,
         ingress_gateway: IngressGateway,
         sink_gateway: SinkGateway,
     ) -> None:
-        self._front_end_plan_reader = front_end_plan_reader
+        self._flow_plan_reader = flow_plan_reader
         self._hop_deployment_directory = hop_deployment_directory
         self._ingress_gateway = ingress_gateway
         self._sink_gateway = sink_gateway
@@ -41,8 +41,10 @@ class DefaultInferenceRunner(InferenceCoordinator):
         self,
         flow_id: FlowId,
     ) -> ModelContract:
-        plan_version = await self._front_end_plan_reader.get_current_plan_version()
-        flow_plan = await self._front_end_plan_reader.get_flow_plan_by_version(
+        plan_version = await self._flow_plan_reader.get_current_plan_version_for_flow(
+            flow_id
+        )
+        flow_plan = await self._flow_plan_reader.get_flow_plan_by_plan_version(
             flow_id, plan_version
         )
 
@@ -56,10 +58,14 @@ class DefaultInferenceRunner(InferenceCoordinator):
         request: InferenceRequest,
     ) -> InferenceResult:
 
-        curr_plan_version = await self._front_end_plan_reader.get_current_plan_version()
+        curr_plan_version = (
+            await self._flow_plan_reader.get_current_plan_version_for_flow(
+                request.flow_id
+            )
+        )
         if request.plan_version != curr_plan_version:
             raise ValueError("Plan has been updated, use the new one")
-        flow_plan = await self._front_end_plan_reader.get_flow_plan_by_version(
+        flow_plan = await self._flow_plan_reader.get_flow_plan_by_plan_version(
             request.flow_id, curr_plan_version
         )
 

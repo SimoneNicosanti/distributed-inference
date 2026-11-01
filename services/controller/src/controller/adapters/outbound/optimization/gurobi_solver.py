@@ -37,11 +37,11 @@ from controller.adapters.outbound.optimization.gurobi_variables import (
     add_gurobi_variables,
 )
 from controller.application.optimization.abc.solver import Solver
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
-)
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
+)
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
 )
 from controller.domain.optimization.solving.optimization_solution import (
     OptimizationSolution,
@@ -134,6 +134,7 @@ class GurobiSolver(Solver):
                     variables.assignment,
                     variables.execution,
                     context=context,
+                    requests_by_flow=requests_by_flow,
                     max_components=problem_config.max_components,
                 )
                 add_transmission_constraints(

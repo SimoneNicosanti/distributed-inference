@@ -1,6 +1,9 @@
 from collections import defaultdict
 from collections.abc import Sequence
 
+from controller.application.deployment.builder.endpoint_replica_id_builder import (
+    EndpointIdsByFlow,
+)
 from controller.application.deployment.builder.flow_solution_routes import (
     executable_components,
     input_tensors,
@@ -10,25 +13,31 @@ from controller.application.deployment.builder.flow_solution_routes import (
 from controller.application.deployment.builder.partition_replica_id_builder import (
     ReplicaIdsByFlow,
 )
+from controller.domain.hop.hop import ExternalHop, InvocableHop, SourceHop
 from controller.domain.optimization.solving.optimization_solution import (
     ComponentSolution,
     OptimizationSolution,
 )
 from controller.domain.plan.deployment_plan import DeploymentPlan, ResourceAllocation
+from controller.domain.plan.hop_routing_plan import (
+    HopAddress,
+    HopInputRouting,
+    HopOutputRouting,
+    HopRoutingPlan,
+    HopRoutings,
+)
 from controller.domain.plan.partition_execution_plan import (
     PartitionExecutionPlan,
     PartitionIOScheme,
 )
-from controller.domain.plan.routing_plan import (
-    ReplicaInputBinding,
-    ReplicaOutputRoute,
-    ReplicaRouting,
-    RoutingPlan,
-)
 from controller.domain.plan.scheduling_plan import PriorityKey, SchedulingPlan
 from controller.domain.plan.worker_plan import WorkerPlan
 from shared.model.model_partition import ModelPartitionId
-from shared.plan.hop_logical_id import PartitionReplicaId
+from shared.plan.hop_logical_id import (
+    IngressReplicaId,
+    PartitionReplicaId,
+    SinkReplicaId,
+)
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import WorkerId
 
@@ -39,10 +48,16 @@ class DefaultWorkerPlanBuilder:
         plan_version: PlanVersion,
         solution: OptimizationSolution,
         replica_ids_by_flow: ReplicaIdsByFlow,
+        endpoint_ids_by_flow: EndpointIdsByFlow,
     ) -> dict[WorkerId, WorkerPlan]:
         involved_workers: dict[WorkerId, None] = {}
         replicas_by_worker: dict[WorkerId, list[PartitionReplicaId]] = defaultdict(list)
-        routings_by_worker: dict[WorkerId, list[ReplicaRouting]] = defaultdict(list)
+        ingress_by_worker: dict[WorkerId, list[IngressReplicaId]] = defaultdict(list)
+        sink_by_worker: dict[WorkerId, list[SinkReplicaId]] = defaultdict(list)
+        addresses_by_worker: dict[WorkerId, list[HopAddress[InvocableHop]]] = (
+            defaultdict(list)
+        )
+        routings_by_worker: dict[WorkerId, list[HopRoutings]] = defaultdict(list)
         priority_keys_by_worker: dict[WorkerId, list[PriorityKey]] = defaultdict(list)
         priorities_by_worker: dict[WorkerId, list[int]] = defaultdict(list)
         schemes_by_worker: dict[WorkerId, dict[ModelPartitionId, PartitionIOScheme]] = (
@@ -50,7 +65,11 @@ class DefaultWorkerPlanBuilder:
         )
 
         for flow_solution in solution.flow_solutions:
-            involved_workers.setdefault(flow_solution.ingress_id, None)
+            involved_workers.setdefault(flow_solution.ingress_worker_id, None)
+            involved_workers.setdefault(flow_solution.sink_worker_id, None)
+            endpoints = endpoint_ids_by_flow[flow_solution.flow_id]
+            ingress_by_worker[flow_solution.ingress_worker_id].append(endpoints.ingress)
+            sink_by_worker[flow_solution.sink_worker_id].append(endpoints.sink)
             components = executable_components(flow_solution)
             replicas = tuple(
                 replica_ids_by_flow[flow_solution.flow_id][component.component_index]
@@ -64,7 +83,7 @@ class DefaultWorkerPlanBuilder:
                 priority_keys_by_worker[worker_id].append(
                     PriorityKey(
                         flow_id=flow_solution.flow_id,
-                        partition_replica_id=replica_id,
+                        executable_hop=replica_id,
                     )
                 )
                 priorities_by_worker[worker_id].append(component.priority)
@@ -77,10 +96,32 @@ class DefaultWorkerPlanBuilder:
             flow_input_tensors = input_tensors(flow_solution, components[0])
             flow_result_tensors = result_tensors(flow_solution, components[-1])
 
+            addresses_by_worker[flow_solution.ingress_worker_id].append(
+                HopAddress(flow_solution.flow_id, endpoints.ingress)
+            )
+            routings_by_worker[flow_solution.ingress_worker_id].append(
+                HopRoutings(
+                    input_routings=(
+                        HopInputRouting(
+                            source=HopAddress(flow_solution.flow_id, ExternalHop()),
+                            tensors=flow_input_tensors,
+                        ),
+                    ),
+                    output_routings=(
+                        HopOutputRouting(
+                            destination=HopAddress(flow_solution.flow_id, replicas[0]),
+                            tensors=flow_input_tensors,
+                        ),
+                    ),
+                )
+            )
+
             for index, component in enumerate(components):
-                previous_replica = replicas[index - 1] if index > 0 else None
+                previous_hop: SourceHop = (
+                    replicas[index - 1] if index > 0 else endpoints.ingress
+                )
                 next_replica = (
-                    replicas[index + 1] if index + 1 < len(replicas) else None
+                    replicas[index + 1] if index + 1 < len(replicas) else endpoints.sink
                 )
                 incoming_tensors = (
                     flow_input_tensors
@@ -100,27 +141,50 @@ class DefaultWorkerPlanBuilder:
                         components[index + 1],
                     )
                 )
+                addresses_by_worker[component.worker_id].append(
+                    HopAddress(flow_solution.flow_id, replicas[index])
+                )
                 routings_by_worker[component.worker_id].append(
-                    ReplicaRouting(
-                        input_bindings=(
-                            ReplicaInputBinding(
-                                prev_replica_id=previous_replica,
+                    HopRoutings(
+                        input_routings=(
+                            HopInputRouting(
+                                source=HopAddress(flow_solution.flow_id, previous_hop),
                                 tensors=incoming_tensors,
                             ),
                         ),
-                        output_routes=(
-                            ReplicaOutputRoute(
-                                next_replica_id=next_replica,
+                        output_routings=(
+                            HopOutputRouting(
+                                destination=HopAddress(
+                                    flow_solution.flow_id, next_replica
+                                ),
                                 tensors=outgoing_tensors,
                             ),
                         ),
                     )
                 )
 
+            addresses_by_worker[flow_solution.sink_worker_id].append(
+                HopAddress(flow_solution.flow_id, endpoints.sink)
+            )
+            routings_by_worker[flow_solution.sink_worker_id].append(
+                HopRoutings(
+                    input_routings=(
+                        HopInputRouting(
+                            source=HopAddress(flow_solution.flow_id, replicas[-1]),
+                            tensors=flow_result_tensors,
+                        ),
+                    ),
+                    output_routings=(),
+                )
+            )
+
         return {
             worker_id: self._build_worker_plan(
                 plan_version=plan_version,
                 replicas=replicas_by_worker[worker_id],
+                ingress_hops=ingress_by_worker[worker_id],
+                sink_hops=sink_by_worker[worker_id],
+                addresses=addresses_by_worker[worker_id],
                 routings=routings_by_worker[worker_id],
                 priority_keys=priority_keys_by_worker[worker_id],
                 priorities=priorities_by_worker[worker_id],
@@ -151,7 +215,10 @@ class DefaultWorkerPlanBuilder:
         *,
         plan_version: PlanVersion,
         replicas: Sequence[PartitionReplicaId],
-        routings: Sequence[ReplicaRouting],
+        ingress_hops: Sequence[IngressReplicaId],
+        sink_hops: Sequence[SinkReplicaId],
+        addresses: Sequence[HopAddress[InvocableHop]],
+        routings: Sequence[HopRoutings],
         priority_keys: Sequence[PriorityKey],
         priorities: Sequence[int],
         schemes: dict[ModelPartitionId, PartitionIOScheme],
@@ -160,10 +227,12 @@ class DefaultWorkerPlanBuilder:
         return WorkerPlan(
             plan_version=plan_version,
             deployment_plan=DeploymentPlan(
-                replica_ids=replica_ids,
+                executable_hops=replica_ids,
                 allocations=tuple(
                     ResourceAllocation(use_gpu=False) for _ in replica_ids
                 ),
+                ingress_hops=tuple(ingress_hops),
+                sink_hops=tuple(sink_hops),
             ),
             scheduling_plan=SchedulingPlan(
                 priority_keys=tuple(priority_keys),
@@ -173,8 +242,8 @@ class DefaultWorkerPlanBuilder:
                 partition_ids=tuple(schemes),
                 schemes=tuple(schemes.values()),
             ),
-            routing_plan=RoutingPlan(
-                replica_ids=replica_ids,
+            hop_routing_plan=HopRoutingPlan(
+                hop_addresses=tuple(addresses),
                 routings=tuple(routings),
             ),
         )

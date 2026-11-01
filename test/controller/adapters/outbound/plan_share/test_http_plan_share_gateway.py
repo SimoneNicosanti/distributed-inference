@@ -11,10 +11,9 @@ from controller.application.ports.outbound.directory.worker_directory_gateway im
     WorkerDirectoryGateway,
 )
 from controller.domain.plan.deployment_plan import DeploymentPlan
+from controller.domain.plan.hop_routing_plan import HopRoutingPlan
 from controller.domain.plan.partition_execution_plan import PartitionExecutionPlan
-from controller.domain.plan.routing_plan import RoutingPlan
 from controller.domain.plan.scheduling_plan import SchedulingPlan
-from controller.domain.plan.service_plan import ServicePlan
 from controller.domain.plan.worker_plan import WorkerPlan
 from integration.service_instance.service_instance import (
     Capability,
@@ -24,7 +23,7 @@ from integration.service_instance.service_instance import (
 )
 from integration.service_instance.worker_instance import WorkerInstance
 from integration.worker.deployment.http.service_plan_http_schema import (
-    PrepareServicePlanRequest,
+    PrepareWorkerPlanRequest,
 )
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
@@ -48,19 +47,15 @@ class StubServiceDirectory(WorkerDirectoryGateway):
         return self._service_instance
 
 
-def _service_plan(plan_version: PlanVersion) -> ServicePlan:
-    return ServicePlan(
-        worker_plan=WorkerPlan(
-            plan_version=plan_version,
-            deployment_plan=DeploymentPlan(replica_ids=(), allocations=()),
-            scheduling_plan=SchedulingPlan(priority_keys=(), priorities=()),
-            partition_execution_plan=PartitionExecutionPlan(
-                partition_ids=(),
-                schemes=(),
-            ),
-            routing_plan=RoutingPlan(replica_ids=(), routings=()),
+def _worker_plan(plan_version: PlanVersion) -> WorkerPlan:
+    return WorkerPlan(
+        plan_version=plan_version,
+        deployment_plan=DeploymentPlan(
+            executable_hops=(), allocations=(), ingress_hops=(), sink_hops=()
         ),
-        ingress_plan=None,
+        scheduling_plan=SchedulingPlan(priority_keys=(), priorities=()),
+        partition_execution_plan=PartitionExecutionPlan(partition_ids=(), schemes=()),
+        hop_routing_plan=HopRoutingPlan(hop_addresses=(), routings=()),
     )
 
 
@@ -113,7 +108,7 @@ async def test_sends_prepare_and_apply_to_discovered_worker_endpoint() -> None:
     ) as http_client:
         gateway = HttpPlanShareGateway(http_client, directory)
         plan_version = PlanVersion(version_number=3)
-        plan = _service_plan(plan_version)
+        plan = _worker_plan(plan_version)
 
         await gateway.send_prepare_plan_message(worker_id, plan)
         await gateway.send_apply_plan_message(worker_id, plan_version)
@@ -123,9 +118,10 @@ async def test_sends_prepare_and_apply_to_discovered_worker_endpoint() -> None:
         "/worker/deployment/plans/3",
         "/worker/deployment/active-plan/3",
     ]
-    request = PrepareServicePlanRequest.model_validate_json(requests[0].content)
-    assert request.service_plan.worker_plan.plan_version == plan_version
-    assert request.service_plan.ingress_plan is None
+    request = PrepareWorkerPlanRequest.model_validate_json(requests[0].content)
+    assert request.worker_plan.plan_version == plan_version
+    assert set(request.model_dump()) == {"worker_plan"}
+    assert request.worker_plan.deployment_plan.executable_hops == ()
 
 
 @pytest.mark.asyncio

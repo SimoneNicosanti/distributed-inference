@@ -17,11 +17,18 @@ from controller.adapters.outbound.optimization.gurobi_variables import (
     NetworkVariables,
     QoSVariables,
 )
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
+from controller.domain.optimization.request.flow_endpoint_placement import (
+    FixedPlacement,
+)
+from controller.domain.optimization.request.local_worker_config import (
+    ValidLocalWorkerConfig,
 )
 from controller.domain.optimization.request.optimization_request import (
+    OptimizationRequest,
     OptimizationRequestsByFlow,
+)
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
 )
 from controller.domain.optimization.solving.optimization_solution import (
     ComponentSolution,
@@ -47,6 +54,45 @@ def _flow_key(flow: FlowId) -> str:
 
 def _solution_value(term: GurobiAffineTerm) -> float:
     return float(term.X if isinstance(term, gp.Var) else term.getValue())
+
+
+def _validate_flow_placements(
+    request: OptimizationRequest,
+    components: list[ComponentSolution],
+) -> None:
+    if not components:
+        raise GurobiSolutionError(
+            f"Expected at least one component for flow {_flow_key(request.flow_id)}"
+        )
+
+    placement = request.flow_endpoint_placement
+    for endpoint, endpoint_placement, component in (
+        ("ingress", placement.ingress_placement, components[0]),
+        ("sink", placement.sink_placement, components[-1]),
+    ):
+        if (
+            isinstance(endpoint_placement, FixedPlacement)
+            and component.worker_id != endpoint_placement.worker_id
+        ):
+            raise GurobiSolutionError(
+                f"Fixed {endpoint} placement violated for flow "
+                f"{_flow_key(request.flow_id)}"
+            )
+
+    local_worker = request.local_worker_config
+    if (
+        isinstance(local_worker, ValidLocalWorkerConfig)
+        and not local_worker.is_inference_runner
+        and any(
+            component.worker_id == local_worker.worker_id
+            and component.executable_layer_keys
+            for component in components
+        )
+    ):
+        raise GurobiSolutionError(
+            f"Relay-only worker executes computational layers for flow "
+            f"{_flow_key(request.flow_id)}"
+        )
 
 
 def extract_solution(
@@ -166,6 +212,8 @@ def extract_solution(
                 )
             )
 
+        _validate_flow_placements(requests_by_flow[flow], components)
+
         cuts = tuple(
             CutSolution(
                 source_component_index=source.component_index,
@@ -193,7 +241,8 @@ def extract_solution(
         flow_solutions.append(
             FlowOptimizationSolution(
                 flow_id=flow,
-                ingress_id=requests_by_flow[flow].ingress_id,
+                ingress_worker_id=components[0].worker_id,
+                sink_worker_id=components[-1].worker_id,
                 model_variant_id=selected_model,
                 components=tuple(components),
                 cuts=cuts,

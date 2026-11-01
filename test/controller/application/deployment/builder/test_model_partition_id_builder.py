@@ -5,10 +5,10 @@ from controller.application.deployment.builder.model_partition_id_builder import
 )
 from controller.domain.optimization.solving.optimization_solution import (
     ComponentSolution,
+    ComponentTensorContract,
     FlowOptimizationSolution,
     OptimizationSolution,
 )
-from controller.domain.profile.model_variant_topology import ComponentTensorContract
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_partition import ModelPartitionId
@@ -64,7 +64,8 @@ def test_builds_partitions_only_from_executable_layers() -> None:
         flow_solutions=(
             FlowOptimizationSolution(
                 flow_id=FlowId(user_id=user_id),
-                ingress_id=ingress_id,
+                ingress_worker_id=ingress_id,
+                sink_worker_id=components[-1].worker_id,
                 model_variant_id=model_variant_id,
                 components=components,
                 cuts=(),

@@ -45,8 +45,8 @@ from controller.application.deployment.builder.plan_version_builder import (
 from controller.application.deployment.default_actuation_manager import (
     DefaultActuationManager,
 )
-from controller.application.deployment.default_service_plan_builder import (
-    DefaultServicePlanBuilder,
+from controller.application.deployment.default_all_worker_plan_builder import (
+    DefaultSolutionToPlanConverter,
 )
 from controller.application.optimization.abc.optimization_context_builder import (
     OptimizationContextBuilder,
@@ -185,7 +185,7 @@ class DefaultCompositionRoot(CompositionRoot):
             )
 
             plan_version_builder = PlanVersionBuilder()
-            service_plan_builder = DefaultServicePlanBuilder()
+            service_plan_builder = DefaultSolutionToPlanConverter()
 
             actuation_manager = DefaultActuationManager(
                 solution_observer,

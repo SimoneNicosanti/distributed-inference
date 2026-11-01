@@ -6,10 +6,13 @@ from shared.plan.hop_logical_id import (
     IngressReplicaId,
     SinkReplicaId,
 )
+from shared.plan.plan_version import PlanVersion
 
 
 @dataclass(frozen=True, slots=True)
 class FlowPlan:
+    plan_version: PlanVersion
+
     model_specs: ModelSpecs
 
     ingress_replica_id: IngressReplicaId

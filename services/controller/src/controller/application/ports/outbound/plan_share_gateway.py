@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from controller.domain.plan.service_plan import ServicePlan
+from controller.domain.plan.worker_plan import WorkerPlan
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import WorkerId
 
@@ -8,7 +8,7 @@ from shared.service.service import WorkerId
 class PlanShareGateway(ABC):
     @abstractmethod
     async def send_prepare_plan_message(
-        self, worker_id: WorkerId, plan: ServicePlan
+        self, worker_id: WorkerId, plan: WorkerPlan
     ) -> None: ...
 
     @abstractmethod

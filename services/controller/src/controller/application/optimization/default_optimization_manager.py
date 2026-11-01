@@ -40,4 +40,6 @@ class DefaultOptimizationManager(OptimizationManager):
             context,
             self._problem_config,
         )
+        ## NOTE: Maybe it would be better to add a post-processing step
+        ## Right now, part of the post processing (e.g., determine the cut tensors) is done as part of solution building
         await self._solution_store.put_solution(solution)
