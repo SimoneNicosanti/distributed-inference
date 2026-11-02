@@ -46,9 +46,15 @@ class TensorShapeProperty:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelShapeProperty:
+    max_cut_size: float
+
+
+@dataclass(frozen=True, slots=True)
 class ShapeProfile:
     layer_properties: Mapping[LayerKey, LayerShapeProperty]
     tensor_properties: Mapping[TensorKey, TensorShapeProperty]
+    # model_properties: ModelShapeProperty
 
     def __post_init__(self) -> None:
         object.__setattr__(

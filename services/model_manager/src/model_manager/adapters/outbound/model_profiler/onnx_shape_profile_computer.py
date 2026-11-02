@@ -7,6 +7,9 @@ import onnx_tool
 from onnx.shape_inference import infer_shapes
 
 from artifacts.contracts.artifact_workspace import ArtifactWorkspace
+from model_manager.adapters.outbound.model_max_cut_size_computer.pulp_max_cut_size_computer import (
+    PulpMaxCutSizeComputer,
+)
 from model_manager.application.ports.outbound.shape_profile_computer import (
     ShapeProfileComputer,
 )
@@ -165,6 +168,10 @@ class OnnxShapeProfileComputer(ShapeProfileComputer):
             tensor_properties[tensor_key] = TensorShapeProperty(
                 shape=tuple(int(dimension) for dimension in tensor_shape)
             )
+
+        PulpMaxCutSizeComputer.compute_model_variant_max_cut_size(
+            topology, tensor_properties
+        )
 
         return ShapeProfile(
             layer_properties=layer_properties,
