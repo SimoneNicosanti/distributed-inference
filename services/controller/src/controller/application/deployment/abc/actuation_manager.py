@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
 
-from controller.domain.optimization.solving.optimization_solution import (
-    OptimizationSolution,
+from controller.domain.optimization.solving.enriched_optimization_solution import (
+    EnrichedOptimizationSolution,
 )
 
 
 class ActuationManager(ABC):
     @abstractmethod
-    async def actuate_solution(self, solution: OptimizationSolution) -> None: ...
+    async def actuate_solution(
+        self, solution: EnrichedOptimizationSolution
+    ) -> None: ...

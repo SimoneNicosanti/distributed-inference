@@ -1,5 +1,6 @@
 import math
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from enum import StrEnum, auto
 
 
@@ -32,14 +33,44 @@ class ProblemConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class SolverRunStatistics:
+    """Native solver observations, collected before its model is disposed."""
+
+    status: int | None
+    runtime_s: float | None
+    solution_count: int
+    objective_value: float | None
+    objective_bound: float | None
+    relative_gap: float | None
+    construction_time_s: float
+    time_limit_s: float
+    mip_gap_target: float
+    threads: int
+    seed: int
+
+
+@dataclass(frozen=True, slots=True)
 class SolverConfig:
     objective: ObjectiveKind
     output_flag: bool = False
     time_limit_s: float | None = None
     mip_gap: float | None = None
+    threads: int | None = None
+    seed: int | None = None
+    observer: Callable[[SolverRunStatistics], None] | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
-        if self.time_limit_s is not None and self.time_limit_s <= 0:
+        if self.time_limit_s is not None and (
+            not math.isfinite(self.time_limit_s) or self.time_limit_s <= 0
+        ):
             raise ValueError("time_limit_s must be positive")
-        if self.mip_gap is not None and self.mip_gap < 0:
+        if self.mip_gap is not None and (
+            not math.isfinite(self.mip_gap) or self.mip_gap < 0
+        ):
             raise ValueError("mip_gap cannot be negative")
+        if self.threads is not None and self.threads < 0:
+            raise ValueError("threads cannot be negative")
+        if self.seed is not None and not 0 <= self.seed <= 2_000_000_000:
+            raise ValueError("seed must be between zero and 2000000000")

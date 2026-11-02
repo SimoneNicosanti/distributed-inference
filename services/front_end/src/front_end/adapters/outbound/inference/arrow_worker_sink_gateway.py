@@ -7,12 +7,9 @@ from typing import override
 import pyarrow as pa
 from pyarrow import flight
 
-from catalog.api.service.service_directory import ServiceDirectory
+from catalog.api.worker.worker_directory import WorkerDirectory
 from front_end.adapters.outbound.mappers.context_dto_mapper import (
     model_pass_context_to_dto,
-)
-from front_end.adapters.outbound.worker_endpoint_resolver import (
-    get_arrow_worker_endpoint,
 )
 from front_end.application.ports.outbound.inference.sink_gateway import SinkGateway
 from front_end.domain.tensor_map import TensorMap
@@ -20,7 +17,11 @@ from integration.dto.context.context_dto import (
     ModelPassContextDto,
     ModelPassResultMetadataDto,
 )
-from integration.service_instance.service_instance import CapabilityType
+from integration.service_instance.service_instance import (
+    CapabilityProtocol,
+    CapabilityType,
+)
+from integration.service_instance.worker_instance import WorkerInstance
 from integration.sink.arrow.model_pass_result.arrow_model_pass_result_schema import (
     CONTEXT_FIELD_NAME,
     RETRIEVE_RESULT_COMMAND,
@@ -32,7 +33,7 @@ from shared.service.service import WorkerId
 
 
 class ArrowWorkerSinkGateway(SinkGateway):
-    def __init__(self, directory: ServiceDirectory, timeout_s: float = 300.0) -> None:
+    def __init__(self, directory: WorkerDirectory, timeout_s: float = 300.0) -> None:
         self._directory = directory
         self._timeout_s = timeout_s
 
@@ -42,14 +43,23 @@ class ArrowWorkerSinkGateway(SinkGateway):
         model_pass_context: ModelPassContext,
         worker_id: WorkerId,
     ) -> TensorMap:
-        location = await get_arrow_worker_endpoint(
-            self._directory,
-            worker_id,
-            CapabilityType.RESULT_RETRIEVE,
-        )
+        worker_instance = await self._directory.get_worker_instance_by_id(worker_id)
+        location = self._get_arrow_worker_endpoint(worker_instance)
         return await asyncio.to_thread(
             self._retrieve_sync, location, model_pass_context_to_dto(model_pass_context)
         )
+
+    @staticmethod
+    def _get_arrow_worker_endpoint(worker_instance: WorkerInstance) -> str:
+        interfaces = worker_instance.get_capability_interfaces_by_type_and_protocol(
+            CapabilityType.RESULT_RETRIEVE, CapabilityProtocol.ARROW
+        )
+        if len(interfaces) != 1:
+            raise ValueError(
+                f"Worker {worker_instance.service_id} must expose exactly one "
+                f"Arrow {CapabilityType.RESULT_RETRIEVE} interface"
+            )
+        return interfaces[0].endpoint.unicode_string()
 
     def _retrieve_sync(self, location: str, context: ModelPassContextDto) -> TensorMap:
         schema = build_retrieve_request_schema()

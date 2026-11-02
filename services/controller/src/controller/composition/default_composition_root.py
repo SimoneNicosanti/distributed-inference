@@ -10,7 +10,9 @@ from advertisement.http.http_capability_life_checker import (
     build_http_capability_life_checkers,
 )
 from catalog.api.service.service_directory import ServiceDirectory
-from catalog.redis.service.redis_service_catalog import RedisServiceCatalog
+from catalog.redis.service.redis_service_directory import RedisServiceDirectory
+from catalog.redis.service.redis_service_registrar import RedisServiceRegistrar
+from catalog.view.worker.default_worker_directory import DefaultWorkerDirectory
 from controller.adapters.outbound.directory.default_worker_directory_gateway import (
     DefaultWorkerDirectoryGateway,
 )
@@ -36,6 +38,9 @@ from controller.adapters.outbound.profile.redis_static_profile_store_gateway imp
 from controller.adapters.outbound.store.in_memory_optimization_solution_store import (
     InMemoryOptimizationSolutionStore,
 )
+from controller.adapters.outbound.store.redis_flow_plan_publisher import (
+    RedisFlowPlanPublisher,
+)
 from controller.application.deployment.abc.actuation_manager import ActuationManager
 from controller.application.deployment.abc.solution_observer import SolutionObserver
 from controller.application.deployment.builder.plan_version_builder import (
@@ -56,6 +61,9 @@ from controller.application.optimization.default_optimization_context_builder im
 from controller.application.optimization.default_optimization_manager import (
     DefaultOptimizationManager,
 )
+from controller.application.optimization.default_optimization_solution_enricher import (
+    DefaultOptimizationSolutionEnricher,
+)
 from controller.application.ports.inbound.optimization.optimization_manager import (
     OptimizationManager,
 )
@@ -71,6 +79,7 @@ from controller.domain.optimization.solving.solver_config import (
     ProblemConfig,
     SolverConfig,
 )
+from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
 from integration.redis.model.keys_factory import StringModelKeyFactory
 from integration.redis.profiled_model_variant.keys_factory import (
     StringProfiledModelVariantKeyFactory,
@@ -106,8 +115,9 @@ class DefaultCompositionRoot(CompositionRoot):
                 self.build_advertising_manager_context(redis, service_instance)
             )
 
-            directory = RedisServiceCatalog(redis, entry_ttl_s=60)
-            worker_directory_gateway = DefaultWorkerDirectoryGateway(directory)
+            directory = RedisServiceDirectory(redis)
+            worker_directory = DefaultWorkerDirectory(directory)
+            worker_directory_gateway = DefaultWorkerDirectoryGateway(worker_directory)
 
             optimization_manager = self.build_optimization_manager(
                 solution_store, redis, worker_directory_gateway
@@ -115,7 +125,7 @@ class DefaultCompositionRoot(CompositionRoot):
 
             await stack.enter_async_context(
                 self.build_actuation_manager_context(
-                    solution_store, directory, worker_directory_gateway
+                    solution_store, directory, worker_directory_gateway, redis
                 )
             )
 
@@ -149,6 +159,7 @@ class DefaultCompositionRoot(CompositionRoot):
         optimization_manager = DefaultOptimizationManager(
             optimization_context_builder,
             solver,
+            DefaultOptimizationSolutionEnricher(),
             solution_store,
             problem_config,
         )
@@ -161,6 +172,7 @@ class DefaultCompositionRoot(CompositionRoot):
         solution_observer: SolutionObserver,
         directory: ServiceDirectory,
         worker_directory_gateway: WorkerDirectoryGateway,
+        redis: redis_asyncio.Redis,
     ) -> AsyncGenerator[ActuationManager]:
 
         async with AsyncExitStack() as stack:
@@ -192,6 +204,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 plan_version_builder,
                 service_plan_builder,
                 plan_share_gateway,
+                RedisFlowPlanPublisher(redis, StringFlowPlanKeyFactory()),
             )
 
             stack.push_async_callback(actuation_manager.stop)
@@ -241,7 +254,7 @@ class DefaultCompositionRoot(CompositionRoot):
         self, redis: redis_asyncio.Redis, service_instance: ServiceInstance
     ) -> AsyncGenerator[AdvertisingManager]:
         async with httpx.AsyncClient() as http_client:
-            registrar = RedisServiceCatalog(redis, entry_ttl_s=60)
+            registrar = RedisServiceRegistrar(redis, entry_ttl_s=60)
             advertising_manager = AdvertisingManager(
                 registrar,
                 service_instance.service_id,

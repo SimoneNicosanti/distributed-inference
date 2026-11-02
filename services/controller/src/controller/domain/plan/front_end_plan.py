@@ -1,56 +1,35 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
+from controller.domain.profile.model_variant_static_profile import TensorProperty
 from shared.model.keys import TensorKey
 from shared.model.model_variant import ModelVariantId
-from shared.plan.hop_logical_id import PlannedPartitionReplicaId
+from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
+from shared.plan.plan_version import PlanVersion
 
 
 @dataclass(frozen=True, slots=True)
-class IngressInputRoute:
-    target_replica_id: PlannedPartitionReplicaId
-    tensors: tuple[TensorKey, ...]
-
-    def __post_init__(self) -> None:
-        if not self.tensors:
-            raise ValueError("Ingress input route must carry at least one tensor")
-        if len(self.tensors) != len(set(self.tensors)):
-            raise ValueError("Ingress input route tensors must be unique")
-
-
-@dataclass
 class FlowPlan:
-    pass
-
-
-@dataclass(frozen=True, slots=True)
-class FrontEndPlan:
+    plan_version: PlanVersion
     model_variant_id: ModelVariantId
-    input_routes: tuple[IngressInputRoute, ...]
-    result_tensors: tuple[TensorKey, ...]
+    input_tensor_properties: Mapping[TensorKey, TensorProperty]
+    ingress_replica_id: PlannedIngressReplicaId
+    sink_replica_id: PlannedSinkReplicaId
 
     def __post_init__(self) -> None:
-        if not self.input_routes:
-            raise ValueError("Flow plan must contain at least one input route")
-
-        targets = [route.target_replica_id for route in self.input_routes]
-        if len(targets) != len(set(targets)):
-            raise ValueError("Flow plan input route targets must be unique")
-
-        partitions = [target.partition_id for target in targets]
-        if len(partitions) != len(set(partitions)):
-            raise ValueError(
-                "Flow plan must contain only one input route per partition"
-            )
-
-        if any(
-            target.partition_id.model_variant_id != self.model_variant_id
-            for target in targets
+        if (
+            self.ingress_replica_id.model_variant_id != self.model_variant_id
+            or self.sink_replica_id.model_variant_id != self.model_variant_id
         ):
             raise ValueError(
-                "Flow plan input routes must target the configured model variant"
+                "Model variant id must be consistent across ingress and sink"
             )
+        if not self.input_tensor_properties:
+            raise ValueError("Flow plan must contain model input tensor properties")
 
-        if not self.result_tensors:
-            raise ValueError("Flow plan must contain at least one result tensor")
-        if len(self.result_tensors) != len(set(self.result_tensors)):
-            raise ValueError("Flow plan result tensors must be unique")
+        object.__setattr__(
+            self,
+            "input_tensor_properties",
+            MappingProxyType(dict(self.input_tensor_properties)),
+        )

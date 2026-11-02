@@ -1,0 +1,84 @@
+root: ..
+seeds: [42]
+output: results
+export: {seed: 42, opset: 17, weights: random, optimization: basic}
+catalog:
+  directory: models
+  selection: nested_permutation
+  dataset: synthetic-classification-v1
+  accuracy_range: [0.65, 0.95]
+  # A synthetic ranking, not a claim about measured ImageNet performance.
+  models:
+    - {name: resnet50, filename: resnet50.onnx, input_shape: [1, 3, 224, 224], accuracy_rank: 1}
+    - {name: resnet101, filename: resnet101.onnx, input_shape: [1, 3, 224, 224], accuracy_rank: 3}
+    - {name: resnet152, filename: resnet152.onnx, input_shape: [1, 3, 224, 224], accuracy_rank: 5}
+    - {name: efficientnet_b0, filename: efficientnet_b0.onnx, input_shape: [1, 3, 224, 224], accuracy_rank: 0}
+    - {name: efficientnet_b2, filename: efficientnet_b2.onnx, input_shape: [1, 3, 260, 260], accuracy_rank: 2}
+    - {name: efficientnet_b4, filename: efficientnet_b4.onnx, input_shape: [1, 3, 380, 380], accuracy_rank: 4}
+hardware:
+  device: {backend: cpu, cpu_cores: 4, ram_gib: 8, vram_gib: 0, compute_flops_s: 80000000000, memory_bytes_s: 20000000000, overhead_s: 0.000005}
+  edge: {backend: gpu, cpu_cores: 8, ram_gib: 16, vram_gib: 8, compute_flops_s: 3000000000000, memory_bytes_s: 120000000000, overhead_s: 0.000025}
+  cloud: {backend: gpu, cpu_cores: 16, ram_gib: 64, vram_gib: 24, compute_flops_s: 12000000000000, memory_bytes_s: 450000000000, overhead_s: 0.000035}
+infrastructure: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [5, 1], [5, 2], [5, 3], [5, 4], [5, 5]]
+execution:
+  jitter_fraction: 0.1
+  service_scv: 0
+  memory_strategy: weights_plus_peak_live_diagnostic
+  groups:
+    convolution: {operators: [Conv, ConvTranspose], compute: 0.65, memory: 0.7}
+    matrix: {operators: [Gemm, MatMul], compute: 0.75, memory: 0.7}
+    activation: {operators: [Relu, LeakyRelu, Sigmoid, Tanh, Softmax, Clip, HardSwish, HardSigmoid, Elu, Selu], compute: 0.25, memory: 0.7}
+    normalization: {operators: [BatchNormalization, InstanceNormalization, LayerNormalization], compute: 0.35, memory: 0.6}
+    pooling: {operators: [MaxPool, AveragePool, GlobalAveragePool, GlobalMaxPool], compute: 0.3, memory: 0.65}
+    elementwise: {operators: [Add, Sub, Mul, Div, Pow, Sqrt, ReduceMean, ReduceSum], compute: 0.3, memory: 0.75}
+    movement: {operators: [Reshape, Flatten, Transpose, Concat, Identity, Squeeze, Unsqueeze, Gather, Slice, Expand], compute: 0.15, memory: 0.8}
+  fallback: {operators: [], compute: 0.3, memory: 0.5}
+network:
+  device-edge: {one_way_ms: [2, 10], throughput_mbps: [30, 200]}
+  edge-edge: {one_way_ms: [2, 15], throughput_mbps: [100, 1000]}
+  edge-cloud: {one_way_ms: [15, 50], throughput_mbps: [500, 5000]}
+  device-cloud: {one_way_ms: [25, 70], throughput_mbps: [50, 200]}
+  cloud-cloud: {one_way_ms: [1, 10], throughput_mbps: [5000, 25000]}
+flows:
+  pool_size: 5
+  arrival_process: poisson
+  minimum_accuracy: 0
+  deadline_s: [0.2, 5.0]
+  arrival_weight_range: [0.8, 1.2]
+  reference_model: resnet50
+  reference_tier: device
+  calibration: full_pool_reference_utilization
+  max_energy_consumption: 1000000
+optimization:
+  max_components: 7
+  priority_count: 3
+  compute_utilization_limit: 0.8
+  network_utilization_limit: 0.8
+  relative_error: 0.1
+  objective: arrival_weighted_response_slack
+solver:
+  timeout_s: 300
+  relative_gap: 0.01
+  threads: null
+  seed: 0
+  output_flag: false
+main:
+  enabled: true
+  loads: [0.6]
+  flows: [1, 2, 3, 4, 5]
+  models: [1, 2, 3, 4, 5, 6]
+sensitivity:
+  enabled: false
+  loads: [0.3, 0.8]
+  flows: [1, 3, 5]
+  models: [1, 3, 6]
+pilot:
+  timeout_s: 60
+  load: 0.6
+  cases:
+    - {flows: 1, models: 1, infrastructure_index: 0}
+    - {flows: 1, models: 3, infrastructure_index: 3}
+    - {flows: 3, models: 1, infrastructure_index: 5}
+    - {flows: 3, models: 3, infrastructure_index: 6}
+    - {flows: 5, models: 6, infrastructure_index: 0}
+    - {flows: 5, models: 6, infrastructure_index: 10}

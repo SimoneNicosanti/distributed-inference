@@ -5,7 +5,7 @@ from uuid import uuid4
 import httpx
 import onnx
 import pytest
-from test.system.test_upload_model import _build_model_archive, _read_model_inputs
+from test.system.model_support import _build_model_archive, _read_model_inputs
 
 from integration.dto.model.model_dto import ModelDto
 from integration.dto.model.model_variant_dto import (

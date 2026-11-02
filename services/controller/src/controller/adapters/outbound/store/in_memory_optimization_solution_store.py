@@ -5,18 +5,20 @@ from controller.application.deployment.abc.solution_observer import SolutionObse
 from controller.application.ports.outbound.store.optimization_solution_store import (
     OptimizationSolutionStore,
 )
-from controller.domain.optimization.solving.optimization_solution import (
-    OptimizationSolution,
+from controller.domain.optimization.solving.enriched_optimization_solution import (
+    EnrichedOptimizationSolution,
 )
 
 
 class InMemoryOptimizationSolutionStore(OptimizationSolutionStore, SolutionObserver):
     def __init__(self) -> None:
-        self._current_solution: OptimizationSolution | None = None
-        self._updates: asyncio.Queue[OptimizationSolution] = asyncio.Queue(maxsize=1)
+        self._current_solution: EnrichedOptimizationSolution | None = None
+        self._updates: asyncio.Queue[EnrichedOptimizationSolution] = asyncio.Queue(
+            maxsize=1
+        )
 
     @override
-    async def put_solution(self, solution: OptimizationSolution) -> None:
+    async def put_solution(self, solution: EnrichedOptimizationSolution) -> None:
         self._current_solution = solution
 
         if self._updates.full():
@@ -26,11 +28,11 @@ class InMemoryOptimizationSolutionStore(OptimizationSolutionStore, SolutionObser
         self._updates.put_nowait(solution)
 
     @override
-    async def get_current_solution(self) -> OptimizationSolution | None:
+    async def get_current_solution(self) -> EnrichedOptimizationSolution | None:
         return self._current_solution
 
     @override
-    async def observe_new_solution(self) -> OptimizationSolution:
+    async def observe_new_solution(self) -> EnrichedOptimizationSolution:
         solution = await self._updates.get()
         self._updates.task_done()
         return solution

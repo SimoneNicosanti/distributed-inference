@@ -1,13 +1,13 @@
 from abc import ABC, abstractmethod
 
-from controller.domain.optimization.solving.optimization_solution import (
-    OptimizationSolution,
+from controller.domain.optimization.solving.enriched_optimization_solution import (
+    EnrichedOptimizationSolution,
 )
 
 
 class OptimizationSolutionStore(ABC):
     @abstractmethod
-    async def put_solution(self, solution: OptimizationSolution) -> None: ...
+    async def put_solution(self, solution: EnrichedOptimizationSolution) -> None: ...
 
     @abstractmethod
-    async def get_current_solution(self) -> OptimizationSolution | None: ...
+    async def get_current_solution(self) -> EnrichedOptimizationSolution | None: ...

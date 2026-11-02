@@ -84,6 +84,12 @@ def add_assignment_constraints(
         _endpoint_placement_constraints(
             model, assignment, requests_by_flow, components, flow, flow_index
         )
+        for cut in cuts:
+            _successive_components_use_different_workers(
+                model, assignment, p, flow, flow_index, cut
+            )
+
+
 
         for model_variant in p.models_by_flow[flow]:
             model_index = p.model_index[flow, model_variant]
@@ -126,6 +132,27 @@ def _endpoint_placement_constraints(
                 >= assignment.component_last[flow, component],
                 name=f"last_on_device[{flow_index},{component}]",
             )
+
+
+
+def _successive_components_use_different_workers(
+    model: gp.Model,
+    assignment: AssignmentVariables,
+    p: GurobiProblem,
+    flow: FlowId,
+    flow_index: int,
+    cut: int,
+) -> None:
+    for worker in p.workers_by_flow[flow]:
+        model.addConstr(
+            assignment.component_worker[flow, cut, worker]
+            + assignment.component_worker[flow, cut + 1, worker]
+            <= 1,
+            name=(
+                f"successive_components_different_workers["
+                f"{flow_index},{cut},{p.worker_index[worker]}]"
+            ),
+        )
 
 
 def _component_sequence_is_prefix(

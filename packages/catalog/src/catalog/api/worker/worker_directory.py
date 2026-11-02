@@ -4,7 +4,7 @@ from integration.service_instance.worker_instance import WorkerInstance
 from shared.service.service import WorkerId
 
 
-class ServiceDirectoryGateway(ABC):
+class WorkerDirectory(ABC):
     @abstractmethod
     async def get_all_worker_instances(self) -> list[WorkerInstance]: ...
 

@@ -16,7 +16,8 @@ from artifacts.storage.s3.s3_artifact_store import S3ArtifactStore
 from artifacts.storage.s3.s3_client import S3Client
 from catalog.redis.hop.keys_factory import StringHopDeploymentKeyFactory
 from catalog.redis.hop.redis_hop_deployment_catalog import RedisHopDeploymentCatalog
-from catalog.redis.service.redis_service_catalog import RedisServiceCatalog
+from catalog.redis.service.redis_service_directory import RedisServiceDirectory
+from catalog.view.worker.default_worker_directory import DefaultWorkerDirectory
 from front_end.adapters.outbound.inference.arrow_worker_ingress_gateway import (
     ArrowWorkerIngressGateway,
 )
@@ -70,7 +71,8 @@ class DefaultCompositionRoot(CompositionRoot):
             redis = await stack.enter_async_context(
                 self.build_redis_connection_context()
             )
-            directory = RedisServiceCatalog(redis, entry_ttl_s=60)
+            service_directory = RedisServiceDirectory(redis)
+            directory = DefaultWorkerDirectory(service_directory)
 
             inference = DefaultInferenceRunner(
                 flow_plan_reader=RedisFlowPlanReader(redis, StringFlowPlanKeyFactory()),

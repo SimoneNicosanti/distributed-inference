@@ -6,12 +6,15 @@ import httpx
 import numpy as np
 import pyarrow as pa
 import pytest
+from front_end.adapters.outbound.redis_hop_deployment_directory import (
+    RedisHopDeploymentDirectory,
+)
 from redis import asyncio as redis_asyncio
 from shared.plan.hop_deployment_id import HopDeploymentId
 
 from catalog.redis.hop.keys_factory import StringHopDeploymentKeyFactory
 from catalog.redis.service.keys_factory import build_catalog_key, build_service_hset_key
-from catalog.redis.service.redis_service_catalog import RedisServiceCatalog
+from catalog.redis.service.redis_service_directory import RedisServiceDirectory
 from front_end.adapters.outbound.inference.arrow_worker_ingress_gateway import (
     ArrowWorkerIngressGateway,
 )
@@ -20,9 +23,6 @@ from front_end.adapters.outbound.inference.arrow_worker_sink_gateway import (
 )
 from front_end.adapters.outbound.inference.redis_flow_plan_reader import (
     RedisFlowPlanReader,
-)
-from front_end.adapters.outbound.redis_hop_deployment_directory import (
-    RedisHopDeploymentDirectory,
 )
 from front_end.application.inference.default_inference_runner import (
     DefaultInferenceRunner,
@@ -138,7 +138,7 @@ async def test_http_to_ingress_and_sink_using_versioned_redis_contracts() -> Non
         return values.get((key, field))
 
     redis.hget.side_effect = hget
-    directory = RedisServiceCatalog(redis, entry_ttl_s=60)
+    directory = RedisServiceDirectory(redis)
     runner = DefaultInferenceRunner(
         flow_plan_reader=RedisFlowPlanReader(redis, StringFlowPlanKeyFactory()),
         hop_deployment_directory=RedisHopDeploymentDirectory(

@@ -3,14 +3,14 @@ from typing import override
 from pydantic import ValidationError
 
 from catalog.api.service.service_directory import ServiceDirectory
+from catalog.api.worker.worker_directory import (
+    WorkerDirectory,
+)
 from integration.service_instance.worker_instance import WorkerInstance
 from shared.service.service import WorkerId
-from worker.application.ports.outbound.catalog.service.service_directory_gateway import (
-    ServiceDirectoryGateway,
-)
 
 
-class DefaultServiceDirectoryGateway(ServiceDirectoryGateway):
+class DefaultWorkerDirectory(WorkerDirectory):
     def __init__(
         self,
         directory: ServiceDirectory,
@@ -41,6 +41,12 @@ class DefaultServiceDirectoryGateway(ServiceDirectoryGateway):
         try:
             service_instance_dump = service_instance.model_dump()
             worker_instance = WorkerInstance.model_validate(service_instance_dump)
+
+            if worker_instance.service_id != worker_id:
+                raise ValueError(
+                    "Discovered worker identity does not match requested worker"
+                )
+
             return worker_instance
         except ValidationError as e:
             raise ValueError(

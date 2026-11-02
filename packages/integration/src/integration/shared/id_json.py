@@ -43,21 +43,15 @@ type _HopReplicaIdEnvelope = Annotated[
 ]
 
 
-class _HopDeploymentIdEnvelope(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    replica_id: _HopReplicaIdEnvelope
-    worker_id: WorkerId
-
-
 _SERVICE_ID_ADAPTER = TypeAdapter(ServiceId)
 _FLOW_ID_ADAPTER = TypeAdapter(FlowId)
 _MODEL_ID_ADAPTER = TypeAdapter(ModelId)
 _MODEL_VARIANT_ID_ADAPTER = TypeAdapter(ModelVariantId)
 _MODEL_PARTITION_ID_ADAPTER = TypeAdapter(ModelPartitionId)
 _PARTITION_REPLICA_ID_ADAPTER = TypeAdapter(PlannedPartitionReplicaId)
-_HOP_REPLICA_ID_ADAPTER = TypeAdapter(_HopReplicaIdEnvelope)
-_HOP_DEPLOYMENT_ID_ADAPTER = TypeAdapter(_HopDeploymentIdEnvelope)
+_HOP_REPLICA_ID_ADAPTER: TypeAdapter[_HopReplicaIdEnvelope] = TypeAdapter(
+    _HopReplicaIdEnvelope
+)
 
 
 def service_id_to_json(value: ServiceId) -> str:

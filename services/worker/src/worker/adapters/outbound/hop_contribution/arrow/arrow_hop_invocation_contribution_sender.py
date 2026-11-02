@@ -8,6 +8,9 @@ import numpy as np
 import pyarrow as pa
 from pyarrow import flight
 
+from catalog.api.worker.worker_directory import (
+    WorkerDirectory,
+)
 from integration.dto.context.context_dto import (
     HopInvocationContributionAckDto,
     HopInvocationContributionMetadataDto,
@@ -28,9 +31,6 @@ from worker.adapters.context_mapper import (
     hop_invocation_context_from_dto,
     hop_invocation_context_to_dto,
 )
-from worker.application.ports.outbound.catalog.service.service_directory_gateway import (
-    ServiceDirectoryGateway,
-)
 from worker.application.ports.outbound.hop_contribution_snd.contribution_sender import (
     ContributionSender,
 )
@@ -40,7 +40,7 @@ from worker.domain.hop.hop_invocation_contribution import HopInvocationContribut
 class ArrowHopInvocationContributionSender(ContributionSender):
     def __init__(
         self,
-        directory: ServiceDirectoryGateway,
+        directory: WorkerDirectory,
         timeout_s: float = 30.0,
     ) -> None:
         self._directory = directory

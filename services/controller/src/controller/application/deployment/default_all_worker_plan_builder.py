@@ -17,8 +17,8 @@ from controller.application.deployment.builder.endpoint_replica_id_builder impor
 from controller.application.deployment.builder.partition_replica_id_builder import (
     PartitionReplicaIdBuilder,
 )
-from controller.domain.optimization.solving.optimization_solution import (
-    OptimizationSolution,
+from controller.domain.optimization.solving.enriched_optimization_solution import (
+    EnrichedOptimizationSolution,
 )
 from shared.plan.plan_version import PlanVersion
 
@@ -34,17 +34,20 @@ class DefaultSolutionToPlanConverter(SolutionToPlanConverter):
     async def convert_solution_to_plans(
         self,
         plan_version: PlanVersion,
-        solution: OptimizationSolution,
+        solution: EnrichedOptimizationSolution,
     ) -> tuple[WorkerPlanMapping, FlowPlanMapping]:
+        optimization_solution = solution.solution
         replica_ids_by_flow = (
             self._replica_id_builder.build_all_partition_replica_ids_from_solution(
-                solution
+                optimization_solution
             )
         )
-        endpoint_ids_by_flow = self._endpoint_id_builder.build_all(solution)
+        endpoint_ids_by_flow = self._endpoint_id_builder.build_all(
+            optimization_solution
+        )
         worker_plan_mapping = self._worker_plan_builder.build_all(
             plan_version,
-            solution,
+            optimization_solution,
             replica_ids_by_flow,
             endpoint_ids_by_flow,
         )
@@ -52,7 +55,6 @@ class DefaultSolutionToPlanConverter(SolutionToPlanConverter):
         flow_plan_mapping = self._flow_plan_builder.build_all(
             plan_version,
             solution,
-            replica_ids_by_flow,
             endpoint_ids_by_flow,
         )
 

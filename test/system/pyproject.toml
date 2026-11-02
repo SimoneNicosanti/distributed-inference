@@ -1,0 +1,27 @@
+[project]
+name = "distributed-inference-system-tests"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+  "boto3>=1.43.116",
+  "distributed-inference-artifacts",
+  "distributed-inference-catalog",
+  "distributed-inference-integration",
+  "distributed-inference-shared",
+  "httpx>=0.28.1",
+  "numpy>=2.0",
+  "onnx>=1.23",
+  "onnxruntime>=1.31.0",
+  "pytest>=8.0",
+  "pytest-asyncio>=0.24",
+  "redis>=8.0.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+distributed-inference-artifacts = { path = "../../packages/artifacts", editable = true }
+distributed-inference-catalog = { path = "../../packages/catalog", editable = true }
+distributed-inference-integration = { path = "../../packages/integration", editable = true }
+distributed-inference-shared = { path = "../../packages/shared", editable = true }

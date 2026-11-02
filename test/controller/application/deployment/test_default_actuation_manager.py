@@ -1,8 +1,12 @@
+from collections.abc import Mapping
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from controller.application.deployment.abc.solution_observer import SolutionObserver
+from controller.application.deployment.abc.solution_to_plan_converter import (
+    SolutionToPlanConverter,
+)
 from controller.application.deployment.builder.plan_version_builder import (
     PlanVersionBuilder,
 )
@@ -16,6 +20,12 @@ from controller.application.ports.outbound.partition.partition_builder_gateway i
     PartitionBuilderGateway,
 )
 from controller.application.ports.outbound.plan_share_gateway import PlanShareGateway
+from controller.application.ports.outbound.store.flow_plan_publisher import (
+    FlowPlanPublisher,
+)
+from controller.domain.optimization.solving.enriched_optimization_solution import (
+    EnrichedOptimizationSolution,
+)
 from controller.domain.optimization.solving.optimization_solution import (
     ComponentSolution,
     ComponentTensorContract,
@@ -23,7 +33,9 @@ from controller.domain.optimization.solving.optimization_solution import (
     FlowOptimizationSolution,
     OptimizationSolution,
 )
+from controller.domain.plan.front_end_plan import FlowPlan
 from controller.domain.plan.worker_plan import WorkerPlan
+from controller.domain.profile.model_variant_static_profile import TensorProperty
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_partition import ModelPartitionId
@@ -79,8 +91,12 @@ async def test_prepares_all_workers_including_endpoints_before_applying(
         objective_value=0,
         is_optimal=True,
     )
+    enriched_solution = EnrichedOptimizationSolution(
+        solution, {variant: {"x": TensorProperty("float32", 4, (1,))}}
+    )
     partition_gateway = AsyncMock(spec=PartitionBuilderGateway)
     share_gateway = AsyncMock(spec=PlanShareGateway)
+    publisher = AsyncMock(spec=FlowPlanPublisher)
     prepared: dict[ServiceId, WorkerPlan] = {}
     applied: set[ServiceId] = set()
 
@@ -98,24 +114,69 @@ async def test_prepares_all_workers_including_endpoints_before_applying(
         assert version == PlanVersion(version_number=1)
         applied.add(worker_id)
 
+    async def publish(flow_plans: Mapping[FlowId, FlowPlan]) -> None:
+        assert applied == {ingress, compute, sink}
+        flow_plan = flow_plans[solution.flow_solutions[0].flow_id]
+        assert flow_plan.plan_version == PlanVersion(version_number=1)
+        assert (
+            flow_plan.ingress_replica_id
+            == prepared[ingress].deployment_plan.ingress_hops[0]
+        )
+        assert flow_plan.sink_replica_id == prepared[sink].deployment_plan.sink_hops[0]
+
     share_gateway.send_prepare_plan_message.side_effect = prepare
     share_gateway.send_apply_plan_message.side_effect = apply
+    publisher.publish_flow_plans.side_effect = publish
     manager = DefaultActuationManager(
         solution_observer=Mock(spec=SolutionObserver),
         partition_builder_gateway=partition_gateway,
         plan_version_builder=PlanVersionBuilder(),
         worker_plan_builder=DefaultSolutionToPlanConverter(),
         plan_share_gateway=share_gateway,
+        flow_plan_publisher=publisher,
     )
 
     if prepare_fails:
-        with pytest.raises(RuntimeError, match="prepare failed"):
-            await manager.actuate_solution(solution)
+        with pytest.raises(ExceptionGroup, match="Worker deploy failed") as caught:
+            await manager.actuate_solution(enriched_solution)
+        assert any(str(error) == "prepare failed" for error in caught.value.exceptions)
         share_gateway.send_apply_plan_message.assert_not_awaited()
+        publisher.publish_flow_plans.assert_not_awaited()
     else:
-        await manager.actuate_solution(solution)
+        await manager.actuate_solution(enriched_solution)
         assert applied == {ingress, compute, sink}
         assert prepared[ingress].deployment_plan.executable_hops == ()
         assert prepared[sink].deployment_plan.executable_hops == ()
         assert prepared[ingress].deployment_plan.ingress_hops
         assert prepared[sink].deployment_plan.sink_hops
+        publisher.publish_flow_plans.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_passes_enriched_solution_to_plan_conversion() -> None:
+    solution = OptimizationSolution((), 0, True)
+    enriched_solution = EnrichedOptimizationSolution(solution, {})
+    partition_gateway = AsyncMock(spec=PartitionBuilderGateway)
+    converter = AsyncMock(spec=SolutionToPlanConverter)
+    converter.convert_solution_to_plans.side_effect = RuntimeError("conversion failed")
+    share_gateway = AsyncMock(spec=PlanShareGateway)
+    publisher = AsyncMock(spec=FlowPlanPublisher)
+    manager = DefaultActuationManager(
+        solution_observer=Mock(spec=SolutionObserver),
+        partition_builder_gateway=partition_gateway,
+        plan_version_builder=PlanVersionBuilder(),
+        worker_plan_builder=converter,
+        plan_share_gateway=share_gateway,
+        flow_plan_publisher=publisher,
+    )
+
+    with pytest.raises(RuntimeError, match="conversion failed"):
+        await manager.actuate_solution(enriched_solution)
+
+    partition_gateway.build_all_partitions_by_ids.assert_awaited_once_with(set())
+    converter.convert_solution_to_plans.assert_awaited_once_with(
+        PlanVersion(version_number=1), enriched_solution
+    )
+    share_gateway.send_prepare_plan_message.assert_not_awaited()
+    share_gateway.send_apply_plan_message.assert_not_awaited()
+    publisher.publish_flow_plans.assert_not_awaited()

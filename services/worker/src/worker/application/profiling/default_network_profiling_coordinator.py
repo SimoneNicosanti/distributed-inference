@@ -1,6 +1,9 @@
 import asyncio
 from typing import override
 
+from catalog.api.worker.worker_directory import (
+    WorkerDirectory,
+)
 from lifecycle.async_lifecycle import AsyncLifecycle
 from shared.service.service import WorkerId
 from worker.application.activity.abc.activity_request_factory import (
@@ -8,9 +11,6 @@ from worker.application.activity.abc.activity_request_factory import (
 )
 from worker.application.ports.outbound.activity_manager.activity_manager import (
     ActivityManager,
-)
-from worker.application.ports.outbound.catalog.service.service_directory_gateway import (
-    ServiceDirectoryGateway,
 )
 from worker.application.ports.outbound.profiling.network.network_probe_client import (
     NetworkProbeClient,
@@ -35,7 +35,7 @@ class DefaultNetworkProfilingCoordinator(NetworkProfilingCoordinator, AsyncLifec
         worker_id: WorkerId,
         activity_request_factory: ActivityRequestFactory,
         activity_manager: ActivityManager,
-        service_directory: ServiceDirectoryGateway,
+        service_directory: WorkerDirectory,
         net_probe_client: NetworkProbeClient,
         net_profile_publisher: NetworkProfilePublisher,
     ):

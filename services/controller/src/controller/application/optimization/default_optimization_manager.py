@@ -3,6 +3,9 @@ from typing import override
 from controller.application.optimization.abc.optimization_context_builder import (
     OptimizationContextBuilder,
 )
+from controller.application.optimization.abc.optimization_solution_enricher import (
+    OptimizationSolutionEnricher,
+)
 from controller.application.optimization.abc.solver import Solver
 from controller.application.ports.inbound.optimization.optimization_manager import (
     OptimizationManager,
@@ -21,11 +24,13 @@ class DefaultOptimizationManager(OptimizationManager):
         self,
         optimization_context_builder: OptimizationContextBuilder,
         solver: Solver,
+        solution_enricher: OptimizationSolutionEnricher,
         solution_store: OptimizationSolutionStore,
         problem_config: ProblemConfig,
     ) -> None:
         self._optimization_context_builder = optimization_context_builder
         self._solver = solver
+        self._solution_enricher = solution_enricher
         self._solution_store = solution_store
         self._problem_config = problem_config
 
@@ -40,6 +45,8 @@ class DefaultOptimizationManager(OptimizationManager):
             context,
             self._problem_config,
         )
-        ## NOTE: Maybe it would be better to add a post-processing step
-        ## Right now, part of the post processing (e.g., determine the cut tensors) is done as part of solution building
-        await self._solution_store.put_solution(solution)
+        enriched_solution = self._solution_enricher.enrich_solution(
+            solution,
+            context.static_profiles_by_variant,
+        )
+        await self._solution_store.put_solution(enriched_solution)

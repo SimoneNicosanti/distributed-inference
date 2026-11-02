@@ -1,4 +1,6 @@
 import asyncio
+import math
+from time import perf_counter
 from typing import override
 
 import gurobipy as gp
@@ -49,6 +51,7 @@ from controller.domain.optimization.solving.optimization_solution import (
 from controller.domain.optimization.solving.solver_config import (
     ProblemConfig,
     SolverConfig,
+    SolverRunStatistics,
 )
 
 
@@ -58,6 +61,42 @@ class OptimizationInfeasibleError(RuntimeError):
 
 class OptimizationNotSolvedError(RuntimeError):
     pass
+
+
+def _finite_attribute(model: gp.Model, name: str) -> float | None:
+    try:
+        value = float(model.getAttr(name))
+    except AttributeError, gp.GurobiError:
+        return None
+    return value if math.isfinite(value) and abs(value) < GRB.INFINITY else None
+
+
+def _observe_model(
+    model: gp.Model, config: SolverConfig, construction_time_s: float
+) -> None:
+    if config.observer is None:
+        return
+    status = _finite_attribute(model, "Status")
+    solution_count = int(_finite_attribute(model, "SolCount") or 0)
+    config.observer(
+        SolverRunStatistics(
+            status=int(status) if status is not None else None,
+            runtime_s=_finite_attribute(model, "Runtime"),
+            solution_count=solution_count,
+            objective_value=(
+                _finite_attribute(model, "ObjVal") if solution_count else None
+            ),
+            objective_bound=_finite_attribute(model, "ObjBound"),
+            relative_gap=(
+                _finite_attribute(model, "MIPGap") if solution_count else None
+            ),
+            construction_time_s=construction_time_s,
+            time_limit_s=float(model.Params.TimeLimit),
+            mip_gap_target=float(model.Params.MIPGap),
+            threads=int(model.Params.Threads),
+            seed=int(model.Params.Seed),
+        )
+    )
 
 
 class GurobiSolver(Solver):
@@ -89,6 +128,7 @@ class GurobiSolver(Solver):
         context: OptimizationContext,
         problem_config: ProblemConfig,
     ) -> OptimizationSolution:
+        construction_started = perf_counter()
         problem: GurobiProblem = self._problem_builder.build(
             requests_by_flow,
             context,
@@ -104,6 +144,10 @@ class GurobiSolver(Solver):
                     model.Params.TimeLimit = self._config.time_limit_s
                 if self._config.mip_gap is not None:
                     model.Params.MIPGap = self._config.mip_gap
+                if self._config.threads is not None:
+                    model.Params.Threads = self._config.threads
+                if self._config.seed is not None:
+                    model.Params.Seed = self._config.seed
 
                 variables = add_gurobi_variables(
                     model,
@@ -194,7 +238,11 @@ class GurobiSolver(Solver):
                     self._config.objective,
                     requests_by_flow=requests_by_flow,
                 )
-                model.optimize()
+                construction_time_s = perf_counter() - construction_started
+                try:
+                    model.optimize()
+                finally:
+                    _observe_model(model, self._config, construction_time_s)
 
                 if model.Status == GRB.INFEASIBLE:
                     raise OptimizationInfeasibleError(

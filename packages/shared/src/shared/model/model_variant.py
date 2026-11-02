@@ -19,6 +19,7 @@ class QuantizationType(StrEnum):
 
 
 class PerformanceMetricType(StrEnum):
+    ACCURACY = auto()
     MAE = auto()
     RMSE = auto()
 

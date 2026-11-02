@@ -5,6 +5,7 @@ requires-python = ">=3.14"
 dependencies = [
   "distributed-inference-integration",
   "distributed-inference-shared",
+  "pydantic>=2.8",
   "redis>=8.0.1",
 ]
 

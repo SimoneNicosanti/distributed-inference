@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from itertools import pairwise
 
 import pytest
@@ -9,6 +10,9 @@ from controller.application.deployment.default_all_worker_plan_builder import (
     DefaultSolutionToPlanConverter,
 )
 from controller.domain.hop.hop import ExternalHop
+from controller.domain.optimization.solving.enriched_optimization_solution import (
+    EnrichedOptimizationSolution,
+)
 from controller.domain.optimization.solving.optimization_solution import (
     ComponentSolution,
     ComponentTensorContract,
@@ -16,8 +20,10 @@ from controller.domain.optimization.solving.optimization_solution import (
     FlowOptimizationSolution,
     OptimizationSolution,
 )
+from controller.domain.plan.front_end_plan import FlowPlan
 from controller.domain.plan.hop_routing_plan import HopAddress
 from controller.domain.plan.worker_plan import WorkerPlan
+from controller.domain.profile.model_variant_static_profile import TensorProperty
 from integration.worker.deployment.http.service_plan_http_schema import (
     PrepareWorkerPlanRequest,
 )
@@ -156,8 +162,11 @@ async def test_maps_solution_to_all_involved_workers() -> None:
         is_optimal=True,
     )
 
-    plans = await DefaultSolutionToPlanConverter().convert_solution_to_plans(
-        PlanVersion(version_number=1), solution
+    (
+        plans,
+        flow_plans,
+    ) = await DefaultSolutionToPlanConverter().convert_solution_to_plans(
+        PlanVersion(version_number=1), _enriched(solution)
     )
 
     assert set(plans) == {ingress_one, ingress_two, sink_one, compute_one, compute_two}
@@ -224,6 +233,7 @@ async def test_maps_solution_to_all_involved_workers() -> None:
     ) == (0,)
     assert len(plans[ingress_two].hop_routing_plan.hop_addresses) == 3
     _assert_plan_graph(plans)
+    _assert_flow_plans(plans, flow_plans)
     for plan in plans.values():
         _assert_worker_round_trip(plan)
 
@@ -264,7 +274,7 @@ async def test_rejects_flow_without_executable_components() -> None:
 
     with pytest.raises(ValueError, match="has no executable components"):
         await DefaultSolutionToPlanConverter().convert_solution_to_plans(
-            PlanVersion(version_number=1), solution
+            PlanVersion(version_number=1), _enriched(solution)
         )
 
 
@@ -324,8 +334,11 @@ async def test_respects_resolved_endpoint_and_compute_placements(
     )
     variant = ModelVariantId(ModelId(model_name="model"), "variant")
     flow = _placed_flow(variant, placements)
-    plans = await DefaultSolutionToPlanConverter().convert_solution_to_plans(
-        PlanVersion(version_number=1), OptimizationSolution((flow,), 0, True)
+    (
+        plans,
+        flow_plans,
+    ) = await DefaultSolutionToPlanConverter().convert_solution_to_plans(
+        PlanVersion(version_number=1), _enriched(OptimizationSolution((flow,), 0, True))
     )
 
     assert set(plans) == set(placements)
@@ -341,6 +354,7 @@ async def test_respects_resolved_endpoint_and_compute_placements(
         assert bool(plan.scheduling_plan.priority_keys) == (worker_id == placements[1])
         _assert_worker_round_trip(plan)
     _assert_plan_graph(plans)
+    _assert_flow_plans(plans, flow_plans)
 
 
 @pytest.mark.asyncio
@@ -349,9 +363,12 @@ async def test_relay_worker_in_one_flow_can_compute_for_another_flow() -> None:
     variant = ModelVariantId(ModelId(model_name="model"), "variant")
     relay_flow = _placed_flow(variant, (local_worker, remote_worker, local_worker))
     inference_flow = _placed_flow(variant, (remote_worker, local_worker, remote_worker))
-    plans = await DefaultSolutionToPlanConverter().convert_solution_to_plans(
+    (
+        plans,
+        flow_plans,
+    ) = await DefaultSolutionToPlanConverter().convert_solution_to_plans(
         PlanVersion(version_number=1),
-        OptimizationSolution((relay_flow, inference_flow), 0, True),
+        _enriched(OptimizationSolution((relay_flow, inference_flow), 0, True)),
     )
 
     assert set(plans) == {local_worker, remote_worker}
@@ -374,6 +391,7 @@ async def test_relay_worker_in_one_flow_can_compute_for_another_flow() -> None:
         } == {endpoint_flow.flow_id}
         _assert_worker_round_trip(plan)
     _assert_plan_graph(plans)
+    _assert_flow_plans(plans, flow_plans)
 
 
 @pytest.mark.asyncio
@@ -384,9 +402,12 @@ async def test_shared_compute_worker_keeps_flow_replicas_and_deduplicates_scheme
     variant = ModelVariantId(ModelId(model_name="model"), "variant")
     first_flow = _placed_flow(variant, (first_endpoint, compute, first_endpoint))
     second_flow = _placed_flow(variant, (second_endpoint, compute, second_endpoint))
-    plans = await DefaultSolutionToPlanConverter().convert_solution_to_plans(
+    (
+        plans,
+        flow_plans,
+    ) = await DefaultSolutionToPlanConverter().convert_solution_to_plans(
         PlanVersion(version_number=1),
-        OptimizationSolution((first_flow, second_flow), 0, True),
+        _enriched(OptimizationSolution((first_flow, second_flow), 0, True)),
     )
 
     compute_plan = plans[compute]
@@ -411,16 +432,50 @@ async def test_shared_compute_worker_keeps_flow_replicas_and_deduplicates_scheme
         != plans[second_endpoint].deployment_plan.sink_hops
     )
     _assert_plan_graph(plans)
+    _assert_flow_plans(plans, flow_plans)
     for plan in plans.values():
         _assert_worker_round_trip(plan)
 
 
 @pytest.mark.asyncio
 async def test_empty_solution_produces_no_worker_plans() -> None:
-    plans = await DefaultSolutionToPlanConverter().convert_solution_to_plans(
-        PlanVersion(version_number=1), OptimizationSolution((), 0, True)
+    (
+        plans,
+        flow_plans,
+    ) = await DefaultSolutionToPlanConverter().convert_solution_to_plans(
+        PlanVersion(version_number=1), _enriched(OptimizationSolution((), 0, True))
     )
     assert plans == {}
+    assert flow_plans == {}
+
+
+def _enriched(solution: OptimizationSolution) -> EnrichedOptimizationSolution:
+    return EnrichedOptimizationSolution(
+        solution,
+        {
+            flow.model_variant_id: {"x": TensorProperty("float32", 4, ("batch", 3))}
+            for flow in solution.flow_solutions
+        },
+    )
+
+
+def _assert_flow_plans(
+    worker_plans: Mapping[ServiceId, WorkerPlan],
+    flow_plans: Mapping[FlowId, FlowPlan],
+) -> None:
+    addresses = {
+        address
+        for plan in worker_plans.values()
+        for address in plan.hop_routing_plan.hop_addresses
+    }
+    assert set(flow_plans) == {address.flow_id for address in addresses}
+    for flow_id, plan in flow_plans.items():
+        assert plan.plan_version == PlanVersion(version_number=1)
+        assert plan.input_tensor_properties == {
+            "x": TensorProperty("float32", 4, ("batch", 3))
+        }
+        assert HopAddress(flow_id, plan.ingress_replica_id) in addresses
+        assert HopAddress(flow_id, plan.sink_replica_id) in addresses
 
 
 def _assert_plan_graph(plans: dict[ServiceId, WorkerPlan]) -> None:

@@ -8,12 +8,9 @@ import numpy as np
 import pyarrow as pa
 from pyarrow import flight
 
-from catalog.api.service.service_directory import ServiceDirectory
+from catalog.api.worker.worker_directory import WorkerDirectory
 from front_end.adapters.outbound.mappers.context_dto_mapper import (
     external_source_context_to_dto,
-)
-from front_end.adapters.outbound.worker_endpoint_resolver import (
-    get_arrow_worker_endpoint,
 )
 from front_end.application.ports.outbound.inference.ingress_gateway import (
     IngressGateway,
@@ -27,7 +24,11 @@ from integration.dto.context.context_dto import (
     HopInvocationContributionMetadataDto,
     IngressHopDto,
 )
-from integration.service_instance.service_instance import CapabilityType
+from integration.service_instance.service_instance import (
+    CapabilityProtocol,
+    CapabilityType,
+)
+from integration.service_instance.worker_instance import WorkerInstance
 from integration.worker.hop_contribution.arrow.arrow_hop_invocation_contribution_schema import (
     SUBMIT_CONTRIBUTION_COMMAND,
     build_contribution_schema,
@@ -37,7 +38,7 @@ from shared.service.service import WorkerId
 
 
 class ArrowWorkerIngressGateway(IngressGateway):
-    def __init__(self, directory: ServiceDirectory, timeout_s: float = 30.0) -> None:
+    def __init__(self, directory: WorkerDirectory, timeout_s: float = 30.0) -> None:
         self._directory = directory
         self._timeout_s = timeout_s
 
@@ -49,11 +50,8 @@ class ArrowWorkerIngressGateway(IngressGateway):
         planned_ingress_replica_id: PlannedIngressReplicaId,
         worker_id: WorkerId,
     ) -> None:
-        location = await get_arrow_worker_endpoint(
-            self._directory,
-            worker_id,
-            CapabilityType.HOP_INVOCATION,
-        )
+        worker_instance = await self._directory.get_worker_instance_by_id(worker_id)
+        location = self._get_arrow_worker_endpoint(worker_instance)
         metadata = HopInvocationContributionMetadataDto(
             source_context=external_source_context_to_dto(
                 external_source_invocation_context
@@ -63,6 +61,20 @@ class ArrowWorkerIngressGateway(IngressGateway):
             ),
         )
         await asyncio.to_thread(self._submit_sync, location, metadata, bundle)
+
+    @staticmethod
+    def _get_arrow_worker_endpoint(
+        worker_instance: WorkerInstance,
+    ) -> str:
+        interfaces = worker_instance.get_capability_interfaces_by_type_and_protocol(
+            CapabilityType.HOP_INVOCATION, CapabilityProtocol.ARROW
+        )
+        if len(interfaces) != 1:
+            raise ValueError(
+                f"Worker {worker_instance.service_id} must expose exactly one "
+                f"Arrow {CapabilityType.HOP_INVOCATION} interface"
+            )
+        return interfaces[0].endpoint.unicode_string()
 
     def _submit_sync(
         self,

@@ -7,9 +7,6 @@ import onnx_tool
 from onnx.shape_inference import infer_shapes
 
 from artifacts.contracts.artifact_workspace import ArtifactWorkspace
-from model_manager.adapters.outbound.model_profiler import (
-    onnx_tool_custom_nodes as _onnx_tool_custom_nodes,  # noqa: F401
-)
 from model_manager.application.ports.outbound.shape_profile_computer import (
     ShapeProfileComputer,
 )

@@ -27,7 +27,9 @@ from catalog.redis.hop.keys_factory import (
 from catalog.redis.hop.redis_hop_deployment_catalog import (
     RedisHopDeploymentCatalog,
 )
-from catalog.redis.service.redis_service_catalog import RedisServiceCatalog
+from catalog.redis.service.redis_service_directory import RedisServiceDirectory
+from catalog.redis.service.redis_service_registrar import RedisServiceRegistrar
+from catalog.view.worker.default_worker_directory import DefaultWorkerDirectory
 from integration.redis.model_partition.keys_factory import (
     StringModelPartitionKeyFactory,
 )
@@ -48,9 +50,6 @@ from lifecycle.async_lifecycle import AsyncLifecycle
 from shared.context.model_pass_context import ModelPassId
 from worker.adapters.outbound.activity_manager.local_activity_manager import (
     LocalActivityManagerAdapter,
-)
-from worker.adapters.outbound.catalog.service.default_service_directory_gateway import (
-    DefaultServiceDirectoryGateway,
 )
 from worker.adapters.outbound.contribution.in_memory_contribution_store import (
     InMemoryContributionStore,
@@ -201,8 +200,8 @@ class DefaultCompositionRoot(CompositionRoot):
                 self.build_artifact_store_context()
             )
 
-            directory = RedisServiceCatalog(redis, entry_ttl_s=60)
-            service_directory = DefaultServiceDirectoryGateway(directory)
+            directory = RedisServiceDirectory(redis)
+            service_directory = DefaultWorkerDirectory(directory)
             deployment_catalog = RedisHopDeploymentCatalog(
                 redis,
                 StringHopDeploymentKeyFactory,
@@ -315,7 +314,7 @@ class DefaultCompositionRoot(CompositionRoot):
         worker_instance: WorkerInstance,
         redis: redis_asyncio.Redis,
         artifact_store: ArtifactStore,
-        service_directory: DefaultServiceDirectoryGateway,
+        service_directory: DefaultWorkerDirectory,
         activity_request_factory: DefaultActivityRequestFactory,
         activity_manager: LocalActivityManagerAdapter,
     ) -> None:
@@ -413,7 +412,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 *build_arrow_capability_life_checkers(service_instance),
             ]
             advertising_manager = AdvertisingManager(
-                RedisServiceCatalog(redis, entry_ttl_s=60),
+                RedisServiceRegistrar(redis, entry_ttl_s=60),
                 service_instance.service_id,
                 capability_life_checkers,
                 heartbeat_interval_s=20,

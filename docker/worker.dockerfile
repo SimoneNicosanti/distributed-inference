@@ -72,6 +72,6 @@ COPY --from=builder /opt/venv /opt/venv
 USER worker
 WORKDIR /app
 
-EXPOSE 9000 8815 8816 8817 8818
+EXPOSE 9000 8815 8816 8817
 
 CMD ["python", "-m", "worker.main"]

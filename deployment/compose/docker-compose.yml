@@ -4,7 +4,7 @@ name: distributed-inference
 services:
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     container_name: redis
     ports:
       - "6379:6379"
@@ -109,7 +109,6 @@ services:
       dockerfile: docker/front_end.dockerfile
     environment:
       WORKER_HTTP_BASE_URL: http://first-worker:9000
-      WORKER_MODEL_INVOCATION_LOCATION: grpc+tcp://first-worker:8818
     depends_on:
       - model-manager
       - first-worker
@@ -121,7 +120,17 @@ services:
     profiles: ["test"]
     environment:
       FRONT_END_BASE_URL: http://front-end:8000
-    command: ["sleep", "infinity"]
+      CONTROLLER_BASE_URL: http://controller:8000
+      MODEL_MANAGER_BASE_URL: http://model-manager:8000
+      REDIS_URL: redis://redis:6379/0
+      MODEL_PATH: ${MODEL_PATH:-/app/assets/models/resnet50.onnx}
+      EXPECTED_WORKER_COUNT: "4"
+    depends_on:
+      - front-end
+      - controller
+      - worker-1
+      - worker-2
+      - worker-3
     volumes:
       - ../../assets/models:/app/assets/models
       - ../../test/system:/app/test/system

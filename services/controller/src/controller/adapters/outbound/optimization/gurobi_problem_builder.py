@@ -65,6 +65,7 @@ def _is_metric_satisfied(
     if metric.type in {PerformanceMetricType.MAE, PerformanceMetricType.RMSE}:
         return metric.value <= requirement.value
     if metric.type in {
+        PerformanceMetricType.ACCURACY,
         PerformanceMetricType.MAP_AT_50,
         PerformanceMetricType.MAP_AT_75,
     }:
