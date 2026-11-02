@@ -9,9 +9,9 @@ from shared.flow.flow import FlowId
 from shared.model.keys import TensorKey
 from shared.model.model_partition import ModelPartitionId
 from shared.plan.hop_logical_id import (
-    IngressReplicaId,
-    PartitionReplicaId,
-    SinkReplicaId,
+    PlannedIngressReplicaId,
+    PlannedPartitionReplicaId,
+    PlannedSinkReplicaId,
 )
 from shared.plan.plan_version import PlanVersion
 
@@ -25,10 +25,10 @@ class ResourceAllocationDto(BaseModel):
 class DeploymentPlanDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    executable_hops: tuple[PartitionReplicaId, ...]
+    executable_hops: tuple[PlannedPartitionReplicaId, ...]
     allocations: tuple[ResourceAllocationDto, ...]
-    ingress_hops: tuple[IngressReplicaId, ...]
-    sink_hops: tuple[SinkReplicaId, ...]
+    ingress_hops: tuple[PlannedIngressReplicaId, ...]
+    sink_hops: tuple[PlannedSinkReplicaId, ...]
 
 
 class PartitionIOSchemeDto(BaseModel):
@@ -98,7 +98,7 @@ class PriorityKeyDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     flow_id: FlowId
-    executable_hop: PartitionReplicaId
+    executable_hop: PlannedPartitionReplicaId
 
 
 class SchedulingPlanDto(BaseModel):

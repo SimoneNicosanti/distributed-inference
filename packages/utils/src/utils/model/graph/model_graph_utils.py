@@ -168,7 +168,7 @@
 #             outputs=outputs,
 #             name=layer_info.name,
 #             domain=_VISUALIZATION_DOMAIN,
-#             **attributes,  # type: ignore
+#             **attributes,
 #         )
 
 #         onnx_nodes.append(node)

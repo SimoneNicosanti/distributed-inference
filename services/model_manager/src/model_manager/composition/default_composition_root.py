@@ -18,8 +18,8 @@ from advertisement.http.http_capability_life_checker import (
 from artifacts.storage.artifact_store import ArtifactStore
 from artifacts.storage.s3.s3_artifact_store import S3ArtifactStore
 from artifacts.storage.s3.s3_client import S3Client
-from catalog.api.registrar import Registrar
-from catalog.redis.redis_registrar import RedisRegistrar
+from catalog.api.service.service_registrar import ServiceRegistrar
+from catalog.redis.service.redis_service_catalog import RedisServiceCatalog
 from integration.redis.model.keys_factory import StringModelKeyFactory
 from integration.redis.model_partition.keys_factory import (
     StringModelPartitionKeyFactory,
@@ -82,7 +82,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 self.build_redis_connection_context()
             )
 
-            registrar = RedisRegistrar(redis, entry_ttl_s=60)
+            registrar = RedisServiceCatalog(redis, entry_ttl_s=60)
             await stack.enter_async_context(
                 self.build_advertising_manager_context(registrar, service_instance)
             )
@@ -124,7 +124,7 @@ class DefaultCompositionRoot(CompositionRoot):
     @asynccontextmanager
     async def build_advertising_manager_context(
         self,
-        registrar: Registrar,
+        registrar: ServiceRegistrar,
         service_instance: ServiceInstance,
     ) -> AsyncGenerator[AdvertisingManager]:
         async with httpx.AsyncClient() as http_client:

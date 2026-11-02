@@ -6,7 +6,7 @@ from typing import override
 import numpy as np
 import onnxruntime as ort
 
-from shared.plan.hop_logical_id import PartitionReplicaId
+from shared.plan.hop_logical_id import PlannedPartitionReplicaId
 from worker.adapters.outbound.partition_execution.onnx.onnx_partition_executor_options import (
     OnnxDeviceType,
     OnnxPartitionExecutorOptions,
@@ -48,8 +48,8 @@ class OnnxPartitionExecutor(PartitionExecutor):
 
     @override
     async def execute(
-        self, partition_execution_input: HopExecutionInput[PartitionReplicaId]
-    ) -> HopExecutionOutput[PartitionReplicaId]:
+        self, partition_execution_input: HopExecutionInput[PlannedPartitionReplicaId]
+    ) -> HopExecutionOutput[PlannedPartitionReplicaId]:
 
         ## Three ways to run inference
         ## Using a thread in the same process
@@ -70,8 +70,8 @@ class OnnxPartitionExecutor(PartitionExecutor):
         return partition_execution_output
 
     def _execute_sync(
-        self, partition_execution_input: HopExecutionInput[PartitionReplicaId]
-    ) -> HopExecutionOutput[PartitionReplicaId]:
+        self, partition_execution_input: HopExecutionInput[PlannedPartitionReplicaId]
+    ) -> HopExecutionOutput[PlannedPartitionReplicaId]:
 
         ## TODO: With this management we are managing only numerical types input
         session_inputs: dict[str, np.ndarray] = {}

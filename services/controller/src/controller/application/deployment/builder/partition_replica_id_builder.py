@@ -9,9 +9,9 @@ from controller.domain.optimization.solving.optimization_solution import (
 )
 from shared.flow.flow import FlowId
 from shared.model.model_partition import ModelPartitionId
-from shared.plan.hop_logical_id import PartitionReplicaId
+from shared.plan.hop_logical_id import PlannedPartitionReplicaId
 
-type ReplicaIdsByComponentIndex = Mapping[int, PartitionReplicaId]
+type ReplicaIdsByComponentIndex = Mapping[int, PlannedPartitionReplicaId]
 type ReplicaIdsByFlow = Mapping[FlowId, ReplicaIdsByComponentIndex]
 
 
@@ -25,17 +25,17 @@ class PartitionReplicaIdBuilder:
             raise ValueError("Flow ids in an optimization solution must be unique")
 
         next_replica_index: dict[ModelPartitionId, int] = defaultdict(int)
-        replica_ids_by_flow: dict[FlowId, dict[int, PartitionReplicaId]] = {}
+        replica_ids_by_flow: dict[FlowId, dict[int, PlannedPartitionReplicaId]] = {}
 
         for flow_solution in solution.flow_solutions:
-            replica_ids_by_component: dict[int, PartitionReplicaId] = {}
+            replica_ids_by_component: dict[int, PlannedPartitionReplicaId] = {}
             for component in executable_components(flow_solution):
                 partition_id = ModelPartitionId(
                     model_variant_id=flow_solution.model_variant_id,
                     layers=component.executable_layer_keys,
                 )
                 replica_ids_by_component[component.component_index] = (
-                    PartitionReplicaId(
+                    PlannedPartitionReplicaId(
                         partition_id=partition_id,
                         replica_idx=next_replica_index[partition_id],
                     )

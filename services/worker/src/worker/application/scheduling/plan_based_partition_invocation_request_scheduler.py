@@ -13,7 +13,7 @@ from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import
 from worker.application.scheduling.abc.partition_invocation_request_scheduler import (
     HopInvocationRequestScheduler,
 )
-from worker.domain.hop.hop import ExecutableHop
+from shared.plan.hop import PlannedExecutableHopId
 from worker.domain.hop.hop_invocation import (
     HopInvocationRequest,
 )
@@ -22,7 +22,7 @@ from worker.domain.plan.scheduling_plan import PriorityKey
 
 @dataclass
 class QueuedPartitionInvocationRequest(
-    QueueRequest[HopInvocationRequest[ExecutableHop], Any]
+    QueueRequest[HopInvocationRequest[PlannedExecutableHopId], Any]
 ):
     plan_version: PlanVersion
     per_plan_priority: int
@@ -56,7 +56,7 @@ class PlanBasedPartitionInvocationRequestScheduler(HopInvocationRequestScheduler
 
     @override
     async def enqueue(
-        self, request: HopInvocationRequest[ExecutableHop], future: Future[Any]
+        self, request: HopInvocationRequest[PlannedExecutableHopId], future: Future[Any]
     ) -> None:
         async with self._lock:
             request_priority = await self._assign_priority(request)
@@ -71,7 +71,9 @@ class PlanBasedPartitionInvocationRequestScheduler(HopInvocationRequestScheduler
             self._priority_queue.put_nowait(queued_request)
 
     @override
-    async def dequeue(self) -> tuple[HopInvocationRequest[ExecutableHop], Future[Any]]:
+    async def dequeue(
+        self,
+    ) -> tuple[HopInvocationRequest[PlannedExecutableHopId], Future[Any]]:
         queued_request = await self._priority_queue.get()
         return queued_request.request, queued_request.future
 
@@ -80,7 +82,7 @@ class PlanBasedPartitionInvocationRequestScheduler(HopInvocationRequestScheduler
         return self._priority_queue.qsize()
 
     async def _assign_priority(
-        self, request: HopInvocationRequest[ExecutableHop]
+        self, request: HopInvocationRequest[PlannedExecutableHopId]
     ) -> int:
         plan_version = request.plan_version
         scheduling_plan = (

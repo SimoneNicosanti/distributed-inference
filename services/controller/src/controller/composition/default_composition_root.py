@@ -9,9 +9,8 @@ from advertisement.advertising_manager import AdvertisingManager
 from advertisement.http.http_capability_life_checker import (
     build_http_capability_life_checkers,
 )
-from catalog.api.directory import Directory
-from catalog.redis.redis_directory import RedisDirectory
-from catalog.redis.redis_registrar import RedisRegistrar
+from catalog.api.service.service_directory import ServiceDirectory
+from catalog.redis.service.redis_service_catalog import RedisServiceCatalog
 from controller.adapters.outbound.directory.default_worker_directory_gateway import (
     DefaultWorkerDirectoryGateway,
 )
@@ -107,7 +106,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 self.build_advertising_manager_context(redis, service_instance)
             )
 
-            directory = RedisDirectory(redis)
+            directory = RedisServiceCatalog(redis, entry_ttl_s=60)
             worker_directory_gateway = DefaultWorkerDirectoryGateway(directory)
 
             optimization_manager = self.build_optimization_manager(
@@ -160,7 +159,7 @@ class DefaultCompositionRoot(CompositionRoot):
     async def build_actuation_manager_context(
         self,
         solution_observer: SolutionObserver,
-        directory: Directory,
+        directory: ServiceDirectory,
         worker_directory_gateway: WorkerDirectoryGateway,
     ) -> AsyncGenerator[ActuationManager]:
 
@@ -242,7 +241,7 @@ class DefaultCompositionRoot(CompositionRoot):
         self, redis: redis_asyncio.Redis, service_instance: ServiceInstance
     ) -> AsyncGenerator[AdvertisingManager]:
         async with httpx.AsyncClient() as http_client:
-            registrar = RedisRegistrar(redis, entry_ttl_s=60)
+            registrar = RedisServiceCatalog(redis, entry_ttl_s=60)
             advertising_manager = AdvertisingManager(
                 registrar,
                 service_instance.service_id,

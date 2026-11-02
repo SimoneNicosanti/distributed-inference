@@ -14,10 +14,12 @@ from integration.service_instance.service_instance import (
     CapabilityType,
 )
 from integration.service_instance.worker_instance import WorkerInstance
+from shared.context.model_pass_context import ModelPassContext
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
-from shared.plan.hop_logical_id import IngressReplicaId
+from shared.plan.hop import ExternalHopId
+from shared.plan.hop_logical_id import PlannedIngressReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
 from shared.user.user import UserId
@@ -31,8 +33,7 @@ from worker.application.ports.inbound.hop_contribution_rcv.hop_invocation_contri
     HopInvocationContributionReceiveCoordinator,
 )
 from worker.domain.context.hop_invocation_context import HopInvocationContext
-from worker.domain.context.model_pass_context import ModelPassContext, ModelPassType
-from worker.domain.hop.hop import ExternalHop
+from worker.domain.context.model_pass_context import ModelPassType
 from worker.domain.hop.hop_invocation_contribution import (
     HopInvocationContribution,
     HopInvocationContributionAck,
@@ -41,8 +42,8 @@ from worker.domain.tensor.tensor import Tensor
 from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
-def _ingress_replica_id() -> IngressReplicaId:
-    return IngressReplicaId(
+def _ingress_replica_id() -> PlannedIngressReplicaId:
+    return PlannedIngressReplicaId(
         model_variant_id=ModelVariantId(
             model_id=ModelId("test-model"),
             variant_tag="test-variant",
@@ -51,7 +52,7 @@ def _ingress_replica_id() -> IngressReplicaId:
     )
 
 
-def _contribution(destination_id: IngressReplicaId) -> HopInvocationContribution:
+def _contribution(destination_id: PlannedIngressReplicaId) -> HopInvocationContribution:
     return HopInvocationContribution(
         source_context=HopInvocationContext(
             model_pass_context=ModelPassContext(
@@ -61,7 +62,7 @@ def _contribution(destination_id: IngressReplicaId) -> HopInvocationContribution
                 plan_version=PlanVersion(version_number=1),
                 model_pass_type=ModelPassType.FORWARD,
             ),
-            hop=ExternalHop(),
+            hop=ExternalHopId(),
         ),
         destination_hop=destination_id,
         bundle=TensorBundle(
@@ -107,7 +108,7 @@ class _Directory:
     def __init__(self, worker: WorkerInstance) -> None:
         self.worker = worker
 
-    async def get_worker_instance_by_id(self, worker_id):  # type: ignore[no-untyped-def]
+    async def get_worker_instance_by_id(self, worker_id):  [no-untyped-def]
         assert worker_id == self.worker.service_id
         return self.worker
 
@@ -142,7 +143,7 @@ async def test_sender_reaches_generic_hop_server() -> None:
         ],
     )
     sender = ArrowHopInvocationContributionSender(
-        _Directory(worker),  # type: ignore[arg-type]
+        _Directory(worker),  [arg-type]
     )
 
     try:

@@ -187,6 +187,8 @@ explicit = true
 [tool.mypy]
 python_version = "3.14"
 files = ["services", "packages"]
+
+# Il codice del monorepo è distribuito in più directory src/.
 namespace_packages = true
 explicit_package_bases = true
 mypy_path = [
@@ -206,52 +208,26 @@ mypy_path = [
   "$MYPY_CONFIG_FILE_DIR/services/worker/src",
   "$MYPY_CONFIG_FILE_DIR/services/ingress/src",
   "$MYPY_CONFIG_FILE_DIR/services/front_end/src",
-
   "$MYPY_CONFIG_FILE_DIR/services",
 ]
 
-# Parallelismo introdotto in mypy 2.0 (fino a ~5x con 8 worker). Richiede e
-# abilita automaticamente --native-parser. Sovrascritto da MYPY_NUM_WORKERS,
-# impostato nel devcontainer. Parti da 3-4 e sali finché migliora.
+strict = true
+plugins = ["pydantic.mypy"]
 num_workers = 4
 
-# Il plugin pydantic è indispensabile con strict: senza, i modelli generano
-# falsi positivi sui __init__ sintetizzati.
-plugins = ["pydantic.mypy"]
-
-strict = true
 enable_error_code = ["explicit-override", "redundant-expr", "truthy-bool"]
-
-# Rimossi perché GIÀ inclusi in strict = true:
-#   warn_unused_configs, disallow_any_generics, warn_return_any
-# (warn_unused_configs, inoltre, funziona solo con --no-incremental:
-#  nel tuo setup era comunque inerte)
 warn_unreachable = true
 
-# La tua configurazione aveva `disallow_any_unimported = false` con un commento
-# che descriveva l'effetto opposto. Impostato a true: con gli override
-# ignore_missing_imports più sotto, ti segnala dove un Any da libreria non
-# tipizzata entra in una firma pubblica — che è esattamente il rischio che il
-# commento originale voleva scongiurare. Mettilo a false se il rumore è eccessivo.
-disallow_any_unimported = true
-
-# sqlite_cache RIMOSSO: da mypy 2.3 è attivo per default insieme alla cache
-# in formato binario a lunghezza fissa. Impostarlo a false disabilitava due
-# ottimizzazioni pensate esattamente per il tuo problema.
-# La cache vive in MYPY_CACHE_DIR (volume, non bind mount): vedi devcontainer.json.
+# Alcune librerie esterne sono deliberatamente ignorate (follow_imports=skip).
+# I relativi tipi diventano Any: evita gli errori no-any-unimported,
+# mantenendo strict e gli altri controlli attivi nel codice del progetto.
+disallow_any_unimported = false
 
 pretty = true
 show_error_codes = true
 show_column_numbers = true
-# show_error_context RIMOSSO: allunga l'output senza aggiungere informazione
-# quando hai già codici ed errori con colonna.
 
-# `exclude` RIMOSSO: files = ["src", "test"] già esclude deployment/,
-# experiments/, tools/ e .venv. In più `exclude` non impedisce a mypy di
-# seguirci gli import — per quello serve follow_imports.
-
-## TODO Double check this onnxruntime configuration
-# Stub mancanti nelle librerie di terze parti.
+# Librerie con import non tipizzati o privi di stub completi.
 [[tool.mypy.overrides]]
 module = [
   "Pyro5.*",
@@ -263,48 +239,19 @@ module = [
   "pyroute2.*",
   "pyomo.*",
   "fakeredis.*",
+  "boto3",
+  "boto3.*",
+  "botocore",
+  "botocore.*",
 ]
 ignore_missing_imports = true
 
-# Il tooling ML non è nei default-groups, ma se lavori con --group export
-# questi override evitano che mypy attraversi torch/transformers (facilmente
-# la voce di costo maggiore dell'analisi).
-# Trade-off reale: questi moduli diventano Any, quindi perdi i controlli sulle
-# firme che li attraversano. Accettabile per torch/ultralytics, NON per
-# pydantic o fastapi.
+# Workaround mirato per le annotazioni esposte da PyArrow e ONNX Runtime.
+# Gli import diventano Any: non vengono verificati staticamente da mypy.
 [[tool.mypy.overrides]]
-module = [
-  "torch.*",
-  "torchvision.*",
-  "transformers.*",
-  "optimum.*",
-  "ultralytics.*",
-  "matplotlib.*",
-  "pandas.*",
-  "kubernetes.*",
-
-  "ort.*",
-
-  "onnxruntime.*",
-]
-ignore_missing_imports = false
-follow_imports = "normal"
-follow_untyped_imports = true
-
-
-# pyproject.toml
-[[tool.mypy.overrides]]
-module = "pyarrow.*"
-ignore_missing_imports = false
-follow_imports = "normal"
-follow_untyped_imports = true
-disable_error_code = ["no-any-unimported", "attr-defined"]
-
-# I test possono essere un filo più permissivi: i decoratori di pytest e i
-# fixture non tipizzati generano rumore senza valore diagnostico.
-[[tool.mypy.overrides]]
-module = ["test.*"]
-disallow_untyped_decorators = false
+module = ["pyarrow.*", "onnxruntime.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
 
 [tool.pydantic-mypy]
 init_forbid_extra = true
@@ -378,42 +325,23 @@ markers = [
 # (rimosso da trunk.yaml: stessa versione in editor, pre-commit e CI)
 # ---------------------------------------------------------------------------
 [tool.ruff]
-line-length = 88                               # esplicito ma identico al default: nessun riformattamento
 target-version = "py314"
-src = ["services/*/src", "packages/*/src", "services"]                     # risoluzione corretta dei first-party per isort
-extend-exclude = []
+line-length = 88
+
+# Radici del monorepo per distinguere import first-party e third-party.
+src = ["src", "packages/*/src", "services/*/src", "services"]
 
 [tool.ruff.lint]
-# ATTENZIONE: questa selezione è più ampia della tua (`extend-select = ["I"]`)
-# e al primo giro produrrà molte segnalazioni. Introducila per gruppi, non
-# tutta insieme: parti da E,F,W,I,UP e aggiungi il resto quando il repo è verde.
 select = [
-  "E",     # pycodestyle
-  "F",     # pyflakes
-  "W",     # warning
-  "I",     # isort
-  "N",     # pep8-naming
-  "UP",    # pyupgrade
-  "B",     # bugbear
-  "C4",    # comprehensions
-  "SIM",   # simplify
-  "ASYNC", # asyncio: rilevante, il progetto è tutto async
-  "PTH",   # usa pathlib invece di os.path
-  "TID",   # import relativi vietati
-  "RUF",   # regole specifiche di ruff
-  "LOG",   # logging
-  "G",     # formattazione dei messaggi di log
+  "E", "F", "W", "I",       # Stile di base, errori e import
+  "N", "UP", "B", "C4", "SIM",  # Naming, modernizzazione e semplificazioni
+  "ASYNC", "PTH", "TID", "RUF", # Async, pathlib, import e regole Ruff
+  "LOG", "G",                 # Logging
 ]
-ignore = [
-  "E501", # lunghezza riga: la gestisce il formatter
-]
-
-[tool.ruff.lint.isort]
-known-first-party = ["distributed_inference"]
+ignore = ["E501"] # La lunghezza delle righe è gestita dal formatter.
 
 [tool.ruff.lint.flake8-bugbear]
-# Senza questo, B008 segnala come errore ogni Depends()/Query() nelle firme
-# FastAPI, che è invece il pattern corretto.
+# FastAPI usa intenzionalmente chiamate come default degli argomenti.
 extend-immutable-calls = [
   "fastapi.Depends",
   "fastapi.Query",
@@ -424,9 +352,7 @@ extend-immutable-calls = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Nei test assert nudi e valori magici sono normali.
-"test/**/*.py" = ["S101", "PLR2004", "ANN"]
-"**/__init__.py" = ["F401"]                 # re-export intenzionali
+"**/__init__.py" = ["F401"] # Consente i re-export dei package.
 
 [tool.ruff.format]
 docstring-code-format = true

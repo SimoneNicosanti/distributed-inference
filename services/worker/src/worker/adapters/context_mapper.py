@@ -10,21 +10,21 @@ from integration.dto.context.context_dto import (
     SinkHopDto,
     SourceHopDto,
 )
+from shared.context.model_invocation_context import ModelInvocationContext
+from shared.context.model_pass_context import ModelPassContext, ModelPassType
+from shared.plan.hop import (
+    ExternalHopId,
+    PlannedDestinationHopId,
+    PlannedHopId,
+    PlannedInvocableHopId,
+    PlannedSourceHopId,
+)
 from shared.plan.hop_logical_id import (
-    IngressReplicaId,
-    PartitionReplicaId,
-    SinkReplicaId,
+    PlannedIngressReplicaId,
+    PlannedPartitionReplicaId,
+    PlannedSinkReplicaId,
 )
 from worker.domain.context.hop_invocation_context import HopInvocationContext
-from worker.domain.context.model_invocation_context import ModelInvocationContext
-from worker.domain.context.model_pass_context import ModelPassContext, ModelPassType
-from worker.domain.hop.hop import (
-    DestinationHop,
-    ExternalHop,
-    Hop,
-    InvocableHop,
-    SourceHop,
-)
 
 
 def model_pass_context_to_dto(context: ModelPassContext) -> ModelPassContextDto:
@@ -53,24 +53,24 @@ def model_pass_context_from_dto(context: ModelPassContextDto) -> ModelPassContex
     )
 
 
-def hop_to_dto(hop: Hop) -> ExternalHopDto | InvocableHopDto:
+def hop_to_dto(hop: PlannedHopId) -> ExternalHopDto | InvocableHopDto:
     match hop:
-        case ExternalHop():
+        case ExternalHopId():
             return ExternalHopDto()
-        case IngressReplicaId():
+        case PlannedIngressReplicaId():
             return IngressHopDto(ingress_replica_id=hop)
-        case PartitionReplicaId():
+        case PlannedPartitionReplicaId():
             return PartitionReplicaHopDto(partition_replica_id=hop)
-        case SinkReplicaId():
+        case PlannedSinkReplicaId():
             return SinkHopDto(sink_replica_id=hop)
         case _:
             raise TypeError(f"Unsupported hop: {hop!r}")
 
 
-def source_hop_from_dto(hop: SourceHopDto) -> SourceHop:
+def source_hop_from_dto(hop: SourceHopDto) -> PlannedSourceHopId:
     match hop:
         case ExternalHopDto():
-            return ExternalHop()
+            return ExternalHopId()
         case IngressHopDto(ingress_replica_id=ingress_replica_id):
             return ingress_replica_id
         case PartitionReplicaHopDto(partition_replica_id=replica_id):
@@ -79,7 +79,7 @@ def source_hop_from_dto(hop: SourceHopDto) -> SourceHop:
             raise TypeError(f"Unsupported source hop DTO: {hop!r}")
 
 
-def destination_hop_from_dto(hop: DestinationHopDto) -> DestinationHop:
+def destination_hop_from_dto(hop: DestinationHopDto) -> PlannedDestinationHopId:
     match hop:
         case IngressHopDto(ingress_replica_id=ingress_replica_id):
             return ingress_replica_id
@@ -91,19 +91,19 @@ def destination_hop_from_dto(hop: DestinationHopDto) -> DestinationHop:
             raise TypeError(f"Unsupported destination hop DTO: {hop!r}")
 
 
-def destination_hop_to_dto(hop: DestinationHop) -> DestinationHopDto:
+def destination_hop_to_dto(hop: PlannedDestinationHopId) -> DestinationHopDto:
     dto = hop_to_dto(hop)
     if not isinstance(dto, (IngressHopDto, PartitionReplicaHopDto, SinkHopDto)):
         raise TypeError(f"Unsupported destination hop: {hop!r}")
     return dto
 
 
-def invocable_hop_from_dto(hop: InvocableHopDto) -> InvocableHop:
+def invocable_hop_from_dto(hop: InvocableHopDto) -> PlannedInvocableHopId:
     return destination_hop_from_dto(hop)
 
 
 def hop_invocation_context_to_dto(
-    context: HopInvocationContext[SourceHop],
+    context: HopInvocationContext[PlannedSourceHopId],
 ) -> HopInvocationContextDto:
     hop = hop_to_dto(context.hop)
     if not isinstance(hop, (ExternalHopDto, IngressHopDto, PartitionReplicaHopDto)):
@@ -117,7 +117,7 @@ def hop_invocation_context_to_dto(
 
 def hop_invocation_context_from_dto(
     context: HopInvocationContextDto,
-) -> HopInvocationContext[SourceHop]:
+) -> HopInvocationContext[PlannedSourceHopId]:
     return HopInvocationContext(
         model_pass_context=model_pass_context_from_dto(context.model_pass_context),
         hop=source_hop_from_dto(context.hop),

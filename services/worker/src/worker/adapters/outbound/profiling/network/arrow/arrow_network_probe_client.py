@@ -135,6 +135,7 @@ class ArrowNetworkProbeClient(NetworkProbeClient):
         if acknowledgement is None:
             raise RuntimeError("Missing network probe acknowledgement")
 
+        received_bytes: float
         received_bytes = UPLOAD_ACK.unpack(acknowledgement.to_pybytes())[0]
 
         if received_bytes != len(payload):

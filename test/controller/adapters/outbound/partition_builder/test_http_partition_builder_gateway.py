@@ -4,7 +4,7 @@ import httpx
 import pytest
 from pydantic import HttpUrl
 
-from catalog.api.directory import Directory
+from catalog.api.service.service_directory import ServiceDirectory
 from controller.adapters.outbound.partition_builder.http_partition_builder_gateway import (
     HttpPartitionBuilderGateway,
 )
@@ -26,7 +26,7 @@ from shared.model.model_variant import ModelVariantId
 from shared.service.service import ServiceId
 
 
-class StubServiceDirectory(Directory):
+class StubServiceDirectory(ServiceDirectory):
     def __init__(self, service_instances: list[ServiceInstance]) -> None:
         self._service_instances = service_instances
         self.get_all_calls = 0

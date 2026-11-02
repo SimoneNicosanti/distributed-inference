@@ -10,7 +10,7 @@ from integration.dto.flow_plan.flow_plan_dto import (
 )
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
-from shared.plan.hop_logical_id import IngressReplicaId, SinkReplicaId
+from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 from shared.plan.plan_version import PlanVersion
 
 
@@ -19,8 +19,8 @@ def _flow_plan_dto(inputs: tuple[InputSpecDto, ...]) -> FlowPlanDto:
     return FlowPlanDto(
         plan_version=PlanVersion(version_number=3),
         model_specs=ModelSpecsDto(model_variant_id=variant, inputs=inputs),
-        ingress_replica_id=IngressReplicaId(variant, replica_idx=1),
-        sink_replica_id=SinkReplicaId(variant, replica_idx=2),
+        ingress_replica_id=PlannedIngressReplicaId(variant, replica_idx=1),
+        sink_replica_id=PlannedSinkReplicaId(variant, replica_idx=2),
     )
 
 
@@ -57,9 +57,9 @@ def test_mapping_rejects_inconsistent_endpoint_variants(endpoint: str) -> None:
     dto = _flow_plan_dto(())
     other_variant = ModelVariantId(ModelId(model_name="other"), "fp32")
     endpoint_id = (
-        IngressReplicaId(other_variant, replica_idx=0)
+        PlannedIngressReplicaId(other_variant, replica_idx=0)
         if endpoint == "ingress_replica_id"
-        else SinkReplicaId(other_variant, replica_idx=0)
+        else PlannedSinkReplicaId(other_variant, replica_idx=0)
     )
     invalid_dto = dto.model_copy(update={endpoint: endpoint_id})
 

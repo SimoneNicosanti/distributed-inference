@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 
 from shared.plan.hop_logical_id import (
-    IngressReplicaId,
-    PartitionReplicaId,
-    SinkReplicaId,
+    PlannedIngressReplicaId,
+    PlannedPartitionReplicaId,
+    PlannedSinkReplicaId,
 )
 
 
@@ -12,8 +12,10 @@ class ExternalHop:
     pass
 
 
-type ExecutableHop = PartitionReplicaId
-type SourceHop = ExternalHop | IngressReplicaId | PartitionReplicaId
-type DestinationHop = IngressReplicaId | PartitionReplicaId | SinkReplicaId
+type ExecutableHop = PlannedPartitionReplicaId
+type SourceHop = ExternalHop | PlannedIngressReplicaId | PlannedPartitionReplicaId
+type DestinationHop = (
+    PlannedIngressReplicaId | PlannedPartitionReplicaId | PlannedSinkReplicaId
+)
 type InvocableHop = DestinationHop
 type Hop = ExternalHop | InvocableHop

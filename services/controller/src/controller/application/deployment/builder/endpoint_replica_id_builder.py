@@ -7,13 +7,13 @@ from controller.domain.optimization.solving.optimization_solution import (
 )
 from shared.flow.flow import FlowId
 from shared.model.model_variant import ModelVariantId
-from shared.plan.hop_logical_id import IngressReplicaId, SinkReplicaId
+from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 
 
 @dataclass(frozen=True, slots=True)
 class EndpointReplicaIds:
-    ingress: IngressReplicaId
-    sink: SinkReplicaId
+    ingress: PlannedIngressReplicaId
+    sink: PlannedSinkReplicaId
 
 
 type EndpointIdsByFlow = Mapping[FlowId, EndpointReplicaIds]
@@ -29,7 +29,7 @@ class EndpointReplicaIdBuilder:
             index = indexes[flow.model_variant_id]
             indexes[flow.model_variant_id] += 1
             endpoints[flow.flow_id] = EndpointReplicaIds(
-                ingress=IngressReplicaId(flow.model_variant_id, index),
-                sink=SinkReplicaId(flow.model_variant_id, index),
+                ingress=PlannedIngressReplicaId(flow.model_variant_id, index),
+                sink=PlannedSinkReplicaId(flow.model_variant_id, index),
             )
         return endpoints

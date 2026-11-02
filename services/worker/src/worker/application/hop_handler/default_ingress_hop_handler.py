@@ -1,15 +1,15 @@
 from typing import override
 
-from shared.plan.hop_logical_id import IngressReplicaId
+from shared.plan.hop_logical_id import PlannedIngressReplicaId
 from worker.application.hop_handler.abc.hop_handler import HopHandler
 from worker.domain.hop.hop_invocation import HopInvocationRequest, HopInvocationResult
 
 
-class DefaultIngressHopHandler(HopHandler[IngressReplicaId]):
+class DefaultIngressHopHandler(HopHandler[PlannedIngressReplicaId]):
     @override
     async def handle(
-        self, hop_invocation_request: HopInvocationRequest[IngressReplicaId]
-    ) -> HopInvocationResult[IngressReplicaId]:
+        self, hop_invocation_request: HopInvocationRequest[PlannedIngressReplicaId]
+    ) -> HopInvocationResult[PlannedIngressReplicaId]:
 
         return HopInvocationResult(
             context=hop_invocation_request.context,

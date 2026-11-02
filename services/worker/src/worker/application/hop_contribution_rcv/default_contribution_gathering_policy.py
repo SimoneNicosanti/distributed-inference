@@ -1,6 +1,7 @@
 from typing import override
 
 from shared.model.keys import TensorKey
+from shared.plan.hop import PlannedSourceHopId
 from worker.application.hop_contribution_rcv.abc.contribution_gathering_policy import (
     ContributionGatheringPolicy,
     HopContributionCollection,
@@ -9,7 +10,6 @@ from worker.application.hop_contribution_rcv.abc.contribution_gathering_policy i
 from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import (
     HopRoutingPlanReader,
 )
-from worker.domain.hop.hop import SourceHop
 from worker.domain.hop.hop_invocation_contribution import (
     HopInvocationContribution,
 )
@@ -51,10 +51,10 @@ class DefaultContributionGatheringPolicy(ContributionGatheringPolicy):
 
         first = contributions[0]
         key = await self.key_of(first)
-        if any(
-            await self.key_of(contribution) != key
-            for contribution in contributions[1:]  # type: ignore
-        ):
+        key_inequalities = [
+            await self.key_of(contribution) != key for contribution in contributions[1:]
+        ]
+        if any(key_inequalities):
             raise ValueError("Contributions belong to different collections")
 
         routing_plan = await self._routing_plan_reader.get_hop_routing_plan_by_version(
@@ -66,7 +66,7 @@ class DefaultContributionGatheringPolicy(ContributionGatheringPolicy):
         )
         routings = routing_plan.get_routings_for_hop_address(destination)
 
-        arrived: dict[HopAddress[SourceHop], set[TensorKey]] = {}
+        arrived: dict[HopAddress[PlannedSourceHopId], set[TensorKey]] = {}
         for contribution in contributions:
             source = HopAddress(
                 flow_id=contribution.flow_id,
@@ -85,10 +85,11 @@ class DefaultContributionGatheringPolicy(ContributionGatheringPolicy):
         new_contribution: HopInvocationContribution,
     ) -> None:
         key = await self.key_of(new_contribution)
-        if any(
+        key_inequalities = [
             await self.key_of(contribution) != key
-            for contribution in other_contributions  # type: ignore
-        ):
+            for contribution in other_contributions
+        ]
+        if any(key_inequalities):
             raise ValueError("Contributions belong to different collections")
 
         routing_plan = await self._routing_plan_reader.get_hop_routing_plan_by_version(

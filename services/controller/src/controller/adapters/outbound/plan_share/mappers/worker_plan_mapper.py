@@ -25,9 +25,9 @@ from integration.dto.worker_plan.worker_plan_dto import (
     WorkerPlanDto,
 )
 from shared.plan.hop_logical_id import (
-    IngressReplicaId,
-    PartitionReplicaId,
-    SinkReplicaId,
+    PlannedIngressReplicaId,
+    PlannedPartitionReplicaId,
+    PlannedSinkReplicaId,
 )
 
 
@@ -107,17 +107,17 @@ class WorkerPlanMapper:
         match hop:
             case ExternalHop():
                 return ExternalHopDto()
-            case IngressReplicaId():
+            case PlannedIngressReplicaId():
                 return IngressHopDto(ingress_replica_id=hop)
-            case PartitionReplicaId():
+            case PlannedPartitionReplicaId():
                 return PartitionReplicaHopDto(partition_replica_id=hop)
 
     @staticmethod
     def _destination_hop_to_dto(hop: DestinationHop) -> DestinationHopDto:
         match hop:
-            case IngressReplicaId():
+            case PlannedIngressReplicaId():
                 return IngressHopDto(ingress_replica_id=hop)
-            case PartitionReplicaId():
+            case PlannedPartitionReplicaId():
                 return PartitionReplicaHopDto(partition_replica_id=hop)
-            case SinkReplicaId():
+            case PlannedSinkReplicaId():
                 return SinkHopDto(sink_replica_id=hop)

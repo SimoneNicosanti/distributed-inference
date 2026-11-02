@@ -1,13 +1,19 @@
 from typing import override
 
 import pytest
-
 from front_end.domain.context.model_invocation_context import ModelInvocationContext
+from shared.plan.hop_deployment_id import HopDeploymentId, HopReplicaId
+from worker.domain.context.model_pass_context import ModelPassType
+
+from catalog.api.hop.hop_deployment_directory import (
+    HopDeploymentDirectory,
+)
+from shared.context.model_pass_context import ModelPassContext
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
-from shared.plan.hop_deployment_id import HopDeploymentId, HopReplicaId
-from shared.plan.hop_logical_id import IngressReplicaId
+from shared.plan.hop import ExternalHopId
+from shared.plan.hop_logical_id import PlannedIngressReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId, WorkerId
 from shared.user.user import UserId
@@ -20,9 +26,6 @@ from worker.application.hop_contribution_snd.default_hop_contribution_dispatcher
 from worker.application.ports.outbound.activity_manager.activity_manager import (
     ActivityManager,
 )
-from worker.application.ports.outbound.catalog.hop_deployment.hop_deployment_directory import (
-    HopDeploymentDirectory,
-)
 from worker.application.ports.outbound.hop_contribution_snd.contribution_sender import (
     ContributionSender,
 )
@@ -34,8 +37,6 @@ from worker.domain.activity.activity_request import (
     ActivityType,
 )
 from worker.domain.context.hop_invocation_context import HopInvocationContext
-from worker.domain.context.model_pass_context import ModelPassContext, ModelPassType
-from worker.domain.hop.hop import ExternalHop
 from worker.domain.hop.hop_invocation_contribution import HopInvocationContribution
 from worker.domain.tensor.tensor_bundle import TensorBundle
 
@@ -68,7 +69,7 @@ class _DeploymentDirectory(HopDeploymentDirectory):
         self.lookup: tuple[PlanVersion, HopReplicaId] | None = None
 
     @override
-    async def get_hop_deployment_id[ReplicaIdT: HopReplicaId](
+    async def get_worker_for_planned_invocable_hop[ReplicaIdT: HopReplicaId](
         self,
         plan_version: PlanVersion,
         replica_id: ReplicaIdT,
@@ -92,7 +93,7 @@ class _ContributionSender(ContributionSender):
 
 def _contribution(
     plan_version: PlanVersion,
-    destination_hop: IngressReplicaId,
+    destination_hop: PlannedIngressReplicaId,
 ) -> HopInvocationContribution:
     return HopInvocationContribution(
         source_context=HopInvocationContext(
@@ -103,7 +104,7 @@ def _contribution(
                 plan_version=plan_version,
                 model_pass_type=ModelPassType.FORWARD,
             ),
-            hop=ExternalHop(),
+            hop=ExternalHopId(),
         ),
         destination_hop=destination_hop,
         bundle=TensorBundle({}),
@@ -113,7 +114,7 @@ def _contribution(
 @pytest.mark.asyncio
 async def test_dispatch_resolves_worker_before_sending() -> None:
     plan_version = PlanVersion(version_number=1)
-    destination_hop = IngressReplicaId(
+    destination_hop = PlannedIngressReplicaId(
         model_variant_id=ModelVariantId(
             model_id=ModelId("test-model"),
             variant_tag="test-variant",

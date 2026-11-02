@@ -1,22 +1,22 @@
 from dataclasses import dataclass
 
+from shared.context.model_pass_context import (
+    ModelPassContext,
+)
 from shared.flow.flow import FlowId
+from shared.plan.hop import PlannedDestinationHopId, PlannedSourceHopId
 from shared.plan.plan_version import PlanVersion
 from worker.domain.context.hop_invocation_context import (
     HopInvocationContext,
 )
-from worker.domain.context.model_pass_context import (
-    ModelPassContext,
-)
-from worker.domain.hop.hop import DestinationHop, SourceHop
 from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
 ## This is the input to the execution of an hop as sent by a source
 @dataclass(frozen=True, slots=True)
 class HopInvocationContribution:
-    source_context: HopInvocationContext[SourceHop]
-    destination_hop: DestinationHop
+    source_context: HopInvocationContext[PlannedSourceHopId]
+    destination_hop: PlannedDestinationHopId
     bundle: TensorBundle
 
     @property
@@ -28,7 +28,7 @@ class HopInvocationContribution:
         return self.source_context.model_pass_context
 
     @property
-    def source_hop(self) -> SourceHop:
+    def source_hop(self) -> PlannedSourceHopId:
         return self.source_context.hop
 
     @property
@@ -40,5 +40,5 @@ class HopInvocationContribution:
 ## We ack the creation of a new invocation for the destination
 @dataclass(frozen=True, slots=True)
 class HopInvocationContributionAck:
-    source_context: HopInvocationContext[SourceHop]
-    destination_hop: DestinationHop
+    source_context: HopInvocationContext[PlannedSourceHopId]
+    destination_hop: PlannedDestinationHopId

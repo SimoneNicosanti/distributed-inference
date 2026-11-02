@@ -5,8 +5,9 @@ from shared.model.model_variant import ModelVariantId
 
 
 ## Identifier of a partition replica system-wide
+## for a specific version of the plan
 @dataclass(frozen=True, slots=True)
-class PartitionReplicaId:
+class PlannedPartitionReplicaId:
     partition_id: ModelPartitionId
     replica_idx: int
 
@@ -16,8 +17,9 @@ class PartitionReplicaId:
 
 
 ## Identifier of an ingress replica system-wide
+## for a specific version of the plan
 @dataclass(frozen=True, slots=True)
-class IngressReplicaId:
+class PlannedIngressReplicaId:
     model_variant_id: ModelVariantId
     replica_idx: int
 
@@ -27,8 +29,9 @@ class IngressReplicaId:
 
 
 ## Identifier of a sink replica system-wide
+## for a specific version of the plan
 @dataclass(frozen=True, slots=True)
-class SinkReplicaId:
+class PlannedSinkReplicaId:
     model_variant_id: ModelVariantId
     replica_idx: int
 

@@ -34,9 +34,9 @@ from controller.domain.plan.scheduling_plan import PriorityKey, SchedulingPlan
 from controller.domain.plan.worker_plan import WorkerPlan
 from shared.model.model_partition import ModelPartitionId
 from shared.plan.hop_logical_id import (
-    IngressReplicaId,
-    PartitionReplicaId,
-    SinkReplicaId,
+    PlannedIngressReplicaId,
+    PlannedPartitionReplicaId,
+    PlannedSinkReplicaId,
 )
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import WorkerId
@@ -51,9 +51,13 @@ class DefaultWorkerPlanBuilder:
         endpoint_ids_by_flow: EndpointIdsByFlow,
     ) -> dict[WorkerId, WorkerPlan]:
         involved_workers: dict[WorkerId, None] = {}
-        replicas_by_worker: dict[WorkerId, list[PartitionReplicaId]] = defaultdict(list)
-        ingress_by_worker: dict[WorkerId, list[IngressReplicaId]] = defaultdict(list)
-        sink_by_worker: dict[WorkerId, list[SinkReplicaId]] = defaultdict(list)
+        replicas_by_worker: dict[WorkerId, list[PlannedPartitionReplicaId]] = (
+            defaultdict(list)
+        )
+        ingress_by_worker: dict[WorkerId, list[PlannedIngressReplicaId]] = defaultdict(
+            list
+        )
+        sink_by_worker: dict[WorkerId, list[PlannedSinkReplicaId]] = defaultdict(list)
         addresses_by_worker: dict[WorkerId, list[HopAddress[InvocableHop]]] = (
             defaultdict(list)
         )
@@ -214,9 +218,9 @@ class DefaultWorkerPlanBuilder:
     def _build_worker_plan(
         *,
         plan_version: PlanVersion,
-        replicas: Sequence[PartitionReplicaId],
-        ingress_hops: Sequence[IngressReplicaId],
-        sink_hops: Sequence[SinkReplicaId],
+        replicas: Sequence[PlannedPartitionReplicaId],
+        ingress_hops: Sequence[PlannedIngressReplicaId],
+        sink_hops: Sequence[PlannedSinkReplicaId],
         addresses: Sequence[HopAddress[InvocableHop]],
         routings: Sequence[HopRoutings],
         priority_keys: Sequence[PriorityKey],

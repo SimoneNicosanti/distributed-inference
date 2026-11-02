@@ -1,11 +1,11 @@
 import asyncio
 from typing import override
 
+from shared.context.model_pass_context import ModelPassId
 from worker.application.ports.inbound.sink.model_pass_result_retriever import (
     ModelPassResultRetriever,
 )
 from worker.application.postbox.abc.inbox import Inbox
-from worker.domain.context.model_pass_context import ModelPassId
 from worker.domain.model.model_pass import ModelPassError, ModelPassResult
 
 

@@ -24,13 +24,13 @@ from integration.worker.deployment.http.service_plan_http_schema import (
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
+from shared.plan.hop import ExternalHopId as WorkerExternalHop
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
 from shared.user.user import UserId
 from worker.adapters.inbound.deployment.http.service_plan_mapper import (
     worker_plan_from_dto,
 )
-from worker.domain.hop.hop import ExternalHop as WorkerExternalHop
 
 
 def _component(
@@ -464,7 +464,7 @@ def _assert_worker_round_trip(plan: WorkerPlan) -> None:
     worker_plan = worker_plan_from_dto(received.worker_plan)
     assert worker_plan.plan_version == plan.plan_version
     assert (
-        worker_plan.deployment_plan.deployed_hops == plan.deployment_plan.deployed_hops
+        worker_plan.deployment_plan.planned_hops == plan.deployment_plan.deployed_hops
     )
     assert tuple(
         allocation.use_gpu for allocation in worker_plan.deployment_plan.allocations

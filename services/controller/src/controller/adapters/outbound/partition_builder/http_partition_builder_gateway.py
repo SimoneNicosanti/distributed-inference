@@ -4,7 +4,7 @@ from typing import override
 
 import httpx
 
-from catalog.api.directory import Directory
+from catalog.api.service.service_directory import ServiceDirectory
 from controller.application.ports.outbound.partition.partition_builder_gateway import (
     PartitionBuilderGateway,
 )
@@ -26,7 +26,7 @@ class HttpPartitionBuilderGateway(PartitionBuilderGateway):
     def __init__(
         self,
         http_client: httpx.AsyncClient,
-        directory: Directory,
+        directory: ServiceDirectory,
     ) -> None:
         self._http_client = http_client
         self._directory = directory

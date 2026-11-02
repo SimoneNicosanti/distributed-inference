@@ -2,24 +2,29 @@ from dataclasses import dataclass
 
 from shared.flow.flow import FlowId
 from shared.model.keys import TensorKey
-from worker.domain.hop.hop import DestinationHop, Hop, InvocableHop, SourceHop
+from shared.plan.hop import (
+    PlannedDestinationHopId,
+    PlannedHopId,
+    PlannedInvocableHopId,
+    PlannedSourceHopId,
+)
 
 
 @dataclass(frozen=True, slots=True)
-class HopAddress[HopT: Hop]:
+class HopAddress[HopT: PlannedHopId]:
     flow_id: FlowId
     hop: HopT
 
 
 @dataclass(frozen=True, slots=True)
 class HopInputRouting:
-    source: HopAddress[SourceHop]
+    source: HopAddress[PlannedSourceHopId]
     tensors: tuple[TensorKey, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class HopOutputRouting:
-    destination: HopAddress[DestinationHop]
+    destination: HopAddress[PlannedDestinationHopId]
     tensors: tuple[TensorKey, ...]
 
 
@@ -30,7 +35,7 @@ class HopRoutings:
 
     def check_inputs_ready(
         self,
-        arrived: dict[HopAddress[SourceHop], set[TensorKey]],
+        arrived: dict[HopAddress[PlannedSourceHopId], set[TensorKey]],
     ) -> bool:
         expected = {
             input_routing.source: set(input_routing.tensors)
@@ -53,7 +58,7 @@ class HopRoutings:
     def route_output_tensors(
         self,
         available_tensors: set[TensorKey],
-    ) -> dict[HopAddress[DestinationHop], set[TensorKey]]:
+    ) -> dict[HopAddress[PlannedDestinationHopId], set[TensorKey]]:
         routed = {
             route.destination: set(route.tensors) for route in self.output_routings
         }
@@ -71,11 +76,11 @@ class HopRoutings:
 
 @dataclass(frozen=True, slots=True)
 class HopRoutingPlan:
-    hop_addresses: tuple[HopAddress[InvocableHop], ...]
+    hop_addresses: tuple[HopAddress[PlannedInvocableHopId], ...]
     routings: tuple[HopRoutings, ...]
 
     def get_routings_for_hop_address(
-        self, hop_address: HopAddress[InvocableHop]
+        self, hop_address: HopAddress[PlannedInvocableHopId]
     ) -> HopRoutings:
         if hop_address not in self.hop_addresses:
             raise KeyError(f"No routing for hop address {hop_address}")

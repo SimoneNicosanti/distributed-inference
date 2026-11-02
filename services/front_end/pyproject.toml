@@ -7,6 +7,7 @@ dependencies = [
   "boto3>=1.43.116",
   "botocore>=1.43.116",
   "distributed-inference-artifacts",
+  "distributed-inference-catalog",
   "distributed-inference-integration",
   "distributed-inference-shared",
   "fastapi>=0.139.2",
@@ -14,6 +15,7 @@ dependencies = [
   "numpy>=2.0",
   "pyarrow>=25.0.0",
   "python-multipart>=0.0.20",
+  "redis>=8.0.1",
   "uvicorn[standard]",
 ]
 
@@ -26,5 +28,6 @@ packages = ["src/front_end"]
 
 [tool.uv.sources]
 distributed-inference-artifacts = { path = "../../packages/artifacts", editable = true }
+distributed-inference-catalog = { path = "../../packages/catalog", editable = true }
 distributed-inference-integration = { path = "../../packages/integration", editable = true }
 distributed-inference-shared = { path = "../../packages/shared", editable = true }

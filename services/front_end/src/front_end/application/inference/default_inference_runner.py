@@ -1,25 +1,23 @@
 from typing import override
 
+from catalog.api.hop.hop_deployment_directory import HopDeploymentDirectory
 from front_end.application.ports.inbound.inference_runner import (
     InferenceCoordinator,
 )
-from front_end.application.ports.outbound.flow_plan_reader import (
+from front_end.application.ports.outbound.inference.flow_plan_reader import (
     FlowPlanReader,
 )
-from front_end.application.ports.outbound.hop_deployment_directory import (
-    HopDeploymentDirectory,
-)
-from front_end.application.ports.outbound.ingress_gateway import (
+from front_end.application.ports.outbound.inference.ingress_gateway import (
     IngressGateway,
 )
-from front_end.application.ports.outbound.sink_gateway import SinkGateway
+from front_end.application.ports.outbound.inference.sink_gateway import SinkGateway
 from front_end.domain.context.external_source_context import (
     ExternalSourceInvocationContext,
 )
-from front_end.domain.context.model_invocation_context import ModelInvocationContext
-from front_end.domain.context.model_pass_context import ModelPassContext, ModelPassType
 from front_end.domain.inference_result import InferenceRequest, InferenceResult
 from front_end.domain.model_contract import ModelContract
+from shared.context.model_invocation_context import ModelInvocationContext
+from shared.context.model_pass_context import ModelPassContext, ModelPassType
 from shared.flow.flow import FlowId
 
 
@@ -86,24 +84,27 @@ class DefaultInferenceRunner(InferenceCoordinator):
             model_pass_context,
         )
 
-        ingress_deployment_id = (
-            await self._hop_deployment_directory.get_hop_deployment_id(
+        ingress_worker_id = (
+            await self._hop_deployment_directory.get_worker_for_planned_invocable_hop(
                 curr_plan_version, flow_plan.ingress_replica_id
             )
         )
 
-        sink_deployment_id = await self._hop_deployment_directory.get_hop_deployment_id(
-            curr_plan_version, flow_plan.sink_replica_id
+        sink_worker_id = (
+            await self._hop_deployment_directory.get_worker_for_planned_invocable_hop(
+                curr_plan_version, flow_plan.sink_replica_id
+            )
         )
 
         await self._ingress_gateway.submit_model_pass(
             external_source_invocation_context,
             bundle=request.bundle,
-            ingress_deployment_id=ingress_deployment_id,
+            planned_ingress_replica_id=flow_plan.ingress_replica_id,
+            worker_id=ingress_worker_id,
         )
 
         result_map = await self._sink_gateway.retrieve_result(
-            model_pass_context, sink_deployment_id
+            model_pass_context, sink_worker_id
         )
 
         return InferenceResult(result_map, request.request_id)

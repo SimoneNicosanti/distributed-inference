@@ -2,12 +2,12 @@ from dataclasses import dataclass
 
 from shared.model.keys import TensorKey
 from shared.model.model_variant import ModelVariantId
-from shared.plan.hop_logical_id import PartitionReplicaId
+from shared.plan.hop_logical_id import PlannedPartitionReplicaId
 
 
 @dataclass(frozen=True, slots=True)
 class IngressInputRoute:
-    target_replica_id: PartitionReplicaId
+    target_replica_id: PlannedPartitionReplicaId
     tensors: tuple[TensorKey, ...]
 
     def __post_init__(self) -> None:

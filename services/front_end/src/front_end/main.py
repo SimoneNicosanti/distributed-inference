@@ -17,7 +17,7 @@ def build_http_app(composition: FrontEndComposition) -> FastAPI:
     app.include_router(
         build_front_end_router(
             inference_runner=composition.inference_runner,
-            local_worker_identity_query=composition.local_worker_identity_query,
+            worker_identity_gateway=composition.worker_identity_gateway,
             model_loader=composition.model_loader,
         )
     )

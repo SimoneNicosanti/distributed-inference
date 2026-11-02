@@ -1,4 +1,4 @@
-from typing import Annotated, Literal, cast
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
@@ -7,11 +7,11 @@ from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_partition import ModelPartitionId
 from shared.model.model_variant import ModelVariantId
-from shared.plan.hop_deployment_id import HopDeploymentId, HopReplicaId
+from shared.plan.hop import PlannedInvocableHopId
 from shared.plan.hop_logical_id import (
-    IngressReplicaId,
-    PartitionReplicaId,
-    SinkReplicaId,
+    PlannedIngressReplicaId,
+    PlannedPartitionReplicaId,
+    PlannedSinkReplicaId,
 )
 from shared.service.service import ServiceId, WorkerId
 
@@ -20,21 +20,21 @@ class _PartitionReplicaIdEnvelope(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     kind: Literal["partition"] = "partition"
-    value: PartitionReplicaId
+    value: PlannedPartitionReplicaId
 
 
 class _IngressReplicaIdEnvelope(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     kind: Literal["ingress"] = "ingress"
-    value: IngressReplicaId
+    value: PlannedIngressReplicaId
 
 
 class _SinkReplicaIdEnvelope(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     kind: Literal["sink"] = "sink"
-    value: SinkReplicaId
+    value: PlannedSinkReplicaId
 
 
 type _HopReplicaIdEnvelope = Annotated[
@@ -50,13 +50,22 @@ class _HopDeploymentIdEnvelope(BaseModel):
     worker_id: WorkerId
 
 
+_SERVICE_ID_ADAPTER = TypeAdapter(ServiceId)
 _FLOW_ID_ADAPTER = TypeAdapter(FlowId)
 _MODEL_ID_ADAPTER = TypeAdapter(ModelId)
 _MODEL_VARIANT_ID_ADAPTER = TypeAdapter(ModelVariantId)
 _MODEL_PARTITION_ID_ADAPTER = TypeAdapter(ModelPartitionId)
-_PARTITION_REPLICA_ID_ADAPTER = TypeAdapter(PartitionReplicaId)
+_PARTITION_REPLICA_ID_ADAPTER = TypeAdapter(PlannedPartitionReplicaId)
 _HOP_REPLICA_ID_ADAPTER = TypeAdapter(_HopReplicaIdEnvelope)
 _HOP_DEPLOYMENT_ID_ADAPTER = TypeAdapter(_HopDeploymentIdEnvelope)
+
+
+def service_id_to_json(value: ServiceId) -> str:
+    return _SERVICE_ID_ADAPTER.dump_json(value).decode()
+
+
+def service_id_from_json(value: str | bytes) -> ServiceId:
+    return _canonical_worker_id(_SERVICE_ID_ADAPTER.validate_json(value))
 
 
 def flow_id_to_json(value: FlowId) -> str:
@@ -83,65 +92,30 @@ def model_partition_id_to_json(value: ModelPartitionId) -> str:
     return _MODEL_PARTITION_ID_ADAPTER.dump_json(value).decode()
 
 
-def partition_replica_id_to_json(value: PartitionReplicaId) -> str:
+def partition_replica_id_to_json(value: PlannedPartitionReplicaId) -> str:
     return _PARTITION_REPLICA_ID_ADAPTER.dump_json(value).decode()
 
 
-def hop_replica_id_to_json(value: HopReplicaId) -> str:
+def planned_invocable_hop_id_to_json(value: PlannedInvocableHopId) -> str:
     return _HOP_REPLICA_ID_ADAPTER.dump_json(
-        _hop_replica_id_to_envelope(value)
+        _planned_invocable_hop_id_to_envelope(value)
     ).decode()
 
 
-def hop_replica_id_from_json(value: str | bytes) -> HopReplicaId:
+def planned_invocable_hop_id_from_json(value: str | bytes) -> PlannedInvocableHopId:
     envelope = _HOP_REPLICA_ID_ADAPTER.validate_json(value)
     return envelope.value
 
 
-def hop_deployment_id_to_json[ReplicaIdT: HopReplicaId](
-    value: HopDeploymentId[ReplicaIdT],
-) -> str:
-    envelope = _HopDeploymentIdEnvelope(
-        replica_id=_hop_replica_id_to_envelope(value.replica_id),
-        worker_id=value.worker_id,
-    )
-    return _HOP_DEPLOYMENT_ID_ADAPTER.dump_json(envelope).decode()
-
-
-def hop_deployment_id_from_json(
-    value: str | bytes,
-) -> HopDeploymentId[HopReplicaId]:
-    envelope = _HOP_DEPLOYMENT_ID_ADAPTER.validate_json(value)
-    return HopDeploymentId(
-        replica_id=envelope.replica_id.value,
-        worker_id=_canonical_worker_id(envelope.worker_id),
-    )
-
-
-def partition_deployment_id_to_json(
-    value: HopDeploymentId[PartitionReplicaId],
-) -> str:
-    return hop_deployment_id_to_json(value)
-
-
-def partition_deployment_id_from_json(
-    value: str | bytes,
-) -> HopDeploymentId[PartitionReplicaId]:
-    deployment_id = hop_deployment_id_from_json(value)
-    if not isinstance(deployment_id.replica_id, PartitionReplicaId):
-        raise ValueError("Expected a partition hop deployment ID")
-    return cast(HopDeploymentId[PartitionReplicaId], deployment_id)
-
-
-def _hop_replica_id_to_envelope(
-    value: HopReplicaId,
+def _planned_invocable_hop_id_to_envelope(
+    value: PlannedInvocableHopId,
 ) -> _HopReplicaIdEnvelope:
     match value:
-        case PartitionReplicaId():
+        case PlannedPartitionReplicaId():
             return _PartitionReplicaIdEnvelope(value=value)
-        case IngressReplicaId():
+        case PlannedIngressReplicaId():
             return _IngressReplicaIdEnvelope(value=value)
-        case SinkReplicaId():
+        case PlannedSinkReplicaId():
             return _SinkReplicaIdEnvelope(value=value)
 
 

@@ -45,10 +45,7 @@ class CgroupCpuProfiler(CpuProfiler):
             if elapsed_ns > 0 and used_usec >= 0:
                 sample_duration_s = elapsed_ns / 1_000_000_000
                 utilization_ratio = min(
-                    used_usec
-                    / 1_000_000
-                    / sample_duration_s
-                    / capacity_cores,
+                    used_usec / 1_000_000 / sample_duration_s / capacity_cores,
                     1.0,
                 )
 
@@ -66,7 +63,7 @@ class CgroupCpuProfiler(CpuProfiler):
     @staticmethod
     def _get_logical_cpu_count() -> int:
         logical_cpu_count = os.process_cpu_count()
-        if logical_cpu_count is None or logical_cpu_count <= 0:
+        if logical_cpu_count <= 0:
             raise RuntimeError("Unable to determine the process CPU count")
         return logical_cpu_count
 

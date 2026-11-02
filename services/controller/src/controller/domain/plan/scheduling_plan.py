@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 
 from shared.flow.flow import FlowId
-from shared.plan.hop_logical_id import PartitionReplicaId
+from shared.plan.hop_logical_id import PlannedPartitionReplicaId
 
 
 @dataclass(frozen=True, slots=True)
 class PriorityKey:
     flow_id: FlowId
-    executable_hop: PartitionReplicaId
+    executable_hop: PlannedPartitionReplicaId
 
 
 type PriorityValue = int

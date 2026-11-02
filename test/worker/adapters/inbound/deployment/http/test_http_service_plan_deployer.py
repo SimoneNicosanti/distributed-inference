@@ -28,14 +28,14 @@ from integration.worker.deployment.http.service_plan_http_paths import (
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
-from shared.plan.hop_logical_id import IngressReplicaId, SinkReplicaId
+from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.user.user import UserId
 from worker.adapters.inbound.deployment.http.http_service_plan_deployer import (
     build_worker_plan_deployment_router,
 )
 from worker.application.ports.inbound.deployment.plan_deployer import PlanDeployer
-from worker.domain.hop.hop import ExternalHop
+from shared.plan.hop import ExternalHopId
 from worker.domain.plan.worker_plan import WorkerPlan
 
 
@@ -132,8 +132,10 @@ def test_maps_hop_routing_plan() -> None:
         model_id=ModelId("test-model"),
         variant_tag="test-variant",
     )
-    ingress_id = IngressReplicaId(model_variant_id=model_variant_id, replica_idx=0)
-    sink_id = SinkReplicaId(model_variant_id=model_variant_id, replica_idx=0)
+    ingress_id = PlannedIngressReplicaId(
+        model_variant_id=model_variant_id, replica_idx=0
+    )
+    sink_id = PlannedSinkReplicaId(model_variant_id=model_variant_id, replica_idx=0)
     plan = plan.model_copy(
         update={
             "deployment_plan": DeploymentPlanDto(
@@ -186,5 +188,5 @@ def test_maps_hop_routing_plan() -> None:
     assert prepared_plan.deployment_plan.sink_hops == (sink_id,)
     routing_plan = prepared_plan.hop_routing_plan
     assert routing_plan.hop_addresses[0].hop == ingress_id
-    assert routing_plan.routings[0].input_routings[0].source.hop == ExternalHop()
+    assert routing_plan.routings[0].input_routings[0].source.hop == ExternalHopId()
     assert routing_plan.routings[0].output_routings[0].destination.hop == sink_id

@@ -1,7 +1,10 @@
 import asyncio
 from typing import override
 
-from shared.plan.hop_deployment_id import HopDeploymentId, HopReplicaId
+from catalog.api.hop.hop_deployment_directory import (
+    HopDeploymentDirectory,
+)
+from shared.service.service import WorkerId
 from worker.application.activity.abc.activity_request_factory import (
     ActivityRequestFactory,
 )
@@ -10,9 +13,6 @@ from worker.application.hop_contribution_snd.abc.hop_contribution_dispatcher imp
 )
 from worker.application.ports.outbound.activity_manager.activity_manager import (
     ActivityManager,
-)
-from worker.application.ports.outbound.catalog.hop_deployment.hop_deployment_directory import (
-    HopDeploymentDirectory,
 )
 from worker.application.ports.outbound.hop_contribution_snd.contribution_sender import (
     ContributionSender,
@@ -44,7 +44,7 @@ class DefaultHopContributionDispatcher(HopContributionDispatcher):
         if not contributions:
             return
 
-        hop_deployment_ids = await asyncio.gather(
+        worker_ids = await asyncio.gather(
             *[
                 self._resolve_hop_replica_id(contribution)
                 for contribution in contributions
@@ -60,18 +60,18 @@ class DefaultHopContributionDispatcher(HopContributionDispatcher):
             activity_request
         )
         async with activity_grant, asyncio.TaskGroup() as task_group:
-            for contribution, hop_deployment_id in zip(
-                contributions, hop_deployment_ids, strict=True
-            ):
+            for contribution, worker_id in zip(contributions, worker_ids, strict=True):
                 task_group.create_task(
-                    self._contribution_sender.send(contribution, hop_deployment_id)
+                    self._contribution_sender.send(contribution, worker_id)
                 )
 
     async def _resolve_hop_replica_id(
         self, contribution: HopInvocationContribution
-    ) -> HopDeploymentId[HopReplicaId]:
-        hop_deployment_id = await self._hop_deployment_directory.get_hop_deployment_id(
-            plan_version=contribution.plan_version,
-            replica_id=contribution.destination_hop,
+    ) -> WorkerId:
+        worker_id = (
+            await self._hop_deployment_directory.get_worker_for_planned_invocable_hop(
+                plan_version=contribution.plan_version,
+                planned_hop=contribution.destination_hop,
+            )
         )
-        return hop_deployment_id
+        return worker_id

@@ -1,6 +1,6 @@
 from typing import override
 
-from shared.plan.hop_logical_id import SinkReplicaId
+from shared.plan.hop_logical_id import PlannedSinkReplicaId
 from worker.application.hop_handler.abc.hop_handler import HopHandler
 from worker.application.postbox.abc.outbox import Outbox
 from worker.domain.hop.hop_invocation import HopInvocationRequest, HopInvocationResult
@@ -8,15 +8,15 @@ from worker.domain.model.model_pass import ModelPassResult
 from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
-class DefaultSinkHopHandler(HopHandler[SinkReplicaId]):
+class DefaultSinkHopHandler(HopHandler[PlannedSinkReplicaId]):
     def __init__(self, outbox: Outbox[ModelPassResult]) -> None:
         super().__init__()
         self._outbox = outbox
 
     @override
     async def handle(
-        self, hop_invocation_request: HopInvocationRequest[SinkReplicaId]
-    ) -> HopInvocationResult[SinkReplicaId]:
+        self, hop_invocation_request: HopInvocationRequest[PlannedSinkReplicaId]
+    ) -> HopInvocationResult[PlannedSinkReplicaId]:
 
         model_pass_result = ModelPassResult(
             context=hop_invocation_request.model_pass_context,

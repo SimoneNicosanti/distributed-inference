@@ -12,7 +12,7 @@ from integration.worker.profiling.arrow.arrow_network_probe_integration import (
 from integration.worker.profiling.general_network_probe_integration import PAYLOAD_SIZE
 
 
-class ArrowNetworkProbeServer(flight.FlightServerBase):
+class ArrowNetworkProbeServer(flight.FlightServerBase):  # type: ignore
     def __init__(self, location: str):
         super().__init__(location)
         pass

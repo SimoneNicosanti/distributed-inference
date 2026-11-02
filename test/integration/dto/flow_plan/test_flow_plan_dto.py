@@ -8,7 +8,7 @@ from integration.dto.flow_plan.flow_plan_dto import (
 )
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
-from shared.plan.hop_logical_id import IngressReplicaId, SinkReplicaId
+from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 from shared.plan.plan_version import PlanVersion
 
 
@@ -20,8 +20,8 @@ def _flow_plan(shape: tuple[int | str | None, ...]) -> FlowPlanDto:
             model_variant_id=variant,
             inputs=(InputSpecDto(name="input", shape=shape, dtype="float32"),),
         ),
-        ingress_replica_id=IngressReplicaId(variant, replica_idx=1),
-        sink_replica_id=SinkReplicaId(variant, replica_idx=2),
+        ingress_replica_id=PlannedIngressReplicaId(variant, replica_idx=1),
+        sink_replica_id=PlannedSinkReplicaId(variant, replica_idx=2),
     )
 
 

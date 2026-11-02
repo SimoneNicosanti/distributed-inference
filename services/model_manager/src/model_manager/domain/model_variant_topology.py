@@ -162,7 +162,7 @@ class ModelVariantTopology:
         self._graph.remove_nodes_from(layers)
 
     def is_dag(self) -> bool:
-        return nx.is_directed_acyclic_graph(self._graph)  # type: ignore
+        return nx.is_directed_acyclic_graph(self._graph)
 
     def extract_incoming_outgoing_tensors_of_partition(
         self, layers: set[LayerKey]
@@ -186,7 +186,7 @@ class ModelVariantTopology:
         return incoming, outgoing
 
     def get_topological_sort(self) -> list[LayerKey]:
-        return list(nx.topological_sort(self._graph))  # type: ignore
+        return list(nx.topological_sort(self._graph))
 
     def _get_layer_set_boundary_tensors(
         self,

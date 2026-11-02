@@ -6,7 +6,7 @@ from typing import override
 from advertisement.capability_life_checker import (
     CapabilityLifeChecker,
 )
-from catalog.api.registrar import Registrar
+from catalog.api.service.service_registrar import ServiceRegistrar
 from integration.service_instance.service_instance import (
     Capability,
     CapabilityInterface,
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class AdvertisingManager(AsyncLifecycle):
     def __init__(
         self,
-        registrar: Registrar,
+        registrar: ServiceRegistrar,
         service_id: ServiceId,
         capability_life_checkers: list[CapabilityLifeChecker],
         heartbeat_interval_s: float,
@@ -47,9 +47,9 @@ class AdvertisingManager(AsyncLifecycle):
         for capability_couple in capability_couples:
             if capability_couple is None:
                 continue
-            interfaces_by_capability_type.setdefault(
-                capability_couple.type, []
-            ).append(capability_couple.interface)
+            interfaces_by_capability_type.setdefault(capability_couple.type, []).append(
+                capability_couple.interface
+            )
 
         capabilities = [
             Capability(type=capability_type, interfaces=interfaces)

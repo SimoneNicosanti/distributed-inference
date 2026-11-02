@@ -8,9 +8,12 @@ from fastapi import APIRouter, File, Form, UploadFile
 from artifacts.archive.zip_archive import decompress_artifact_bundle
 from front_end.application.ports.inbound.inference_runner import (
     InferenceCoordinator,
-    LocalWorkerIdentityQuery,
 )
 from front_end.application.ports.inbound.model_loader import ModelLoader
+from front_end.application.ports.outbound.inference.local_worker_identity_gateway import (
+    LocalWorkerIdentityGateway,
+)
+from front_end.domain.inference_result import InferenceRequest
 from integration.dto.tensor.tensor_bundle_dto import TensorBundleDto
 from integration.dto.worker_identity.worker_identity_dto import WorkerIdentityDto
 from integration.front_end.http.front_end_http_paths import (
@@ -34,7 +37,7 @@ CHUNK_SIZE = 1024 * 1024
 
 def build_front_end_router(
     inference_runner: InferenceCoordinator,
-    local_worker_identity_query: LocalWorkerIdentityQuery,
+    worker_identity_gateway: LocalWorkerIdentityGateway,
     model_loader: ModelLoader,
 ) -> APIRouter:
     router = APIRouter(tags=["front-end"])
@@ -44,7 +47,7 @@ def build_front_end_router(
         response_model=WorkerIdentityDto,
     )
     async def get_local_worker_identity() -> WorkerIdentityDto:
-        worker_id = await local_worker_identity_query.get_local_worker_identity()
+        worker_id = await worker_identity_gateway.get_local_worker_identity()
         return WorkerIdentityDto(service_id=worker_id.id)
 
     @router.post(
@@ -54,9 +57,13 @@ def build_front_end_router(
     async def run_inference(
         request: RunInferenceRequest,
     ) -> RunInferenceResponse:
+        contract = await inference_runner.get_current_contract_for_flow(request.flow_id)
         result = await inference_runner.run_inference_for_request(
-            flow_id=request.flow_id,
-            bundle=request.bundle.to_ndarrays(),
+            InferenceRequest(
+                flow_id=request.flow_id,
+                plan_version=contract.plan_version,
+                bundle=request.bundle.to_ndarrays(),
+            )
         )
         return RunInferenceResponse(
             bundle=TensorBundleDto.from_ndarrays(result.bundle),

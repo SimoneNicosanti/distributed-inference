@@ -5,11 +5,11 @@ import httpx
 import pytest
 
 from artifacts.contracts.artifact_bundle import ArtifactBundle
-from front_end.adapters.outbound.http_model_manager_gateway import (
+from front_end.adapters.outbound.loading.http_model_manager_gateway import (
     HttpModelManagerGateway,
 )
 from front_end.application.loading.default_model_loader import DefaultModelLoader
-from front_end.application.ports.outbound.model_loading_gateway import (
+from front_end.application.ports.outbound.loading.model_loading_gateway import (
     ModelArtifactUploader,
     ModelManagerGateway,
 )

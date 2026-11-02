@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from worker.domain.context.hop_execution_context import (
     HopExecutionContext,
 )
-from worker.domain.hop.hop import ExecutableHop
+from shared.plan.hop import PlannedExecutableHopId
 from worker.domain.tensor.tensor_bundle import TensorBundle
 
 ## NOTE: To handle stateful models, we will need to add a sort of state in the input/output
@@ -13,7 +13,7 @@ from worker.domain.tensor.tensor_bundle import TensorBundle
 
 ## Input for local partition execution.
 @dataclass(frozen=True, slots=True)
-class HopExecutionInput[HopT: ExecutableHop]:
+class HopExecutionInput[HopT: PlannedExecutableHopId]:
     context: HopExecutionContext[HopT]
 
     payload: TensorBundle
@@ -21,7 +21,7 @@ class HopExecutionInput[HopT: ExecutableHop]:
 
 ## Output of local partition execution.
 @dataclass(frozen=True, slots=True)
-class HopExecutionOutput[HopT: ExecutableHop]:
+class HopExecutionOutput[HopT: PlannedExecutableHopId]:
     context: HopExecutionContext[HopT]
 
     payload: TensorBundle

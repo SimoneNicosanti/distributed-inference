@@ -1,16 +1,15 @@
 from typing import override
 
 from artifacts.storage.artifact_store import ArtifactStore
-from shared.plan.hop_deployment_id import HopDeploymentId
+from catalog.api.hop.hop_deployment_registrar import (
+    HopDeploymentRegistrar,
+)
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import WorkerId
 from worker.application.hop_handler.abc.partition_executor_registry import (
     PartitionExecutorRegistry,
 )
 from worker.application.ports.inbound.deployment.plan_deployer import PlanDeployer
-from worker.application.ports.outbound.catalog.hop_deployment.hop_deployment_registrar import (
-    HopDeploymentRegistrar,
-)
 from worker.application.ports.outbound.model_metadata.model_partition_metadata_reader import (
     ModelPartitionMetadataReader,
 )
@@ -58,7 +57,7 @@ class DefaultWorkerPlanDeployer(PlanDeployer[WorkerPlan]):
         ):
             executor_exists = (
                 await self._partition_executor_registry.check_partition_executor_exists(
-                    executable_hop
+                    worker_plan.plan_version, executable_hop
                 )
             )
             if not executor_exists:
@@ -73,19 +72,17 @@ class DefaultWorkerPlanDeployer(PlanDeployer[WorkerPlan]):
                         resource_allocation,
                     )
                     await self._partition_executor_registry.register_partition_executor(
+                        worker_plan.plan_version,
                         executable_hop,
                         partition_executor,
                     )
 
     async def _register_hop_deployments(self, worker_plan: WorkerPlan) -> None:
-        invocable_hops = worker_plan.deployment_plan.deployed_hops
-        deployed_hops = [
-            HopDeploymentId(replica_id=invocable_hop, worker_id=self._worker_id)
-            for invocable_hop in invocable_hops
-        ]
-        await self._hop_deployment_registrar.register_hop_deployments(
+        planned_hops = worker_plan.deployment_plan.planned_hops
+        await self._hop_deployment_registrar.register_worker_for_planned_invocable_hop(
             plan_version=worker_plan.plan_version,
-            deployment_ids=tuple(deployed_hops),
+            planned_hops=planned_hops,
+            worker_id=self._worker_id,
         )
 
     @override

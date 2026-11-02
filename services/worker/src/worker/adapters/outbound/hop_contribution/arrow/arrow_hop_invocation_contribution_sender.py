@@ -22,7 +22,7 @@ from integration.worker.hop_contribution.arrow.arrow_hop_invocation_contribution
     SUBMIT_CONTRIBUTION_COMMAND,
     build_contribution_schema,
 )
-from shared.plan.hop_deployment_id import HopDeploymentId
+from shared.service.service import WorkerId
 from worker.adapters.context_mapper import (
     destination_hop_to_dto,
     hop_invocation_context_from_dto,
@@ -34,7 +34,6 @@ from worker.application.ports.outbound.catalog.service.service_directory_gateway
 from worker.application.ports.outbound.hop_contribution_snd.contribution_sender import (
     ContributionSender,
 )
-from worker.domain.hop.hop import DestinationHop
 from worker.domain.hop.hop_invocation_contribution import HopInvocationContribution
 
 
@@ -51,11 +50,9 @@ class ArrowHopInvocationContributionSender(ContributionSender):
     async def send(
         self,
         contribution: HopInvocationContribution,
-        destination_deployment_id: HopDeploymentId[DestinationHop],
+        worker_id: WorkerId,
     ) -> None:
-        worker_instance = await self._directory.get_worker_instance_by_id(
-            destination_deployment_id.worker_id
-        )
+        worker_instance = await self._directory.get_worker_instance_by_id(worker_id)
         interface = self._select_arrow_interface(worker_instance)
 
         await asyncio.to_thread(self._send_sync, interface, contribution)

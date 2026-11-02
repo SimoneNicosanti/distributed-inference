@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 
 from shared.flow.flow import FlowId
-from worker.domain.hop.hop import ExecutableHop
+from shared.plan.hop import PlannedExecutableHopId
 
 
 @dataclass(frozen=True, slots=True)
 class PriorityKey:
     flow_id: FlowId
-    executable_hop: ExecutableHop
+    executable_hop: PlannedExecutableHopId
 
 
 type PriorityValue = int  ## Lower values are higher priority

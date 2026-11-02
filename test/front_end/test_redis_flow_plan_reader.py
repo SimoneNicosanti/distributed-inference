@@ -2,7 +2,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from front_end.adapters.outbound.redis_flow_plan_reader import RedisFlowPlanReader
+from front_end.adapters.outbound.inference.redis_flow_plan_reader import (
+    RedisFlowPlanReader,
+)
 from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
 from shared.flow.flow import FlowId
 from shared.plan.plan_version import PlanVersion

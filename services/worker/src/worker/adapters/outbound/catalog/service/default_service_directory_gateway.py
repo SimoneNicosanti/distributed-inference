@@ -2,7 +2,7 @@ from typing import override
 
 from pydantic import ValidationError
 
-from catalog.api.directory import Directory
+from catalog.api.service.service_directory import ServiceDirectory
 from integration.service_instance.worker_instance import WorkerInstance
 from shared.service.service import WorkerId
 from worker.application.ports.outbound.catalog.service.service_directory_gateway import (
@@ -13,7 +13,7 @@ from worker.application.ports.outbound.catalog.service.service_directory_gateway
 class DefaultServiceDirectoryGateway(ServiceDirectoryGateway):
     def __init__(
         self,
-        directory: Directory,
+        directory: ServiceDirectory,
     ) -> None:
 
         self._directory = directory

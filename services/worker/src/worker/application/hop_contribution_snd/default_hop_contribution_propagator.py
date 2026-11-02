@@ -9,7 +9,7 @@ from worker.application.hop_contribution_snd.abc.hop_contribution_propagator imp
 from worker.application.hop_contribution_snd.abc.hop_output_router import (
     HopOutputRouter,
 )
-from worker.domain.hop.hop import InvocableHop
+from shared.plan.hop import PlannedInvocableHopId
 from worker.domain.hop.hop_invocation import HopInvocationResult
 from worker.domain.hop.hop_invocation_contribution import HopInvocationContribution
 
@@ -26,7 +26,7 @@ class DefaultHopContributionPropagator(HopContributionPropagator):
     async def propagate(
         self,
         incoming_contributions: list[HopInvocationContribution],
-        hop_invocation_result: HopInvocationResult[InvocableHop],
+        hop_invocation_result: HopInvocationResult[PlannedInvocableHopId],
     ) -> None:
 
         routed_contributions = await self._router.route(

@@ -1,15 +1,15 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from worker.domain.context.model_pass_context import ModelPassContext
-from worker.domain.hop.hop import DestinationHop
+from shared.context.model_pass_context import ModelPassContext
+from shared.plan.hop import PlannedDestinationHopId
 from worker.domain.hop.hop_invocation_contribution import HopInvocationContribution
 
 
 @dataclass(frozen=True, slots=True)
 class HopContributionCollectionKey:
     model_pass_context: ModelPassContext
-    hop: DestinationHop
+    hop: PlannedDestinationHopId
 
 
 @dataclass(frozen=True, slots=True)

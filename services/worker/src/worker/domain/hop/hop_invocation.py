@@ -1,17 +1,17 @@
 from dataclasses import dataclass
 
+from shared.context.model_pass_context import ModelPassContext
 from shared.flow.flow import FlowId
+from shared.plan.hop import PlannedInvocableHopId
 from shared.plan.plan_version import PlanVersion
 from worker.domain.context.hop_invocation_context import HopInvocationContext
-from worker.domain.context.model_pass_context import ModelPassContext
-from worker.domain.hop.hop import InvocableHop
 from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
 ## This is the input of the hop.
 ## It contains only the inputs of the partition, not the skip tensors.
 @dataclass(frozen=True, slots=True)
-class HopInvocationRequest[HopT: InvocableHop]:
+class HopInvocationRequest[HopT: PlannedInvocableHopId]:
     context: HopInvocationContext[HopT]
 
     payload: TensorBundle
@@ -35,7 +35,7 @@ class HopInvocationRequest[HopT: InvocableHop]:
 
 ## This is the output of the sub-model as returned to the caller
 @dataclass(frozen=True, slots=True)
-class HopInvocationResult[HopT: InvocableHop]:
+class HopInvocationResult[HopT: PlannedInvocableHopId]:
     context: HopInvocationContext[HopT]
 
     payload: TensorBundle

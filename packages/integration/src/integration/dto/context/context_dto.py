@@ -5,9 +5,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from shared.flow.flow import FlowId
 from shared.plan.hop_logical_id import (
-    IngressReplicaId,
-    PartitionReplicaId,
-    SinkReplicaId,
+    PlannedIngressReplicaId,
+    PlannedPartitionReplicaId,
+    PlannedSinkReplicaId,
 )
 from shared.plan.plan_version import PlanVersion
 
@@ -38,21 +38,21 @@ class IngressHopDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     kind: Literal["ingress"] = "ingress"
-    ingress_replica_id: IngressReplicaId
+    ingress_replica_id: PlannedIngressReplicaId
 
 
 class PartitionReplicaHopDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     kind: Literal["partition_replica"] = "partition_replica"
-    partition_replica_id: PartitionReplicaId
+    partition_replica_id: PlannedPartitionReplicaId
 
 
 class SinkHopDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     kind: Literal["sink"] = "sink"
-    sink_replica_id: SinkReplicaId
+    sink_replica_id: PlannedSinkReplicaId
 
 
 type SourceHopDto = Annotated[

@@ -4,6 +4,8 @@ from unittest.mock import Mock
 
 import pyarrow as pa
 
+from shared.context.model_invocation_context import ModelInvocationContext
+from shared.context.model_pass_context import ModelPassContext
 from shared.flow.flow import FlowId
 from shared.plan.plan_version import PlanVersion
 from shared.user.user import UserId
@@ -16,8 +18,7 @@ from worker.application.ports.inbound.sink.model_pass_result_retriever import (
 from worker.application.sink.default_model_pass_result_retriever import (
     DefaultModelPassResultRetriever,
 )
-from worker.domain.context.model_invocation_context import ModelInvocationContext
-from worker.domain.context.model_pass_context import ModelPassContext, ModelPassType
+from worker.domain.context.model_pass_context import ModelPassType
 from worker.domain.model.model_pass import ModelPassResult
 
 
@@ -51,7 +52,7 @@ class _ResultRetriever(ModelPassResultRetriever):
         self.result = result
         self.requested_id = None
 
-    async def retrieve_result(self, request_id):  # type: ignore[no-untyped-def]
+    async def retrieve_result(self, request_id):  [no-untyped-def]
         self.requested_id = request_id
         return self.result
 
@@ -61,7 +62,7 @@ class _Reader:
         self.schema = batch.schema
         self._batch = batch
 
-    def __iter__(self):  # type: ignore[no-untyped-def]
+    def __iter__(self):  [no-untyped-def]
         yield SimpleNamespace(data=self._batch)
 
 

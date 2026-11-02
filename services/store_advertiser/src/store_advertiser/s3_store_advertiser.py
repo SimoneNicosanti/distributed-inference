@@ -1,7 +1,7 @@
 import asyncio
 
 
-def main():
+def main() -> None:
     pass
 
 

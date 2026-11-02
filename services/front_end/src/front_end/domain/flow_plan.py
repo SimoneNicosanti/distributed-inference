@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from front_end.domain.model_specs import ModelSpecs
 from front_end.domain.tensor_map import TensorMap
 from shared.plan.hop_logical_id import (
-    IngressReplicaId,
-    SinkReplicaId,
+    PlannedIngressReplicaId,
+    PlannedSinkReplicaId,
 )
 from shared.plan.plan_version import PlanVersion
 
@@ -15,8 +15,8 @@ class FlowPlan:
 
     model_specs: ModelSpecs
 
-    ingress_replica_id: IngressReplicaId
-    sink_replica_id: SinkReplicaId
+    ingress_replica_id: PlannedIngressReplicaId
+    sink_replica_id: PlannedSinkReplicaId
 
     def __post_init__(self) -> None:
         if (

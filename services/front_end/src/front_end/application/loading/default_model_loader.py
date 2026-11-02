@@ -2,7 +2,7 @@ from typing import override
 
 from artifacts.contracts.artifact_bundle import ArtifactBundle
 from front_end.application.ports.inbound.model_loader import ModelLoader
-from front_end.application.ports.outbound.model_loading_gateway import (
+from front_end.application.ports.outbound.loading.model_loading_gateway import (
     ModelArtifactUploader,
     ModelManagerGateway,
 )
@@ -33,11 +33,12 @@ class DefaultModelLoader(ModelLoader):
         model_variant_info: ModelVariantInfoDto,
         artifact_bundle: ArtifactBundle,
     ) -> tuple[ModelVariantId, ArtifactRef]:
-        model_variant_id, artifact_ref = (
-            await self._model_manager_gateway.start_model_variant_registration(
-                model_id,
-                model_variant_info,
-            )
+        (
+            model_variant_id,
+            artifact_ref,
+        ) = await self._model_manager_gateway.start_model_variant_registration(
+            model_id,
+            model_variant_info,
         )
         await self._model_artifact_uploader.upload_model_artifact(
             artifact_ref=artifact_ref,

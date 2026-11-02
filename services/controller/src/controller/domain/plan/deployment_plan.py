@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from controller.domain.hop.hop import ExecutableHop, InvocableHop
-from shared.plan.hop_logical_id import IngressReplicaId, SinkReplicaId
+from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,8 +13,8 @@ class ResourceAllocation:
 class DeploymentPlan:
     executable_hops: tuple[ExecutableHop, ...]
     allocations: tuple[ResourceAllocation, ...]
-    ingress_hops: tuple[IngressReplicaId, ...]
-    sink_hops: tuple[SinkReplicaId, ...]
+    ingress_hops: tuple[PlannedIngressReplicaId, ...]
+    sink_hops: tuple[PlannedSinkReplicaId, ...]
 
     def __post_init__(self) -> None:
         if len(self.executable_hops) != len(set(self.executable_hops)):

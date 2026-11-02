@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from worker.domain.context.model_pass_context import ModelPassId
+from shared.context.model_pass_context import ModelPassId
 from worker.domain.model.model_pass import ModelPassResult
 
 

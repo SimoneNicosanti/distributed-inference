@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 
 from shared.model.model_variant import ModelVariantId
-from shared.plan.hop_logical_id import IngressReplicaId, SinkReplicaId
+from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 from shared.plan.plan_version import PlanVersion
 
 
@@ -25,5 +25,5 @@ class FlowPlanDto(BaseModel):
 
     plan_version: PlanVersion
     model_specs: ModelSpecsDto
-    ingress_replica_id: IngressReplicaId
-    sink_replica_id: SinkReplicaId
+    ingress_replica_id: PlannedIngressReplicaId
+    sink_replica_id: PlannedSinkReplicaId

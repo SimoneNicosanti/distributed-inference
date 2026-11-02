@@ -35,6 +35,7 @@ class CapabilityInterface(BaseModel):
 
     @model_validator(mode="after")
     def validate_endpoint(self) -> Self:
+        validator: TypeAdapter[HttpUrl | ArrowUrl]
         match self.protocol:
             case CapabilityProtocol.HTTP:
                 validator = TypeAdapter(HttpUrl)
