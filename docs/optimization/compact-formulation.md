@@ -19,7 +19,7 @@ from controller.domain.optimization.solving.solver_config import (
 )
 
 settings = SolverConfig(
-    objective=ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK,
+    objective=ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
     formulation=FormulationKind.COMPACT,
 )
 solver = GurobiSolver(settings)
@@ -39,6 +39,98 @@ observer also receives continuous/binary/nonbinary-integer counts, linear,
 quadratic and general constraint counts, node count, timings, objective, final
 bound and gap. Scalability records include the selected formulation and memory
 assumption. Presolve reductions and root-relaxation statistics are not collected.
+
+## Four alternative objectives
+
+Each solve selects exactly one `ObjectiveKind`, using `setObjective` once.
+There are no hierarchical objectives, combined penalties or latency tie-breaks.
+Let `w_f = arrival_rate[f] / sum_f arrival_rate[f]`.
+
+| Setting | Objective | Hard response deadline |
+| --- | --- | --- |
+| `arrival_weighted_response_time` | Minimize `sum_f w_f * R[f]` | `R[f] <= deadline[f]` for every flow |
+| `arrival_weighted_accuracy` | Maximize `sum_f w_f * sum_m accuracy[f,m] * u[f,m]` | `R[f] <= deadline[f]` for every flow |
+| `deadline_violations` | Minimize the unweighted count `sum_f v[f]` | Only the indicator `v[f] == 0 => R[f] <= deadline[f]` |
+| `arrival_weighted_normalized_delay` | Minimize `sum_f w_f * D[f] / deadline[f]` | None; `D[f] >= 0` and `D[f] >= R[f] - deadline[f]` |
+
+Violation variables are binary, as required by Gurobi's indicator constraints;
+one indicator and one binary variable are added per flow only for that objective.
+Delay variables are continuous and nonnegative, one per flow only for the delay
+objective; positive arrival weights make the delay epigraph tight at optimum.
+No response deadline remains hidden in response, transmission or queue variable
+bounds. The response-time and accuracy objectives add unconditional hard deadlines;
+violation-count and delay objectives retain their conditional/soft treatment.
+
+Accuracy uses the type and dataset of each flow's existing performance requirement:
+accuracy, mAP@50 or mAP@75. Matching finite profile values supply `a_m`; if duplicate
+measurements exist, their maximum is used, consistently with existing eligibility.
+MAE/RMSE requirements are rejected for the accuracy objective because they are error
+metrics, not accuracy scores to maximize. Existing minimum-performance eligibility
+is retained for every objective.
+
+The old `arrival_weighted_response_slack` setting is replaced by
+`arrival_weighted_response_time`. The former normalized response-minus-one
+objective is removed; normalized delay is its nonnegative positive-part alternative.
+Old objective names are rejected rather than silently remapped.
+
+Response and queue epigraphs need not be tight when an objective does not reward
+smaller response (accuracy, violation-count ties, or zero-delay cases). Reported
+response times can therefore be conservative. No secondary minimization is added.
+
+### Deadline-independent queue bounds
+
+For each worker, using full profile-derived service bounds, including every
+eligible model even if its batch-fill time exceeds the flow's deadline:
+
+\[
+\hat H_s = \min\left\{
+\sum_{f:s\in\mathcal S^f}\max_{m\in\mathcal M^f}
+\lambda_m^f(\hat E^f_{m,s})^2,
+\quad \hat\rho^{ex}\max_{f:s\in\mathcal S^f,m\in\mathcal M^f}\hat E^f_{m,s}
+\right\}.
+\]
+
+The global wait bound is `H_hat / (2*(1-rho_ex_limit)**2)`. First priority uses
+`H_hat / (2*(1-rho_ex_limit))`; for later priorities and each bin upper endpoint:
+
+\[
+\hat W_{s,i} = \frac{\hat H_s}
+{2(1-\hat\rho_i)(1-\hat\rho^{ex})}.
+\]
+
+Flow wait bounds use the maximum over eligible workers, without clipping to
+deadlines. Nominal execution bounds, queue/bin activation, network PS constraints
+and the previously enabled/commented strengthenings otherwise retain their roles.
+
+### Campaign selection and verification
+
+`--objectives all` runs all four objectives independently for every instance.
+`--objectives NAME [NAME ...]` selects a subset; omitted uses the YAML objective.
+Run specifications, IDs, CSVs, effective solver statistics and plots include the
+objective. Aggregation never pools different objectives. The scenario is reused
+across objectives; profiles and random instances are not regenerated per objective.
+
+Changed production files: `solver_config.py`, `default_composition_root.py`,
+`compact_bounds.py`, `gurobi_variables.py`, `gurobi_qos_constraints.py`,
+`gurobi_objective.py`, `gurobi_solver.py`; benchmark `configuration.py`,
+`campaigns.py`, `cli.py`, `solver.py`, `persistence.py`, `analysis.py` and default YAML.
+Updated static inspection, documentation and existing objective/bound/physical
+checks; added `test_gurobi_objectives.py` and `test_objective_campaigns.py`.
+Updated benchmark configuration, solver-dispatch and per-objective aggregation
+tests, and migrated existing response-objective references and analytical values.
+
+| Stage | Change | Static validation before proceeding |
+| --- | --- | --- |
+| Bounds | Full-profile H bound; no batch-fill exclusion/deadline clipping; remove response/transmission deadline UBs. | Ruff, mypy, AST absence of deadline references in bound/variable builders. |
+| Objectives | Four mutually exclusive branches; conditional hard deadline; binary indicators for violations; nonnegative delay epigraph. | Ruff, mypy, AST proof of one `setObjective`, no `setObjectiveN`, and guarded hard deadline. |
+| Campaign | CLI selection, per-run objective/identity, solver dispatch, CSV/aggregation/plot separation. | Ruff, mypy, static call graph and objective schema checks. |
+
+Final static checks: Ruff lint/format passes on 24 modified/added Python files;
+mypy passes on 25 controller/test files and eight benchmark/script/test files.
+`check_static.py` validates 37 syntax trees, YAML/TOML, base grids 330/198, four
+objectives, conditional deadlines, absence of implicit deadline bounds and solver
+call order. Diff checks pass. No tests, profiler, campaign or solver have been executed.
+All runtime measurements below predate these objective/bound changes.
 
 ## Removal of the legacy implementation
 
@@ -171,22 +263,23 @@ decision or GPU memory semantics were introduced.
    recomputed execution, first-priority waiting, PS transmission, latency and
    objective values.
 
-The existing objective is preserved exactly: `ARRIVAL_WEIGHTED_RESPONSE_SLACK`
+Historically, the original objective was preserved exactly: `ARRIVAL_WEIGHTED_RESPONSE_SLACK`
 currently minimizes arrival-weighted response time, despite its name;
 `ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_SLACK` minimizes the weighted sum of
-`response / deadline - 1`. No auxiliary penalty was added.
+`response / deadline - 1`. These have since been replaced by the four alternatives
+described above.
 
 One-sided auxiliary quantities may exceed physical minima in a feasible or
 time-limited incumbent. Reducing them to physical demands preserves feasibility
-and cannot worsen either existing objective. Tests reconstruct physical demands
+and could not worsen either original response objective. Tests reconstruct physical demands
 instead of requiring equality at every feasible auxiliary assignment.
 
 ### Compact bounds and common constraints
 
 Compact H bounds use the minimum of the per-flow maximum second-moment sum and
-utilization-limit times maximum service time. Service bounds respect each model's
-execution profile and remaining response budget; models excluded by batch-fill
-time do not contribute. W bounds distinguish first priority, later priorities
+utilization-limit times maximum service time. Service bounds now use each model's
+full execution profile without deadline clipping or batch-fill exclusion.
+W bounds distinguish first priority, later priorities
 and individual bin endpoints. The compact problem is a separate immutable copy;
 shared preprocessing output is not mutated.
 

@@ -100,7 +100,7 @@ async def test_existing_operational_cases_with_compact(monkeypatch, case):
         "_solver",
         lambda: GurobiSolver(
             SolverConfig(
-                ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_SLACK,
+                ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
                 formulation=FormulationKind.COMPACT,
                 threads=1,
                 seed=0,
@@ -128,7 +128,7 @@ def test_compact_physical_times_and_response_aggregation(priorities):
     )
     result = GurobiSolver(
         SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_SLACK,
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=FormulationKind.COMPACT,
             threads=1,
             seed=0,
@@ -163,8 +163,7 @@ def test_compact_physical_times_and_response_aggregation(priorities):
     ) == pytest.approx(0.002)
 
 
-@pytest.mark.parametrize("objective", list(ObjectiveKind))
-def test_physical_network_queue_and_objective_at_well_scaled_tensor_sizes(objective):
+def test_physical_network_queue_and_objective_at_well_scaled_tensor_sizes():
     from controller.domain.profile.model_variant_static_profile import (
         TensorShapeProperty,
     )
@@ -210,6 +209,7 @@ def test_physical_network_queue_and_objective_at_well_scaled_tensor_sizes(object
     )
     expected_wait = 0.05 * 0.04**2 / (2 * (1 - 0.05 * 0.04))
     expected = 0.04 + expected_wait + 2 * 0.01 / (1 - 0.5) + 0.002
+    objective = ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME
     result = GurobiSolver(
         SolverConfig(
             objective, formulation=FormulationKind.COMPACT, threads=1, seed=0, mip_gap=0
@@ -223,12 +223,7 @@ def test_physical_network_queue_and_objective_at_well_scaled_tensor_sizes(object
     assert tuple(c.mean_transmission_time_s for c in flow.components) == pytest.approx(
         (0.02, 0.02, 0), abs=1e-7
     )
-    expected_objective = (
-        expected
-        if objective == ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK
-        else expected / 2 - 1
-    )
-    assert result.objective_value == pytest.approx(expected_objective, abs=1e-6)
+    assert result.objective_value == pytest.approx(expected, abs=1e-6)
 
 
 @pytest.mark.parametrize("inference_runner", [False, True])
@@ -250,7 +245,7 @@ def test_relay_only_worker_keeps_endpoints_and_excludes_computation(inference_ru
     )
     result = GurobiSolver(
         SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK,
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=FormulationKind.COMPACT,
             threads=1,
             seed=0,

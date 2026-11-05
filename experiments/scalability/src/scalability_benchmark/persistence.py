@@ -12,6 +12,7 @@ SUMMARY_FIELDS = (
     "run_id",
     "scenario_id",
     "campaign",
+    "objective",
     "seed",
     "load",
     "flow_count",

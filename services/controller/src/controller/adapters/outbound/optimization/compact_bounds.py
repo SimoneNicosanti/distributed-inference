@@ -1,4 +1,4 @@
-"""Compact-only physical queue bounds; shared preprocessing is unchanged."""
+"""Physical queue bounds independent of response deadlines and objective."""
 
 from dataclasses import replace
 
@@ -32,20 +32,9 @@ def prepare_compact_problem(
                 continue
             candidates = []
             for variant in problem.models_by_flow[flow]:
-                budget = (
-                    float(
-                        requests_by_flow[flow].qos_requirements.max_mean_response_time
-                    )
-                    - problem.batch_fill_time_s[flow, variant]
-                )
-                if budget < 0:
-                    continue
                 profiles = layer_execution_profiles(context, variant, worker) or {}
-                time = min(
-                    sum(
-                        float(profile.execution_time_s) for profile in profiles.values()
-                    ),
-                    budget,
+                time = sum(
+                    float(profile.execution_time_s) for profile in profiles.values()
                 )
                 maximum_time = max(maximum_time, time)
                 candidates.append(
@@ -58,10 +47,7 @@ def prepare_compact_problem(
         problem,
         max_queue_wait_s_by_worker=waits,
         max_queue_wait_s_by_flow={
-            flow: min(
-                float(requests_by_flow[flow].qos_requirements.max_mean_response_time),
-                max(waits[worker] for worker in problem.workers_by_flow[flow]),
-            )
+            flow: max(waits[worker] for worker in problem.workers_by_flow[flow])
             for flow in problem.flows
         },
     )

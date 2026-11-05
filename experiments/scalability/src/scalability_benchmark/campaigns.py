@@ -1,9 +1,10 @@
 """Deterministic campaign enumeration, independent of profiling and solving."""
 
 from collections.abc import Iterator
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Literal
 
+from controller.domain.optimization.solving.solver_config import ObjectiveKind
 from scalability_benchmark.configuration import ExperimentConfig
 
 type CampaignName = Literal["pilot", "main", "sensitivity"]
@@ -19,6 +20,7 @@ class RunSpec:
     edge_count: int
     cloud_count: int
     timeout_s: float
+    objective: ObjectiveKind = ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME
 
     @property
     def worker_count(self) -> int:
@@ -28,7 +30,30 @@ class RunSpec:
         return {**asdict(self), "worker_count": self.worker_count}
 
 
-def campaign_specs(config: ExperimentConfig, name: CampaignName) -> Iterator[RunSpec]:
+def campaign_specs(
+    config: ExperimentConfig,
+    name: CampaignName,
+    *,
+    objectives: tuple[ObjectiveKind, ...] | None = None,
+) -> Iterator[RunSpec]:
+    selected = tuple(
+        dict.fromkeys(
+            ObjectiveKind(value)
+            for value in (
+                objectives
+                if objectives is not None
+                else (config.optimization.objective,)
+            )
+        )
+    )
+    if not selected:
+        raise ValueError("Select at least one objective")
+    for spec in _instance_specs(config, name):
+        for objective in selected:
+            yield replace(spec, objective=objective)
+
+
+def _instance_specs(config: ExperimentConfig, name: CampaignName) -> Iterator[RunSpec]:
     for seed in sorted(config.seeds):
         if name == "pilot":
             for case in config.pilot.cases:

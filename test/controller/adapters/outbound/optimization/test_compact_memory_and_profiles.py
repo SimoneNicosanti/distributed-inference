@@ -135,7 +135,7 @@ def test_resident_weights_sum_across_flows_but_activation_is_maximum(capacity):
     }
     solver = GurobiSolver(
         SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK,
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=FormulationKind.COMPACT,
         )
     )
@@ -154,6 +154,6 @@ def test_profiled_cut_activation_fits_despite_larger_layer_activation_sum():
     )
 
     result = GurobiSolver(
-        SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK)
+        SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
     )._solve({request.flow_id: request}, context, _problem_config(1))
     assert result.is_optimal

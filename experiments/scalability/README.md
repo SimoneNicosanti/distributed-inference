@@ -101,6 +101,51 @@ model counts 1/3/6, all 11 infrastructures. Solver time budgets: 27.5 and 16.5
 hours, 44 hours combined. Model construction, profiling, persistence and solver
 shutdown add time; these figures are not strict wall-clock bounds.
 
+## Objective selection
+
+Each run optimizes exactly one objective. Accepted YAML/CLI values:
+
+| Objective | Behavior |
+| --- | --- |
+| `arrival_weighted_response_time` | Minimize arrival-weighted response; enforce every response deadline. Default YAML objective. |
+| `arrival_weighted_accuracy` | Maximize arrival-weighted accuracy; enforce every response deadline. |
+| `deadline_violations` | Minimize the number of missed deadlines using binary indicators. |
+| `arrival_weighted_normalized_delay` | Minimize arrival-weighted positive delay divided by each flow's deadline. |
+
+```bash
+# Plan all objectives without loading models or running a solver.
+uv run --project experiments/scalability --locked scalability plan --objectives all
+
+# Run all four independently on the same generated instances.
+uv run --project experiments/scalability --locked scalability main --objectives all --output experiments/scalability/results/main-objectives
+
+# Select only a subset.
+uv run --project experiments/scalability --locked scalability main --objectives arrival_weighted_accuracy deadline_violations --output experiments/scalability/results/accuracy-violations
+```
+
+Omitting `--objectives` uses `optimization.objective` from YAML. Names are
+deduplicated while preserving order; `all` must be used alone. There is no
+hierarchical optimization or response-time tie-break. The former response-slack
+objective names are replaced by the four values above.
+
+The counts/budgets above are **per objective**. Selecting all four gives 1,320
+main runs, 792 sensitivity runs and 24 pilot runs with the default configuration;
+solver time budgets scale by the number selected. `--limit N` limits total runs
+after objective expansion. Run IDs include the objective, so `--resume` skips
+only completed runs for that objective. Instance generation and profile caches
+are shared across the selected objectives. CSVs, aggregates and plots identify
+each objective separately; historical records without objective metadata form
+an `unspecified` group rather than being pooled with a current objective.
+Code/provenance changes still invalidate old run IDs; runs from before the
+objective/bound changes are historical comparisons, not equivalent resumed runs.
+
+Accuracy uses the flow's requested metric/dataset (accuracy or mAP); error metrics
+MAE/RMSE have no automatic conversion into an accuracy score. Deadlines no longer
+clip service-time/queue bounds or response/transmission variables for soft
+objectives. Response epigraphs may be conservative when smaller response is not
+rewarded by the selected objective. The synthetic benchmark accuracy remains
+the YAML-generated score rather than a measured prediction metric.
+
 ## Synthetic assumptions
 
 All assumptions are in `config/default.yaml`; changes are included in result IDs.

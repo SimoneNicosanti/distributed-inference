@@ -5,8 +5,10 @@ from enum import StrEnum, auto
 
 
 class ObjectiveKind(StrEnum):
-    ARRIVAL_WEIGHTED_RESPONSE_SLACK = auto()
-    ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_SLACK = auto()
+    ARRIVAL_WEIGHTED_RESPONSE_TIME = auto()
+    ARRIVAL_WEIGHTED_ACCURACY = auto()
+    DEADLINE_VIOLATIONS = auto()
+    ARRIVAL_WEIGHTED_NORMALIZED_DELAY = auto()
 
 
 class FormulationKind(StrEnum):
@@ -59,6 +61,7 @@ class SolverRunStatistics:
     quadratic_constraints: int = 0
     general_constraints: int = 0
     node_count: float | None = None
+    objective: str = ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME.value
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +78,7 @@ class SolverConfig:
     formulation: FormulationKind = FormulationKind.COMPACT
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "objective", ObjectiveKind(self.objective))
         object.__setattr__(self, "formulation", FormulationKind(self.formulation))
         if self.time_limit_s is not None and (
             not math.isfinite(self.time_limit_s) or self.time_limit_s <= 0

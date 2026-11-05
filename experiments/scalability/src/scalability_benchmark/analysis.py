@@ -26,15 +26,26 @@ def finite_number(value: object) -> float | None:
     return float(value)
 
 
+def record_objective(record: dict[str, Any]) -> str:
+    requested = record.get("requested_solver_configuration") or {}
+    return str(record.get("objective") or requested.get("objective") or "unspecified")
+
+
 def aggregate(records: list[dict[str, Any]]) -> list[dict[str, object]]:
-    grouped: dict[tuple[str, float, str, int], list[dict[str, Any]]] = defaultdict(list)
+    grouped: dict[tuple[str, float, str, str, int], list[dict[str, Any]]] = defaultdict(
+        list
+    )
     for record in records:
         for dimension in DIMENSIONS:
             grouped[
-                record["campaign"], record["load"], dimension, record[dimension]
+                record["campaign"],
+                record["load"],
+                record_objective(record),
+                dimension,
+                record[dimension],
             ].append(record)
     rows: list[dict[str, object]] = []
-    for (campaign, load, dimension, size), group in sorted(grouped.items()):
+    for (campaign, load, objective, dimension, size), group in sorted(grouped.items()):
         runtimes = [
             value
             for record in group
@@ -51,6 +62,7 @@ def aggregate(records: list[dict[str, Any]]) -> list[dict[str, object]]:
         rows.append(
             {
                 "campaign": campaign,
+                "objective": objective,
                 "load": load,
                 "dimension": dimension,
                 "size": size,
@@ -108,18 +120,26 @@ def analyze(directory: Path) -> None:
     plt.rcParams.update(
         {"font.size": 10, "axes.grid": True, "grid.alpha": 0.25, "savefig.dpi": 200}
     )
-    campaigns = sorted({(record["campaign"], record["load"]) for record in records})
-    for campaign, load in campaigns:
+    campaigns = sorted(
+        {
+            (record["campaign"], record["load"], record_objective(record))
+            for record in records
+        }
+    )
+    for campaign, load, objective in campaigns:
         selected = [
             record
             for record in records
-            if record["campaign"] == campaign and record["load"] == load
+            if record["campaign"] == campaign
+            and record["load"] == load
+            and record_objective(record) == objective
         ]
         for dimension, label in DIMENSIONS.items():
             subset = [
                 row
                 for row in rows
                 if row["campaign"] == campaign
+                and row["objective"] == objective
                 and row["load"] == load
                 and row["dimension"] == dimension
             ]
@@ -174,9 +194,12 @@ def analyze(directory: Path) -> None:
                 axis.set_xlabel(label)
                 axis.set_xticks(sorted({record[dimension] for record in selected}))
                 axis.legend(fontsize=8)
-            figure.suptitle(f"{campaign}; reference load={load}; other factors pooled")
+            figure.suptitle(
+                f"{campaign}; objective={objective}; reference load={load}; other factors pooled"
+            )
             for extension in ("pdf", "png"):
                 figure.savefig(
-                    destination / f"{campaign}-load-{load}-{dimension}.{extension}"
+                    destination
+                    / f"{campaign}-{objective}-load-{load}-{dimension}.{extension}"
                 )
             plt.close(figure)

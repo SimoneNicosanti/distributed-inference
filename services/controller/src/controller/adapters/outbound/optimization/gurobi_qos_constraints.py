@@ -10,12 +10,13 @@ from controller.adapters.outbound.optimization.gurobi_variables import (
     NetworkVariables,
     QoSVariables,
 )
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
-)
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
 )
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
+)
+from controller.domain.optimization.solving.solver_config import ObjectiveKind
 
 
 def add_response_time_constraints(
@@ -30,6 +31,7 @@ def add_response_time_constraints(
     context: OptimizationContext,
     requests_by_flow: OptimizationRequestsByFlow,
     max_components: int,
+    objective_kind: ObjectiveKind = ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
 ) -> None:
     p = problem
     connections = context.network_topology.connections()
@@ -79,8 +81,14 @@ def add_response_time_constraints(
             + latency,
             name=f"response_definition[{flow_index}]",
         )
-        model.addConstr(
-            qos.response_time_s[flow]
-            <= float(requests_by_flow[flow].qos_requirements.max_mean_response_time),
-            name=f"response_requirement[{flow_index}]",
-        )
+        if objective_kind in {
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+            ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
+        }:
+            model.addConstr(
+                qos.response_time_s[flow]
+                <= float(
+                    requests_by_flow[flow].qos_requirements.max_mean_response_time
+                ),
+                name=f"response_requirement[{flow_index}]",
+            )

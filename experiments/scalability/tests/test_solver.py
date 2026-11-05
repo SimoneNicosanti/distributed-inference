@@ -26,7 +26,11 @@ from shared.model.model_variant import PerformanceMetric, PerformanceMetricType
 
 
 def statistics(
-    status: int, solutions: int, gap: float | None = None
+    status: int,
+    solutions: int,
+    gap: float | None = None,
+    *,
+    objective: ObjectiveKind = ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
 ) -> SolverRunStatistics:
     return SolverRunStatistics(
         status=status,
@@ -40,6 +44,7 @@ def statistics(
         mip_gap_target=0.01,
         threads=0,
         seed=0,
+        objective=objective.value,
     )
 
 
@@ -111,7 +116,7 @@ def test_observer_guards_unavailable_attributes_and_captures_effective_parameter
     _observe_model(
         model,
         SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK, observer=observed.append
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME, observer=observed.append
         ),
         0.2,
     )
@@ -132,17 +137,19 @@ def test_observer_guards_unavailable_attributes_and_captures_effective_parameter
 )
 def test_solver_rejects_invalid_settings(settings: dict[str, Any]) -> None:
     with pytest.raises(ValueError):
-        SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK, **settings)
+        SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME, **settings)
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("time_limit_s", [60, 300])
 @pytest.mark.parametrize("formulation", ["compact"])
+@pytest.mark.parametrize("objective", list(ObjectiveKind))
 async def test_runner_invokes_existing_solver_with_explicit_limits(
     config: ExperimentConfig,
     monkeypatch: pytest.MonkeyPatch,
     time_limit_s: int,
     formulation: str,
+    objective: ObjectiveKind,
 ) -> None:
     from unittest.mock import AsyncMock
 
@@ -156,7 +163,7 @@ async def test_runner_invokes_existing_solver_with_explicit_limits(
     def factory(settings: SolverConfig) -> Any:
         configured.append(settings)
         assert settings.observer is not None
-        settings.observer(statistics(GRB.OPTIMAL, 1, 0))
+        settings.observer(statistics(GRB.OPTIMAL, 1, 0, objective=settings.objective))
         return gateway
 
     monkeypatch.setattr(benchmark_solver, "GurobiSolver", factory)
@@ -164,7 +171,9 @@ async def test_runner_invokes_existing_solver_with_explicit_limits(
         benchmark_solver, "make_instance", lambda scenario, spec: ({}, Mock())
     )
     result = await benchmark_solver.execute_solver(
-        Mock(spec=Scenario), RunSpec("main", 42, 0.6, 1, 1, 0, 0, time_limit_s), config
+        Mock(spec=Scenario),
+        RunSpec("main", 42, 0.6, 1, 1, 0, 0, time_limit_s, objective),
+        config,
     )
     gateway.solve.assert_awaited_once()
     assert configured[0].time_limit_s == time_limit_s
@@ -172,5 +181,8 @@ async def test_runner_invokes_existing_solver_with_explicit_limits(
     assert configured[0].seed == config.solver.seed
     assert configured[0].threads is None
     assert configured[0].formulation == formulation
+    assert configured[0].objective is objective
+    assert result["requested_solver_configuration"]["objective"] == objective.value
+    assert result["effective_solver_configuration"]["objective"] == objective.value
     assert result["requested_solver_configuration"]["formulation"] == formulation
     assert result["solution_extracted"] is True

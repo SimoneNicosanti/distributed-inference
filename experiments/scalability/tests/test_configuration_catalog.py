@@ -12,6 +12,7 @@ from scalability_benchmark.catalog import (
 from scalability_benchmark.configuration import ExperimentConfig
 from scalability_benchmark.randomness import fingerprint, stream
 
+from controller.domain.optimization.solving.solver_config import ObjectiveKind
 from shared.model.model_variant import PerformanceMetricType
 
 
@@ -72,6 +73,15 @@ def test_compact_is_default_and_legacy_is_rejected(config: ExperimentConfig) -> 
     raw["solver"]["formulation"] = "legacy"
     with pytest.raises(ValidationError, match="formulation"):
         ExperimentConfig.model_validate(raw)
+
+
+@pytest.mark.parametrize("objective", list(ObjectiveKind))
+def test_all_four_objectives_are_accepted(
+    config: ExperimentConfig, objective: ObjectiveKind
+) -> None:
+    raw = config.model_dump()
+    raw["optimization"]["objective"] = objective.value
+    assert ExperimentConfig.model_validate(raw).optimization.objective is objective
 
 
 def test_missing_models_never_download(

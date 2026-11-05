@@ -26,7 +26,7 @@ def solve(formulation=FormulationKind.COMPACT, *, components=1, priorities=1):
     request = _request(worker, arrival_rate=1, max_response_time_s=10, flow_id=_flow(1))
     solution = GurobiSolver(
         SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_SLACK,
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=formulation,
             observer=observations.append,
             threads=1,
@@ -41,7 +41,7 @@ def solve(formulation=FormulationKind.COMPACT, *, components=1, priorities=1):
 
 
 def test_formulation_configuration():
-    config = SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK)
+    config = SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
     assert config.formulation is FormulationKind.COMPACT
     assert list(FormulationKind) == [FormulationKind.COMPACT]
     assert replace(config, formulation="compact").formulation is FormulationKind.COMPACT
@@ -53,7 +53,7 @@ def test_formulation_configuration():
 @pytest.mark.parametrize("components", [1, 2])
 def test_compact_matches_analytical_single_worker_response(components):
     compact, statistics = solve(components=components)
-    assert compact.objective_value == pytest.approx(-0.9894444444444445)
+    assert compact.objective_value == pytest.approx(0.10555555555555556)
     assert compact.flow_solutions[0].mean_response_time_s == pytest.approx(
         0.10555555555555556
     )
@@ -271,7 +271,7 @@ def test_compact_priority_queue_matches_physical_first_priority(priorities):
     assert stats.quadratic_constraints == priorities
 
 
-def test_queue_bounds_respect_response_budget():
+def test_queue_bounds_use_full_profile_and_stability_without_deadline_clipping():
     from controller.adapters.outbound.optimization.compact_bounds import (
         prepare_compact_problem,
     )
@@ -290,15 +290,18 @@ def test_queue_bounds_respect_response_budget():
     bounded = prepare_compact_problem(
         problem, context=context, requests_by_flow=requests, problem_config=config
     )
-    assert bounded.max_queue_wait_s_by_worker[worker] == pytest.approx(0.5)
-    assert bounded.max_queue_wait_s_by_flow[request.flow_id] == pytest.approx(0.1)
+    expected = min(1 * 100**2, config.compute_utilization_limit * 100) / (
+        2 * (1 - config.compute_utilization_limit) ** 2
+    )
+    assert bounded.max_queue_wait_s_by_worker[worker] == pytest.approx(expected)
+    assert bounded.max_queue_wait_s_by_flow[request.flow_id] == pytest.approx(expected)
     assert (
         problem.max_queue_wait_s_by_worker[worker]
         > bounded.max_queue_wait_s_by_worker[worker]
     )
 
 
-def test_queue_bound_excludes_model_ruled_out_by_batch_fill():
+def test_queue_bound_keeps_models_even_when_batch_fill_exceeds_deadline():
     from controller.adapters.outbound.optimization.compact_bounds import (
         prepare_compact_problem,
     )
@@ -318,8 +321,9 @@ def test_queue_bound_excludes_model_ruled_out_by_batch_fill():
     bounded = prepare_compact_problem(
         problem, context=context, requests_by_flow=requests, problem_config=config
     )
-    assert bounded.max_queue_wait_s_by_worker[worker] == 0
-    assert bounded.max_queue_wait_s_by_flow[request.flow_id] == 0
+    expected = 0.1**2 / (2 * (1 - config.compute_utilization_limit) ** 2)
+    assert bounded.max_queue_wait_s_by_worker[worker] == pytest.approx(expected)
+    assert bounded.max_queue_wait_s_by_flow[request.flow_id] == pytest.approx(expected)
 
 
 def test_two_priority_queue_uses_upper_bin_endpoint_and_unscaled_wait():

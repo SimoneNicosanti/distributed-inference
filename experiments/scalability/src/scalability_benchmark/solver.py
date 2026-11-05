@@ -12,7 +12,6 @@ from controller.adapters.outbound.optimization.gurobi_solver import (
 )
 from controller.domain.optimization.solving.solver_config import (
     FormulationKind,
-    ObjectiveKind,
     ProblemConfig,
     SolverConfig,
     SolverRunStatistics,
@@ -90,6 +89,7 @@ def classify(
         "construction_time_s": statistics.construction_time_s if statistics else None,
         "effective_solver_configuration": {
             "formulation": statistics.formulation,
+            "objective": statistics.objective,
             "time_limit_s": statistics.time_limit_s,
             "mip_gap": statistics.mip_gap_target,
             "threads": statistics.threads,
@@ -108,7 +108,7 @@ async def execute_solver(
     observations: list[SolverRunStatistics] = []
     solver_config = SolverConfig(
         formulation=FormulationKind(config.solver.formulation),
-        objective=ObjectiveKind(config.optimization.objective),
+        objective=spec.objective,
         output_flag=True,
         time_limit_s=spec.timeout_s,
         mip_gap=config.solver.relative_gap,
@@ -146,6 +146,6 @@ async def execute_solver(
             "mip_gap": config.solver.relative_gap,
             "threads": config.solver.threads,
             "seed": config.solver.seed,
-            "objective": config.optimization.objective,
+            "objective": spec.objective.value,
         },
     }

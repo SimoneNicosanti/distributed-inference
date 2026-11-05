@@ -86,6 +86,7 @@ def _observe_model(
             quadratic_constraints=model.NumQConstrs,
             general_constraints=model.NumGenConstrs,
             node_count=_finite_attribute(model, "NodeCount"),
+            objective=config.objective.value,
         )
     )
 
@@ -228,6 +229,7 @@ class GurobiSolver(Solver):
                     context=context,
                     requests_by_flow=requests_by_flow,
                     max_components=problem_config.max_components,
+                    objective_kind=self._config.objective,
                 )
                 set_objective(
                     model,
@@ -235,6 +237,8 @@ class GurobiSolver(Solver):
                     variables.qos,
                     self._config.objective,
                     requests_by_flow=requests_by_flow,
+                    assignment=variables.assignment,
+                    context=context,
                 )
                 construction_time_s = perf_counter() - construction_started
                 try:

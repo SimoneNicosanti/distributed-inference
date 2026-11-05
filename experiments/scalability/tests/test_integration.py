@@ -116,7 +116,7 @@ async def test_real_solver_feasible_and_infeasible(
     observed: list[SolverRunStatistics] = []
     solver = GurobiSolver(
         SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK,
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=formulation,
             time_limit_s=300,
             mip_gap=0.01,

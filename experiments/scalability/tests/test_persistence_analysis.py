@@ -82,6 +82,35 @@ def test_aggregation_keeps_timeouts_and_missing_data_explicit() -> None:
         assert row["gap_observed_count"] == 1
 
 
+def test_aggregation_never_pools_different_objectives() -> None:
+    first = {
+        **record("first", "optimal_closed_gap", 1),
+        "objective": "deadline_violations",
+    }
+    second = {
+        **record("second", "optimal_closed_gap", 9),
+        "objective": "arrival_weighted_accuracy",
+    }
+    rows = aggregate([first, second])
+    assert len(rows) == 6
+    assert all(row["completed_count"] == 1 for row in rows)
+    assert {row["objective"]: row["runtime_mean_s"] for row in rows} == {
+        "deadline_violations": 1,
+        "arrival_weighted_accuracy": 9,
+    }
+
+
+def test_historical_objective_metadata_is_preserved() -> None:
+    historic = record("historic")
+    historic["requested_solver_configuration"] = {
+        "objective": "arrival_weighted_response_slack"
+    }
+    assert all(
+        row["objective"] == "arrival_weighted_response_slack"
+        for row in aggregate([historic])
+    )
+
+
 def test_offline_plot_generation(tmp_path: Path) -> None:
     pytest.importorskip("matplotlib")
     from scalability_benchmark.analysis import analyze

@@ -145,7 +145,7 @@ class DefaultCompositionRoot(CompositionRoot):
             redis, worker_directory_gateway
         )
         solver_config = self._solver_config or SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK,
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             output_flag=True,
             time_limit_s=180,
         )

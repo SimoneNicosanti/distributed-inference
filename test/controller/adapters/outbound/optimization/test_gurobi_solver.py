@@ -503,7 +503,7 @@ def _problem_config(
 def _solver() -> GurobiSolver:
     return GurobiSolver(
         SolverConfig(
-            objective=(ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_SLACK),
+            objective=(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME),
         )
     )
 

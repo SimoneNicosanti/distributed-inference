@@ -6,6 +6,8 @@ from typing import Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from controller.domain.optimization.solving.solver_config import ObjectiveKind
+
 
 class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
@@ -134,9 +136,7 @@ class OptimizationSettings(Settings):
     compute_utilization_limit: float = Field(gt=0, lt=1)
     network_utilization_limit: float = Field(gt=0, lt=1)
     relative_error: float = Field(gt=0)
-    objective: Literal[
-        "arrival_weighted_response_slack", "arrival_weighted_normalized_response_slack"
-    ]
+    objective: ObjectiveKind
 
 
 class SolverSettings(Settings):

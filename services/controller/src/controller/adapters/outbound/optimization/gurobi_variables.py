@@ -310,9 +310,6 @@ def _add_network_variables(
 
     for flow in problem.flows:
         flow_index = problem.flow_index[flow]
-        max_response_s = float(
-            requests_by_flow[flow].qos_requirements.max_mean_response_time
-        )
         for model_variant in problem.models_by_flow[flow]:
             model_index = problem.model_index[flow, model_variant]
             static_profile = context.static_profiles_by_variant[model_variant]
@@ -334,7 +331,6 @@ def _add_network_variables(
                     transmission_time_s[flow, model_variant, cut, worker] = (
                         model.addVar(
                             lb=0.0,
-                            ub=max_response_s,
                             name=f"ttx[{flow_index},{model_index},{cut},{worker_index}]",
                         )
                     )
@@ -342,7 +338,6 @@ def _add_network_variables(
         for cut in cuts:
             component_transmission_response_s[flow, cut] = model.addVar(
                 lb=0.0,
-                ub=max_response_s,
                 name=f"rtx[{flow_index},{cut}]",
             )
             for source in problem.workers_by_flow[flow]:
@@ -396,9 +391,6 @@ def _add_qos_variables(
         response_time_s={
             flow: model.addVar(
                 lb=0.0,
-                ub=float(
-                    requests_by_flow[flow].qos_requirements.max_mean_response_time
-                ),
                 name=f"response[{problem.flow_index[flow]}]",
             )
             for flow in problem.flows

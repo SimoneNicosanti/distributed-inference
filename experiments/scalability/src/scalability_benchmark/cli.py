@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
+from controller.domain.optimization.solving.solver_config import ObjectiveKind
 from scalability_benchmark.campaigns import CampaignName, campaign_specs
 from scalability_benchmark.configuration import ExperimentConfig, load_configuration
 from scalability_benchmark.instances import build_scenario, request_record
@@ -24,10 +25,11 @@ async def run_campaign(
     resume: bool,
     retry_errors: bool,
     limit: int | None,
+    objectives: tuple[ObjectiveKind, ...] | None = None,
 ) -> None:
     provenance = software_provenance()
     provenance_hash = fingerprint(provenance)
-    specs = campaign_specs(config, campaign)
+    specs = campaign_specs(config, campaign, objectives=objectives)
     if limit is not None:
         specs = iter(itertools.islice(specs, limit))
     with ResultStore(output, resume=resume, retry_errors=retry_errors) as store:
@@ -91,7 +93,7 @@ async def run_campaign(
                     }
                 )
                 print(
-                    f"{run_id[:12]} {result['termination']} runtime={result['solver_runtime_s']}",
+                    f"{run_id[:12]} {spec.objective.value} {result['termination']} runtime={result['solver_runtime_s']}",
                     flush=True,
                 )
 
@@ -110,6 +112,12 @@ def main() -> None:
         "--seed", type=int, action="append", help="Repeat to override the seed list"
     )
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--objectives",
+        nargs="+",
+        choices=(*ObjectiveKind, "all"),
+        help="Run each selected objective independently; all selects all four (default: YAML objective)",
+    )
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--retry-errors", action="store_true")
     parser.add_argument(
@@ -125,6 +133,18 @@ def main() -> None:
         parser.error("--limit must be positive")
     if args.retry_errors and not args.resume:
         parser.error("--retry-errors requires --resume")
+    objectives = None
+    if args.objectives:
+        if "all" in args.objectives:
+            if len(args.objectives) != 1:
+                parser.error(
+                    "--objectives all cannot be combined with individual objectives"
+                )
+            objectives = tuple(ObjectiveKind)
+        else:
+            objectives = tuple(
+                dict.fromkeys(ObjectiveKind(value) for value in args.objectives)
+            )
     config = load_configuration(args.config)
     if args.seed:
         config = ExperimentConfig.model_validate(
@@ -137,7 +157,7 @@ def main() -> None:
         analyze(output)
     elif args.command == "plan":
         for name in ("pilot", "main", "sensitivity"):
-            specs = list(campaign_specs(config, name))
+            specs = list(campaign_specs(config, name, objectives=objectives))
             print(
                 f"{name}: {len(specs)} runs; solver budget={sum(spec.timeout_s for spec in specs) / 3600:g} h"
             )
@@ -151,6 +171,7 @@ def main() -> None:
                     resume=args.resume,
                     retry_errors=args.retry_errors,
                     limit=args.limit,
+                    objectives=objectives,
                 )
             )
         except KeyboardInterrupt:

@@ -55,7 +55,7 @@ optimization:
   compute_utilization_limit: 0.8
   network_utilization_limit: 0.8
   relative_error: 0.1
-  objective: arrival_weighted_response_slack
+  objective: arrival_weighted_response_time
 solver:
   formulation: compact
   timeout_s: 300
