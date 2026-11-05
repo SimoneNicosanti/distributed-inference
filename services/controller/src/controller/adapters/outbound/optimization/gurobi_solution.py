@@ -190,6 +190,9 @@ def extract_solution(
                 ComponentSolution(
                     component_index=component,
                     worker_id=worker,
+                    backend=context.resource_profiles_by_worker[
+                        worker
+                    ].execution_backend,
                     layer_keys=layers,
                     input_layer_keys=tuple(
                         layer for layer in layers if layer_descriptions[layer].is_input

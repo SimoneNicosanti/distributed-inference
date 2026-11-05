@@ -1,6 +1,7 @@
 import math
 from dataclasses import dataclass
 
+from controller.domain.backend import Backend
 from shared.service.service import WorkerId
 
 
@@ -93,10 +94,16 @@ class WorkerResourceProfile:
     ram_profile: RamProfile
 
     def __post_init__(self) -> None:
-        device_indices = [profile.device_index for profile in self.gpu_profiles]
-        if len(device_indices) != len(set(device_indices)):
-            raise ValueError("Duplicate GPU device indices")
+        if len(self.gpu_profiles) > 1:
+            raise ValueError("Only one GPU per worker is supported")
 
-        device_uuids = [profile.device_uuid for profile in self.gpu_profiles]
-        if len(device_uuids) != len(set(device_uuids)):
-            raise ValueError("Duplicate GPU device UUIDs")
+    @property
+    def execution_backend(self) -> Backend:
+        return Backend.GPU if self.gpu_profiles else Backend.CPU
+
+    @property
+    def available_inference_memory_bytes(self) -> int:
+        """Use VRAM on GPU workers; additional host RAM is assumed negligible."""
+        if self.gpu_profiles:
+            return self.gpu_profiles[0].available_memory_bytes
+        return self.ram_profile.available_bytes

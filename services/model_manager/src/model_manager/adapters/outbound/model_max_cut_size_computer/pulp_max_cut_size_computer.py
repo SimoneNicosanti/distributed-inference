@@ -65,7 +65,7 @@ class PulpMaxCutSizeComputer(MaxCutSizeComputer):
         )
 
         c_dict = {
-            tensor: problem.add_variable(name=f"c_{tensor}", cat="Binary")
+            tensor: problem.add_variable(name=f"c_{tensor}", lowBound=0, upBound=1)
             for tensor in invariable_tensor_properties
         }
         y_dict = {

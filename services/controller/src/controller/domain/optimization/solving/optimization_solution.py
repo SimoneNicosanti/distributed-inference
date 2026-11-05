@@ -2,6 +2,7 @@ import math
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
+from controller.domain.backend import Backend
 from shared.flow.flow import FlowId
 from shared.model.keys import LayerKey, TensorKey
 from shared.model.model_variant import ModelVariantId
@@ -30,6 +31,7 @@ class ComponentTensorContract:
 class ComponentSolution:
     component_index: int
     worker_id: WorkerId
+    backend: Backend
 
     layer_keys: tuple[LayerKey, ...]
     input_layer_keys: tuple[LayerKey, ...]
@@ -45,6 +47,7 @@ class ComponentSolution:
     transmission_latency_s: float
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "backend", Backend(self.backend))
         if self.component_index <= 0:
             raise ValueError("Component index must be positive")
         if self.priority <= 0:

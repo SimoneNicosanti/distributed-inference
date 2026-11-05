@@ -6,6 +6,7 @@ from controller.application.deployment.builder.default_flow_plan_builder import 
 from controller.application.deployment.builder.endpoint_replica_id_builder import (
     EndpointReplicaIdBuilder,
 )
+from controller.domain.backend import Backend
 from controller.domain.optimization.solving.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
@@ -31,6 +32,7 @@ def _flow(variant: ModelVariantId) -> FlowOptimizationSolution:
     component = ComponentSolution(
         component_index=1,
         worker_id=worker_id,
+        backend=Backend.CPU,
         layer_keys=("compute",),
         input_layer_keys=(),
         output_layer_keys=(),

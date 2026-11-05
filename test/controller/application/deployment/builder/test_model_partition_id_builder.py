@@ -3,6 +3,7 @@ import pytest
 from controller.application.deployment.builder.model_partition_id_builder import (
     ModelPartitionIdBuilder,
 )
+from controller.domain.backend import Backend
 from controller.domain.optimization.solving.optimization_solution import (
     ComponentSolution,
     ComponentTensorContract,
@@ -28,6 +29,7 @@ def _component(
     return ComponentSolution(
         component_index=index,
         worker_id=worker_id or ServiceId(),
+        backend=Backend.CPU,
         layer_keys=layer_keys,
         input_layer_keys=input_layer_keys,
         output_layer_keys=output_layer_keys,

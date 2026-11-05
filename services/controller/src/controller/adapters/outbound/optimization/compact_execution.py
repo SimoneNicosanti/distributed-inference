@@ -1,4 +1,4 @@
-"""One-sided execution epigraph with CPU and relay eligibility rules."""
+"""Execution epigraph using the worker's backend and relay eligibility rules."""
 
 import gurobipy as gp
 

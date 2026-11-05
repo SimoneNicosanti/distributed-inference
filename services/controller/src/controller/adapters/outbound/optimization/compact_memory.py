@@ -1,4 +1,4 @@
-"""Resident weights plus one maximum-cut activation epigraph per CPU server."""
+"""Resident weights and one activation buffer, bounded by CPU RAM or GPU VRAM."""
 
 import gurobipy as gp
 
@@ -34,7 +34,7 @@ def add_compact_memory_variables(
                         ub=bytes_to_megabytes(
                             context.resource_profiles_by_worker[
                                 worker
-                            ].ram_profile.available_bytes
+                            ].available_inference_memory_bytes
                         ),
                         name=f"mem_weight[{problem.flow_index[flow]},{problem.model_index[flow, variant]},{component},{problem.worker_index[worker]}]",
                     )
@@ -46,7 +46,7 @@ def add_compact_memory_variables(
                 ub=bytes_to_megabytes(
                     context.resource_profiles_by_worker[
                         worker
-                    ].ram_profile.available_bytes
+                    ].available_inference_memory_bytes
                 ),
                 name=f"max_activation[{problem.worker_index[worker]}]",
             )
@@ -102,7 +102,9 @@ def add_compact_memory_constraints(
             )
             + memory.max_activation_mb[worker]
             <= bytes_to_megabytes(
-                context.resource_profiles_by_worker[worker].ram_profile.available_bytes
+                context.resource_profiles_by_worker[
+                    worker
+                ].available_inference_memory_bytes
             ),
             name=f"memory_capacity[{p.worker_index[worker]}]",
         )

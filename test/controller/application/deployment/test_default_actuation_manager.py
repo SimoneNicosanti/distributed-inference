@@ -23,6 +23,7 @@ from controller.application.ports.outbound.plan_share_gateway import PlanShareGa
 from controller.application.ports.outbound.store.flow_plan_publisher import (
     FlowPlanPublisher,
 )
+from controller.domain.backend import Backend
 from controller.domain.optimization.solving.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
@@ -56,6 +57,7 @@ async def test_prepares_all_workers_including_endpoints_before_applying(
         ComponentSolution(
             component_index=index,
             worker_id=worker,
+            backend=Backend.CPU,
             layer_keys=(layer,),
             input_layer_keys=("input",) if layer == "input" else (),
             output_layer_keys=("output",) if layer == "output" else (),

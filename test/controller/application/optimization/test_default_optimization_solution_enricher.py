@@ -6,6 +6,7 @@ import pytest
 from controller.application.optimization.default_optimization_solution_enricher import (
     DefaultOptimizationSolutionEnricher,
 )
+from controller.domain.backend import Backend
 from controller.domain.optimization.solving.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
@@ -42,6 +43,7 @@ def _solution(*variants: ModelVariantId) -> OptimizationSolution:
     component = ComponentSolution(
         component_index=1,
         worker_id=worker_id,
+        backend=Backend.CPU,
         layer_keys=("input", "first", "second", "output"),
         input_layer_keys=("input",),
         output_layer_keys=("output",),

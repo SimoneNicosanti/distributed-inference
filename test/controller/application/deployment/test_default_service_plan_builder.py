@@ -9,6 +9,7 @@ from controller.adapters.outbound.plan_share.mappers.worker_plan_mapper import (
 from controller.application.deployment.default_all_worker_plan_builder import (
     DefaultSolutionToPlanConverter,
 )
+from controller.domain.backend import Backend
 from controller.domain.hop.hop import ExternalHop
 from controller.domain.optimization.solving.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
@@ -49,10 +50,12 @@ def _component(
     input_layers: tuple[str, ...] = (),
     output_layers: tuple[str, ...] = (),
     priority: int = 1,
+    backend: Backend = Backend.CPU,
 ) -> ComponentSolution:
     return ComponentSolution(
         component_index=index,
         worker_id=worker_id,
+        backend=backend,
         layer_keys=layers,
         input_layer_keys=input_layers,
         output_layer_keys=output_layers,

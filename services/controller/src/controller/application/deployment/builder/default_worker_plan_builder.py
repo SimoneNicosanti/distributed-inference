@@ -13,6 +13,7 @@ from controller.application.deployment.builder.flow_solution_routes import (
 from controller.application.deployment.builder.partition_replica_id_builder import (
     ReplicaIdsByFlow,
 )
+from controller.domain.backend import Backend
 from controller.domain.hop.hop import ExternalHop, InvocableHop, SourceHop
 from controller.domain.optimization.solving.optimization_solution import (
     ComponentSolution,
@@ -54,6 +55,9 @@ class DefaultWorkerPlanBuilder:
         replicas_by_worker: dict[WorkerId, list[PlannedPartitionReplicaId]] = (
             defaultdict(list)
         )
+        allocations_by_worker: dict[WorkerId, list[ResourceAllocation]] = defaultdict(
+            list
+        )
         ingress_by_worker: dict[WorkerId, list[PlannedIngressReplicaId]] = defaultdict(
             list
         )
@@ -84,6 +88,9 @@ class DefaultWorkerPlanBuilder:
                 worker_id = component.worker_id
                 involved_workers.setdefault(worker_id, None)
                 replicas_by_worker[worker_id].append(replica_id)
+                allocations_by_worker[worker_id].append(
+                    ResourceAllocation(use_gpu=component.backend is Backend.GPU)
+                )
                 priority_keys_by_worker[worker_id].append(
                     PriorityKey(
                         flow_id=flow_solution.flow_id,
@@ -186,6 +193,7 @@ class DefaultWorkerPlanBuilder:
             worker_id: self._build_worker_plan(
                 plan_version=plan_version,
                 replicas=replicas_by_worker[worker_id],
+                allocations=allocations_by_worker[worker_id],
                 ingress_hops=ingress_by_worker[worker_id],
                 sink_hops=sink_by_worker[worker_id],
                 addresses=addresses_by_worker[worker_id],
@@ -219,6 +227,7 @@ class DefaultWorkerPlanBuilder:
         *,
         plan_version: PlanVersion,
         replicas: Sequence[PlannedPartitionReplicaId],
+        allocations: Sequence[ResourceAllocation],
         ingress_hops: Sequence[PlannedIngressReplicaId],
         sink_hops: Sequence[PlannedSinkReplicaId],
         addresses: Sequence[HopAddress[InvocableHop]],
@@ -232,9 +241,7 @@ class DefaultWorkerPlanBuilder:
             plan_version=plan_version,
             deployment_plan=DeploymentPlan(
                 executable_hops=replica_ids,
-                allocations=tuple(
-                    ResourceAllocation(use_gpu=False) for _ in replica_ids
-                ),
+                allocations=tuple(allocations),
                 ingress_hops=tuple(ingress_hops),
                 sink_hops=tuple(sink_hops),
             ),

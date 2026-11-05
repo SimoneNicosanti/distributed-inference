@@ -5,7 +5,6 @@ from controller.domain.optimization.solving.optimization_context import (
     OptimizationContext,
 )
 from controller.domain.profile.model_variant_execution_profile import (
-    Backend,
     LayerExecutionProfile,
 )
 from controller.domain.profile.model_variant_static_profile import (
@@ -85,6 +84,7 @@ def layer_execution_profiles(
     worker: WorkerId,
 ) -> Mapping[LayerKey, LayerExecutionProfile] | None:
     static_profile = context.static_profiles_by_variant[model_variant]
+    backend = context.resource_profiles_by_worker[worker].execution_backend
     boundary_layer_profiles = {
         layer: LayerExecutionProfile(execution_time_s=0.0)
         for layer, description in static_profile.topology.layers().items()
@@ -112,19 +112,20 @@ def layer_execution_profiles(
     if not matching_profiles:
         return boundary_layer_profiles or None
 
-    cpu_profiles = tuple(
+    backend_profiles = tuple(
         profile
         for profile in matching_profiles[0].backend_profiles
-        if profile.backend == Backend.CPU
+        if profile.backend == backend
     )
-    if len(cpu_profiles) > 1:
+    if len(backend_profiles) > 1:
         raise GurobiProfileDataError(
-            f"Duplicate CPU execution profiles for worker {worker.id} and model "
+            f"Duplicate {backend.value.upper()} execution profiles for worker "
+            f"{worker.id} and model "
             f"{model_variant_id_to_json(model_variant)}"
         )
-    if not cpu_profiles:
+    if not backend_profiles:
         return boundary_layer_profiles or None
     return {
-        **cpu_profiles[0].layer_profiles,
+        **backend_profiles[0].layer_profiles,
         **boundary_layer_profiles,
     }

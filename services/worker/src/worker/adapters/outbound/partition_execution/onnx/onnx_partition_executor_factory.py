@@ -31,13 +31,21 @@ class OnnxInferenceSessionBuilder:
         ## TODO: Here we should apply all the optimizations needed
         ## We can call the optimizer we have built for the graph extraction pipeline
 
-        if resource_allocation.use_gpu:
-            sess = ort.InferenceSession(
-                bundle.entrypoint_path,
-                providers=["CUDAExecutionProvider"],
+        provider = (
+            "CUDAExecutionProvider"
+            if resource_allocation.use_gpu
+            else "CPUExecutionProvider"
+        )
+        if provider not in ort.get_available_providers():
+            raise RuntimeError(f"ONNX Runtime provider unavailable: {provider}")
+        sess = ort.InferenceSession(bundle.entrypoint_path, providers=[provider])
+        active_providers = sess.get_providers()
+        if not active_providers or active_providers[0] != provider:
+            raise RuntimeError(
+                f"Expected primary provider {provider!r}, got {active_providers!r}"
             )
-        else:
-            sess = ort.InferenceSession(bundle.entrypoint_path)
+        if resource_allocation.use_gpu:
+            sess.disable_fallback()
         return sess
 
 

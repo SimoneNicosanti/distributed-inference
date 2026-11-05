@@ -1,20 +1,15 @@
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import StrEnum
 from types import MappingProxyType
 
+from controller.domain.backend import Backend as Backend
 from controller.domain.profile.model_variant_static_profile import (
     ModelInputConcreteShapes,
 )
 from shared.model.keys import LayerKey
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import WorkerId
-
-
-class Backend(StrEnum):
-    CPU = "cpu"
-    GPU = "gpu"
 
 
 @dataclass(frozen=True, slots=True)
