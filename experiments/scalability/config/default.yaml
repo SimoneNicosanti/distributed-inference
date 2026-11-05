@@ -57,6 +57,7 @@ optimization:
   relative_error: 0.1
   objective: arrival_weighted_response_slack
 solver:
+  formulation: compact
   timeout_s: 300
   relative_gap: 0.01
   threads: null

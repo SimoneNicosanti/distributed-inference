@@ -65,6 +65,15 @@ def test_reject_inconsistent_configuration(
         ExperimentConfig.model_validate(raw)
 
 
+def test_compact_is_default_and_legacy_is_rejected(config: ExperimentConfig) -> None:
+    raw = config.model_dump()
+    raw["solver"].pop("formulation")
+    assert ExperimentConfig.model_validate(raw).solver.formulation == "compact"
+    raw["solver"]["formulation"] = "legacy"
+    with pytest.raises(ValidationError, match="formulation"):
+        ExperimentConfig.model_validate(raw)
+
+
 def test_missing_models_never_download(
     config: ExperimentConfig, tmp_path: Path
 ) -> None:

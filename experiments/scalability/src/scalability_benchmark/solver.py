@@ -11,6 +11,7 @@ from controller.adapters.outbound.optimization.gurobi_solver import (
     OptimizationNotSolvedError,
 )
 from controller.domain.optimization.solving.solver_config import (
+    FormulationKind,
     ObjectiveKind,
     ProblemConfig,
     SolverConfig,
@@ -88,6 +89,7 @@ def classify(
         "solver_runtime_s": statistics.runtime_s if statistics else None,
         "construction_time_s": statistics.construction_time_s if statistics else None,
         "effective_solver_configuration": {
+            "formulation": statistics.formulation,
             "time_limit_s": statistics.time_limit_s,
             "mip_gap": statistics.mip_gap_target,
             "threads": statistics.threads,
@@ -105,8 +107,9 @@ async def execute_solver(
 ) -> dict[str, object]:
     observations: list[SolverRunStatistics] = []
     solver_config = SolverConfig(
+        formulation=FormulationKind(config.solver.formulation),
         objective=ObjectiveKind(config.optimization.objective),
-        output_flag=config.solver.output_flag,
+        output_flag=True,
         time_limit_s=spec.timeout_s,
         mip_gap=config.solver.relative_gap,
         threads=config.solver.threads,
@@ -138,6 +141,7 @@ async def execute_solver(
         "raw_solver_statistics": asdict(statistics) if statistics else None,
         "solution_extracted": solution is not None,
         "requested_solver_configuration": {
+            "formulation": config.solver.formulation,
             "time_limit_s": spec.timeout_s,
             "mip_gap": config.solver.relative_gap,
             "threads": config.solver.threads,

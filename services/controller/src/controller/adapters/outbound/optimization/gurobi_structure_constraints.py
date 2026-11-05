@@ -1,31 +1,19 @@
 from collections.abc import Mapping
 
 import gurobipy as gp
-from gurobipy import GRB
 
 from controller.adapters.outbound.optimization.gurobi_expressions import (
     destination_crossing_expression,
-    transmitted_data_size_mb_expression,
 )
 from controller.adapters.outbound.optimization.gurobi_problem import (
     GurobiProblem,
 )
-from controller.adapters.outbound.optimization.gurobi_profile_data import (
-    layer_execution_profiles,
-)
-from controller.adapters.outbound.optimization.gurobi_units import (
-    bytes_per_second_to_megabytes_per_second,
-)
 from controller.adapters.outbound.optimization.gurobi_variables import (
     AssignmentVariables,
-    ExecutionVariables,
     NetworkVariables,
 )
 from controller.domain.optimization.request.flow_endpoint_placement import (
     FixedPlacement,
-)
-from controller.domain.optimization.request.local_worker_config import (
-    ValidLocalWorkerConfig,
 )
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
@@ -41,8 +29,6 @@ from controller.domain.profile.model_variant_static_profile import (
 )
 from controller.domain.profile.model_variant_topology import LayerDescription
 from controller.domain.profile.network_topology import (
-    NetworkConnection,
-    NetworkConnectionKey,
     NetworkTopology,
 )
 from shared.flow.flow import FlowId
@@ -89,8 +75,6 @@ def add_assignment_constraints(
                 model, assignment, p, flow, flow_index, cut
             )
 
-
-
         for model_variant in p.models_by_flow[flow]:
             model_index = p.model_index[flow, model_variant]
             static_profile = context.static_profiles_by_variant[model_variant]
@@ -132,7 +116,6 @@ def _endpoint_placement_constraints(
                 >= assignment.component_last[flow, component],
                 name=f"last_on_device[{flow_index},{component}]",
             )
-
 
 
 def _successive_components_use_different_workers(
@@ -479,85 +462,6 @@ def _layer_assigned_to_component_if_model_selected(
         )
 
 
-def add_execution_constraints(
-    model: gp.Model,
-    problem: GurobiProblem,
-    assignment: AssignmentVariables,
-    execution: ExecutionVariables,
-    *,
-    context: OptimizationContext,
-    requests_by_flow: OptimizationRequestsByFlow,
-    max_components: int,
-) -> None:
-    p = problem
-    for flow in p.flows:
-        flow_index = p.flow_index[flow]
-        local_worker = requests_by_flow[flow].local_worker_config
-        for model_variant in p.models_by_flow[flow]:
-            model_index = p.model_index[flow, model_variant]
-            static_profile = context.static_profiles_by_variant[model_variant]
-            layers = static_profile.topology.layers_in_topological_order()
-            profiles_by_worker = {
-                worker: layer_execution_profiles(context, model_variant, worker)
-                for worker in p.workers_by_flow[flow]
-            }
-            if (
-                isinstance(local_worker, ValidLocalWorkerConfig)
-                and not local_worker.is_inference_runner
-            ):
-                local_profiles = profiles_by_worker.get(local_worker.worker_id)
-                if local_profiles is not None:
-                    boundary_layers = {
-                        layer
-                        for layer, description in static_profile.topology.layers().items()
-                        if description.is_input or description.is_output
-                    }
-                    # Reuse unsupported x + e <= 1 constraints for this flow only.
-                    profiles_by_worker[local_worker.worker_id] = {
-                        layer: profile
-                        for layer, profile in local_profiles.items()
-                        if layer in boundary_layers
-                    }
-            minimum_execution_time_by_layer = _minimum_execution_time_by_layer(
-                layers,
-                profiles_by_worker,
-            )
-            for component in range(1, max_components + 1):
-                for worker in p.workers_by_flow[flow]:
-                    _define_model_component_execution_time_on_worker(
-                        model,
-                        assignment,
-                        execution,
-                        p,
-                        flow,
-                        flow_index,
-                        model_variant,
-                        model_index,
-                        layers,
-                        profiles_by_worker,
-                        component,
-                        worker,
-                    )
-                model.addConstr(
-                    gp.quicksum(
-                        execution.execution_time_s[
-                            flow, model_variant, component, worker
-                        ]
-                        for worker in p.workers_by_flow[flow]
-                    )
-                    >= gp.quicksum(
-                        minimum_execution_time
-                        * assignment.layer_component[
-                            flow, model_variant, layer, component
-                        ]
-                        for layer, minimum_execution_time in (
-                            minimum_execution_time_by_layer.items()
-                        )
-                    ),
-                    name=(f"execution_minimum[{flow_index},{model_index},{component}]"),
-                )
-
-
 def _minimum_execution_time_by_layer(
     layers: tuple[LayerKey, ...],
     profiles_by_worker: dict[WorkerId, Mapping[LayerKey, LayerExecutionProfile] | None],
@@ -572,190 +476,6 @@ def _minimum_execution_time_by_layer(
         if compatible_times:
             result[layer] = min(compatible_times)
     return result
-
-
-def _define_model_component_execution_time_on_worker(
-    model: gp.Model,
-    assignment: AssignmentVariables,
-    execution: ExecutionVariables,
-    p: GurobiProblem,
-    flow: FlowId,
-    flow_index: int,
-    model_variant: ModelVariantId,
-    model_index: int,
-    layers: tuple[LayerKey, ...],
-    profiles_by_worker: dict[WorkerId, Mapping[LayerKey, LayerExecutionProfile] | None],
-    component: int,
-    worker: WorkerId,
-) -> None:
-    worker_index = p.worker_index[worker]
-    execution_profiles = profiles_by_worker[worker]
-    execution_terms: list[gp.LinExpr] = []
-    e = assignment.component_worker[flow, component, worker]
-    for layer in layers:
-        layer_index = p.layer_index[model_variant, layer]
-        x = assignment.layer_component[flow, model_variant, layer, component]
-        layer_profile = (
-            execution_profiles.get(layer) if execution_profiles is not None else None
-        )
-        if layer_profile is None:
-            model.addConstr(
-                x + e <= 1,
-                name=(
-                    f"unsupported[{flow_index},{model_index},"
-                    f"{layer_index},{component},{worker_index}]"
-                ),
-            )
-        else:
-            execution_terms.append(float(layer_profile.execution_time_s) * x)
-
-    execution_time = execution.execution_time_s[flow, model_variant, component, worker]
-    model.addGenConstrIndicator(
-        e,
-        False,
-        execution_time,
-        GRB.EQUAL,
-        0.0,
-        name=(
-            f"execution_inactive[{flow_index},{model_index},{component},{worker_index}]"
-        ),
-    )
-    model.addGenConstrIndicator(
-        e,
-        True,
-        execution_time - gp.quicksum(execution_terms),
-        GRB.EQUAL,
-        0.0,
-        name=(
-            f"execution_value[{flow_index},{model_index},{component},{worker_index}]"
-        ),
-    )
-
-
-def add_transmission_constraints(
-    model: gp.Model,
-    problem: GurobiProblem,
-    assignment: AssignmentVariables,
-    network: NetworkVariables,
-    *,
-    context: OptimizationContext,
-    requests_by_flow: OptimizationRequestsByFlow,
-    max_components: int,
-) -> None:
-    p = problem
-    connections = context.network_topology.connections()
-    for flow in p.flows:
-        flow_index = p.flow_index[flow]
-        workers = p.workers_by_flow[flow]
-        response_limit_s = float(
-            requests_by_flow[flow].qos_requirements.max_mean_response_time
-        )
-        for cut in range(1, max_components):
-            _add_transition_marginal_constraints(
-                model,
-                p,
-                assignment,
-                network,
-                topology=context.network_topology,
-                flow=flow,
-                cut=cut,
-            )
-
-            for model_variant in p.models_by_flow[flow]:
-                model_index = p.model_index[flow, model_variant]
-                static_profile = context.static_profiles_by_variant[model_variant]
-                delta_mb = transmitted_data_size_mb_expression(
-                    assignment,
-                    network,
-                    static_profile,
-                    flow=flow,
-                    model_variant=model_variant,
-                    cut=cut,
-                )
-                for source in workers:
-                    source_index = p.worker_index[source]
-                    successors = context.network_topology.successors(source)
-                    transmission = network.transmission_time_s[
-                        flow, model_variant, cut, source
-                    ]
-                    _define_transmission_time_for_model_component_on_source_server(
-                        model,
-                        network,
-                        p,
-                        connections,
-                        flow,
-                        flow_index,
-                        workers,
-                        response_limit_s,
-                        cut,
-                        model_index,
-                        delta_mb,
-                        source,
-                        source_index,
-                        successors,
-                        transmission,
-                    )
-
-
-def _define_transmission_time_for_model_component_on_source_server(
-    model: gp.Model,
-    network: NetworkVariables,
-    p: GurobiProblem,
-    connections: Mapping[NetworkConnectionKey, NetworkConnection],
-    flow: FlowId,
-    flow_index: int,
-    workers: tuple[WorkerId, ...],
-    response_limit_s: float,
-    cut: int,
-    model_index: int,
-    delta_mb: gp.LinExpr,
-    source: WorkerId,
-    source_index: int,
-    successors: frozenset[WorkerId],
-    transmission: gp.Var,
-) -> None:
-    outgoing = gp.quicksum(
-        network.adjacent_component_workers[flow, cut, source, target]
-        for target in workers
-        if source == target or target in successors
-    )
-
-    model.addConstr(
-        transmission <= response_limit_s * outgoing,
-        name=(f"transmission_active[{flow_index},{model_index},{cut},{source_index}]"),
-    )
-    for target in workers:
-        if source != target and target not in successors:
-            continue
-        q = network.adjacent_component_workers[flow, cut, source, target]
-        target_index = p.worker_index[target]
-        if source == target:
-            model.addGenConstrIndicator(
-                q,
-                True,
-                transmission,
-                GRB.EQUAL,
-                0.0,
-                name=(
-                    f"local_transmission[{flow_index},{model_index},"
-                    f"{cut},{source_index}]"
-                ),
-            )
-        else:
-            throughput_mb_per_s = bytes_per_second_to_megabytes_per_second(
-                connections[source, target].throughput_bytes_per_sec
-            )
-            model.addGenConstrIndicator(
-                q,
-                True,
-                throughput_mb_per_s * transmission - delta_mb,
-                GRB.EQUAL,
-                0.0,
-                name=(
-                    f"transmission_value[{flow_index},{model_index},"
-                    f"{cut},{source_index},{target_index}]"
-                ),
-            )
 
 
 def _add_transition_marginal_constraints(

@@ -5,11 +5,11 @@ import gurobipy as gp
 import pytest
 from gurobipy import GRB
 
-from controller.adapters.outbound.optimization.gurobi_network_queue_constraints import (
-    add_network_queue_constraints,
+from controller.adapters.outbound.optimization.compact_network_queue import (
+    CompactNetworkVariables,
+    add_compact_network_queue_constraints,
 )
 from controller.adapters.outbound.optimization.gurobi_problem import GurobiProblem
-from controller.adapters.outbound.optimization.gurobi_variables import NetworkVariables
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -43,15 +43,14 @@ def _problem() -> GurobiProblem:
         flow_index={_FLOW: 0},
         worker_index={worker: index for index, worker in enumerate(_WORKERS)},
         model_index={
-            (_FLOW, model_variant): index
-            for index, model_variant in enumerate(_MODELS)
+            (_FLOW, model_variant): index for index, model_variant in enumerate(_MODELS)
         },
         layer_index={},
         tensor_index={},
     )
 
 
-def _network_variables(model: gp.Model) -> NetworkVariables:
+def _network_variables(model: gp.Model) -> CompactNetworkVariables:
     nominal_values = {
         (_MODEL_A, 1, _WORKER_A): 0.2,
         (_MODEL_B, 1, _WORKER_B): 0.2,
@@ -65,7 +64,7 @@ def _network_variables(model: gp.Model) -> NetworkVariables:
         for cut in range(1, _MAX_COMPONENTS)
         for worker in _WORKERS
     }
-    return NetworkVariables(
+    return CompactNetworkVariables(
         tensor_crossing_auxiliary={},
         adjacent_component_workers={},
         transmission_time_s=transmission_time_s,
@@ -74,13 +73,18 @@ def _network_variables(model: gp.Model) -> NetworkVariables:
             (worker, 1): model.addVar(vtype=GRB.BINARY) for worker in _WORKERS
         },
         component_transmission_response_s={
-            (_FLOW, cut): model.addVar(lb=0.0)
+            (_FLOW, cut): model.addVar(lb=0.0) for cut in range(1, _MAX_COMPONENTS)
+        },
+        nominal_upper_s={(_FLOW, worker): 0.2 for worker in _WORKERS},
+        source_response_s={
+            (_FLOW, cut, worker): model.addVar(lb=0.0)
             for cut in range(1, _MAX_COMPONENTS)
+            for worker in _WORKERS
         },
     )
 
 
-def test_network_nominal_bound_strengthens_fractional_worker_sum() -> None:
+def test_projected_network_queue_sums_fractional_source_responses() -> None:
     problem = _problem()
     with gp.Model() as model:
         model.Params.OutputFlag = 0
@@ -88,7 +92,7 @@ def test_network_nominal_bound_strengthens_fractional_worker_sum() -> None:
         model.update()
         variable_count = model.NumVars
 
-        add_network_queue_constraints(
+        add_compact_network_queue_constraints(
             model,
             problem,
             network,
@@ -101,19 +105,19 @@ def test_network_nominal_bound_strengthens_fractional_worker_sum() -> None:
         model.update()
 
         assert model.NumVars == variable_count
-        assert model.NumConstrs == 12
-        assert model.NumGenConstrs == 4
-        assert model.getConstrByName("network_response_nominal[0,1]") is not None
-        assert model.getConstrByName("network_response_nominal[0,2]") is not None
+        assert model.NumGenConstrs == 0
+        assert model.getConstrByName("compact_ps_sum[0,1]") is not None
+        assert model.getConstrByName("compact_ps_sum[0,2]") is not None
 
         model.optimize()
 
         assert model.Status == GRB.OPTIMAL
-        assert network.network_utilization[_WORKER_A].X == pytest.approx(0.02)
-        assert network.network_utilization[_WORKER_B].X == pytest.approx(0.02)
-        assert network.component_transmission_response_s[_FLOW, 1].X == pytest.approx(
-            0.4
+        assert pytest.approx(0.02) == network.network_utilization[_WORKER_A].X
+        assert pytest.approx(0.02) == network.network_utilization[_WORKER_B].X
+        assert (
+            pytest.approx(0.4 / (1 - problem.network_bin_limits[-1]))
+            == network.component_transmission_response_s[_FLOW, 1].X
         )
-        assert network.component_transmission_response_s[_FLOW, 2].X == pytest.approx(
-            0.0
+        assert (
+            pytest.approx(0.0) == network.component_transmission_response_s[_FLOW, 2].X
         )

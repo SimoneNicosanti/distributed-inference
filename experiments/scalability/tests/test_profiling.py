@@ -58,6 +58,10 @@ def test_roofline_uses_operator_efficiency_and_stable_jitter(
     settings = config.execution.model_copy(update={"jitter_fraction": 0.0})
     hardware = config.hardware["device"]
     result = execution_profile(model.profile, hardware, settings, 42, "device")
+    assert (
+        result.profile.shape_execution_profiles[0].input_shapes
+        == model.profile.shape_profiles[0].input_shapes
+    )
     backend = result.profile.shape_execution_profiles[0].backend_profiles[0]
     assert backend.backend == Backend.CPU
     convolution = settings.groups["convolution"]

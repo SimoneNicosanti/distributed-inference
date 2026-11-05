@@ -1,4 +1,6 @@
-from pydantic import BaseModel, PositiveInt
+from typing import Annotated
+
+from pydantic import BaseModel, Field, PositiveInt
 
 from shared.model.model_variant import (
     ModelVariantFormat,
@@ -9,11 +11,15 @@ from shared.model.model_variant import (
 
 
 class DynamicShapeValuesDto(BaseModel):
-    values: frozenset[PositiveInt]
+    values: frozenset[Annotated[PositiveInt, Field(strict=True)]] = Field(min_length=1)
 
 
 class InputInfoDto(BaseModel):
-    shape: tuple[str | PositiveInt, ...]
+    shape: tuple[
+        Annotated[str, Field(min_length=1)]
+        | Annotated[PositiveInt, Field(strict=True)],
+        ...,
+    ]
 
 
 class ModelVariantInfoDto(BaseModel):

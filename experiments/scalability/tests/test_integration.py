@@ -17,7 +17,6 @@ from scalability_benchmark.network import select_network
 from scalability_benchmark.profiling.execution import execution_profile
 from scalability_benchmark.profiling.static import (
     StaticModel,
-    build_profiler,
     profile_entry,
 )
 
@@ -29,6 +28,7 @@ from controller.domain.optimization.solving.optimization_context import (
     OptimizationContext,
 )
 from controller.domain.optimization.solving.solver_config import (
+    FormulationKind,
     ObjectiveKind,
     ProblemConfig,
     SolverConfig,
@@ -75,18 +75,21 @@ async def test_real_onnx_static_profiler(
         synthetic_accuracies(config, 42)[specification.name],
         artifact_hashes(path),
     )
-    result = await profile_entry(
-        entry, tmp_path / "profiles", "integration", build_profiler()
-    )
+    result = await profile_entry(entry, tmp_path / "profiles", "integration")
     assert result.profile.shape_profiles[0].tensor_properties
+    assert result.profile.shape_profiles[0].max_cut_size_mib == pytest.approx(
+        1 * 3 * 224 * 224 * 4 / 1024**2
+    )
     assert result.profile.topology.layers()["relu"].type == "Relu"
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("formulation", list(FormulationKind))
 async def test_real_solver_feasible_and_infeasible(
     config: ExperimentConfig,
     make_model: Callable[[CatalogEntry], StaticModel],
     tmp_path: Path,
+    formulation: FormulationKind,
 ) -> None:
     specification = config.catalog.models[0]
     entry = CatalogEntry(
@@ -114,6 +117,7 @@ async def test_real_solver_feasible_and_infeasible(
     solver = GurobiSolver(
         SolverConfig(
             ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK,
+            formulation=formulation,
             time_limit_s=300,
             mip_gap=0.01,
             observer=observed.append,

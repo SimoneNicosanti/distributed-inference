@@ -4,18 +4,18 @@ from types import MappingProxyType
 
 
 @dataclass(frozen=True, slots=True)
-class ShapePoint:
-    input_shape_points: Mapping[str, tuple[int, ...]]
+class ModelInputConcreteShapes:
+    input_shapes: Mapping[str, tuple[int, ...]]
 
     def __post_init__(self) -> None:
         if any(
-            isinstance(dimension, bool) or dimension <= 0
-            for shape in self.input_shape_points.values()
+            type(dimension) is not int or dimension <= 0
+            for shape in self.input_shapes.values()
             for dimension in shape
         ):
             raise ValueError("Input shape dimensions must be positive integers")
         object.__setattr__(
             self,
-            "input_shape_points",
-            MappingProxyType(dict(self.input_shape_points)),
+            "input_shapes",
+            MappingProxyType(dict(self.input_shapes)),
         )

@@ -140,6 +140,7 @@ class OptimizationSettings(Settings):
 
 
 class SolverSettings(Settings):
+    formulation: Literal["compact"] = "compact"
     timeout_s: float = Field(gt=0)
     relative_gap: float = Field(ge=0)
     threads: int | None = Field(default=None, ge=0)

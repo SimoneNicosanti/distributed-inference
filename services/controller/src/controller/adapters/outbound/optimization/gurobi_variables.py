@@ -7,12 +7,11 @@ from controller.adapters.outbound.optimization.gurobi_problem import (
     FlowModel,
     GurobiProblem,
 )
-from controller.adapters.outbound.optimization.gurobi_units import bytes_to_megabytes
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
-)
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
+)
+from controller.domain.optimization.solving.optimization_context import (
+    OptimizationContext,
 )
 from shared.flow.flow import FlowId
 from shared.model.keys import LayerKey, TensorKey
@@ -73,7 +72,6 @@ class NetworkVariables:
 @dataclass(slots=True)
 class MemoryVariables:
     component_weight_mb: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var]
-    component_activation_mb: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var]
     max_activation_mb: dict[WorkerId, gp.Var]
 
 
@@ -389,64 +387,6 @@ def _add_network_variables(
     )
 
 
-def _add_memory_variables(
-    model: gp.Model,
-    problem: GurobiProblem,
-    context: OptimizationContext,
-    *,
-    max_components: int,
-) -> MemoryVariables:
-    component_weight_mb: dict[tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var] = {}
-    component_activation_mb: dict[
-        tuple[FlowId, ModelVariantId, int, WorkerId], gp.Var
-    ] = {}
-    for flow in problem.flows:
-        flow_index = problem.flow_index[flow]
-        for model_variant in problem.models_by_flow[flow]:
-            model_index = problem.model_index[flow, model_variant]
-            for component in range(1, max_components + 1):
-                for worker in problem.workers_by_flow[flow]:
-                    worker_index = problem.worker_index[worker]
-                    available_mb = bytes_to_megabytes(
-                        context.resource_profiles_by_worker[
-                            worker
-                        ].ram_profile.available_bytes
-                    )
-                    key = (flow, model_variant, component, worker)
-                    component_weight_mb[key] = model.addVar(
-                        lb=0.0,
-                        ub=available_mb,
-                        name=(
-                            f"mem_weight[{flow_index},{model_index},{component},"
-                            f"{worker_index}]"
-                        ),
-                    )
-                    component_activation_mb[key] = model.addVar(
-                        lb=0.0,
-                        ub=available_mb,
-                        name=(
-                            f"mem_activation[{flow_index},{model_index},{component},"
-                            f"{worker_index}]"
-                        ),
-                    )
-    return MemoryVariables(
-        component_weight_mb=component_weight_mb,
-        component_activation_mb=component_activation_mb,
-        max_activation_mb={
-            worker: model.addVar(
-                lb=0.0,
-                ub=bytes_to_megabytes(
-                    context.resource_profiles_by_worker[
-                        worker
-                    ].ram_profile.available_bytes
-                ),
-                name=f"max_activation[{problem.worker_index[worker]}]",
-            )
-            for worker in problem.workers
-        },
-    )
-
-
 def _add_qos_variables(
     model: gp.Model,
     problem: GurobiProblem,
@@ -463,52 +403,4 @@ def _add_qos_variables(
             )
             for flow in problem.flows
         }
-    )
-
-
-def add_gurobi_variables(
-    model: gp.Model,
-    problem: GurobiProblem,
-    *,
-    context: OptimizationContext,
-    requests_by_flow: OptimizationRequestsByFlow,
-    max_components: int,
-    priority_count: int,
-    compute_utilization_limit: float,
-    network_utilization_limit: float,
-) -> GurobiVariables:
-    return GurobiVariables(
-        assignment=_add_assignment_variables(
-            model,
-            problem,
-            context,
-            max_components=max_components,
-        ),
-        execution=_add_execution_variables(
-            model,
-            problem,
-            max_components=max_components,
-        ),
-        compute_queue=_add_compute_queue_variables(
-            model,
-            problem,
-            max_components=max_components,
-            priority_count=priority_count,
-            compute_utilization_limit=compute_utilization_limit,
-        ),
-        network=_add_network_variables(
-            model,
-            problem,
-            context,
-            requests_by_flow,
-            max_components=max_components,
-            network_utilization_limit=network_utilization_limit,
-        ),
-        memory=_add_memory_variables(
-            model,
-            problem,
-            context,
-            max_components=max_components,
-        ),
-        qos=_add_qos_variables(model, problem, requests_by_flow),
     )

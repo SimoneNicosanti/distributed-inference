@@ -5,20 +5,31 @@ from integration.dto.model.model_variant_dto import (
 )
 from integration.dto.model.profiled_model_variant_dto import (
     EdgeDescriptionDto,
-    InputShapePointDto,
+    InputShapeInvariableLayerPropertiesDto,
+    InputShapeInvariablePropertiesDto,
+    InputShapeInvariableTensorPropertiesDto,
+    InputShapeVariableLayerPropertiesDto,
+    InputShapeVariableModelPropertiesDto,
+    InputShapeVariablePropertiesDto,
+    InputShapeVariableTensorPropertiesDto,
     LayerDescriptionDto,
-    LayerPropertyDto,
-    LayerShapePropertyDto,
+    ModelInputConcreteShapesDto,
     ProfiledModelVariantDto,
     ProfileDto,
-    ShapePointDto,
-    ShapeProfileDto,
-    TensorPropertyDto,
-    TensorShapePropertyDto,
     TopologyDto,
-    WeightPropertyDto,
 )
-from model_manager.domain.layer_property import LayerProperty, WeightProperty
+from model_manager.domain.input_shape_invariable_properties import (
+    InputShapeInvariableLayerProperties,
+    InputShapeInvariableProperties,
+    InputShapeInvariableTensorProperties,
+)
+from model_manager.domain.input_shape_variable_properties import (
+    InputShapeVariableLayerProperties,
+    InputShapeVariableModelProperties,
+    InputShapeVariableProperties,
+    InputShapeVariableTensorProperties,
+    ModelInputConcreteShapes,
+)
 from model_manager.domain.model_variant import (
     DynamicShapeValues,
     InputInfo,
@@ -32,14 +43,6 @@ from model_manager.domain.model_variant_topology import (
     ModelVariantTopology,
 )
 from model_manager.domain.profiled_model_variant import ProfiledModelVariant
-from model_manager.domain.shape_profile import (
-    InputShapePoint,
-    LayerShapeProperty,
-    ShapePoint,
-    ShapeProfile,
-    TensorShapeProperty,
-)
-from model_manager.domain.tensor_property import TensorProperty
 
 
 class ProfiledModelVariantMapper:
@@ -69,24 +72,28 @@ class ProfiledModelVariantMapper:
             ],
         )
 
-        shape_profiles = [
-            ShapeProfileDto(
-                shape_point=ShapePointDto(
-                    input_shape_points=tuple(
-                        InputShapePointDto(name=point.name, shape=point.shape)
-                        for point in shape_point.input_shape_points
-                    )
+        variable_properties = [
+            InputShapeVariablePropertiesDto(
+                input_shapes=ModelInputConcreteShapesDto(
+                    input_shapes=dict(input_shapes.input_shapes)
                 ),
                 layer_properties={
-                    layer_key: LayerShapePropertyDto(flops=property_.flops)
-                    for layer_key, property_ in shape_profile.layer_properties.items()
+                    layer_key: InputShapeVariableLayerPropertiesDto(
+                        flops=property_.flops
+                    )
+                    for layer_key, property_ in properties.layer_properties.items()
                 },
                 tensor_properties={
-                    tensor_key: TensorShapePropertyDto(shape=property_.shape)
-                    for tensor_key, property_ in shape_profile.tensor_properties.items()
+                    tensor_key: InputShapeVariableTensorPropertiesDto(
+                        shape=property_.shape
+                    )
+                    for tensor_key, property_ in properties.tensor_properties.items()
                 },
+                model_properties=InputShapeVariableModelPropertiesDto(
+                    max_cut_size_mib=properties.model_properties.max_cut_size_mib,
+                ),
             )
-            for shape_point, shape_profile in profile.shape_profiles.items()
+            for input_shapes, properties in profile.variable_properties.items()
         ]
 
         return ProfiledModelVariantDto(
@@ -113,36 +120,38 @@ class ProfiledModelVariantMapper:
             ),
             profile=ProfileDto(
                 topology=topology,
-                invariant_layer_properties={
-                    layer_key: LayerPropertyDto(
-                        weight_properties={
-                            tensor_key: WeightPropertyDto(
-                                data_type=weight.data_type,
-                                shape=weight.shape,
-                                data_type_size_in_bytes=(
-                                    weight.data_type_size_in_bytes
-                                ),
-                            )
-                            for tensor_key, weight in (
-                                property_.weight_properties.items()
-                            )
-                        }
-                    )
-                    for layer_key, property_ in (
-                        profile.invariant_layer_properties.items()
-                    )
-                },
-                invariant_tensor_properties={
-                    tensor_key: TensorPropertyDto(
-                        data_type=property_.data_type,
-                        data_type_size_in_bytes=property_.data_type_size_in_bytes,
-                        shape_expression=property_.shape_expression,
-                    )
-                    for tensor_key, property_ in (
-                        profile.invariant_tensor_properties.items()
-                    )
-                },
-                shape_profiles=shape_profiles,
+                invariable_properties=InputShapeInvariablePropertiesDto(
+                    layer_properties={
+                        layer_key: InputShapeInvariableLayerPropertiesDto(
+                            weight_properties={
+                                tensor_key: InputShapeInvariableTensorPropertiesDto(
+                                    data_type=weight.data_type,
+                                    shape_expression=weight.shape_expression,
+                                    data_type_size_in_bytes=(
+                                        weight.data_type_size_in_bytes
+                                    ),
+                                )
+                                for tensor_key, weight in (
+                                    property_.weight_properties.items()
+                                )
+                            }
+                        )
+                        for layer_key, property_ in (
+                            profile.invariable_properties.layer_properties.items()
+                        )
+                    },
+                    tensor_properties={
+                        tensor_key: InputShapeInvariableTensorPropertiesDto(
+                            data_type=property_.data_type,
+                            data_type_size_in_bytes=property_.data_type_size_in_bytes,
+                            shape_expression=property_.shape_expression,
+                        )
+                        for tensor_key, property_ in (
+                            profile.invariable_properties.tensor_properties.items()
+                        )
+                    },
+                ),
+                variable_properties=variable_properties,
                 optimization_contractions=list(profile.optimization_contractions),
             ),
             artifact_ref=profiled_model_variant.artifact_ref,
@@ -173,30 +182,34 @@ class ProfiledModelVariantMapper:
                 ),
             )
 
-        shape_profiles: dict[ShapePoint, ShapeProfile] = {}
-        for shape_profile_dto in dto.profile.shape_profiles:
-            shape_point = ShapePoint(
-                input_shape_points=tuple(
-                    InputShapePoint(name=point.name, shape=point.shape)
-                    for point in shape_profile_dto.shape_point.input_shape_points
-                )
+        variable_properties: dict[
+            ModelInputConcreteShapes, InputShapeVariableProperties
+        ] = {}
+        for properties_dto in dto.profile.variable_properties:
+            input_shapes = ModelInputConcreteShapes(
+                input_shapes=properties_dto.input_shapes.input_shapes,
             )
-            if shape_point in shape_profiles:
-                raise ValueError(f"Duplicate shape point in Redis DTO: {shape_point}")
+            if input_shapes in variable_properties:
+                raise ValueError(f"Duplicate input shapes in Redis DTO: {input_shapes}")
 
-            shape_profiles[shape_point] = ShapeProfile(
+            variable_properties[input_shapes] = InputShapeVariableProperties(
                 layer_properties={
-                    layer_key: LayerShapeProperty(flops=property_.flops)
+                    layer_key: InputShapeVariableLayerProperties(flops=property_.flops)
                     for layer_key, property_ in (
-                        shape_profile_dto.layer_properties.items()
+                        properties_dto.layer_properties.items()
                     )
                 },
                 tensor_properties={
-                    tensor_key: TensorShapeProperty(shape=property_.shape)
+                    tensor_key: InputShapeVariableTensorProperties(
+                        shape=property_.shape
+                    )
                     for tensor_key, property_ in (
-                        shape_profile_dto.tensor_properties.items()
+                        properties_dto.tensor_properties.items()
                     )
                 },
+                model_properties=InputShapeVariableModelProperties(
+                    max_cut_size_mib=properties_dto.model_properties.max_cut_size_mib,
+                ),
             )
 
         return ProfiledModelVariant(
@@ -219,36 +232,38 @@ class ProfiledModelVariantMapper:
             ),
             profile=ModelVariantProfile(
                 topology=topology,
-                invariant_layer_properties={
-                    layer_key: LayerProperty(
-                        weight_properties={
-                            tensor_key: WeightProperty(
-                                data_type=weight.data_type,
-                                shape=weight.shape,
-                                data_type_size_in_bytes=(
-                                    weight.data_type_size_in_bytes
-                                ),
-                            )
-                            for tensor_key, weight in (
-                                property_.weight_properties.items()
-                            )
-                        }
-                    )
-                    for layer_key, property_ in (
-                        dto.profile.invariant_layer_properties.items()
-                    )
-                },
-                invariant_tensor_properties={
-                    tensor_key: TensorProperty(
-                        data_type=property_.data_type,
-                        data_type_size_in_bytes=property_.data_type_size_in_bytes,
-                        shape_expression=property_.shape_expression,
-                    )
-                    for tensor_key, property_ in (
-                        dto.profile.invariant_tensor_properties.items()
-                    )
-                },
-                shape_profiles=shape_profiles,
+                invariable_properties=InputShapeInvariableProperties(
+                    layer_properties={
+                        layer_key: InputShapeInvariableLayerProperties(
+                            weight_properties={
+                                tensor_key: InputShapeInvariableTensorProperties(
+                                    data_type=weight.data_type,
+                                    shape_expression=weight.shape_expression,
+                                    data_type_size_in_bytes=(
+                                        weight.data_type_size_in_bytes
+                                    ),
+                                )
+                                for tensor_key, weight in (
+                                    property_.weight_properties.items()
+                                )
+                            }
+                        )
+                        for layer_key, property_ in (
+                            dto.profile.invariable_properties.layer_properties.items()
+                        )
+                    },
+                    tensor_properties={
+                        tensor_key: InputShapeInvariableTensorProperties(
+                            data_type=property_.data_type,
+                            data_type_size_in_bytes=property_.data_type_size_in_bytes,
+                            shape_expression=property_.shape_expression,
+                        )
+                        for tensor_key, property_ in (
+                            dto.profile.invariable_properties.tensor_properties.items()
+                        )
+                    },
+                ),
+                variable_properties=variable_properties,
                 optimization_contractions=tuple(dto.profile.optimization_contractions),
             ),
             artifact_ref=dto.artifact_ref,

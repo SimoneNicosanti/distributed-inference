@@ -6,22 +6,16 @@ import gurobipy as gp
 import pytest
 from gurobipy import GRB
 
-import controller.adapters.outbound.optimization.gurobi_memory_constraints as memory_constraints
-import controller.adapters.outbound.optimization.gurobi_structure_constraints as structure_constraints
-from controller.adapters.outbound.optimization.gurobi_memory_constraints import (
-    add_memory_constraints,
+import controller.adapters.outbound.optimization.compact_execution as structure_constraints
+from controller.adapters.outbound.optimization.compact_execution import (
+    add_compact_execution_constraints,
 )
 from controller.adapters.outbound.optimization.gurobi_problem import GurobiProblem
-from controller.adapters.outbound.optimization.gurobi_structure_constraints import (
-    add_execution_constraints,
-)
 from controller.adapters.outbound.optimization.gurobi_variables import (
     AssignmentVariables,
     ExecutionVariables,
-    MemoryVariables,
     _add_assignment_variables,
     _add_execution_variables,
-    _add_memory_variables,
 )
 from controller.domain.optimization.request.local_worker_config import (
     NoLocalWorkerConfig,
@@ -65,9 +59,6 @@ _WORKER_A = cast(WorkerId, ServiceId(id=UUID(int=3)))
 _WORKER_B = cast(WorkerId, ServiceId(id=UUID(int=4)))
 _WORKERS = (_WORKER_A, _WORKER_B)
 _MAX_COMPONENTS = 2
-_EXECUTION_TIMES = (1, 2, 3)
-_WEIGHT_BYTES = (10, 20, 30)
-_ACTIVATION_BYTES = (4, 5, 6)
 
 
 def _requests_by_flow() -> OptimizationRequestsByFlow:
@@ -138,7 +129,7 @@ def _variables(
     model: gp.Model,
     problem: GurobiProblem,
     context: OptimizationContext,
-) -> tuple[AssignmentVariables, ExecutionVariables, MemoryVariables]:
+) -> tuple[AssignmentVariables, ExecutionVariables]:
     assignment = _add_assignment_variables(
         model,
         problem,
@@ -148,12 +139,6 @@ def _variables(
     execution = _add_execution_variables(
         model,
         problem,
-        max_components=_MAX_COMPONENTS,
-    )
-    memory = _add_memory_variables(
-        model,
-        problem,
-        context,
         max_components=_MAX_COMPONENTS,
     )
     model.update()
@@ -178,206 +163,7 @@ def _variables(
             variable.LB = value
             variable.UB = value
 
-    return assignment, execution, memory
-
-
-def _execution_profiles(
-    _context: OptimizationContext,
-    _model: ModelVariantId,
-    _worker: WorkerId,
-) -> dict[str, LayerExecutionProfile]:
-    return {
-        layer: LayerExecutionProfile(execution_time_s=execution_time)
-        for layer, execution_time in zip(_LAYERS, _EXECUTION_TIMES, strict=True)
-    }
-
-
-def _weight_size_bytes(_profile: object, layer: str) -> int:
-    return _WEIGHT_BYTES[_LAYERS.index(layer)]
-
-
-def _activation_sizes_bytes(_profile: object) -> dict[str, int]:
-    return dict(zip(_LAYERS, _ACTIVATION_BYTES, strict=True))
-
-
-def _legacy_aggregate_values(
-    *,
-    layer_selected: bool,
-    worker_selected: bool,
-) -> tuple[float, float, float]:
-    with gp.Model() as model:
-        model.Params.OutputFlag = 0
-        x = {
-            layer: model.addVar(
-                lb=int(layer_selected),
-                ub=int(layer_selected),
-                vtype=GRB.BINARY,
-            )
-            for layer in _LAYERS
-        }
-        e = model.addVar(
-            lb=int(worker_selected),
-            ub=int(worker_selected),
-        )
-        z = {layer: model.addVar(lb=0.0, ub=1.0) for layer in _LAYERS}
-        for layer in _LAYERS:
-            model.addConstr(z[layer] <= x[layer])
-            model.addConstr(z[layer] <= e)
-            model.addConstr(z[layer] >= x[layer] + e - 1)
-
-        aggregates = tuple(model.addVar(lb=0.0) for _ in range(3))
-        for aggregate, coefficients in zip(
-            aggregates,
-            (_EXECUTION_TIMES, _WEIGHT_BYTES, _ACTIVATION_BYTES),
-            strict=True,
-        ):
-            model.addConstr(
-                aggregate
-                == gp.quicksum(
-                    coefficient * z[layer]
-                    for layer, coefficient in zip(_LAYERS, coefficients, strict=True)
-                )
-            )
-        model.optimize()
-        assert model.Status == GRB.OPTIMAL
-        return tuple(aggregate.X for aggregate in aggregates)
-
-
-def test_indicator_aggregates_replace_all_layer_worker_products(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    problem = _problem()
-    context = _context()
-    monkeypatch.setattr(
-        structure_constraints,
-        "layer_execution_profiles",
-        _execution_profiles,
-    )
-    monkeypatch.setattr(
-        memory_constraints,
-        "layer_weight_size_bytes",
-        _weight_size_bytes,
-    )
-    monkeypatch.setattr(
-        memory_constraints,
-        "layer_activation_sizes_bytes",
-        _activation_sizes_bytes,
-    )
-
-    with gp.Model() as model:
-        model.Params.OutputFlag = 0
-        assignment, execution, memory = _variables(model, problem, context)
-        add_execution_constraints(
-            model,
-            problem,
-            assignment,
-            execution,
-            context=context,
-            requests_by_flow=_requests_by_flow(),
-            max_components=_MAX_COMPONENTS,
-        )
-        add_memory_constraints(
-            model,
-            problem,
-            assignment,
-            memory,
-            context=context,
-            max_components=_MAX_COMPONENTS,
-        )
-        model.setObjective(gp.quicksum(memory.max_activation_mb.values()))
-        model.update()
-
-        aggregate_count = len(_MODELS) * _MAX_COMPONENTS * len(_WORKERS)
-        eliminated_z_count = len(_LAYERS) * aggregate_count
-        assert eliminated_z_count == 24
-        assert model.NumVars == 48
-        assert model.NumBinVars == 16
-        execution_lower_bound_count = len(_MODELS) * _MAX_COMPONENTS
-        assert model.NumConstrs == 10 + execution_lower_bound_count
-        assert model.NumGenConstrs == 6 * aggregate_count == 48
-        assert all(
-            model.getConstrByName(f"execution_minimum[0,{model_index},{component}]")
-            is not None
-            for model_index in range(len(_MODELS))
-            for component in range(1, _MAX_COMPONENTS + 1)
-        )
-        assert all(
-            not variable.VarName.startswith("z[") for variable in model.getVars()
-        )
-        assert all(
-            variable.VType == GRB.BINARY
-            for variable in assignment.component_worker.values()
-        )
-
-        model.optimize()
-
-        assert model.Status == GRB.OPTIMAL
-        active = (_FLOW, _MODEL_A, 1, _WORKER_A)
-        assert pytest.approx(6) == execution.execution_time_s[active].X
-        assert pytest.approx(60e-6) == memory.component_weight_mb[active].X
-        assert pytest.approx(15e-6) == memory.component_activation_mb[active].X
-        assert pytest.approx(15e-6) == memory.max_activation_mb[_WORKER_A].X
-        assert pytest.approx(0) == memory.max_activation_mb[_WORKER_B].X
-
-        active_values = (
-            execution.execution_time_s[active].X,
-            memory.component_weight_mb[active].X * 1_000_000,
-            memory.component_activation_mb[active].X * 1_000_000,
-        )
-        assert (
-            pytest.approx(
-                _legacy_aggregate_values(layer_selected=True, worker_selected=True)
-            )
-            == active_values
-        )
-        assert _legacy_aggregate_values(layer_selected=True, worker_selected=False) == (
-            0,
-            0,
-            0,
-        )
-        assert _legacy_aggregate_values(layer_selected=False, worker_selected=True) == (
-            0,
-            0,
-            0,
-        )
-
-        for key, execution_time in execution.execution_time_s.items():
-            if key != active:
-                assert pytest.approx(0) == execution_time.X
-                assert pytest.approx(0) == memory.component_weight_mb[key].X
-                assert pytest.approx(0) == memory.component_activation_mb[key].X
-
-
-def test_memory_capacity_uses_conditioned_aggregates(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    problem = _problem()
-    context = _context(available_bytes=74)
-    monkeypatch.setattr(
-        memory_constraints,
-        "layer_weight_size_bytes",
-        _weight_size_bytes,
-    )
-    monkeypatch.setattr(
-        memory_constraints,
-        "layer_activation_sizes_bytes",
-        _activation_sizes_bytes,
-    )
-
-    with gp.Model() as model:
-        model.Params.OutputFlag = 0
-        assignment, _, memory = _variables(model, problem, context)
-        add_memory_constraints(
-            model,
-            problem,
-            assignment,
-            memory,
-            context=context,
-            max_components=_MAX_COMPONENTS,
-        )
-        model.optimize()
-
-        assert model.Status == GRB.INFEASIBLE
+    return assignment, execution
 
 
 def test_missing_layer_profile_still_forbids_placement(
@@ -403,8 +189,8 @@ def test_missing_layer_profile_still_forbids_placement(
 
     with gp.Model() as model:
         model.Params.OutputFlag = 0
-        assignment, execution, _ = _variables(model, problem, context)
-        add_execution_constraints(
+        assignment, execution = _variables(model, problem, context)
+        add_compact_execution_constraints(
             model,
             problem,
             assignment,
@@ -471,7 +257,7 @@ def test_execution_minimum_bound_supports_multiple_components_and_workers(
 
     with gp.Model() as model:
         model.Params.OutputFlag = 0
-        assignment, execution, _ = _variables(model, problem, context)
+        assignment, execution = _variables(model, problem, context)
 
         for component, value in ((1, 0), (2, 1)):
             layer_component = assignment.layer_component[
@@ -484,7 +270,7 @@ def test_execution_minimum_bound_supports_multiple_components_and_workers(
             component_worker.LB = value
             component_worker.UB = value
 
-        add_execution_constraints(
+        add_compact_execution_constraints(
             model,
             problem,
             assignment,
@@ -493,6 +279,7 @@ def test_execution_minimum_bound_supports_multiple_components_and_workers(
             requests_by_flow=_requests_by_flow(),
             max_components=_MAX_COMPONENTS,
         )
+        model.setObjective(gp.quicksum(execution.execution_time_s.values()))
         model.optimize()
 
         assert model.Status == GRB.OPTIMAL

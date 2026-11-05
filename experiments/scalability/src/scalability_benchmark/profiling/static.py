@@ -15,6 +15,9 @@ from controller.domain.profile.model_variant_static_profile import (
 )
 from integration.dto.model.model_dto import ModelDto
 from integration.dto.model.profiled_model_variant_dto import ProfiledModelVariantDto
+from model_manager.adapters.outbound.model_max_cut_size_computer.pulp_max_cut_size_computer import (
+    PulpMaxCutSizeComputer,
+)
 from model_manager.adapters.outbound.model_metadata_store.mappers.profiled_model_variant_mapper import (
     ProfiledModelVariantMapper,
 )
@@ -60,7 +63,7 @@ def build_profiler() -> DefaultModelProfiler:
     return DefaultModelProfiler(
         topology,
         OnnxInvariantPropertiesComputer(),
-        OnnxShapeProfileComputer(),
+        OnnxShapeProfileComputer(PulpMaxCutSizeComputer()),
         OnnxContractionComputer(OnnxModelOptimizer(), topology),
     )
 

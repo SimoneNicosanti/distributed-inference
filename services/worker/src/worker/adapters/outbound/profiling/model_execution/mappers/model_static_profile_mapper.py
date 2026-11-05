@@ -1,12 +1,14 @@
 from integration.dto.model.profiled_model_variant_dto import (
+    ModelInputConcreteShapesDto,
     ProfiledModelVariantDto,
-    ShapePointDto,
 )
 from shared.model.keys import LayerKey
+from worker.domain.profiling.model_execution.model_input_concrete_shapes import (
+    ModelInputConcreteShapes,
+)
 from worker.domain.profiling.model_execution.model_static_profile import (
     ModelStaticProfile,
 )
-from worker.domain.profiling.model_execution.shape_point import ShapePoint
 
 
 class ModelStaticProfileMapper:
@@ -18,22 +20,20 @@ class ModelStaticProfileMapper:
         model_variant_id = dto.model_variant_id
         artifact_ref = dto.artifact_ref
 
-        shape_point_dtos: list[ShapePointDto] = dto.profile.shape_points
+        input_shapes_dtos: list[ModelInputConcreteShapesDto] = (
+            dto.profile.input_shape_configurations
+        )
 
-        shape_points = []
-        for shape_point_dto in shape_point_dtos:
-            input_shape_points = {
-                input_shape_point.name: input_shape_point.shape
-                for input_shape_point in shape_point_dto.input_shape_points
-            }
-
-            shape_points.append(ShapePoint(input_shape_points=input_shape_points))
+        input_shape_configurations = [
+            ModelInputConcreteShapes(input_shapes=input_shapes_dto.input_shapes)
+            for input_shapes_dto in input_shapes_dtos
+        ]
 
         contractions: list[tuple[LayerKey, ...]] = dto.profile.optimization_contractions
 
         return ModelStaticProfile(
             model_variant_id=model_variant_id,
             artifact_ref=artifact_ref,
-            shape_points=tuple(shape_points),
+            input_shape_configurations=tuple(input_shape_configurations),
             contractions=tuple(contractions),
         )

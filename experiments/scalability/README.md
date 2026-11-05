@@ -5,6 +5,10 @@ and the model manager's complete `DefaultModelProfiler`. No microservices,
 Redis, HTTP endpoints, worker processes or GPU hardware are needed to construct
 the simulated infrastructure. Real Gurobi execution needs an adequate license.
 
+The solver uses only the compact formulation. `solver.formulation` defaults to
+`compact`; the explicit value `compact` remains accepted and `legacy` is rejected.
+Profiles must contain `max_cut_size_mib`. Historical result files remain readable.
+
 ## Setup
 
 Run commands from the repository root. Python 3.14 or later is required.

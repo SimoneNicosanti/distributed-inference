@@ -71,7 +71,7 @@ def execution_profile(
         ModelVariantExecutionProfile(
             (
                 ShapeExecutionProfile(
-                    shaped.shape_point,
+                    shaped.input_shapes,
                     (BackendExecutionProfile(Backend.CPU, profiles),),
                 ),
             )

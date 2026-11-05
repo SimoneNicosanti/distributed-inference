@@ -5,6 +5,9 @@ import onnx
 from onnx_tool.node import ReshapeNode
 
 from artifacts.contracts.artifact_workspace import ArtifactWorkspace
+from model_manager.adapters.outbound.model_max_cut_size_computer.pulp_max_cut_size_computer import (
+    PulpMaxCutSizeComputer,
+)
 from model_manager.adapters.outbound.model_optimizer.onnx_model_optimizer import (
     OnnxModelOptimizer,
 )
@@ -106,7 +109,7 @@ async def main() -> None:
     model_profiler = DefaultModelProfiler(
         OnnxModelTopologyBuilder(),
         OnnxInvariantPropertiesComputer(),
-        OnnxShapeProfileComputer(),
+        OnnxShapeProfileComputer(PulpMaxCutSizeComputer()),
         OnnxContractionComputer(
             OnnxModelOptimizer(),
             OnnxModelTopologyBuilder(),

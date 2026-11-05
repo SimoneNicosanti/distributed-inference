@@ -15,7 +15,9 @@ from worker.domain.profiling.model_execution.model_execution_profile import (
     ModelExecutionProfile,
     ShapeExecutionProfile,
 )
-from worker.domain.profiling.model_execution.shape_point import ShapePoint
+from worker.domain.profiling.model_execution.model_input_concrete_shapes import (
+    ModelInputConcreteShapes,
+)
 
 
 def test_round_trips_backend_execution_profiles() -> None:
@@ -26,7 +28,7 @@ def test_round_trips_backend_execution_profiles() -> None:
         ),
         shape_execution_profiles=(
             ShapeExecutionProfile(
-                shape_point=ShapePoint(input_shape_points={"input": (1, 3)}),
+                input_shapes=ModelInputConcreteShapes(input_shapes={"input": (1, 3)}),
                 backend_profiles=(
                     BackendExecutionProfile(
                         backend=Backend.CPU,

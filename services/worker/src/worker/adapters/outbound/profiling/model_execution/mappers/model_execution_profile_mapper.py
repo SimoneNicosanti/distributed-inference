@@ -1,10 +1,10 @@
+from integration.dto.model.profiled_model_variant_dto import ModelInputConcreteShapesDto
 from integration.dto.worker_profiles.execution_profile_dto import (
     BackendDto,
     BackendExecutionProfileDto,
     LayerExecutionProfileDto,
     ModelExecutionProfileDto,
     ShapeExecutionProfileDto,
-    ShapePointDto,
 )
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import WorkerId
@@ -15,7 +15,9 @@ from worker.domain.profiling.model_execution.model_execution_profile import (
     ModelExecutionProfile,
     ShapeExecutionProfile,
 )
-from worker.domain.profiling.model_execution.shape_point import ShapePoint
+from worker.domain.profiling.model_execution.model_input_concrete_shapes import (
+    ModelInputConcreteShapes,
+)
 
 
 class ModelExecutionProfileMapper:
@@ -29,10 +31,8 @@ class ModelExecutionProfileMapper:
             model_variant_id=profile.model_version_id,
             shape_execution_profiles=tuple(
                 ShapeExecutionProfileDto(
-                    shape_point=ShapePointDto(
-                        input_shape_points=dict(
-                            shape_profile.shape_point.input_shape_points
-                        )
+                    input_shapes=ModelInputConcreteShapesDto(
+                        input_shapes=dict(shape_profile.input_shapes.input_shapes)
                     ),
                     backend_profiles=tuple(
                         BackendExecutionProfileDto(
@@ -62,8 +62,8 @@ class ModelExecutionProfileMapper:
             model_version_id=dto.model_variant_id,
             shape_execution_profiles=tuple(
                 ShapeExecutionProfile(
-                    shape_point=ShapePoint(
-                        input_shape_points=shape_profile.shape_point.input_shape_points
+                    input_shapes=ModelInputConcreteShapes(
+                        input_shapes=shape_profile.input_shapes.input_shapes
                     ),
                     backend_profiles=tuple(
                         BackendExecutionProfile(

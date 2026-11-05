@@ -32,13 +32,13 @@ def fixed_shape_profile(profile: ModelVariantStaticProfile) -> ShapeProfile:
 
 
 def batch_size(profile: ModelVariantStaticProfile) -> int:
-    input_points = fixed_shape_profile(profile).shape_point.input_shape_points
-    if not input_points or any(not point.shape for point in input_points):
+    input_shapes = fixed_shape_profile(profile).input_shapes.input_shapes
+    if not input_shapes or any(not shape for shape in input_shapes.values()):
         raise GurobiProfileDataError(
             "Cannot infer the batch size of "
             f"{model_variant_id_to_json(profile.model_variant_id)}"
         )
-    batch_sizes = {point.shape[0] for point in input_points}
+    batch_sizes = {shape[0] for shape in input_shapes.values()}
     if len(batch_sizes) != 1:
         raise GurobiProfileDataError(
             "Input batch dimensions disagree for "
@@ -79,15 +79,6 @@ def layer_weight_size_bytes(
     return size
 
 
-def layer_activation_sizes_bytes(
-    profile: ModelVariantStaticProfile,
-) -> dict[LayerKey, int]:
-    sizes = dict.fromkeys(profile.topology.layers(), 0)
-    for tensor, route in profile.topology.tensor_routes().items():
-        sizes[route.source] += tensor_size_bytes(profile, tensor)
-    return sizes
-
-
 def layer_execution_profiles(
     context: OptimizationContext,
     model_variant: ModelVariantId,
@@ -107,11 +98,11 @@ def layer_execution_profiles(
     if execution_profile is None:
         return boundary_layer_profiles or None
 
-    shape_point = fixed_shape_profile(static_profile).shape_point
+    input_shapes = fixed_shape_profile(static_profile).input_shapes
     matching_profiles = tuple(
         profile
         for profile in execution_profile.shape_execution_profiles
-        if profile.shape_point == shape_point
+        if profile.input_shapes == input_shapes
     )
     if len(matching_profiles) > 1:
         raise GurobiProfileDataError(

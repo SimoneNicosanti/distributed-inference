@@ -42,12 +42,11 @@ from controller.domain.profile.model_variant_execution_profile import (
     WorkerExecutionProfiles,
 )
 from controller.domain.profile.model_variant_static_profile import (
-    InputShapePoint,
     LayerProperty,
     LayerShapeProperty,
+    ModelInputConcreteShapes,
     ModelVariantInfo,
     ModelVariantStaticProfile,
-    ShapePoint,
     ShapeProfile,
     TensorProperty,
     TensorShapeProperty,
@@ -130,9 +129,7 @@ _PERFORMANCE = PerformanceMetric(
     dataset="test",
     value=0.9,
 )
-_SHAPE_POINT = ShapePoint(
-    input_shape_points=(InputShapePoint(name="input", shape=(1, 1)),)
-)
+_INPUT_SHAPES = ModelInputConcreteShapes(input_shapes={"input": (1, 1)})
 
 
 def _worker(number: int) -> WorkerId:
@@ -200,7 +197,8 @@ def _static_profile(
         },
         shape_profiles=(
             ShapeProfile(
-                shape_point=_SHAPE_POINT,
+                input_shapes=_INPUT_SHAPES,
+                max_cut_size_mib=4 / 1024**2,
                 layer_properties={
                     layer: LayerShapeProperty(flops=0) for layer in layers
                 },
@@ -259,7 +257,8 @@ def _branched_static_profile() -> ModelVariantStaticProfile:
         },
         shape_profiles=(
             ShapeProfile(
-                shape_point=_SHAPE_POINT,
+                input_shapes=_INPUT_SHAPES,
+                max_cut_size_mib=8 / 1024**2,
                 layer_properties={
                     layer: LayerShapeProperty(flops=0) for layer in layers
                 },
@@ -283,7 +282,7 @@ def _variant_execution_profile(
     return ModelVariantExecutionProfile(
         shape_execution_profiles=(
             ShapeExecutionProfile(
-                shape_point=_SHAPE_POINT,
+                input_shapes=_INPUT_SHAPES,
                 backend_profiles=(
                     BackendExecutionProfile(
                         backend=Backend.CPU,
@@ -301,7 +300,7 @@ def _branched_execution_profile(
     return ModelVariantExecutionProfile(
         shape_execution_profiles=(
             ShapeExecutionProfile(
-                shape_point=_SHAPE_POINT,
+                input_shapes=_INPUT_SHAPES,
                 backend_profiles=(
                     BackendExecutionProfile(
                         backend=Backend.CPU,

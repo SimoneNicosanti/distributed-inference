@@ -6,7 +6,9 @@ from types import MappingProxyType
 
 from shared.model.keys import LayerKey
 from shared.model.model_variant import ModelVariantId
-from worker.domain.profiling.model_execution.shape_point import ShapePoint
+from worker.domain.profiling.model_execution.model_input_concrete_shapes import (
+    ModelInputConcreteShapes,
+)
 
 
 class Backend(StrEnum):
@@ -20,10 +22,14 @@ class LayerExecutionProfile:
     memory_bytes: int | None
 
     def __post_init__(self) -> None:
-        if not math.isfinite(self.execution_time_s) or self.execution_time_s < 0:
+        if (
+            type(self.execution_time_s) not in (int, float)
+            or not math.isfinite(self.execution_time_s)
+            or self.execution_time_s < 0
+        ):
             raise ValueError("Execution time must be finite and non-negative")
         if self.memory_bytes is not None and (
-            isinstance(self.memory_bytes, bool) or self.memory_bytes < 0
+            type(self.memory_bytes) is not int or self.memory_bytes < 0
         ):
             raise ValueError("Memory must be a non-negative byte count")
 
@@ -43,7 +49,7 @@ class BackendExecutionProfile:
 
 @dataclass(frozen=True, slots=True)
 class ShapeExecutionProfile:
-    shape_point: ShapePoint
+    input_shapes: ModelInputConcreteShapes
     backend_profiles: tuple[BackendExecutionProfile, ...]
 
 

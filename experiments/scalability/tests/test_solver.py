@@ -137,12 +137,19 @@ def test_solver_rejects_invalid_settings(settings: dict[str, Any]) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("time_limit_s", [60, 300])
+@pytest.mark.parametrize("formulation", ["compact"])
 async def test_runner_invokes_existing_solver_with_explicit_limits(
-    config: ExperimentConfig, monkeypatch: pytest.MonkeyPatch, time_limit_s: int
+    config: ExperimentConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    time_limit_s: int,
+    formulation: str,
 ) -> None:
     from unittest.mock import AsyncMock
 
     configured: list[SolverConfig] = []
+    config = config.model_copy(
+        update={"solver": config.solver.model_copy(update={"formulation": formulation})}
+    )
     gateway = AsyncMock(spec=GurobiSolver)
     gateway.solve.return_value = Mock()
 
@@ -164,4 +171,6 @@ async def test_runner_invokes_existing_solver_with_explicit_limits(
     assert configured[0].mip_gap == 0.01
     assert configured[0].seed == config.solver.seed
     assert configured[0].threads is None
+    assert configured[0].formulation == formulation
+    assert result["requested_solver_configuration"]["formulation"] == formulation
     assert result["solution_extracted"] is True

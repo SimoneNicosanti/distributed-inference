@@ -17,7 +17,9 @@ class DynamicShapeValues:
     values: frozenset[int]
 
     def __post_init__(self) -> None:
-        if any(isinstance(value, bool) or value <= 0 for value in self.values):
+        if not self.values or any(
+            type(value) is not int or value <= 0 for value in self.values
+        ):
             raise ValueError("Dynamic shape values must be positive integers")
 
 
@@ -27,11 +29,14 @@ class InputInfo:
 
     def __post_init__(self) -> None:
         if any(
-            isinstance(dimension, bool)
-            or (isinstance(dimension, int) and dimension <= 0)
+            not dimension
+            if isinstance(dimension, str)
+            else (type(dimension) is not int or dimension <= 0)
             for dimension in self.shape
         ):
-            raise ValueError("Static input dimensions must be positive integers")
+            raise ValueError(
+                "Input dimensions must be positive integers or non-empty symbols"
+            )
 
 
 @dataclass(frozen=True, slots=True)

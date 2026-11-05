@@ -1,10 +1,9 @@
 from controller.domain.profile.model_variant_static_profile import (
-    InputShapePoint,
     LayerProperty,
     LayerShapeProperty,
+    ModelInputConcreteShapes,
     ModelVariantInfo,
     ModelVariantStaticProfile,
-    ShapePoint,
     ShapeProfile,
     TensorProperty,
     TensorShapeProperty,
@@ -16,7 +15,10 @@ from controller.domain.profile.model_variant_topology import (
     ModelVariantTopology,
 )
 from integration.dto.model.model_dto import ModelDto
-from integration.dto.model.profiled_model_variant_dto import ProfiledModelVariantDto
+from integration.dto.model.profiled_model_variant_dto import (
+    InputShapeInvariableTensorPropertiesDto,
+    ProfiledModelVariantDto,
+)
 
 
 class ModelVariantStaticProfileMapper:
@@ -55,15 +57,13 @@ class ModelVariantStaticProfileMapper:
             invariant_layer_properties={
                 layer_key: LayerProperty(
                     weight_properties={
-                        tensor_key: WeightProperty(
-                            data_type=weight.data_type,
-                            shape=weight.shape,
-                            data_type_size_in_bytes=weight.data_type_size_in_bytes,
+                        tensor_key: ModelVariantStaticProfileMapper._weight_property_from_dto(
+                            weight
                         )
                         for tensor_key, weight in property_.weight_properties.items()
                     }
                 )
-                for layer_key, property_ in profile.invariant_layer_properties.items()
+                for layer_key, property_ in profile.invariable_properties.layer_properties.items()
             },
             invariant_tensor_properties={
                 tensor_key: TensorProperty(
@@ -72,16 +72,14 @@ class ModelVariantStaticProfileMapper:
                     shape_expression=property_.shape_expression,
                 )
                 for tensor_key, property_ in (
-                    profile.invariant_tensor_properties.items()
+                    profile.invariable_properties.tensor_properties.items()
                 )
             },
             shape_profiles=tuple(
                 ShapeProfile(
-                    shape_point=ShapePoint(
-                        input_shape_points=tuple(
-                            InputShapePoint(name=point.name, shape=point.shape)
-                            for point in shape_profile.shape_point.input_shape_points
-                        )
+                    max_cut_size_mib=shape_profile.model_properties.max_cut_size_mib,
+                    input_shapes=ModelInputConcreteShapes(
+                        input_shapes=shape_profile.input_shapes.input_shapes,
                     ),
                     layer_properties={
                         layer_key: LayerShapeProperty(flops=property_.flops)
@@ -96,7 +94,22 @@ class ModelVariantStaticProfileMapper:
                         )
                     },
                 )
-                for shape_profile in profile.shape_profiles
+                for shape_profile in profile.variable_properties
             ),
             optimization_contractions=tuple(profile.optimization_contractions),
+        )
+
+    @staticmethod
+    def _weight_property_from_dto(
+        dto: InputShapeInvariableTensorPropertiesDto,
+    ) -> WeightProperty:
+        shape: list[int] = []
+        for dimension in dto.shape_expression:
+            if isinstance(dimension, bool) or not isinstance(dimension, int):
+                raise ValueError("Weight dimensions must be concrete integers")
+            shape.append(dimension)
+        return WeightProperty(
+            data_type=dto.data_type,
+            shape=tuple(shape),
+            data_type_size_in_bytes=dto.data_type_size_in_bytes,
         )

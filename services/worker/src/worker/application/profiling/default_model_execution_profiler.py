@@ -69,17 +69,17 @@ class DefaultModelExecutionProfiler(ModelExecutionProfiler):
         self, model_static_profile: ModelStaticProfile, artifact_bundle: ArtifactBundle
     ) -> list[ShapeExecutionProfile]:
         shape_execution_profiles: list[ShapeExecutionProfile] = []
-        for shape_point in model_static_profile.shape_points:
+        for input_shapes in model_static_profile.input_shape_configurations:
             backend_profiles: list[BackendExecutionProfile] = []
             for backend in self._backends:
-                backend_profile = await self._engine_profiler.profile_model_execution_on_backend_with_shape_point(
-                    model_static_profile, artifact_bundle, backend, shape_point
+                backend_profile = await self._engine_profiler.profile_model_execution_on_backend_with_input_shapes(
+                    model_static_profile, artifact_bundle, backend, input_shapes
                 )
                 backend_profiles.append(backend_profile)
 
             shape_execution_profiles.append(
                 ShapeExecutionProfile(
-                    shape_point=shape_point,
+                    input_shapes=input_shapes,
                     backend_profiles=tuple(backend_profiles),
                 )
             )

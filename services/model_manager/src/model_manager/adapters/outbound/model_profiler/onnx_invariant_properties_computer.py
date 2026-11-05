@@ -8,11 +8,13 @@ from artifacts.contracts.artifact_workspace import ArtifactWorkspace
 from model_manager.application.ports.outbound.invariant_properties_computer import (
     InvariantPropertiesComputer,
 )
-from model_manager.domain.layer_property import LayerProperty, WeightProperty
+from model_manager.domain.input_shape_invariable_properties import (
+    InputShapeInvariableLayerProperties,
+    InputShapeInvariableTensorProperties,
+)
 from model_manager.domain.model import ModelInfo
 from model_manager.domain.model_variant import ModelVariantInfo
 from model_manager.domain.model_variant_topology import ModelVariantTopology
-from model_manager.domain.tensor_property import TensorProperty
 from shared.model.keys import LayerKey, TensorKey
 
 
@@ -24,9 +26,9 @@ class OnnxInvariantPropertiesComputer(InvariantPropertiesComputer):
         model_info: ModelInfo,
         model_variant_info: ModelVariantInfo,
         topology: ModelVariantTopology,
-    ) -> dict[LayerKey, LayerProperty]:
+    ) -> dict[LayerKey, InputShapeInvariableLayerProperties]:
 
-        invariant_properties: dict[LayerKey, LayerProperty] = {}
+        invariant_properties: dict[LayerKey, InputShapeInvariableLayerProperties] = {}
 
         model_proto = self._load_and_infer_model(artifact_workspace)
 
@@ -39,7 +41,9 @@ class OnnxInvariantPropertiesComputer(InvariantPropertiesComputer):
         }
 
         for layer_key, layer_description in topology.layers().items():
-            weight_properties: dict[TensorKey, WeightProperty] = {}
+            weight_properties: dict[
+                TensorKey, InputShapeInvariableTensorProperties
+            ] = {}
             if not layer_description.is_input and not layer_description.is_output:
                 node_proto = node_proto_dict[layer_key]
 
@@ -48,7 +52,7 @@ class OnnxInvariantPropertiesComputer(InvariantPropertiesComputer):
                         weight_properties[input_name] = self._compute_weight_properties(
                             initializers_dict[input_name],
                         )
-            invariant_properties[layer_key] = LayerProperty(
+            invariant_properties[layer_key] = InputShapeInvariableLayerProperties(
                 weight_properties=weight_properties
             )
 
@@ -71,23 +75,23 @@ class OnnxInvariantPropertiesComputer(InvariantPropertiesComputer):
     @staticmethod
     def _compute_weight_properties(
         onnx_tensor_proto: onnx.TensorProto,
-    ) -> WeightProperty:
+    ) -> InputShapeInvariableTensorProperties:
         data_type = np.dtype(
             onnx.helper.tensor_dtype_to_np_dtype(onnx_tensor_proto.data_type)
         )
         shape = tuple(int(dimension) for dimension in onnx_tensor_proto.dims)
         data_type_size_in_bytes = int(data_type.itemsize)
 
-        return WeightProperty(
+        return InputShapeInvariableTensorProperties(
             data_type=data_type.name,
-            shape=shape,
+            shape_expression=shape,
             data_type_size_in_bytes=data_type_size_in_bytes,
         )
 
     @staticmethod
     def _compute_tensor_properties(
         onnx_tensor_proto: onnx.ValueInfoProto,
-    ) -> TensorProperty:
+    ) -> InputShapeInvariableTensorProperties:
         if onnx_tensor_proto.type.WhichOneof("value") != "tensor_type":
             raise ValueError(
                 f"Value {onnx_tensor_proto.name!r} does not describe a tensor"
@@ -115,7 +119,7 @@ class OnnxInvariantPropertiesComputer(InvariantPropertiesComputer):
                     f"Tensor {onnx_tensor_proto.name!r} has an anonymous dimension"
                 )
 
-        return TensorProperty(
+        return InputShapeInvariableTensorProperties(
             data_type=data_type.name,
             data_type_size_in_bytes=int(data_type.itemsize),
             shape_expression=tuple(shape_expression),
@@ -128,7 +132,7 @@ class OnnxInvariantPropertiesComputer(InvariantPropertiesComputer):
         model_info: ModelInfo,
         model_variant_info: ModelVariantInfo,
         topology: ModelVariantTopology,
-    ) -> dict[TensorKey, TensorProperty]:
+    ) -> dict[TensorKey, InputShapeInvariableTensorProperties]:
 
         model_proto = self._load_and_infer_model(artifact_workspace)
 
@@ -146,7 +150,7 @@ class OnnxInvariantPropertiesComputer(InvariantPropertiesComputer):
             for edge_description in topology.get_layer_out_edges(layer_key).values():
                 tensor_keys.update(edge_description.tensors)
 
-        invariant_properties: dict[TensorKey, TensorProperty] = {}
+        invariant_properties: dict[TensorKey, InputShapeInvariableTensorProperties] = {}
         for tensor_key in tensor_keys:
             value_info_proto = value_info_proto_dict.get(tensor_key)
             if value_info_proto is None:

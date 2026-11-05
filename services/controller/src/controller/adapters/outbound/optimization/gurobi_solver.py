@@ -6,14 +6,8 @@ from typing import override
 import gurobipy as gp
 from gurobipy import GRB
 
-from controller.adapters.outbound.optimization.gurobi_execution_queue_constraints import (
-    add_execution_queue_constraints,
-)
-from controller.adapters.outbound.optimization.gurobi_memory_constraints import (
-    add_memory_constraints,
-)
-from controller.adapters.outbound.optimization.gurobi_network_queue_constraints import (
-    add_network_queue_constraints,
+from controller.adapters.outbound.optimization.gurobi_formulations import (
+    CompactFormulation,
 )
 from controller.adapters.outbound.optimization.gurobi_objective import (
     set_objective,
@@ -23,20 +17,9 @@ from controller.adapters.outbound.optimization.gurobi_problem_builder import (
     DefaultGurobiProblemBuilder,
     GurobiProblemBuilder,
 )
-from controller.adapters.outbound.optimization.gurobi_qos_constraints import (
-    add_response_time_constraints,
-)
 from controller.adapters.outbound.optimization.gurobi_solution import (
     GurobiSolutionError,
     extract_solution,
-)
-from controller.adapters.outbound.optimization.gurobi_structure_constraints import (
-    add_assignment_constraints,
-    add_execution_constraints,
-    add_transmission_constraints,
-)
-from controller.adapters.outbound.optimization.gurobi_variables import (
-    add_gurobi_variables,
 )
 from controller.application.optimization.abc.solver import Solver
 from controller.domain.optimization.request.optimization_request import (
@@ -95,6 +78,14 @@ def _observe_model(
             mip_gap_target=float(model.Params.MIPGap),
             threads=int(model.Params.Threads),
             seed=int(model.Params.Seed),
+            formulation=config.formulation.value,
+            continuous_variables=model.NumVars - model.NumIntVars,
+            binary_variables=model.NumBinVars,
+            integer_variables=model.NumIntVars - model.NumBinVars,
+            linear_constraints=model.NumConstrs,
+            quadratic_constraints=model.NumQConstrs,
+            general_constraints=model.NumGenConstrs,
+            node_count=_finite_attribute(model, "NodeCount"),
         )
     )
 
@@ -106,6 +97,7 @@ class GurobiSolver(Solver):
         problem_builder: GurobiProblemBuilder | None = None,
     ) -> None:
         self._config = config
+        self._formulation = CompactFormulation()
         self._problem_builder = problem_builder or DefaultGurobiProblemBuilder()
 
     @override
@@ -134,12 +126,18 @@ class GurobiSolver(Solver):
             context,
             problem_config,
         )
+        problem = self._formulation.prepare_problem(
+            problem,
+            context=context,
+            requests_by_flow=requests_by_flow,
+            problem_config=problem_config,
+        )
         with gp.Env(empty=True) as environment:
             environment.setParam("OutputFlag", int(self._config.output_flag))
             environment.start()
             with gp.Model("distributed_inference", env=environment) as model:
                 model.Params.NonConvex = 0
-                model.Params.DualReductions = 0
+                model.Params.DualReductions = 1
                 if self._config.time_limit_s is not None:
                     model.Params.TimeLimit = self._config.time_limit_s
                 if self._config.mip_gap is not None:
@@ -149,7 +147,7 @@ class GurobiSolver(Solver):
                 if self._config.seed is not None:
                     model.Params.Seed = self._config.seed
 
-                variables = add_gurobi_variables(
+                variables = self._formulation.add_variables(
                     model,
                     problem,
                     context=context,
@@ -163,7 +161,7 @@ class GurobiSolver(Solver):
                         problem_config.network_utilization_limit
                     ),
                 )
-                add_assignment_constraints(
+                self._formulation.add_assignment_constraints(
                     model,
                     problem,
                     variables.assignment,
@@ -172,7 +170,7 @@ class GurobiSolver(Solver):
                     requests_by_flow=requests_by_flow,
                     max_components=problem_config.max_components,
                 )
-                add_execution_constraints(
+                self._formulation.add_execution_constraints(
                     model,
                     problem,
                     variables.assignment,
@@ -181,7 +179,7 @@ class GurobiSolver(Solver):
                     requests_by_flow=requests_by_flow,
                     max_components=problem_config.max_components,
                 )
-                add_transmission_constraints(
+                self._formulation.add_transmission_constraints(
                     model,
                     problem,
                     variables.assignment,
@@ -190,7 +188,7 @@ class GurobiSolver(Solver):
                     requests_by_flow=requests_by_flow,
                     max_components=problem_config.max_components,
                 )
-                add_execution_queue_constraints(
+                self._formulation.add_execution_queue_constraints(
                     model,
                     problem,
                     variables.assignment,
@@ -202,7 +200,7 @@ class GurobiSolver(Solver):
                         problem_config.compute_utilization_limit
                     ),
                 )
-                add_network_queue_constraints(
+                self._formulation.add_network_queue_constraints(
                     model,
                     problem,
                     variables.network,
@@ -211,7 +209,7 @@ class GurobiSolver(Solver):
                         problem_config.network_utilization_limit
                     ),
                 )
-                add_memory_constraints(
+                self._formulation.add_memory_constraints(
                     model,
                     problem,
                     variables.assignment,
@@ -219,7 +217,7 @@ class GurobiSolver(Solver):
                     context=context,
                     max_components=problem_config.max_components,
                 )
-                add_response_time_constraints(
+                self._formulation.add_response_time_constraints(
                     model,
                     problem,
                     variables.assignment,

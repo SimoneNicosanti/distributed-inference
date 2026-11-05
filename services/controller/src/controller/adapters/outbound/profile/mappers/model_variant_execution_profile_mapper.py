@@ -6,8 +6,7 @@ from controller.domain.profile.model_variant_execution_profile import (
     ShapeExecutionProfile,
 )
 from controller.domain.profile.model_variant_static_profile import (
-    InputShapePoint,
-    ShapePoint,
+    ModelInputConcreteShapes,
 )
 from integration.dto.worker_profiles.execution_profile_dto import (
     ModelExecutionProfileDto,
@@ -39,13 +38,8 @@ class ModelVariantExecutionProfileMapper:
 
             shape_execution_profiles.append(
                 ShapeExecutionProfile(
-                    shape_point=ShapePoint(
-                        input_shape_points=tuple(
-                            InputShapePoint(name=name, shape=shape)
-                            for name, shape in sorted(
-                                shape_profile.shape_point.input_shape_points.items()
-                            )
-                        )
+                    input_shapes=ModelInputConcreteShapes(
+                        input_shapes=shape_profile.input_shapes.input_shapes,
                     ),
                     backend_profiles=tuple(backend_profiles),
                 )

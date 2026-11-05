@@ -57,35 +57,33 @@ def make_model() -> Callable[[CatalogEntry], StaticModel]:
                             )
                         ],
                     },
-                    "invariant_layer_properties": {
-                        layer: {
-                            "weight_properties": {
-                                "weights": {
-                                    "shape": [8, 8],
-                                    "data_type": "float32",
-                                    "data_type_size_in_bytes": 4,
+                    "invariable_properties": {
+                        "layer_properties": {
+                            layer: {
+                                "weight_properties": {
+                                    "weights": {
+                                        "shape_expression": [8, 8],
+                                        "data_type": "float32",
+                                        "data_type_size_in_bytes": 4,
+                                    }
                                 }
+                                if layer == "conv"
+                                else {}
                             }
-                            if layer == "conv"
-                            else {}
-                        }
-                        for layer in layers
+                            for layer in layers
+                        },
+                        "tensor_properties": {
+                            tensor: {
+                                "data_type": "float32",
+                                "data_type_size_in_bytes": 4,
+                                "shape_expression": [1, 8],
+                            }
+                            for tensor in tensors
+                        },
                     },
-                    "invariant_tensor_properties": {
-                        tensor: {
-                            "data_type": "float32",
-                            "data_type_size_in_bytes": 4,
-                            "shape_expression": [1, 8],
-                        }
-                        for tensor in tensors
-                    },
-                    "shape_profiles": [
+                    "variable_properties": [
                         {
-                            "shape_point": {
-                                "input_shape_points": [
-                                    {"name": "images", "shape": [1, 8]}
-                                ]
-                            },
+                            "input_shapes": {"input_shapes": {"images": [1, 8]}},
                             "layer_properties": {
                                 layer: {
                                     "flops": 1024
@@ -99,6 +97,7 @@ def make_model() -> Callable[[CatalogEntry], StaticModel]:
                             "tensor_properties": {
                                 tensor: {"shape": [1, 8]} for tensor in tensors
                             },
+                            "model_properties": {"max_cut_size_mib": 32 / 1024**2},
                         }
                     ],
                     "optimization_contractions": [],

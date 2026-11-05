@@ -28,6 +28,9 @@ from integration.redis.profiled_model_variant.keys_factory import (
     StringProfiledModelVariantKeyFactory,
 )
 from integration.service_instance.service_instance import ServiceInstance
+from model_manager.adapters.outbound.model_max_cut_size_computer.pulp_max_cut_size_computer import (
+    PulpMaxCutSizeComputer,
+)
 from model_manager.adapters.outbound.model_metadata_store.redis_model_metadata_store import (
     RedisModelMetadataStore,
 )
@@ -148,7 +151,7 @@ class DefaultCompositionRoot(CompositionRoot):
 
         model_topology_builder = OnnxModelTopologyBuilder()
         invariant_properties_computer = OnnxInvariantPropertiesComputer()
-        shape_profile_computer = OnnxShapeProfileComputer()
+        shape_profile_computer = OnnxShapeProfileComputer(PulpMaxCutSizeComputer())
 
         onnx_model_optimizer = OnnxModelOptimizer()
 

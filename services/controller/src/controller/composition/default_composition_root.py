@@ -97,6 +97,9 @@ from integration.service_instance.service_instance import ServiceInstance
 
 
 class DefaultCompositionRoot(CompositionRoot):
+    def __init__(self, solver_config: SolverConfig | None = None) -> None:
+        self._solver_config = solver_config
+
     @asynccontextmanager
     @override
     async def compose(
@@ -141,7 +144,7 @@ class DefaultCompositionRoot(CompositionRoot):
         optimization_context_builder = self.build_optimization_context_builder(
             redis, worker_directory_gateway
         )
-        solver_config = SolverConfig(
+        solver_config = self._solver_config or SolverConfig(
             ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_SLACK,
             output_flag=True,
             time_limit_s=180,

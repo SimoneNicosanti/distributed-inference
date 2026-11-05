@@ -19,10 +19,12 @@ from worker.domain.profiling.model_execution.model_execution_profile import (
     BackendExecutionProfile,
     LayerExecutionProfile,
 )
+from worker.domain.profiling.model_execution.model_input_concrete_shapes import (
+    ModelInputConcreteShapes,
+)
 from worker.domain.profiling.model_execution.model_static_profile import (
     ModelStaticProfile,
 )
-from worker.domain.profiling.model_execution.shape_point import ShapePoint
 
 ORT_TO_NUMPY_TYPE = {
     "tensor(float)": np.float32,
@@ -70,35 +72,35 @@ class OrtModelExecutionProfiler(EngineModelExecutionProfiler):
         pass
 
     @override
-    async def profile_model_execution_on_backend_with_shape_point(
+    async def profile_model_execution_on_backend_with_input_shapes(
         self,
         model_static_profile: ModelStaticProfile,
         artifact_bundle: ArtifactBundle,
         backend: Backend,
-        shape_point: ShapePoint,
+        input_shapes: ModelInputConcreteShapes,
     ) -> BackendExecutionProfile:
 
         return await asyncio.to_thread(
-            self._sync_profile_model_execution_on_backend_with_shape_point,
+            self._sync_profile_model_execution_on_backend_with_input_shapes,
             model_static_profile,
             artifact_bundle,
             backend,
-            shape_point,
+            input_shapes,
         )
 
-    def _sync_profile_model_execution_on_backend_with_shape_point(
+    def _sync_profile_model_execution_on_backend_with_input_shapes(
         self,
         model_static_profile: ModelStaticProfile,
         artifact_bundle: ArtifactBundle,
         backend: Backend,
-        shape_point: ShapePoint,
+        input_shapes: ModelInputConcreteShapes,
     ) -> BackendExecutionProfile:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             session = self._build_session_on_backend(
                 artifact_bundle, backend, temp_dir_name
             )
             inputs = self._create_dummy_inputs_for_profiling(
-                session, backend, shape_point
+                session, backend, input_shapes
             )
 
             for _ in range(WARMUP_ITERATIONS + PROFILE_ITERATIONS):
@@ -151,11 +153,11 @@ class OrtModelExecutionProfiler(EngineModelExecutionProfiler):
     def _create_dummy_inputs_for_profiling(
         session: OrtInputInfoProvider,
         backend: Backend,
-        shape_point: ShapePoint,
+        input_shapes: ModelInputConcreteShapes,
     ) -> dict[str, ort.OrtValue]:
         inputs: dict[str, ort.OrtValue] = {}
         for input_info in session.get_inputs():
-            shape = shape_point.input_shape_points.get(input_info.name)
+            shape = input_shapes.input_shapes.get(input_info.name)
             if shape is None:
                 raise ValueError(
                     f"Missing concrete shape for model input {input_info.name!r}"

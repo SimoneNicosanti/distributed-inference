@@ -1,7 +1,8 @@
+from typing import Annotated
+
 from pydantic import (
     BaseModel,
     Field,
-    NonNegativeFloat,
     PositiveInt,
 )
 
@@ -31,55 +32,64 @@ class TopologyDto(BaseModel):
     edges: list[EdgeDescriptionDto]
 
 
-class WeightPropertyDto(BaseModel):
+class InputShapeInvariableTensorPropertiesDto(BaseModel):
     data_type: str
-    shape: tuple[int, ...]
-    data_type_size_in_bytes: int
+    data_type_size_in_bytes: Annotated[PositiveInt, Field(strict=True)]
+    shape_expression: tuple[
+        Annotated[PositiveInt, Field(strict=True)]
+        | Annotated[str, Field(min_length=1)],
+        ...,
+    ]
 
 
-class LayerPropertyDto(BaseModel):
-    weight_properties: dict[TensorKey, WeightPropertyDto]
+class InputShapeInvariableLayerPropertiesDto(BaseModel):
+    weight_properties: dict[TensorKey, InputShapeInvariableTensorPropertiesDto]
 
 
-class TensorPropertyDto(BaseModel):
-    data_type: str
-    data_type_size_in_bytes: int
-    shape_expression: tuple[int | str, ...]
+class InputShapeInvariablePropertiesDto(BaseModel):
+    layer_properties: dict[LayerKey, InputShapeInvariableLayerPropertiesDto]
+    tensor_properties: dict[TensorKey, InputShapeInvariableTensorPropertiesDto]
 
 
-class InputShapePointDto(BaseModel):
-    name: str
-    shape: tuple[PositiveInt, ...]
+class ModelInputConcreteShapesDto(BaseModel):
+    input_shapes: dict[
+        TensorKey, tuple[Annotated[PositiveInt, Field(strict=True)], ...]
+    ]
 
 
-class ShapePointDto(BaseModel):
-    input_shape_points: tuple[InputShapePointDto, ...]
+class InputShapeVariableLayerPropertiesDto(BaseModel):
+    flops: float = Field(strict=True, ge=0, allow_inf_nan=False)
 
 
-class LayerShapePropertyDto(BaseModel):
-    flops: NonNegativeFloat
+class InputShapeVariableTensorPropertiesDto(BaseModel):
+    shape: tuple[Annotated[PositiveInt, Field(strict=True)], ...]
 
 
-class TensorShapePropertyDto(BaseModel):
-    shape: tuple[PositiveInt, ...]
+class InputShapeVariableModelPropertiesDto(BaseModel):
+    max_cut_size_mib: float = Field(
+        strict=True,
+        gt=0,
+        allow_inf_nan=False,
+        description="Maximum cut tensor volume in MiB (1 MiB = 1024 ** 2 bytes)",
+    )
 
 
-class ShapeProfileDto(BaseModel):
-    shape_point: ShapePointDto
-    layer_properties: dict[LayerKey, LayerShapePropertyDto]
-    tensor_properties: dict[TensorKey, TensorShapePropertyDto]
+class InputShapeVariablePropertiesDto(BaseModel):
+    input_shapes: ModelInputConcreteShapesDto
+    layer_properties: dict[LayerKey, InputShapeVariableLayerPropertiesDto]
+    tensor_properties: dict[TensorKey, InputShapeVariableTensorPropertiesDto]
+    model_properties: InputShapeVariableModelPropertiesDto
 
 
 class ProfileDto(BaseModel):
     topology: TopologyDto
-    invariant_layer_properties: dict[LayerKey, LayerPropertyDto]
-    invariant_tensor_properties: dict[TensorKey, TensorPropertyDto]
-    shape_profiles: list[ShapeProfileDto]
+    invariable_properties: InputShapeInvariablePropertiesDto
+    variable_properties: list[InputShapeVariablePropertiesDto]
     optimization_contractions: list[tuple[LayerKey, ...]]
 
     @property
-    def shape_points(self) -> list[ShapePointDto]:
-        return [shape_profile.shape_point for shape_profile in self.shape_profiles]
+    def input_shape_configurations(self) -> list[ModelInputConcreteShapesDto]:
+        return [properties.input_shapes for properties in self.variable_properties]
 
 
 class ProfiledModelVariantDto(BaseModel):

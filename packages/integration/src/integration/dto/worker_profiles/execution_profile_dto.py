@@ -1,7 +1,9 @@
 from enum import StrEnum
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
+from integration.dto.model.profiled_model_variant_dto import ModelInputConcreteShapesDto
 from shared.model.keys import LayerKey
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import WorkerId
@@ -15,8 +17,8 @@ class BackendDto(StrEnum):
 class LayerExecutionProfileDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    execution_time_s: float
-    memory_bytes: int | None
+    execution_time_s: float = Field(strict=True, ge=0, allow_inf_nan=False)
+    memory_bytes: Annotated[int, Field(strict=True, ge=0)] | None
 
 
 class BackendExecutionProfileDto(BaseModel):
@@ -26,16 +28,10 @@ class BackendExecutionProfileDto(BaseModel):
     layer_profiles: dict[LayerKey, LayerExecutionProfileDto]
 
 
-class ShapePointDto(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    input_shape_points: dict[str, tuple[int, ...]]
-
-
 class ShapeExecutionProfileDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    shape_point: ShapePointDto
+    input_shapes: ModelInputConcreteShapesDto
     backend_profiles: tuple[BackendExecutionProfileDto, ...]
 
 

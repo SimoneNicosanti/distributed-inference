@@ -1,7 +1,12 @@
 from abc import ABC, abstractmethod
 
+from model_manager.domain.input_shape_invariable_properties import (
+    InputShapeInvariableTensorProperties,
+)
+from model_manager.domain.input_shape_variable_properties import (
+    InputShapeVariableTensorProperties,
+)
 from model_manager.domain.model_variant_topology import ModelVariantTopology
-from model_manager.domain.shape_profile import TensorShapeProperty
 from shared.model.keys import TensorKey
 
 
@@ -10,5 +15,10 @@ class MaxCutSizeComputer(ABC):
     @abstractmethod
     def compute_model_variant_max_cut_size(
         model_variant_topology: ModelVariantTopology,
-        tensor_shape_properties: dict[TensorKey, TensorShapeProperty],
-    ) -> float: ...
+        invariable_tensor_properties: dict[
+            TensorKey, InputShapeInvariableTensorProperties
+        ],
+        variable_tensor_properties: dict[TensorKey, InputShapeVariableTensorProperties],
+    ) -> float:
+        """Return the maximum cut tensor volume in MiB (1024 ** 2 bytes)."""
+        ...

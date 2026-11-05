@@ -106,7 +106,7 @@ class Scenario:
             "device_worker_id": str(self.workers[0].id.id),
             "endpoint_policy": "fixed_device_ingress_and_sink; is_inference_runner=true",
             "projection": "GPU times in CPU slot; GPU VRAM in solver RAM slot; physical hardware retained separately",
-            "memory_constraint": "production weights plus component-summed activations; peak liveness is diagnostic only",
+            "memory_constraint": "production weights plus profiled maximum-cut activations; peak liveness is diagnostic only",
         }
 
 

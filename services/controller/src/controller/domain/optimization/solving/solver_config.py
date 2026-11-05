@@ -9,6 +9,10 @@ class ObjectiveKind(StrEnum):
     ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_SLACK = auto()
 
 
+class FormulationKind(StrEnum):
+    COMPACT = "compact"
+
+
 @dataclass(frozen=True, slots=True)
 class ProblemConfig:
     max_components: int
@@ -47,6 +51,14 @@ class SolverRunStatistics:
     mip_gap_target: float
     threads: int
     seed: int
+    formulation: str = "compact"
+    continuous_variables: int = 0
+    binary_variables: int = 0
+    integer_variables: int = 0
+    linear_constraints: int = 0
+    quadratic_constraints: int = 0
+    general_constraints: int = 0
+    node_count: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,8 +72,10 @@ class SolverConfig:
     observer: Callable[[SolverRunStatistics], None] | None = field(
         default=None, repr=False, compare=False
     )
+    formulation: FormulationKind = FormulationKind.COMPACT
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "formulation", FormulationKind(self.formulation))
         if self.time_limit_s is not None and (
             not math.isfinite(self.time_limit_s) or self.time_limit_s <= 0
         ):

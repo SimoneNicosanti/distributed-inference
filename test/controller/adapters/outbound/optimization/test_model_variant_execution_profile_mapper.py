@@ -2,13 +2,13 @@ from controller.adapters.outbound.profile.mappers.model_variant_execution_profil
     ModelVariantExecutionProfileMapper,
 )
 from controller.domain.profile.model_variant_execution_profile import Backend
+from integration.dto.model.profiled_model_variant_dto import ModelInputConcreteShapesDto
 from integration.dto.worker_profiles.execution_profile_dto import (
     BackendDto,
     BackendExecutionProfileDto,
     LayerExecutionProfileDto,
     ModelExecutionProfileDto,
     ShapeExecutionProfileDto,
-    ShapePointDto,
 )
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -28,7 +28,9 @@ def test_maps_all_backend_profiles() -> None:
         ),
         shape_execution_profiles=(
             ShapeExecutionProfileDto(
-                shape_point=ShapePointDto(input_shape_points={"input": (1, 3)}),
+                input_shapes=ModelInputConcreteShapesDto(
+                    input_shapes={"input": (1, 3)}
+                ),
                 backend_profiles=(
                     BackendExecutionProfileDto(
                         backend=BackendDto.CPU,

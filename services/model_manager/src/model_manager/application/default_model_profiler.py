@@ -19,6 +19,9 @@ from model_manager.application.ports.outbound.model_topology_builder import (
 from model_manager.application.ports.outbound.shape_profile_computer import (
     ShapeProfileComputer,
 )
+from model_manager.domain.input_shape_invariable_properties import (
+    InputShapeInvariableProperties,
+)
 from model_manager.domain.model import ModelInfo
 from model_manager.domain.model_variant import (
     ModelVariant,
@@ -75,18 +78,22 @@ class DefaultModelProfiler(ModelProfiler):
             model_info,
             model_variant_info,
         )
-        invariant_layer_properties = (
+        invariable_layer_properties = (
             self._invariant_properties_computer.compute_layer_invariant_properties(
                 input_model_workspace, model_info, model_variant_info, topology
             )
         )
-        invariant_tensor_properties = (
+        invariable_tensor_properties = (
             self._invariant_properties_computer.compute_tensor_invariant_properties(
                 input_model_workspace, model_info, model_variant_info, topology
             )
         )
-        shape_profiles = self._shape_profile_computer.compute_shape_profiles(
-            input_model_workspace, model_info, model_variant_info, topology
+        variable_properties = self._shape_profile_computer.compute_shape_profiles(
+            input_model_workspace,
+            model_info,
+            model_variant_info,
+            topology,
+            invariable_tensor_properties,
         )
 
         optimization_contractions = self._contraction_computer.compute_contractions(
@@ -95,8 +102,10 @@ class DefaultModelProfiler(ModelProfiler):
 
         return ModelVariantProfile(
             topology=topology,
-            shape_profiles=shape_profiles,
-            invariant_layer_properties=invariant_layer_properties,
-            invariant_tensor_properties=invariant_tensor_properties,
+            invariable_properties=InputShapeInvariableProperties(
+                layer_properties=invariable_layer_properties,
+                tensor_properties=invariable_tensor_properties,
+            ),
+            variable_properties=variable_properties,
             optimization_contractions=tuple(optimization_contractions),
         )

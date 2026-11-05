@@ -7,26 +7,33 @@ import onnx_tool
 from onnx.shape_inference import infer_shapes
 
 from artifacts.contracts.artifact_workspace import ArtifactWorkspace
-from model_manager.adapters.outbound.model_max_cut_size_computer.pulp_max_cut_size_computer import (
-    PulpMaxCutSizeComputer,
+from model_manager.application.ports.outbound.max_cut_size_computer import (
+    MaxCutSizeComputer,
 )
 from model_manager.application.ports.outbound.shape_profile_computer import (
     ShapeProfileComputer,
 )
+from model_manager.domain.input_shape_invariable_properties import (
+    InputShapeInvariableTensorProperties,
+)
+from model_manager.domain.input_shape_variable_properties import (
+    InputShapeVariableLayerProperties,
+    InputShapeVariableModelProperties,
+    InputShapeVariableProperties,
+    InputShapeVariableTensorProperties,
+    ModelInputConcreteShapes,
+)
 from model_manager.domain.model import ModelInfo
 from model_manager.domain.model_variant import ModelVariantInfo
 from model_manager.domain.model_variant_topology import ModelVariantTopology
-from model_manager.domain.shape_profile import (
-    InputShapePoint,
-    LayerShapeProperty,
-    ShapePoint,
-    ShapeProfile,
-    TensorShapeProperty,
-)
 from shared.model.keys import TensorKey
 
 
 class OnnxShapeProfileComputer(ShapeProfileComputer):
+    def __init__(self, max_cut_size_computer: MaxCutSizeComputer) -> None:
+        super().__init__()
+        self._max_cut_size_computer = max_cut_size_computer
+
     @override
     def compute_shape_profiles(
         self,
@@ -34,18 +41,24 @@ class OnnxShapeProfileComputer(ShapeProfileComputer):
         model_info: ModelInfo,
         model_variant_info: ModelVariantInfo,
         topology: ModelVariantTopology,
-    ) -> dict[ShapePoint, ShapeProfile]:
+        invariable_tensor_properties: dict[
+            TensorKey, InputShapeInvariableTensorProperties
+        ],
+    ) -> dict[ModelInputConcreteShapes, InputShapeVariableProperties]:
 
         model_proto = self._load_and_infer_model(artifact_workspace)
-        shape_points = self._compute_shape_points(model_variant_info)
+        input_shape_configurations = self._compute_input_shape_configurations(
+            model_variant_info
+        )
 
         return {
-            shape_point: self._compute_shape_profile(
+            input_shapes: self._compute_shape_profile(
                 model_proto,
                 topology,
-                shape_point,
+                input_shapes,
+                invariable_tensor_properties,
             )
-            for shape_point in shape_points
+            for input_shapes in input_shape_configurations
         }
 
     @staticmethod
@@ -63,9 +76,9 @@ class OnnxShapeProfileComputer(ShapeProfileComputer):
         return inferred_model
 
     @staticmethod
-    def _compute_shape_points(
+    def _compute_input_shape_configurations(
         model_variant_info: ModelVariantInfo,
-    ) -> list[ShapePoint]:
+    ) -> list[ModelInputConcreteShapes]:
         dynamic_dimension_names = tuple(
             sorted(model_variant_info.dynamic_dimension_values)
         )
@@ -74,58 +87,54 @@ class OnnxShapeProfileComputer(ShapeProfileComputer):
             for dimension_name in dynamic_dimension_names
         )
 
-        shape_points = []
+        input_shape_configurations = []
         for dynamic_values in itertools.product(*dynamic_dimension_options):
             dimension_bindings = dict(
                 zip(dynamic_dimension_names, dynamic_values, strict=True)
             )
-            input_shape_points = tuple(
-                InputShapePoint(
-                    name=input_name,
-                    shape=tuple(
-                        dimension_bindings[dimension]
-                        if isinstance(dimension, str)
-                        else dimension
-                        for dimension in input_info.shape
-                    ),
+            input_shapes = {
+                input_name: tuple(
+                    dimension_bindings[dimension]
+                    if isinstance(dimension, str)
+                    else dimension
+                    for dimension in input_info.shape
                 )
                 for input_name, input_info in sorted(
                     model_variant_info.inputs_info.items()
                 )
+            }
+            input_shape_configurations.append(
+                ModelInputConcreteShapes(input_shapes=input_shapes)
             )
-            shape_points.append(ShapePoint(input_shape_points=input_shape_points))
 
-        return shape_points
+        return input_shape_configurations
 
-    @staticmethod
     def _compute_shape_profile(
+        self,
         model_proto: onnx.ModelProto,
         topology: ModelVariantTopology,
-        shape_point: ShapePoint,
-    ) -> ShapeProfile:
+        input_shapes: ModelInputConcreteShapes,
+        invariable_tensor_properties: dict[
+            TensorKey, InputShapeInvariableTensorProperties
+        ],
+    ) -> InputShapeVariableProperties:
         tool_model = onnx_tool.Model(model_proto)
         if not tool_model.valid:
             raise ValueError("onnx-tool could not load the ONNX model")
 
-        print(f"Computing shape profile for {shape_point}")
+        print(f"Computing shape profile for {input_shapes}")
 
         initializer_names = {
             initializer.name for initializer in model_proto.graph.initializer
         }
-        input_shapes = {
-            input_shape_point.name: input_shape_point.shape
-            for input_shape_point in shape_point.input_shape_points
-        }
         tool_inputs = {
             value_info.name: OnnxShapeProfileComputer._create_input(
                 value_info,
-                input_shapes[value_info.name],
+                input_shapes.input_shapes[value_info.name],
             )
             for value_info in model_proto.graph.input
             if value_info.name not in initializer_names
         }
-
-        print(tool_inputs["images"].shape)
 
         tool_graph = tool_model.graph
         tool_graph.shape_infer(tool_inputs)
@@ -134,14 +143,14 @@ class OnnxShapeProfileComputer(ShapeProfileComputer):
         layer_properties = {}
         for layer_key, layer_description in topology.layers().items():
             if layer_description.is_input or layer_description.is_output:
-                layer_properties[layer_key] = LayerShapeProperty(flops=0)
+                layer_properties[layer_key] = InputShapeVariableLayerProperties(flops=0)
                 continue
 
             node = tool_graph.nodemap.get(layer_key)
             if node is None:
                 raise ValueError(f"Layer {layer_key!r} is missing from onnx-tool")
 
-            layer_properties[layer_key] = LayerShapeProperty(
+            layer_properties[layer_key] = InputShapeVariableLayerProperties(
                 flops=float(2 * node.macs[0])
             )
 
@@ -165,17 +174,22 @@ class OnnxShapeProfileComputer(ShapeProfileComputer):
                     f"Tensor {tensor_key!r} has unresolved shape {tensor_shape!r}"
                 )
 
-            tensor_properties[tensor_key] = TensorShapeProperty(
+            tensor_properties[tensor_key] = InputShapeVariableTensorProperties(
                 shape=tuple(int(dimension) for dimension in tensor_shape)
             )
 
-        PulpMaxCutSizeComputer.compute_model_variant_max_cut_size(
-            topology, tensor_properties
+        max_cut_size_mib = (
+            self._max_cut_size_computer.compute_model_variant_max_cut_size(
+                topology, invariable_tensor_properties, tensor_properties
+            )
         )
 
-        return ShapeProfile(
+        return InputShapeVariableProperties(
             layer_properties=layer_properties,
             tensor_properties=tensor_properties,
+            model_properties=InputShapeVariableModelProperties(
+                max_cut_size_mib=max_cut_size_mib
+            ),
         )
 
     @staticmethod
