@@ -1,4 +1,4 @@
-"""Five stable Poisson streams calibrated once against the full reference pool."""
+"""Stable Poisson streams calibrated once against the configured full pool."""
 
 from controller.domain.optimization.request.flow_endpoint_placement import (
     FixedPlacement,

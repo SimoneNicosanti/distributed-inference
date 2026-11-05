@@ -38,8 +38,22 @@ def main() -> None:
     parser.add_argument("--weights", choices=("random", "local", "download"))
     parser.add_argument("--weights-directory", type=Path)
     parser.add_argument("--force", action="store_true")
+    parser.add_argument(
+        "--models",
+        nargs="+",
+        metavar="NAME",
+        help="Export only these configured model names",
+    )
     args = parser.parse_args()
     config = load_configuration(args.config)
+    selected = (
+        set(args.models)
+        if args.models
+        else {model.name for model in config.catalog.models}
+    )
+    unknown = selected - {model.name for model in config.catalog.models}
+    if unknown:
+        parser.error(f"Unknown model names: {', '.join(sorted(unknown))}")
     args.seed = config.export.seed if args.seed is None else args.seed
     args.opset = config.export.opset if args.opset is None else args.opset
     args.weights = config.export.weights if args.weights is None else args.weights
@@ -52,6 +66,8 @@ def main() -> None:
     raw_directory.mkdir(exist_ok=True)
     torch.set_num_threads(1)
     for specification in config.catalog.models:
+        if specification.name not in selected:
+            continue
         destination = config.model_directory / specification.filename
         if destination.exists() and not args.force:
             raise FileExistsError(

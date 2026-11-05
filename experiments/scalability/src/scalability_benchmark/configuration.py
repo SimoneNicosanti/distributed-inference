@@ -39,14 +39,14 @@ class CatalogSettings(Settings):
 
     @model_validator(mode="after")
     def check(self) -> Self:
-        if len(self.models) != 6:
-            raise ValueError("The model pool must contain exactly six models")
+        if not self.models:
+            raise ValueError("The model pool must not be empty")
         for values in (
             [m.name for m in self.models],
             [m.filename for m in self.models],
             [m.accuracy_rank for m in self.models],
         ):
-            if len(set(values)) != 6:
+            if len(set(values)) != len(self.models):
                 raise ValueError(
                     "Model names, filenames and accuracy ranks must be unique"
                 )
@@ -109,7 +109,7 @@ class LinkSettings(Settings):
 
 
 class FlowSettings(Settings):
-    pool_size: Literal[5]
+    pool_size: int = Field(gt=0)
     arrival_process: Literal["poisson"]
     minimum_accuracy: Literal[0]
     deadline_s: tuple[float, float]
@@ -156,8 +156,8 @@ class CampaignSettings(Settings):
 
 
 class PilotCase(Settings):
-    flows: int = Field(ge=1, le=5)
-    models: int = Field(ge=1, le=6)
+    flows: int = Field(ge=1)
+    models: int = Field(ge=1)
     infrastructure_index: int = Field(ge=0, le=10)
 
 
@@ -217,8 +217,8 @@ class ExperimentConfig(Settings):
             raise ValueError("Calibration reference model is outside the model pool")
         for campaign in (self.main, self.sensitivity):
             for values, maximum, name in (
-                (campaign.flows, 5, "flows"),
-                (campaign.models, 6, "models"),
+                (campaign.flows, self.flows.pool_size, "flows"),
+                (campaign.models, len(self.catalog.models), "models"),
             ):
                 if not values or tuple(sorted(set(values))) != values:
                     raise ValueError(
@@ -235,6 +235,11 @@ class ExperimentConfig(Settings):
                 raise ValueError("Campaign loads must be in (0, 1)")
         if not self.pilot.cases or len(set(self.pilot.cases)) != len(self.pilot.cases):
             raise ValueError("Pilot cases must be nonempty and unique")
+        if any(
+            case.flows > self.flows.pool_size or case.models > len(self.catalog.models)
+            for case in self.pilot.cases
+        ):
+            raise ValueError("Pilot flows or models outside supported pool")
         operators = [
             op for group in self.execution.groups.values() for op in group.operators
         ]

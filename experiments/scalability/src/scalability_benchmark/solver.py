@@ -87,6 +87,9 @@ def classify(
         "objective_bound": statistics.objective_bound if statistics else None,
         "solver_runtime_s": statistics.runtime_s if statistics else None,
         "construction_time_s": statistics.construction_time_s if statistics else None,
+        "time_to_first_incumbent_s": (
+            statistics.time_to_first_incumbent_s if statistics else None
+        ),
         "effective_solver_configuration": {
             "formulation": statistics.formulation,
             "objective": statistics.objective,
@@ -115,6 +118,7 @@ async def execute_solver(
         threads=config.solver.threads,
         seed=config.solver.seed,
         observer=observations.append,
+        record_incumbent_history=True,
     )
     started = perf_counter()
     failure = None

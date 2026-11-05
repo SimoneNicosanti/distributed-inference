@@ -155,8 +155,8 @@ def make_instance(
 ) -> tuple[OptimizationRequestsByFlow, OptimizationContext]:
     if (
         spec.seed != scenario.seed
-        or not 1 <= spec.flow_count <= 5
-        or not 1 <= spec.model_count <= 6
+        or not 1 <= spec.flow_count <= len(scenario.flows.get(spec.load, ()))
+        or not 1 <= spec.model_count <= len(scenario.models)
     ):
         raise ValueError("Run specification does not belong to this scenario")
     if (spec.edge_count, spec.cloud_count) not in scenario.config.infrastructure:

@@ -1,5 +1,6 @@
 import math
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -66,10 +67,12 @@ async def scenario(
 
 @pytest.mark.asyncio
 async def test_nested_entities_and_requests(scenario: Scenario) -> None:
-    small_spec = RunSpec("main", 42, 0.6, 1, 1, 0, 0, 300)
-    large_spec = RunSpec("main", 42, 0.6, 5, 6, 5, 5, 300)
+    load = scenario.config.main.loads[0]
+    small_spec = RunSpec("main", 42, load, 1, 1, 0, 0, 300)
+    large_spec = RunSpec("main", 42, load, 7, 10, 5, 5, 300)
     small_requests, small = make_instance(scenario, small_spec)
     requests, large = make_instance(scenario, large_spec)
+    assert len(requests) == 7 and len(large.static_profiles_by_variant) == 10
     assert small_requests.items() <= requests.items()
     assert all(
         large.static_profiles_by_variant[key] == value
@@ -96,14 +99,27 @@ async def test_nested_entities_and_requests(scenario: Scenario) -> None:
         )
         assert request.flow_endpoint_placement.sink_placement == FixedPlacement(device)
         assert request.local_worker_config == ValidLocalWorkerConfig(device, True)
-        assert 0.2 <= request.qos_requirements.max_mean_response_time <= 5
+        lower, upper = scenario.config.flows.deadline_s
+        assert lower <= request.qos_requirements.max_mean_response_time <= upper
     problem = DefaultGurobiProblemBuilder().build(
         requests,
         large,
         ProblemConfig(**scenario.config.optimization.model_dump(exclude={"objective"})),
     )
-    assert all(len(models) == 6 for models in problem.models_by_flow.values())
+    assert all(len(models) == 10 for models in problem.models_by_flow.values())
     assert device in problem.workers
+
+
+@pytest.mark.asyncio
+async def test_subset_bounds_follow_actual_scenario(scenario: Scenario) -> None:
+    spec = RunSpec("main", 42, scenario.config.main.loads[0], 7, 10, 0, 0, 300)
+    for invalid in (
+        replace(spec, flow_count=scenario.config.flows.pool_size + 1),
+        replace(spec, model_count=len(scenario.models) + 1),
+        replace(spec, load=0.9),
+    ):
+        with pytest.raises(ValueError, match="does not belong"):
+            make_instance(scenario, invalid)
 
 
 @pytest.mark.asyncio

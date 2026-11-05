@@ -31,6 +31,29 @@ def record_objective(record: dict[str, Any]) -> str:
     return str(record.get("objective") or requested.get("objective") or "unspecified")
 
 
+def time_to_first_incumbent(record: dict[str, Any]) -> float | None:
+    value = finite_number(record.get("time_to_first_incumbent_s"))
+    return value if value is not None and value >= 0 else None
+
+
+def incumbent_points(record: dict[str, Any]) -> list[tuple[float, float | None]]:
+    """Preserve missing samples so plotting cannot bridge unavailable values."""
+    statistics = record.get("raw_solver_statistics")
+    if not isinstance(statistics, dict):
+        return []
+    history = statistics.get("incumbent_history")
+    if not isinstance(history, list):
+        return []
+    points = []
+    for sample in history:
+        if not isinstance(sample, dict):
+            continue
+        timestamp = finite_number(sample.get("runtime_s"))
+        if timestamp is not None and timestamp >= 0:
+            points.append((timestamp, finite_number(sample.get("objective_value"))))
+    return points
+
+
 def aggregate(records: list[dict[str, Any]]) -> list[dict[str, object]]:
     grouped: dict[tuple[str, float, str, str, int], list[dict[str, Any]]] = defaultdict(
         list
@@ -58,6 +81,11 @@ def aggregate(records: list[dict[str, Any]]) -> list[dict[str, object]]:
             if record["feasible_incumbent"]
             if (value := finite_number(record.get("final_gap"))) is not None
         ]
+        first_incumbents = [
+            value
+            for record in group
+            if (value := time_to_first_incumbent(record)) is not None
+        ]
         count = len(group)
         rows.append(
             {
@@ -69,6 +97,10 @@ def aggregate(records: list[dict[str, Any]]) -> list[dict[str, object]]:
                 "completed_count": count,
                 "runtime_observed_count": len(runtimes),
                 "gap_observed_count": len(gaps),
+                "first_incumbent_observed_count": len(first_incumbents),
+                "first_incumbent_median_s": (
+                    median(first_incumbents) if first_incumbents else None
+                ),
                 "runtime_median_s": median(runtimes) if runtimes else None,
                 "runtime_mean_s": sum(runtimes) / len(runtimes) if runtimes else None,
                 "runtime_min_s": min(runtimes) if runtimes else None,
@@ -134,6 +166,9 @@ def analyze(directory: Path) -> None:
             and record["load"] == load
             and record_objective(record) == objective
         ]
+        plot_first_incumbent(selected, rows, destination, campaign, load, objective)
+        for record in selected:
+            plot_incumbent_history(record, destination)
         for dimension, label in DIMENSIONS.items():
             subset = [
                 row
@@ -203,3 +238,102 @@ def analyze(directory: Path) -> None:
                     / f"{campaign}-{objective}-load-{load}-{dimension}.{extension}"
                 )
             plt.close(figure)
+
+
+def plot_first_incumbent(
+    records: list[dict[str, Any]],
+    rows: list[dict[str, object]],
+    destination: Path,
+    campaign: str,
+    load: float,
+    objective: str,
+) -> None:
+    observed = [
+        record for record in records if time_to_first_incumbent(record) is not None
+    ]
+    if not observed:
+        return
+    import matplotlib.pyplot as plt
+
+    figure, axes = plt.subplots(1, 3, figsize=(14, 4), constrained_layout=True)
+    for axis, (dimension, label) in zip(axes, DIMENSIONS.items(), strict=True):
+        for timeout, marker, legend in (
+            (False, "o", "Before timeout"),
+            (True, "x", "Timeout with incumbent"),
+        ):
+            subset = [
+                record for record in observed if record["timeout_reached"] == timeout
+            ]
+            axis.scatter(
+                [record[dimension] for record in subset],
+                [time_to_first_incumbent(record) for record in subset],
+                marker=marker,
+                label=legend,
+                alpha=0.65,
+            )
+        summaries = [
+            row
+            for row in rows
+            if row["campaign"] == campaign
+            and row["load"] == load
+            and row["objective"] == objective
+            and row["dimension"] == dimension
+            and row["first_incumbent_median_s"] is not None
+        ]
+        axis.plot(
+            [row["size"] for row in summaries],
+            [row["first_incumbent_median_s"] for row in summaries],
+            color="black",
+            marker="_",
+            label="Observed median",
+        )
+        axis.set_xlabel(label)
+        axis.set_ylabel("Time to first incumbent (s)")
+        axis.set_xticks(sorted({record[dimension] for record in records}))
+        axis.set_ylim(bottom=0)
+        axis.legend(fontsize=8)
+    figure.suptitle(
+        f"{campaign}; objective={objective}; reference load={load}; "
+        f"observed={len(observed)}/{len(records)}; other factors pooled"
+    )
+    for extension in ("pdf", "png"):
+        figure.savefig(
+            destination
+            / f"{campaign}-{objective}-load-{load}-time-to-first-incumbent.{extension}"
+        )
+    plt.close(figure)
+
+
+def plot_incumbent_history(record: dict[str, Any], destination: Path) -> None:
+    points = incumbent_points(record)
+    if not any(value is not None for _, value in points):
+        return
+    import matplotlib.pyplot as plt
+
+    directory = destination / "incumbents"
+    directory.mkdir(exist_ok=True)
+    figure, axis = plt.subplots(figsize=(9, 4), constrained_layout=True)
+    axis.step(
+        [timestamp for timestamp, _ in points],
+        [value if value is not None else math.nan for _, value in points],
+        where="post",
+        marker=".",
+        markersize=3,
+        label="Incumbent (1 s samples + termination)",
+    )
+    first = time_to_first_incumbent(record)
+    if first is not None:
+        axis.axvline(first, linestyle=":", color="black", label="First incumbent")
+    axis.set_xlabel("Solver runtime (s)")
+    axis.set_ylabel("Objective value")
+    axis.set_xlim(left=0)
+    axis.legend(fontsize=8)
+    axis.set_title(
+        f"{record['campaign']}; objective={record_objective(record)}; load={record['load']}\n"
+        f"workers={record['worker_count']}; flows={record['flow_count']}; "
+        f"models={record['model_count']}; seed={record['seed']}\n"
+        f"{record['run_id']}"
+    )
+    for extension in ("pdf", "png"):
+        figure.savefig(directory / f"{record['run_id']}.{extension}")
+    plt.close(figure)

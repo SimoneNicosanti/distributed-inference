@@ -39,6 +39,12 @@ class ProblemConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class SolverIncumbentSample:
+    runtime_s: float
+    objective_value: float | None
+
+
+@dataclass(frozen=True, slots=True)
 class SolverRunStatistics:
     """Native solver observations, collected before its model is disposed."""
 
@@ -62,6 +68,8 @@ class SolverRunStatistics:
     general_constraints: int = 0
     node_count: float | None = None
     objective: str = ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME.value
+    time_to_first_incumbent_s: float | None = None
+    incumbent_history: tuple[SolverIncumbentSample, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +84,7 @@ class SolverConfig:
         default=None, repr=False, compare=False
     )
     formulation: FormulationKind = FormulationKind.COMPACT
+    record_incumbent_history: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "objective", ObjectiveKind(self.objective))

@@ -9,6 +9,9 @@ from gurobipy import GRB
 from controller.adapters.outbound.optimization.gurobi_formulations import (
     CompactFormulation,
 )
+from controller.adapters.outbound.optimization.gurobi_incumbent import (
+    GurobiIncumbentTracker,
+)
 from controller.adapters.outbound.optimization.gurobi_objective import (
     set_objective,
 )
@@ -32,6 +35,7 @@ from controller.domain.optimization.solving.optimization_solution import (
     OptimizationSolution,
 )
 from controller.domain.optimization.solving.solver_config import (
+    ObjectiveKind,
     ProblemConfig,
     SolverConfig,
     SolverRunStatistics,
@@ -55,20 +59,23 @@ def _finite_attribute(model: gp.Model, name: str) -> float | None:
 
 
 def _observe_model(
-    model: gp.Model, config: SolverConfig, construction_time_s: float
+    model: gp.Model,
+    config: SolverConfig,
+    construction_time_s: float,
+    incumbent_tracker: GurobiIncumbentTracker | None = None,
 ) -> None:
     if config.observer is None:
         return
     status = _finite_attribute(model, "Status")
     solution_count = int(_finite_attribute(model, "SolCount") or 0)
+    runtime_s = _finite_attribute(model, "Runtime")
+    objective_value = _finite_attribute(model, "ObjVal") if solution_count else None
     config.observer(
         SolverRunStatistics(
             status=int(status) if status is not None else None,
-            runtime_s=_finite_attribute(model, "Runtime"),
+            runtime_s=runtime_s,
             solution_count=solution_count,
-            objective_value=(
-                _finite_attribute(model, "ObjVal") if solution_count else None
-            ),
+            objective_value=objective_value,
             objective_bound=_finite_attribute(model, "ObjBound"),
             relative_gap=(
                 _finite_attribute(model, "MIPGap") if solution_count else None
@@ -87,6 +94,16 @@ def _observe_model(
             general_constraints=model.NumGenConstrs,
             node_count=_finite_attribute(model, "NodeCount"),
             objective=config.objective.value,
+            time_to_first_incumbent_s=(
+                incumbent_tracker.time_to_first_incumbent_s
+                if incumbent_tracker is not None
+                else None
+            ),
+            incumbent_history=(
+                incumbent_tracker.samples(runtime_s, objective_value)
+                if incumbent_tracker is not None
+                else ()
+            ),
         )
     )
 
@@ -241,10 +258,25 @@ class GurobiSolver(Solver):
                     context=context,
                 )
                 construction_time_s = perf_counter() - construction_started
+                incumbent_tracker = (
+                    GurobiIncumbentTracker(
+                        minimize=(
+                            self._config.objective
+                            != ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY
+                        )
+                    )
+                    if self._config.record_incumbent_history
+                    else None
+                )
                 try:
-                    model.optimize()
+                    if incumbent_tracker is None:
+                        model.optimize()
+                    else:
+                        model.optimize(incumbent_tracker)
                 finally:
-                    _observe_model(model, self._config, construction_time_s)
+                    _observe_model(
+                        model, self._config, construction_time_s, incumbent_tracker
+                    )
 
                 if model.Status == GRB.INFEASIBLE:
                     raise OptimizationInfeasibleError(

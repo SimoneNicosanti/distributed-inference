@@ -3,7 +3,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from scalability_benchmark.analysis import aggregate
+from scalability_benchmark.analysis import (
+    aggregate,
+    incumbent_points,
+    time_to_first_incumbent,
+)
 from scalability_benchmark.persistence import ResultStore, read_journal
 
 
@@ -111,6 +115,39 @@ def test_historical_objective_metadata_is_preserved() -> None:
     )
 
 
+def test_first_incumbent_summary_preserves_zero_and_missing_observations() -> None:
+    zero = {**record("zero"), "time_to_first_incumbent_s": 0.0}
+    later = {**record("later"), "time_to_first_incumbent_s": 2.0}
+    invalid = {**record("invalid"), "time_to_first_incumbent_s": float("nan")}
+    rows = aggregate([zero, later, invalid, record("historic")])
+    assert time_to_first_incumbent(zero) == 0.0
+    assert time_to_first_incumbent(invalid) is None
+    for row in rows:
+        assert row["first_incumbent_observed_count"] == 2
+        assert row["first_incumbent_median_s"] == 1.0
+    assert all(
+        row["first_incumbent_median_s"] is None
+        for row in aggregate([record("historic")])
+    )
+
+
+def test_incumbent_points_keep_missing_values_and_final_fraction() -> None:
+    traced = {
+        **record("traced"),
+        "raw_solver_statistics": {
+            "incumbent_history": [
+                {"runtime_s": 0.0, "objective_value": None},
+                {"runtime_s": 1.0, "objective_value": 5.0},
+                {"runtime_s": 2.0, "objective_value": 0.0},
+                {"runtime_s": 2.3, "objective_value": 0.0},
+            ]
+        },
+    }
+    assert incumbent_points(traced) == [(0, None), (1, 5), (2, 0), (2.3, 0)]
+    assert incumbent_points(record("historic")) == []
+    assert incumbent_points({"raw_solver_statistics": None}) == []
+
+
 def test_offline_plot_generation(tmp_path: Path) -> None:
     pytest.importorskip("matplotlib")
     from scalability_benchmark.analysis import analyze
@@ -121,3 +158,43 @@ def test_offline_plot_generation(tmp_path: Path) -> None:
     assert (tmp_path / "analysis/aggregated.csv").is_file()
     assert len(list((tmp_path / "analysis").glob("*.pdf"))) == 3
     assert len(list((tmp_path / "analysis").glob("*.png"))) == 3
+
+
+def test_offline_incumbent_plot_generation(tmp_path: Path) -> None:
+    pytest.importorskip("matplotlib")
+    from scalability_benchmark.analysis import analyze
+
+    traced = {
+        **record("traced", "timeout_with_incumbent", 2.3),
+        "objective": "deadline_violations",
+        "feasible_incumbent": True,
+        "time_to_first_incumbent_s": 0.2,
+        "raw_solver_statistics": {
+            "incumbent_history": [
+                {"runtime_s": 0.0, "objective_value": None},
+                {"runtime_s": 1.0, "objective_value": 1.0},
+                {"runtime_s": 2.0, "objective_value": 0.0},
+                {"runtime_s": 2.3, "objective_value": 0.0},
+            ]
+        },
+    }
+    with ResultStore(tmp_path, resume=False) as store:
+        store.append(traced)
+        store.append(record("historic"))
+    analyze(tmp_path)
+    destination = tmp_path / "analysis"
+    for extension in ("pdf", "png"):
+        assert (
+            destination
+            / f"main-deadline_violations-load-0.6-time-to-first-incumbent.{extension}"
+        ).is_file()
+        assert (destination / f"incumbents/traced.{extension}").is_file()
+        assert not (destination / f"incumbents/historic.{extension}").exists()
+    with (destination / "aggregated.csv").open(newline="") as handle:
+        observed = [
+            row
+            for row in csv.DictReader(handle)
+            if row["objective"] == "deadline_violations"
+        ]
+    assert len(observed) == 3
+    assert all(row["first_incumbent_observed_count"] == "1" for row in observed)

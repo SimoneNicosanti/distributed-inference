@@ -22,6 +22,7 @@ SUMMARY_FIELDS = (
     "worker_count",
     "timeout_s",
     "solver_runtime_s",
+    "time_to_first_incumbent_s",
     "wall_time_s",
     "construction_time_s",
     "solver_status",

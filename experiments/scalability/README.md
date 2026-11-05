@@ -29,7 +29,7 @@ PyTorch CPU index. It does not install CUDA, NVIDIA runtime packages or Triton.
 
 ## Explicit model preparation
 
-Place all six ONNX files in `experiments/scalability/models/`, or prepare them:
+Place all ten ONNX files in `experiments/scalability/models/`, or prepare them:
 
 ```bash
 uv sync --project experiments/scalability --locked --group export
@@ -49,6 +49,12 @@ uv run --project experiments/scalability --locked --group export python experime
 Neither the runner nor the default exporter downloads model files. Existing model
 files cause an error unless `--force` is supplied.
 
+To add only the four new models while retaining existing artifacts:
+
+```bash
+uv run --project experiments/scalability --locked --group export python experiments/scalability/scripts/export_models.py --models efficientnet_b1 efficientnet_b3 efficientnet_b5 efficientnet_b6
+```
+
 The script uses eager export (`dynamo=False`), FP32, static batch 1, opset 17,
 input `images`, output `logits`, and deterministic unique ONNX node names.
 It then invokes the existing `OnnxModelOptimizer` at BASIC optimization level.
@@ -59,8 +65,11 @@ versions and artifact hashes. Shape, export seed, opset and weight mode are YAML
 settings, with explicit command-line overrides. Keep the local weight files and
 export manifests when archiving an experiment.
 
+The pool contains ResNet-50/101/152 and EfficientNet-B0 through B6.
 Default image sizes: ResNet-50/101/152 and EfficientNet-B0 224x224,
-EfficientNet-B2 260x260, EfficientNet-B4 380x380, three channels.
+B1 240x240, B2 260x260, B3 300x300, B4 380x380, B5 456x456,
+B6 528x528, three channels. The exporter supports `--models NAME [NAME ...]`
+to select configured entries without replacing the others.
 Dynamic symbols in manually supplied models receive exactly one configured value.
 Contradictory static dimensions and anonymous dimensions fail validation.
 The existing profiler currently requires input `images`; it is not modified.
@@ -71,7 +80,7 @@ The existing profiler currently requires input `images`; it is not modified.
 # Six representative runs, native solver timeout 60 seconds, then offline analysis.
 uv run --project experiments/scalability --locked scalability pilot --output experiments/scalability/results/pilot --analyze
 
-# Main: seed 42, load 0.6, 5 flow counts x 6 model counts x 11 infrastructures.
+# Main: seed 42, load 0.75, 7 flow counts x 10 model counts x 11 infrastructures.
 uv run --project experiments/scalability --locked scalability main --output experiments/scalability/results/main
 
 # Resume: completed timeouts and proven infeasibility are completed outcomes.
@@ -95,10 +104,12 @@ Campaign `enabled` flags describe default inclusion; explicitly selecting a name
 campaign opts into it, including sensitivity even with its default `enabled: false`.
 There is no command that implicitly executes both campaigns.
 
-Main: **330** configurations, 300-second timeout and relative gap **0.01**.
-Sensitivity: **198** additional configurations, loads 0.3/0.8, flow counts 1/3/5,
-model counts 1/3/6, all 11 infrastructures. Solver time budgets: 27.5 and 16.5
-hours, 44 hours combined. Model construction, profiling, persistence and solver
+Main: **770** configurations, 300-second timeout and relative gap **0.01**.
+Sensitivity: **198** additional configurations, loads 0.3/0.8, flow counts 1/4/7,
+model counts 1/5/10, all 11 infrastructures. Solver time budgets: 64 hours
+10 minutes and 16 hours 30 minutes, 80 hours 40 minutes combined.
+Main plus sensitivity contains **968** runs; the six-case pilot brings this to
+**974** per objective. Model construction, profiling, persistence and solver
 shutdown add time; these figures are not strict wall-clock bounds.
 
 ## Objective selection
@@ -128,7 +139,7 @@ deduplicated while preserving order; `all` must be used alone. There is no
 hierarchical optimization or response-time tie-break. The former response-slack
 objective names are replaced by the four values above.
 
-The counts/budgets above are **per objective**. Selecting all four gives 1,320
+The counts/budgets above are **per objective**. Selecting all four gives 3,080
 main runs, 792 sensitivity runs and 24 pilot runs with the default configuration;
 solver time budgets scale by the number selected. `--limit N` limits total runs
 after objective expansion. Run IDs include the objective, so `--resume` skips
@@ -159,7 +170,7 @@ repair. Report pilot findings before changing assumptions.
   is synthetic, not measured ImageNet performance. Candidate sets are prefixes of
   a separate seeded permutation. `PerformanceMetricType.ACCURACY` uses `>=` with
   matching dataset; every flow's minimum is zero.
-* One full scenario is generated per seed: six models, five flows, eleven workers
+* One full scenario is generated per seed: ten models, seven flows, eleven workers
   and 110 directed links. Instances select prefixes/subsets without resampling.
   Worker IDs remain stable, and identical tiers share execution profiles.
 * Infrastructure: device alone, one through five edges, then one through five
@@ -192,17 +203,25 @@ repair. Report pilot findings before changing assumptions.
   bytes/s and RTT seconds. RTT is twice sampled one-way latency; the formulation
   already adds RTT/2 once. It retains original cut-tensor transmission coefficients
   and source-worker network sharing. No new NIC scheduler or routing is introduced.
-* Five Poisson flows have independently sampled weights in [0.8, 1.2]. Reference
+* Seven Poisson flows have independently sampled weights in [0.8, 1.2]. Reference
   service time is the complete ResNet-50 CPU model on the device, always available
   for calibration even if absent from a candidate prefix. For load `L`:
 
-  `lambda_i = L * weight_i / (reference_service_time * sum(all_five_weights))`.
+  `lambda_i = L * weight_i / (reference_service_time * sum(all_seven_weights))`.
 
-  Thus all five reference flows together offer utilization `L`. Smaller prefixes
+  Main and pilot use `L = 0.75`, increasing each flow's arrival rate by 25%
+  compared with `L = 0.6` for the same seven-flow pool. Sensitivity retains
+  loads 0.3 and 0.8.
+
+  Thus all seven reference flows together offer utilization `L`. Smaller prefixes
   do not rescale rates. Sensitivity scales arrivals only: IDs, deadlines, models,
   execution, workers and networking remain identical for a seed.
-* Deadlines are uniform in [0.2, 5] seconds. Ingress and sink are fixed to the
-  device, which is also an inference runner. The required finite energy limit is
+  Expanding the old six-model/five-flow pool changes model permutation, synthetic
+  accuracies and arrival-rate calibration relative to that earlier configuration.
+  This defines a new scenario with new IDs; do not treat old results as completed
+  runs of the expanded campaign. Prefixes within the new scenario remain stable.
+* Deadlines are uniform in [0.2, 3] seconds for all campaigns. Ingress and sink
+  are fixed to the device, which is also an inference runner. The required finite energy limit is
   explicit YAML metadata; the current formulation does not enforce energy.
 * Seven components use the existing formulation's component definition, including
   its input/output boundary layers. Priorities, queue discretization, objective,
@@ -229,7 +248,26 @@ The positive-gap label describes observed evidence; it does not infer an
 unreported internal stopping cause. Missing objectives/gaps are null, not zero.
 Infinite bounds/gaps are unavailable. Wall time, native runtime and construction
 time are distinct. Construction includes preparation and environment startup.
-Time to first incumbent is not collected.
+The benchmark enables `SolverConfig.record_incumbent_history` (default false for
+other callers). `time_to_first_incumbent_s` records the first finite MIPSOL
+candidate using native solver runtime, excluding construction. It appears in
+JSONL and `summary.csv`. Strict improvements are filtered for minimization or
+maximization; non-improving candidates are ignored.
+
+`raw_solver_statistics.incumbent_history` in each finished JSONL event contains
+`{runtime_s, objective_value}` samples at 0, 1, 2, ... seconds, plus termination
+when it falls between whole seconds. Samples carry forward the best objective
+observed by that time; before the first incumbent the value is null. A zero
+objective remains zero. The trace is reconstructed from timestamped improvements
+because callbacks are not invoked on a fixed timer. Multiple improvements within
+a second contribute the best value available at its next sampling boundary.
+The native final objective is included at termination. If no discovery callback
+was observed, time-to-first remains null rather than using termination time.
+
+These observations are buffered in memory and persisted with the finished run,
+not streamed during optimization. A process crash loses the unfinished trace;
+resume reruns that attempt. Existing completed runs are not backfilled.
+No additional bound/gap progress trace is collected.
 
 Source hashes include dirty production files, the experiment and its lockfile.
 Artifact hashes include ONNX external-data sidecars. Cached static profiles are
@@ -240,7 +278,8 @@ incompatible results. Fixed instances are reproducible; wall-clock-limited solve
 results and runtimes need not be identical across repetitions.
 
 References: [PyTorch ONNX exporter](https://docs.pytorch.org/docs/stable/onnx.html),
-[Gurobi parameters](https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html).
+[Gurobi parameters](https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html),
+[Gurobi callbacks](https://docs.gurobi.com/projects/optimizer/en/current/reference/numericcodes/callbacks.html).
 
 ## Persistence and analysis
 
@@ -270,9 +309,30 @@ available incumbent gaps. Other scaling factors and seeds are pooled explicitly;
 raw CSV allows conditional analysis. With one seed, these are descriptive plots,
 not estimates with independent-replication confidence intervals.
 
+The same `analyze` command also generates these PDF/PNG files when the required
+observations are present:
+
+* `analysis/<campaign>-<objective>-load-<load>-time-to-first-incumbent.{pdf,png}`:
+  time to first incumbent against workers, flows and candidate models, showing
+  individual observations, timeout markers and the observed median. The title
+  reports observed/total completed attempts. Missing times are excluded, not
+  interpreted as zero or as termination time. `aggregated.csv` includes
+  `first_incumbent_observed_count` and `first_incumbent_median_s`.
+* `analysis/incumbents/<run_id>.{pdf,png}`: one step curve per run of objective
+  value against native solver runtime, using the stored one-second samples and
+  final observation. A vertical line marks the exact first-incumbent time when
+  available. Missing values remain gaps; zero objectives remain visible. Curves
+  stop at the last stored sample and do not extrapolate past termination.
+
+Campaigns, objectives and loads remain separate. Historical runs without these
+metrics are skipped for the corresponding new plots; all existing analysis
+outputs remain available. Analysis reads the latest attempt per run and does not
+invoke the solver. A large campaign produces two incumbent-curve files per run
+with a usable history.
+
 ## Tests and static verification
 
-Tests cover configuration, 330/198 grids, nested reproducibility, model accuracy,
+Tests cover configuration, 770/198 grids, nested reproducibility, model accuracy,
 worker homogeneity, endpoint placement, links, calibration, roofline, liveness,
 profiling cache/production port, accuracy eligibility, solver observations/status,
 JSONL/CSV integrity, recovery, writer exclusion, aggregation and plotting.

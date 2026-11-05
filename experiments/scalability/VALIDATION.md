@@ -6,14 +6,94 @@ pilot/campaign execution, plots, Docker or microservices. No environment sync or
 package installation was performed. The experiment lockfile was resolved and
 checked; this validates dependency resolution, not installation or runtime.
 
-## Checks performed
+## Incumbent plotting verification (2026-11-05)
+
+`analyze` now adds a time-to-first-incumbent figure per campaign/objective/load,
+with worker/flow/model panels, individual observations, timeout markers, observed
+medians and coverage counts. Aggregated CSV rows expose the corresponding count
+and median. Each run with a usable incumbent history also produces its own
+PDF/PNG step curve under `analysis/incumbents/<run_id>.*`, including the first
+discovery marker and final fractional-second sample. Missing values become plot
+gaps; valid zero objectives and discovery times remain observations. Historical
+runs without the measurements are skipped for the relevant new figures.
+
+Ruff lint/format, focused strict mypy on the three changed Python files, the
+39-file syntax/grid/solver-flow checker and `git diff --check` passed. AST checks
+verify both plotting entry points are called from offline analysis and the
+incumbent curve uses post-step rendering. Added test definitions cover observed
+medians with missing/zero times, missing-history compatibility, zero objectives,
+fractional termination samples, output file names and CSV coverage counts.
+No tests, benchmark modules, plotting functions or solver runs were executed.
+Figure generation and visual appearance remain runtime-unverified.
+
+## Incumbent trace verification (2026-11-05)
+
+The benchmark opts into incumbent tracking; existing solver callers default to
+disabled. MIPSOL callbacks record native discovery times and strict objective
+improvements, respecting minimization/maximization. Final statistics reconstruct
+the best-known objective at integer seconds from zero through native runtime,
+plus a final fractional-second observation. No future value is backfilled into
+earlier samples. Missing incumbents remain null, including time-to-first when
+only a final native objective was available. Traces are persisted with finished
+JSONL records; time-to-first is also a summary CSV column. No live disk stream or
+additional bound/gap history was introduced.
+
+Ruff lint/format, focused strict mypy on seven changed Python files, the 39-file
+syntax/grid/solver-flow static checker and `git diff --check` passed. AST checks
+cover benchmark opt-in, callback wiring, callback query codes, absence of callback
+solver mutations and unchanged formulation call order. Added test definitions
+cover both objective directions, non-improvements, subsecond and exact-second
+events, zero objectives, unavailable incumbents and final-only observations.
+These tests were not executed. Native callback delivery, timing and serialized
+runtime results remain unverified; no tests, solves or campaigns were run.
+
+## Workload calibration verification (2026-11-05)
+
+User-approved defaults: reference load 0.75 for main and pilot; uniform deadlines
+in [0.2, 3] seconds for all campaigns. Sensitivity retains loads 0.3 and 0.8.
+For the same seven-flow reference pool, main/pilot arrival rates are 25% higher
+than at load 0.6. Configuration, default-contract assertions, scenario fixtures
+and README were updated together. The scenario tests obtain their load and
+deadline bounds from configuration.
+
+Ruff lint/format, focused strict mypy on the three changed Python files,
+the 37-file compilation/grid/solver-flow static checker and `git diff --check`
+passed. These are revised experimental assumptions, not measurements from a
+pilot. No dynamic tests, profiling, exports, solves or campaigns were executed.
+Run counts remain 770 main, 198 sensitivity and six pilot cases per objective.
+
+## Pool expansion verification (2026-11-05)
+
+Defaults now contain ten models and seven flows. Main enumerates 770 configurations
+per objective; sensitivity samples flows 1/4/7 and models 1/5/10 for 198 runs.
+The six pilot cases include the new maximum. Selecting all four objectives gives
+3,080 main runs. Validation and subset bounds use configured/actual pool sizes,
+including pilot checks, rather than the former hardcoded six/five limits.
+
+For this change: Ruff lint/format passed; the static checker compiled 37 Python
+files and verified YAML/TOML, the 770/198 grids, pool sizes and unchanged solver
+call order; `git diff --check` passed. Targeted strict mypy passed on all seven
+modified Python files with the documented external-library overrides.
+An extended mypy scan of all 29 experiment Python files reports three pre-existing
+`[index]` errors in unchanged `tests/test_solver.py:185-187`: nested indexing of
+values typed as `object`. That file is unchanged relative to HEAD. The extended
+scan is therefore not reported as clean.
+
+No pytest, export, profiling, solve, pilot or plot was executed. The exporter now
+accepts `--models` so the four added EfficientNets can be prepared explicitly
+without replacing existing artifacts. Expanding the scenario changes pool-based
+model selection, synthetic accuracies, arrival calibration and resulting run IDs.
+
+## Framework verification record
 
 * Ruff lint and formatting checks: passed for experiment source, scripts, tests
   and the four production files changed by this work.
 * Python in-memory compilation: **32 files**. No module execution or `.pyc` writes.
-* YAML and TOML parsing: passed. Static default-grid arithmetic: **330 main**,
+* YAML and TOML parsing: passed. Static default-grid arithmetic: **770 main**,
   **198 sensitivity**, **11 ordered infrastructure configurations**, seed 42,
-  300-second timeout, 0.01 gap, 60-second pilot, seven components.
+  300-second timeout, 0.01 gap, 60-second pilot, seven components,
+  ten candidate models and seven flows. Counts are per objective; all four
+  objectives give 3,080 main and 792 sensitivity runs, plus 24 pilot runs.
 * AST comparison: native variable/constraint/objective/solution function call
   signatures and order inside `GurobiSolver._solve` match the repository HEAD.
 * Git diff: queue, memory, network, assignment, variable, QoS and objective
