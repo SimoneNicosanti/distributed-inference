@@ -4,12 +4,12 @@ from shared.plan.hop_logical_id import PlannedSinkReplicaId
 from worker.application.hop_handler.abc.hop_handler import HopHandler
 from worker.application.postbox.abc.outbox import Outbox
 from worker.domain.hop.hop_invocation import HopInvocationRequest, HopInvocationResult
-from worker.domain.model.model_pass import ModelPassResult
+from worker.domain.model.model_pass import ModelPassOutcome, ModelPassResult
 from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
 class DefaultSinkHopHandler(HopHandler[PlannedSinkReplicaId]):
-    def __init__(self, outbox: Outbox[ModelPassResult]) -> None:
+    def __init__(self, outbox: Outbox[ModelPassOutcome]) -> None:
         super().__init__()
         self._outbox = outbox
 

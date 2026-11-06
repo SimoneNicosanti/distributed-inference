@@ -33,7 +33,7 @@ from worker.domain.hop.hop_invocation import (
 )
 
 
-class DefaultPartitionReplicaHopHandler(
+class DefaultPlannedPartitionReplicaHopHandler(
     HopHandler[PlannedPartitionReplicaId], AsyncLifecycle
 ):
     def __init__(
@@ -77,21 +77,25 @@ class DefaultPartitionReplicaHopHandler(
                 hop_invocation_result_future,
             ) = await self._hop_invocation_request_scheduler.dequeue()
 
-            activity_request = (
-                self._activity_request_factory.create_request_for_activity_type(
-                    ActivityType.EXECUTION_INFERENCE
+            try:
+                activity_request = (
+                    self._activity_request_factory.create_request_for_activity_type(
+                        ActivityType.EXECUTION_INFERENCE
+                    )
                 )
-            )
-            activity_grant = await self._activity_manager.acquire_activity_grant(
-                activity_request
-            )
-
-            async with activity_grant:
-                partition_invocation_result = await self._execute_partition_invocation(
-                    partition_invocation_request
+                activity_grant = await self._activity_manager.acquire_activity_grant(
+                    activity_request
                 )
 
-            hop_invocation_result_future.set_result(partition_invocation_result)
+                async with activity_grant:
+                    partition_invocation_result = (
+                        await self._execute_partition_invocation(
+                            partition_invocation_request
+                        )
+                    )
+                hop_invocation_result_future.set_result(partition_invocation_result)
+            except:
+                pass
 
     @override
     async def start(self) -> None:

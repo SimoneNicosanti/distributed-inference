@@ -131,8 +131,8 @@ from worker.application.hop_handler.default_ingress_hop_handler import (
 from worker.application.hop_handler.default_partition_executor_registry import (
     DefaultPartitionExecutorRegistry,
 )
-from worker.application.hop_handler.default_partition_replica_hop_handler import (
-    DefaultPartitionReplicaHopHandler,
+from worker.application.hop_handler.default_planned_partition_replica_hop_handler import (
+    DefaultPlannedPartitionReplicaHopHandler,
 )
 from worker.application.hop_handler.default_sink_hop_handler import (
     DefaultSinkHopHandler,
@@ -146,7 +146,8 @@ from worker.application.hop_invocation.hop_invocation_coordinator import (
 from worker.application.ports.outbound.profiling.resource.gpu_profiler import (
     GpuProfiler,
 )
-from worker.application.postbox.default_postbox import DefaultPostbox
+from worker.application.postbox.keyed_postbox import KeyedPostbox
+from worker.application.postbox.ordered_postbox import OrderedPostbox
 from worker.application.profiling.default_model_execution_profiler import (
     DefaultModelExecutionProfiler,
 )
@@ -176,7 +177,9 @@ from worker.domain.activity.activity_request import ResourceType
 from worker.domain.hop.hop_invocation_contribution import (
     HopInvocationContribution,
 )
-from worker.domain.model.model_pass import ModelPassError, ModelPassResult
+from worker.domain.model.model_pass import (
+    ModelPassOutcome,
+)
 from worker.domain.profiling.model_execution.model_execution_profile import Backend
 
 
@@ -239,7 +242,7 @@ class DefaultCompositionRoot(CompositionRoot):
 
             request_assembler = DefaultHopInvocationRequestAssembler(worker_plan_store)
 
-            hop_contribution_collection_postbox = DefaultPostbox[
+            hop_contribution_collection_postbox = OrderedPostbox[
                 HopContributionCollectionKey,
                 HopContributionCollection,
             ](
@@ -254,7 +257,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 outbox=hop_contribution_collection_postbox,
             )
 
-            partition_replica_handler = DefaultPartitionReplicaHopHandler(
+            partition_replica_handler = DefaultPlannedPartitionReplicaHopHandler(
                 activity_request_factory=activity_request_factory,
                 activity_manager=activity_manager,
                 hop_invocation_request_scheduler=PlanBasedPartitionInvocationRequestScheduler(
@@ -263,15 +266,11 @@ class DefaultCompositionRoot(CompositionRoot):
                 partition_executor_registry=partition_executor_registry,
             )
 
-            result_postbox = DefaultPostbox[ModelPassId, ModelPassResult](
-                key_compute_callable=lambda result: result.context.model_pass_id
-            )
-            result_error_postbox = DefaultPostbox[ModelPassId, ModelPassError](
-                key_compute_callable=lambda error: error.context.model_pass_id
+            outcome_postbox = KeyedPostbox[ModelPassId, ModelPassOutcome](
+                key_compute_callable=lambda outcome: outcome.context.model_pass_id
             )
             model_pass_result_retriever = DefaultModelPassResultRetriever(
-                result_inbox=result_postbox,
-                error_inbox=result_error_postbox,
+                outcome_inbox=outcome_postbox,
             )
 
             invocation_coordinator = HopInvocationCoordinator(
@@ -280,7 +279,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 assembler=request_assembler,
                 ingress_hop_handler=DefaultIngressHopHandler(),
                 partition_replica_hop_handler=partition_replica_handler,
-                sink_hop_handler=DefaultSinkHopHandler(result_postbox),
+                sink_hop_handler=DefaultSinkHopHandler(outcome_postbox),
                 contribution_propagator=DefaultHopContributionPropagator(
                     router=DefaultHopOutputRouter(worker_plan_store),
                     dispatcher=contribution_dispatcher,

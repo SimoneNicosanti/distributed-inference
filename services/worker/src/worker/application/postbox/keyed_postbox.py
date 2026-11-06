@@ -1,20 +1,19 @@
 import asyncio
-from collections import OrderedDict
 from collections.abc import Callable
 from typing import override
 
-from worker.application.postbox.abc.inbox import Inbox
+from worker.application.postbox.abc.inbox import KeyedInbox
 from worker.application.postbox.abc.outbox import Outbox
 
 
-class DefaultPostbox[KeyT, ValT](
-    Inbox[KeyT, ValT],
+class KeyedPostbox[KeyT, ValT](
+    KeyedInbox[KeyT, ValT],
     Outbox[ValT],
 ):
     def __init__(self, key_compute_callable: Callable[[ValT], KeyT]) -> None:
         self._key_compute_callable = key_compute_callable
 
-        self._available: OrderedDict[KeyT, ValT] = OrderedDict()
+        self._available: dict[KeyT, ValT] = {}
         self._extracted: set[KeyT] = set()
         self._condition = asyncio.Condition()
 
@@ -24,7 +23,7 @@ class DefaultPostbox[KeyT, ValT](
 
         async with self._condition:
             if key in self._available or key in self._extracted:
-                raise ValueError(f"Duplicate result: {key}")
+                raise ValueError(f"Duplicate value: {key}")
 
             self._available[key] = value
             self._condition.notify_all()
@@ -37,21 +36,9 @@ class DefaultPostbox[KeyT, ValT](
             )
 
             if key in self._extracted:
-                raise ValueError(f"Result already extracted: {key}")
+                raise ValueError(f"Key already extracted: {key}")
 
             value = self._available.pop(key)
             self._extracted.add(key)
-            self._condition.notify_all()
-
-            return value
-
-    @override
-    async def extract_next(self) -> ValT:
-        async with self._condition:
-            await self._condition.wait_for(lambda: bool(self._available))
-
-            key, value = self._available.popitem(last=False)
-            self._extracted.add(key)
-            self._condition.notify_all()
 
             return value

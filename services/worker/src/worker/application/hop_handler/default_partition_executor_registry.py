@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from shared.plan.hop import PlannedExecutableHopId
 from shared.plan.plan_version import PlanVersion
 from worker.application.hop_handler.abc.partition_executor_registry import (
     PartitionExecutorRegistry,
@@ -11,7 +12,6 @@ from worker.application.hop_handler.abc.partition_executor_registry import (
 from worker.application.ports.outbound.partition_execution.partition_executor import (
     PartitionExecutor,
 )
-from shared.plan.hop import PlannedExecutableHopId
 
 
 class DefaultPartitionExecutorRegistry(PartitionExecutorRegistry):

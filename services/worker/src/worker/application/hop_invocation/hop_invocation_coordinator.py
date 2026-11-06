@@ -3,6 +3,7 @@ from contextlib import suppress
 from typing import cast, override
 
 from lifecycle.async_lifecycle import AsyncLifecycle
+from shared.plan.hop import PlannedInvocableHopId
 from shared.plan.hop_logical_id import (
     PlannedIngressReplicaId,
     PlannedPartitionReplicaId,
@@ -10,7 +11,6 @@ from shared.plan.hop_logical_id import (
 )
 from worker.application.hop_contribution_rcv.abc.contribution_gathering_policy import (
     HopContributionCollection,
-    HopContributionCollectionKey,
 )
 from worker.application.hop_contribution_snd.abc.hop_contribution_propagator import (
     HopContributionPropagator,
@@ -21,8 +21,7 @@ from worker.application.hop_handler.abc.hop_handler import (
 from worker.application.hop_invocation.abc.contribution_assembler import (
     ContributionAssembler,
 )
-from worker.application.postbox.abc.inbox import Inbox
-from shared.plan.hop import PlannedInvocableHopId
+from worker.application.postbox.abc.inbox import OrderedInbox
 from worker.domain.hop.hop_invocation import HopInvocationRequest, HopInvocationResult
 
 
@@ -30,7 +29,7 @@ class HopInvocationCoordinator(AsyncLifecycle):
     def __init__(
         self,
         max_concurrent_invocations: int,
-        inbox: Inbox[HopContributionCollectionKey, HopContributionCollection],
+        inbox: OrderedInbox[HopContributionCollection],
         assembler: ContributionAssembler,
         ingress_hop_handler: HopHandler[PlannedIngressReplicaId],
         partition_replica_hop_handler: HopHandler[PlannedPartitionReplicaId],

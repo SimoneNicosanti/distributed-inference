@@ -20,6 +20,7 @@ dependencies = [
   "onnx>=1.23",
   "onnx-tool>=1.0.1",
   "onnxruntime>=1.31.0",
+  "pulp[highs]>=4.2.0",
   "pydantic>=2.8",
   "redis>=8.0.1",
   "uvicorn[standard]",

@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager
 
+from shared.plan.hop import PlannedExecutableHopId
 from shared.plan.plan_version import PlanVersion
 from worker.application.ports.outbound.partition_execution.partition_executor import (
     PartitionExecutor,
 )
-from shared.plan.hop import PlannedExecutableHopId
 
 
 class PartitionExecutorRegistry(ABC):
