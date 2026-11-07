@@ -3,6 +3,6 @@ from abc import ABC, abstractmethod
 from worker.domain.model.model_pass import ModelPassError
 
 
-class FailureReporter(ABC):
+class FailurePropagator(ABC):
     @abstractmethod
-    async def report_failure(self, error: ModelPassError) -> None: ...
+    async def propagate_failure(self, error: ModelPassError) -> None: ...

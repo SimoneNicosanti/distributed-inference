@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from shared.plan.plan_version import PlanVersion
 from worker.domain.plan.deployment_plan import DeploymentPlan
+from worker.domain.plan.failure_plan import FailurePlan
 from worker.domain.plan.hop_routing_plan import HopRoutingPlan
 from worker.domain.plan.partition_execution_plan import PartitionExecutionPlan
 from worker.domain.plan.scheduling_plan import SchedulingPlan
@@ -14,6 +15,7 @@ class WorkerPlan:
     scheduling_plan: SchedulingPlan
     partition_execution_plan: PartitionExecutionPlan
     hop_routing_plan: HopRoutingPlan
+    failure_plan: FailurePlan
 
     def __post_init__(self) -> None:
         deployed_executable_hops = set(self.deployment_plan.executable_hops)

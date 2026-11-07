@@ -3,6 +3,7 @@ from enum import StrEnum, auto
 from uuid import UUID, uuid4
 
 from shared.context.model_invocation_context import ModelInvocationContext
+from shared.flow.flow import FlowId
 from shared.plan.plan_version import PlanVersion
 
 type ModelPassId = UUID
@@ -22,3 +23,9 @@ class ModelPassContext:
     plan_version: PlanVersion
     model_pass_type: ModelPassType
     model_pass_id: ModelPassId = field(default_factory=uuid4)
+
+    @property
+    def flow_id(
+        self,
+    ) -> FlowId:
+        return self.model_invocation_context.flow_id

@@ -9,32 +9,35 @@ import numpy as np
 import pyarrow as pa
 from pyarrow import flight
 
-from integration.dto.context.context_dto import ModelPassResultMetadataDto
+from integration.dto.context.context_dto import (
+    ModelPassErrorMetadataDto,
+    ModelPassResultMetadataDto,
+)
 from integration.sink.arrow.model_pass_result.arrow_model_pass_result_schema import (
     MODEL_PASS_ID_FIELD_NAME,
     RETRIEVE_RESULT_COMMAND,
+    build_failure_payload_schema,
     build_result_payload_schema,
     validate_retrieve_request_schema,
 )
 from shared.context.model_pass_context import ModelPassId
 from worker.adapters.context_mapper import model_pass_context_to_dto
-from worker.application.ports.inbound.sink.model_pass_result_retriever import (
-    ModelPassResultRetriever,
+from worker.application.ports.inbound.sink.model_pass_outcome_retriever import (
+    ModelPassOutcomeRetriever,
 )
-from worker.domain.model.model_pass import ModelPassResult
+from worker.domain.model.model_pass import ModelPassError, ModelPassOutcome
 
 
-class ArrowModelPassResultRetrieveServer(flight.FlightServerBase):
+class ArrowModelPassOutcomeRetrieveServer(flight.FlightServerBase):
     def __init__(
         self,
         location: str,
-        result_retriever: ModelPassResultRetriever,
+        outcome_retriever: ModelPassOutcomeRetriever,
         event_loop: asyncio.AbstractEventLoop,
     ) -> None:
         super().__init__(location)
-        self._result_retriever = result_retriever
+        self._result_retriever = outcome_retriever
         self._event_loop = event_loop
-        self._result_retriever = result_retriever
 
     def do_exchange(
         self,
@@ -80,18 +83,18 @@ class ArrowModelPassResultRetrieveServer(flight.FlightServerBase):
 
         model_pass_id = self._decode_retrieve_request(received_batch, row_index=0)
         future = asyncio.run_coroutine_threadsafe(
-            self._result_retriever.retrieve_result(model_pass_id),
+            self._result_retriever.retrieve_outcome(model_pass_id),
             self._event_loop,
         )
 
         try:
-            result = future.result()
+            outcome = future.result()
         except Exception as error:
             raise flight.FlightInternalError(
                 "Model pass result retrieval failed"
             ) from error
 
-        response_batch = self._encode_result(result)
+        response_batch = self._encode_outcome(outcome)
         writer.begin(response_batch.schema)
         writer.write_batch(response_batch)
 
@@ -121,14 +124,24 @@ class ArrowModelPassResultRetrieveServer(flight.FlightServerBase):
             raise pa.ArrowInvalid(f"Invalid model pass id: {error}") from error
 
     @staticmethod
-    def _encode_result(result: ModelPassResult) -> pa.RecordBatch:
+    def _encode_outcome(outcome: ModelPassOutcome) -> pa.RecordBatch:
+        if isinstance(outcome, ModelPassError):
+            failure_metadata = ModelPassErrorMetadataDto(
+                model_pass_context=model_pass_context_to_dto(outcome.context),
+                message=outcome.message,
+            )
+            return pa.RecordBatch.from_arrays(
+                [pa.array([failure_metadata.model_dump_json()], type=pa.large_string())],
+                schema=build_failure_payload_schema(),
+            )
+
         tensor_values = {
             name: np.ascontiguousarray(tensor.as_numpy())
-            for name, tensor in result.bundle.bundle.items()
+            for name, tensor in outcome.bundle.bundle.items()
         }
         schema = build_result_payload_schema(tensor_values)
         metadata = ModelPassResultMetadataDto(
-            model_pass_context=model_pass_context_to_dto(result.context)
+            model_pass_context=model_pass_context_to_dto(outcome.context)
         )
 
         arrays: list[pa.Array] = [

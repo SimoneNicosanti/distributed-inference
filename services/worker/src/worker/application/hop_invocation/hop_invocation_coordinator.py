@@ -11,6 +11,7 @@ from shared.plan.hop_logical_id import (
     PlannedPartitionReplicaId,
     PlannedSinkReplicaId,
 )
+from worker.application.failure.abc.failure_propagator import FailurePropagator
 from worker.application.hop_contribution_rcv.abc.contribution_gathering_policy import (
     HopContributionCollection,
 )
@@ -22,9 +23,6 @@ from worker.application.hop_handler.abc.hop_handler import (
 )
 from worker.application.hop_invocation.abc.contribution_assembler import (
     ContributionAssembler,
-)
-from worker.application.ports.outbound.failure_reporter.failure_reporter import (
-    FailureReporter,
 )
 from worker.application.postbox.abc.inbox import OrderedInbox
 from worker.domain.hop.hop_invocation import HopInvocationRequest, HopInvocationResult
@@ -44,7 +42,7 @@ class HopInvocationCoordinator(AsyncLifecycle):
         partition_replica_hop_handler: HopHandler[PlannedPartitionReplicaId],
         sink_hop_handler: HopHandler[PlannedSinkReplicaId],
         contribution_propagator: HopContributionPropagator,
-        failure_reporter: FailureReporter,
+        failure_propagator: FailurePropagator,
     ) -> None:
 
         if max_concurrent_invocations <= 0:
@@ -60,7 +58,7 @@ class HopInvocationCoordinator(AsyncLifecycle):
         self._partition_replica_hop_handler = partition_replica_hop_handler
         self._sink_hop_handler = sink_hop_handler
         self._contribution_propagator = contribution_propagator
-        self._failure_reporter = failure_reporter
+        self._failure_reporter = failure_propagator
 
         self._supervisor_task: asyncio.Task[None] | None = None
 
@@ -132,7 +130,7 @@ class HopInvocationCoordinator(AsyncLifecycle):
     ) -> None:
         model_pass_error = ModelPassError(context=context, message=str(exception))
         try:
-            await self._failure_reporter.report_failure(model_pass_error)
+            await self._failure_reporter.propagate_failure(model_pass_error)
         except Exception:
             logger.exception("Failed to report invocation failure to sink")
 

@@ -6,16 +6,20 @@ from typing import override
 
 import pyarrow as pa
 from pyarrow import flight
+from pydantic import TypeAdapter
 
 from catalog.api.worker.worker_directory import WorkerDirectory
 from front_end.adapters.outbound.mappers.context_dto_mapper import (
     model_pass_context_to_dto,
 )
-from front_end.application.ports.outbound.inference.sink_gateway import SinkGateway
+from front_end.application.ports.outbound.inference.sink_gateway import (
+    ModelPassFailedError,
+    SinkGateway,
+)
 from front_end.domain.tensor_map import TensorMap
 from integration.dto.context.context_dto import (
     ModelPassContextDto,
-    ModelPassResultMetadataDto,
+    ModelPassOutcomeMetadataDto,
 )
 from integration.service_instance.service_instance import (
     CapabilityProtocol,
@@ -26,6 +30,7 @@ from integration.sink.arrow.model_pass_result.arrow_model_pass_result_schema imp
     CONTEXT_FIELD_NAME,
     RETRIEVE_RESULT_COMMAND,
     build_retrieve_request_schema,
+    validate_outcome_payload_schema,
     validate_result_payload_schema,
 )
 from shared.context.model_pass_context import ModelPassContext
@@ -89,7 +94,7 @@ class ArrowWorkerSinkGateway(SinkGateway):
         batch: pa.RecordBatch, context: ModelPassContextDto
     ) -> TensorMap:
         batch.validate(full=True)
-        validate_result_payload_schema(batch.schema)
+        validate_outcome_payload_schema(batch.schema)
         if batch.num_rows != 1:
             raise ValueError("Expected exactly one model pass result row")
         metadata_value = batch.column(batch.schema.get_field_index(CONTEXT_FIELD_NAME))[
@@ -97,11 +102,20 @@ class ArrowWorkerSinkGateway(SinkGateway):
         ]
         if not metadata_value.is_valid:
             raise ValueError("Missing model pass result context")
-        metadata = ModelPassResultMetadataDto.model_validate_json(
+        metadata: ModelPassOutcomeMetadataDto = TypeAdapter(
+            ModelPassOutcomeMetadataDto
+        ).validate_json(
             metadata_value.as_py()
         )
         if metadata.model_pass_context != context:
             raise ValueError("Model pass result context does not match request")
+
+        if metadata.status == "failure":
+            if batch.schema.names != [CONTEXT_FIELD_NAME]:
+                raise ValueError("Model pass failure must not contain tensors")
+            raise ModelPassFailedError(metadata.message)
+
+        validate_result_payload_schema(batch.schema)
 
         tensors: TensorMap = {}
         for column_index, field in enumerate(batch.schema):

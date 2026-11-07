@@ -5,6 +5,7 @@ from worker.adapters.context_mapper import (
     source_hop_from_dto,
 )
 from worker.domain.plan.deployment_plan import DeploymentPlan, ResourceAllocation
+from worker.domain.plan.failure_plan import FailurePlan
 from worker.domain.plan.hop_routing_plan import (
     HopAddress,
     HopInputRouting,
@@ -26,6 +27,10 @@ from worker.domain.plan.worker_plan import WorkerPlan
 def worker_plan_from_dto(dto: WorkerPlanDto) -> WorkerPlan:
     return WorkerPlan(
         plan_version=dto.plan_version,
+        failure_plan=FailurePlan(
+            flow_ids=dto.failure_plan.flow_ids,
+            sink_replica_ids=dto.failure_plan.sink_replica_ids,
+        ),
         deployment_plan=DeploymentPlan(
             executable_hops=dto.deployment_plan.executable_hops,
             allocations=tuple(

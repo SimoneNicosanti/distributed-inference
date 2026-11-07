@@ -95,4 +95,19 @@ class HopInvocationContributionAckDto(BaseModel):
 class ModelPassResultMetadataDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
+    status: Literal["success"] = "success"
     model_pass_context: ModelPassContextDto
+
+
+class ModelPassErrorMetadataDto(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    status: Literal["failure"] = "failure"
+    model_pass_context: ModelPassContextDto
+    message: str
+
+
+type ModelPassOutcomeMetadataDto = Annotated[
+    ModelPassResultMetadataDto | ModelPassErrorMetadataDto,
+    Field(discriminator="status"),
+]

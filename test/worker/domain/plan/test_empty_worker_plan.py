@@ -1,5 +1,6 @@
 from shared.plan.plan_version import PlanVersion
 from worker.domain.plan.deployment_plan import DeploymentPlan
+from worker.domain.plan.failure_plan import FailurePlan
 from worker.domain.plan.hop_routing_plan import HopRoutingPlan
 from worker.domain.plan.partition_execution_plan import PartitionExecutionPlan
 from worker.domain.plan.scheduling_plan import SchedulingPlan
@@ -21,6 +22,7 @@ def test_worker_plan_accepts_empty_subplans() -> None:
             schemes=(),
         ),
         hop_routing_plan=HopRoutingPlan(hop_addresses=(), routings=()),
+        failure_plan=FailurePlan(flow_ids=(), sink_replica_ids=()),
     )
 
     assert plan.deployment_plan.executable_hops == ()

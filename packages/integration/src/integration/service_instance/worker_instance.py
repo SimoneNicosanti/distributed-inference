@@ -22,6 +22,7 @@ class WorkerInstance(ServiceInstance):
             CapabilityType.PLAN_ACTUATION,
             CapabilityType.IN_NETWORK_PROFILING,
             CapabilityType.RESULT_RETRIEVE,
+            CapabilityType.FAILURE_RECEIVE,
         }
 
         actual_capabilities = {capability.type for capability in self.capabilities}

@@ -54,6 +54,7 @@ from worker.adapters.outbound.activity_manager.local_activity_manager import (
 from worker.adapters.outbound.contribution_store.in_memory_contribution_store import (
     InMemoryContributionStore,
 )
+from worker.adapters.outbound.failure.http.http_failure_sender import HttpFailureSender
 from worker.adapters.outbound.hop_contribution.arrow.arrow_hop_invocation_contribution_sender import (
     ArrowHopInvocationContributionSender,
 )
@@ -69,17 +70,14 @@ from worker.adapters.outbound.plan_store.in_memory_worker_plan_store import (
 from worker.adapters.outbound.profiling.model_execution.ort_engine_model_execution_profiler import (
     OrtModelExecutionProfiler,
 )
-from worker.adapters.outbound.profiling.store.redis_model_execution_profile_store import (
-    RedisModelExecutionProfileStore,
-)
-from worker.adapters.outbound.profiling.store.redis_model_static_profile_reader import (
-    RedisModelStaticProfileReader,
-)
 from worker.adapters.outbound.profiling.network.arrow.arrow_network_probe_client import (
     ArrowNetworkProbeClient,
 )
 from worker.adapters.outbound.profiling.publisher.redis_network_profile_publisher import (
     RedisNetworkProfilePublisher,
+)
+from worker.adapters.outbound.profiling.publisher.redis_resource_profile_publisher import (
+    RedisResourceProfilePublisher,
 )
 from worker.adapters.outbound.profiling.resource.cgroup_cpu_profiler import (
     CgroupCpuProfiler,
@@ -91,8 +89,11 @@ from worker.adapters.outbound.profiling.resource.no_gpu_profiler import NoGpuPro
 from worker.adapters.outbound.profiling.resource.nvidia_gpu_profiler import (
     NvidiaGpuProfiler,
 )
-from worker.adapters.outbound.profiling.publisher.redis_resource_profile_publisher import (
-    RedisResourceProfilePublisher,
+from worker.adapters.outbound.profiling.store.redis_model_execution_profile_store import (
+    RedisModelExecutionProfileStore,
+)
+from worker.adapters.outbound.profiling.store.redis_model_static_profile_reader import (
+    RedisModelStaticProfileReader,
 )
 from worker.adapters.outbound.profiling.utils.nvidia_gpu_availability_checker import (
     NvidiaGPUAvailabilityChecker,
@@ -103,6 +104,10 @@ from worker.application.activity.default_activity_request_factory import (
 from worker.application.deployment.default_worker_plan_deployer import (
     DefaultWorkerPlanDeployer,
 )
+from worker.application.failure.default_failure_propagator import (
+    DefaultFailurePropagator,
+)
+from worker.application.failure.default_failure_receiver import DefaultFailureReceiver
 from worker.application.hop_contribution_rcv.abc.contribution_gathering_policy import (
     HopContributionCollection,
     HopContributionCollectionKey,
@@ -166,7 +171,7 @@ from worker.application.profiling.default_resource_profiling_coordinator import 
 from worker.application.scheduling.plan_based_partition_invocation_request_scheduler import (
     PlanBasedPartitionInvocationRequestScheduler,
 )
-from worker.application.sink.default_model_pass_result_retriever import (
+from worker.application.sink.default_model_pass_outcome_retriever import (
     DefaultModelPassResultRetriever,
 )
 from worker.application.worker_identity.default_worker_identity_query import (
@@ -270,7 +275,14 @@ class DefaultCompositionRoot(CompositionRoot):
                 key_compute_callable=lambda outcome: outcome.context.model_pass_id
             )
             model_pass_result_retriever = DefaultModelPassResultRetriever(
-                outcome_inbox=outcome_postbox,
+                inbox=outcome_postbox,
+            )
+            failure_receiver = DefaultFailureReceiver(outcome_postbox)
+            failure_http_client = await stack.enter_async_context(httpx.AsyncClient())
+            failure_propagator = DefaultFailurePropagator(
+                failure_plan_reader=worker_plan_store,
+                hop_directory=deployment_catalog,
+                failure_sender=HttpFailureSender(service_directory, failure_http_client),
             )
 
             invocation_coordinator = HopInvocationCoordinator(
@@ -284,6 +296,7 @@ class DefaultCompositionRoot(CompositionRoot):
                     router=DefaultHopOutputRouter(worker_plan_store),
                     dispatcher=contribution_dispatcher,
                 ),
+                failure_propagator=failure_propagator,
             )
 
             await self.start_lifecycle(stack, partition_replica_handler)
@@ -305,6 +318,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 ),
                 model_pass_result_retriever=model_pass_result_retriever,
                 worker_identity_query=DefaultWorkerIdentityQuery(worker_id),
+                failure_receiver=failure_receiver,
             )
 
     async def start_profiling_lifecycles(
@@ -377,7 +391,6 @@ class DefaultCompositionRoot(CompositionRoot):
 
         await self.start_lifecycle(stack, resource_coordinator)
         await self.start_lifecycle(stack, network_coordinator)
-        await self.start_lifecycle(stack, pending_models_poller)
         await self.start_lifecycle(stack, model_execution_coordinator)
 
     @staticmethod

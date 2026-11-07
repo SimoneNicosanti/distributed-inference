@@ -5,11 +5,14 @@ from dataclasses import dataclass
 
 from integration.service_instance.worker_instance import WorkerInstance
 from worker.application.ports.inbound.deployment.plan_deployer import PlanDeployer
+from worker.application.ports.inbound.failure_rcv.failure_reciever import (
+    FailureReceiver,
+)
 from worker.application.ports.inbound.hop_contribution_rcv.hop_invocation_contribution_receive_coordinator import (
     HopInvocationContributionReceiveCoordinator,
 )
-from worker.application.ports.inbound.sink.model_pass_result_retriever import (
-    ModelPassResultRetriever,
+from worker.application.ports.inbound.sink.model_pass_outcome_retriever import (
+    ModelPassOutcomeRetriever,
 )
 from worker.application.worker_identity.abc.worker_identity_query import (
     WorkerIdentityQuery,
@@ -21,8 +24,9 @@ from worker.domain.plan.worker_plan import WorkerPlan
 class WorkerComposition:
     worker_plan_deployer: PlanDeployer[WorkerPlan]
     hop_contribution_receiver: HopInvocationContributionReceiveCoordinator
-    model_pass_result_retriever: ModelPassResultRetriever
+    model_pass_result_retriever: ModelPassOutcomeRetriever
     worker_identity_query: WorkerIdentityQuery
+    failure_receiver: FailureReceiver
 
 
 class CompositionRoot(ABC):

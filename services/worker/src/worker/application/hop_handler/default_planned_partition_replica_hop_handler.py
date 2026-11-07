@@ -93,9 +93,12 @@ class DefaultPlannedPartitionReplicaHopHandler(
                             partition_invocation_request
                         )
                     )
-                hop_invocation_result_future.set_result(partition_invocation_result)
-            except:
-                pass
+
+                if not hop_invocation_result_future.done():
+                    hop_invocation_result_future.set_result(partition_invocation_result)
+            except Exception as e:
+                if not hop_invocation_result_future.done():
+                    hop_invocation_result_future.set_exception(e)
 
     @override
     async def start(self) -> None:

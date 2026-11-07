@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 from shared.plan.plan_version import PlanVersion
+from worker.domain.plan.failure_plan import FailurePlan
 from worker.domain.plan.hop_routing_plan import HopRoutingPlan
 from worker.domain.plan.partition_execution_plan import PartitionExecutionPlan
 from worker.domain.plan.scheduling_plan import SchedulingPlan
@@ -25,3 +26,10 @@ class HopRoutingPlanReader(ABC):
     async def get_hop_routing_plan_by_version(
         self, version: PlanVersion
     ) -> HopRoutingPlan: ...
+
+
+class FailurePlanReader(ABC):
+    @abstractmethod
+    async def get_failure_plan_by_version(
+        self, version: PlanVersion
+    ) -> FailurePlan: ...

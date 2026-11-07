@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
 
 from shared.context.model_pass_context import ModelPassId
-from worker.domain.model.model_pass import ModelPassResult
+from worker.domain.model.model_pass import ModelPassOutcome
 
 
-class ModelPassResultRetriever(ABC):
+class ModelPassOutcomeRetriever(ABC):
     @abstractmethod
-    async def retrieve_result(
+    async def retrieve_outcome(
         self,
         request_id: ModelPassId,
-    ) -> ModelPassResult: ...
+    ) -> ModelPassOutcome: ...

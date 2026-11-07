@@ -11,6 +11,7 @@ from integration.dto.context.context_dto import (
 from integration.dto.worker_plan.worker_plan_dto import (
     DeploymentPlanDto,
     DestinationHopAddressDto,
+    FailurePlanDto,
     HopInputRoutingDto,
     HopOutputRoutingDto,
     HopRoutingPlanDto,
@@ -28,6 +29,7 @@ from integration.worker.deployment.http.service_plan_http_paths import (
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
+from shared.plan.hop import ExternalHopId
 from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.user.user import UserId
@@ -35,7 +37,6 @@ from worker.adapters.inbound.deployment.http.http_service_plan_deployer import (
     build_worker_plan_deployment_router,
 )
 from worker.application.ports.inbound.deployment.plan_deployer import PlanDeployer
-from shared.plan.hop import ExternalHopId
 from worker.domain.plan.worker_plan import WorkerPlan
 
 
@@ -68,6 +69,7 @@ def _empty_worker_plan(version_number: int) -> WorkerPlanDto:
             schemes=(),
         ),
         hop_routing_plan=HopRoutingPlanDto(hop_addresses=(), routings=()),
+        failure_plan=FailurePlanDto(flow_ids=(), sink_replica_ids=()),
     )
 
 
@@ -144,6 +146,9 @@ def test_maps_hop_routing_plan() -> None:
                 ingress_hops=(ingress_id,),
                 sink_hops=(sink_id,),
             ),
+            "failure_plan": FailurePlanDto(
+                flow_ids=(flow_id,), sink_replica_ids=(sink_id,)
+            ),
             "hop_routing_plan": HopRoutingPlanDto(
                 hop_addresses=(
                     InvocableHopAddressDto(
@@ -186,6 +191,7 @@ def test_maps_hop_routing_plan() -> None:
     prepared_plan = deployer.prepared[0]
     assert prepared_plan.deployment_plan.ingress_hops == (ingress_id,)
     assert prepared_plan.deployment_plan.sink_hops == (sink_id,)
+    assert prepared_plan.failure_plan.get_sink_replica_id_for_flow(flow_id) == sink_id
     routing_plan = prepared_plan.hop_routing_plan
     assert routing_plan.hop_addresses[0].hop == ingress_id
     assert routing_plan.routings[0].input_routings[0].source.hop == ExternalHopId()

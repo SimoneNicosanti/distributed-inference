@@ -1,4 +1,6 @@
-from pydantic import BaseModel, ConfigDict, NonNegativeInt
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, NonNegativeInt, model_validator
 
 from integration.dto.context.context_dto import (
     DestinationHopDto,
@@ -108,6 +110,21 @@ class SchedulingPlanDto(BaseModel):
     priorities: tuple[NonNegativeInt, ...]
 
 
+class FailurePlanDto(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    flow_ids: tuple[FlowId, ...]
+    sink_replica_ids: tuple[PlannedSinkReplicaId, ...]
+
+    @model_validator(mode="after")
+    def validate_flow_sinks(self) -> Self:
+        if len(self.flow_ids) != len(self.sink_replica_ids):
+            raise ValueError("Each flow must have a failure sink")
+        if len(self.flow_ids) != len(set(self.flow_ids)):
+            raise ValueError("Failure plan flows must be unique")
+        return self
+
+
 class WorkerPlanDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -116,3 +133,4 @@ class WorkerPlanDto(BaseModel):
     scheduling_plan: SchedulingPlanDto
     partition_execution_plan: PartitionExecutionPlanDto
     hop_routing_plan: HopRoutingPlanDto
+    failure_plan: FailurePlanDto

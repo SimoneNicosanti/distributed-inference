@@ -68,6 +68,7 @@ class CapabilityType(StrEnum):
     PLAN_ACTUATION = auto()
     IN_NETWORK_PROFILING = auto()
     RESULT_RETRIEVE = auto()
+    FAILURE_RECEIVE = auto()
 
 
 class CapabilityCouple(BaseModel):

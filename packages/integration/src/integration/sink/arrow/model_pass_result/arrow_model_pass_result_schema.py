@@ -5,12 +5,22 @@ from collections.abc import Mapping
 import numpy as np
 import pyarrow as pa
 
-PROTOCOL_VERSION = 1
-
-RETRIEVE_RESULT_COMMAND = b"model-pass-result.v1.retrieve"
+RETRIEVE_RESULT_COMMAND = b"model-pass-outcome.retrieve"
 
 CONTEXT_FIELD_NAME = "__context_json"
 MODEL_PASS_ID_FIELD_NAME = "__model_pass_id"
+
+
+def build_failure_payload_schema() -> pa.Schema:
+    return pa.schema([pa.field(CONTEXT_FIELD_NAME, pa.large_string(), nullable=False)])
+
+
+def validate_outcome_payload_schema(schema: pa.Schema) -> None:
+    if schema.names == [CONTEXT_FIELD_NAME]:
+        if schema.field(CONTEXT_FIELD_NAME) != build_failure_payload_schema().field(0):
+            raise ValueError("Invalid model pass failure metadata field")
+        return
+    validate_result_payload_schema(schema)
 
 
 def build_result_payload_schema(

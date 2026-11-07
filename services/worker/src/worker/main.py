@@ -23,14 +23,17 @@ from shared.service.service import ServiceId
 from worker.adapters.inbound.deployment.http.http_service_plan_deployer import (
     build_worker_plan_deployment_router,
 )
+from worker.adapters.inbound.failure.http.http_failure_receiver import (
+    build_failure_receiver_router,
+)
 from worker.adapters.inbound.hop_contribution.arrow.arrow_hop_invocation_contribution_server import (
     ArrowHopInvocationContributionServer,
 )
 from worker.adapters.inbound.profiling.arrow.arrow_network_probe_server import (
     ArrowNetworkProbeServer,
 )
-from worker.adapters.inbound.sink.arrow.arrow_model_pass_result_retrieve_server import (
-    ArrowModelPassResultRetrieveServer,
+from worker.adapters.inbound.sink.arrow.arrow_model_pass_outcome_retrieve_server import (
+    ArrowModelPassOutcomeRetrieveServer,
 )
 from worker.adapters.inbound.worker_identity.http_worker_identity_query import (
     build_worker_identity_query_router,
@@ -95,6 +98,15 @@ def build_worker_instance() -> WorkerInstance:
 
     capabilities = [
         Capability(
+            type=CapabilityType.FAILURE_RECEIVE,
+            interfaces=[
+                CapabilityInterface(
+                    protocol=CapabilityProtocol.HTTP,
+                    endpoint=HttpUrl(f"http://{advertised_host}:{http_port}"),
+                )
+            ],
+        ),
+        Capability(
             type=CapabilityType.HOP_INVOCATION,
             interfaces=[_arrow_interface(advertised_host, hop_invocation_port)],
         ),
@@ -142,6 +154,7 @@ def build_http_app(composition: WorkerComposition) -> FastAPI:
     app.include_router(
         build_worker_identity_query_router(composition.worker_identity_query)
     )
+    app.include_router(build_failure_receiver_router(composition.failure_receiver))
     return app
 
 
@@ -179,7 +192,7 @@ def build_flight_servers(
     ]
 
     servers.append(
-        ArrowModelPassResultRetrieveServer(
+        ArrowModelPassOutcomeRetrieveServer(
             _arrow_url(
                 bind_host,
                 _get_port("WORKER_RESULT_SINK_PORT", DEFAULT_RESULT_SINK_PORT),

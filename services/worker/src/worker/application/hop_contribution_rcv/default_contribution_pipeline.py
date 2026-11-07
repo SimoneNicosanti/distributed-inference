@@ -59,6 +59,13 @@ class DefaultContributionPipeline(ContributionPipeline):
                 try:
                     await self._submit_pipeline(key, contribution, handle)
                     return handle
+                except InvalidOutboxDepositError:
+                    await self._contribution_store.discard(key)
+
+                    if not handle.future.done():
+                        handle.future.set_result(None)
+
+                    return handle
                 except NotExistentPlanError as cause:
                     error = ContributionSubmissionError("Plan version does not exist")
                     error.__cause__ = cause
@@ -69,10 +76,6 @@ class DefaultContributionPipeline(ContributionPipeline):
                 except InvalidContributionError as cause:
                     raise ContributionSubmissionError(
                         "Contribution is invalid"
-                    ) from cause
-                except InvalidOutboxDepositError as cause:
-                    raise ContributionSubmissionError(
-                        "Invocation already submitted"
                     ) from cause
 
         finally:
