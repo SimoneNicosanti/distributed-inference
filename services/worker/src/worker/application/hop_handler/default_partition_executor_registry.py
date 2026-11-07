@@ -7,7 +7,10 @@ from typing import override
 from shared.plan.hop import PlannedExecutableHopId
 from shared.plan.plan_version import PlanVersion
 from worker.application.hop_handler.abc.partition_executor_registry import (
+    PartitionExecutionAcquisitionError,
+    PartitionExecutorRegistrationError,
     PartitionExecutorRegistry,
+    PartitionExecutorUnregistrationError,
 )
 from worker.application.ports.outbound.partition_execution.partition_executor import (
     PartitionExecutor,
@@ -40,7 +43,7 @@ class DefaultPartitionExecutorRegistry(PartitionExecutorRegistry):
     ) -> None:
         key = self._DeploymentKey(plan_version, executable_hop_id)
         if key in self._partition_executors:
-            raise ValueError(
+            raise PartitionExecutorRegistrationError(
                 f"Partition executor already present for hop {executable_hop_id}"
             )
 
@@ -57,7 +60,9 @@ class DefaultPartitionExecutorRegistry(PartitionExecutorRegistry):
     ) -> PartitionExecutor:
         key = self._DeploymentKey(plan_version, executable_hop_id)
         if key not in self._partition_executors:
-            raise KeyError(f"Partition executor not found for hop {executable_hop_id}")
+            raise PartitionExecutorUnregistrationError(
+                f"Partition executor not found for hop {executable_hop_id}"
+            )
         bundle = self._partition_executors.pop(key)
         async with bundle.lock:
             return bundle.partition_executor
@@ -69,7 +74,9 @@ class DefaultPartitionExecutorRegistry(PartitionExecutorRegistry):
     ) -> AsyncGenerator[PartitionExecutor]:
         key = self._DeploymentKey(plan_version, executable_hop_id)
         if key not in self._partition_executors:
-            raise KeyError(f"Partition executor not found for hop {executable_hop_id}")
+            raise PartitionExecutionAcquisitionError(
+                f"Partition executor not found for hop {executable_hop_id}"
+            )
         bundle = self._partition_executors[key]
 
         ## We do a yield while keeping the lock -> No other task can acquire the lock

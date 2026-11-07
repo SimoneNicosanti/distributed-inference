@@ -5,6 +5,10 @@ from shared.plan.plan_version import PlanVersion
 from shared.service.service import WorkerId
 
 
+class HopDeploymentRetrievalError(Exception):
+    pass
+
+
 class HopDeploymentDirectory(ABC):
     @abstractmethod
     async def get_worker_for_planned_invocable_hop(

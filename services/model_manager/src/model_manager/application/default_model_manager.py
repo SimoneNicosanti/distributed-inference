@@ -164,7 +164,7 @@ class DefaultModelManager(ModelRegistry, ModelVariantRegistry, ModelPartitioner)
                 await self._artifact_ref_factory.build_artifact_ref(partition_id)
             )
             partition_bundle = ArtifactBundle.from_workspace(partition_workspace)
-            await self._artifact_store.put_artifact(
+            await self._artifact_store.upload_artifact(
                 partition_artifact_ref, partition_bundle
             )
 

@@ -18,4 +18,4 @@ class ArtifactStoreModelArtifactUploader(ModelArtifactUploader):
         artifact_ref: ArtifactRef,
         artifact_bundle: ArtifactBundle,
     ) -> None:
-        await self._artifact_store.put_artifact(artifact_ref, artifact_bundle)
+        await self._artifact_store.upload_artifact(artifact_ref, artifact_bundle)

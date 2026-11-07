@@ -10,6 +10,18 @@ from shared.plan.hop import (
 )
 
 
+class NotExistentHopRoutingError(Exception):
+    pass
+
+
+class UnexpectedSourcesError(Exception):
+    pass
+
+
+class UnexpectedTensorsFromSourceError(Exception):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class HopAddress[HopT: PlannedHopId]:
     flow_id: FlowId
@@ -42,18 +54,30 @@ class HopRoutings:
             for input_routing in self.input_routings
         }
 
-        unexpected_sources = arrived.keys() - expected.keys()
-        if unexpected_sources:
-            raise ValueError(f"Unexpected input sources: {unexpected_sources}")
-
-        for source, tensors in arrived.items():
-            if not tensors.issubset(expected[source]):
-                raise ValueError(f"Unexpected tensors from source {source}")
-
         return all(
             arrived.get(source, set()) == tensors
             for source, tensors in expected.items()
         )
+
+    def check_valid_sources(
+        self, arrived: dict[HopAddress[PlannedSourceHopId], set[TensorKey]]
+    ) -> None:
+        expected = {
+            input_routing.source: set(input_routing.tensors)
+            for input_routing in self.input_routings
+        }
+
+        unexpected_sources = arrived.keys() - expected.keys()
+        if unexpected_sources:
+            raise UnexpectedSourcesError(
+                f"Unexpected input sources: {unexpected_sources}"
+            )
+
+        for source, tensors in arrived.items():
+            if not tensors.issubset(expected[source]):
+                raise UnexpectedTensorsFromSourceError(
+                    f"Unexpected tensors from source {source}"
+                )
 
     def route_output_tensors(
         self,
@@ -83,5 +107,7 @@ class HopRoutingPlan:
         self, hop_address: HopAddress[PlannedInvocableHopId]
     ) -> HopRoutings:
         if hop_address not in self.hop_addresses:
-            raise KeyError(f"No routing for hop address {hop_address}")
+            raise NotExistentHopRoutingError(
+                f"No routing for hop address {hop_address}"
+            )
         return self.routings[self.hop_addresses.index(hop_address)]

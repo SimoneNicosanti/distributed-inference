@@ -1,4 +1,6 @@
 import asyncio
+import logging
+from contextlib import suppress
 from typing import override
 
 from catalog.api.worker.worker_directory import (
@@ -14,6 +16,7 @@ from worker.application.ports.outbound.activity_manager.activity_manager import 
 )
 from worker.application.ports.outbound.profiling.network.network_probe_client import (
     NetworkProbeClient,
+    NetworkProbeError,
 )
 from worker.application.ports.outbound.profiling.network.network_profile_publisher import (
     NetworkProfilePublisher,
@@ -26,7 +29,10 @@ from worker.domain.activity.activity_request import (
 )
 from worker.domain.profiling.network_profile import NetworkProfile, WorkerConnection
 
-NETWORK_PROFILING_INTERVAL_S = 60 * 2  # 5 minutes
+NETWORK_PROFILING_INTERVAL_S = 60 * 2  # 2 minutes
+
+
+logger = logging.getLogger(__name__)
 
 
 class DefaultNetworkProfilingCoordinator(NetworkProfilingCoordinator, AsyncLifecycle):
@@ -53,10 +59,6 @@ class DefaultNetworkProfilingCoordinator(NetworkProfilingCoordinator, AsyncLifec
 
     @override
     async def profile_network(self) -> NetworkProfile:
-        ## We retrieve current active workers
-        ## We acquire the grant to do network profiling
-        ## We do peer-to-peer network profiling
-        ## We build the network profile
         async with self._running_lock:
             worker_instances = await self._service_directory.get_all_worker_instances()
 
@@ -66,8 +68,6 @@ class DefaultNetworkProfilingCoordinator(NetworkProfilingCoordinator, AsyncLifec
                 )
             )
             connections = []
-            ## We use an independent profile for each worker
-            ## In this way we avoid stopping the transmission of data
             for worker_instance in worker_instances:
                 if worker_instance.service_id == self._worker_id:
                     ## We skip ourselves
@@ -86,8 +86,13 @@ class DefaultNetworkProfilingCoordinator(NetworkProfilingCoordinator, AsyncLifec
                             connection_info=connection_info,
                         )
                         connections.append(worker_connection)
-                    except:
-                        pass
+                    except NetworkProbeError:
+                        logger.exception(
+                            "Network probe failed: source=%s, target=%s",
+                            self._worker_id,
+                            worker_instance.service_id,
+                        )
+                        continue
 
             return NetworkProfile(connections=tuple(connections))
 
@@ -97,16 +102,28 @@ class DefaultNetworkProfilingCoordinator(NetworkProfilingCoordinator, AsyncLifec
 
     async def _profile_loop(self) -> None:
         while True:
-            await self._coordinate_network_profiling()
+            try:
+                await self._coordinate_network_profiling()
+            except Exception:
+                logger.exception("Network profiling round failed")
+
             await asyncio.sleep(NETWORK_PROFILING_INTERVAL_S)
 
     @override
     async def start(self) -> None:
         ## We do periodical profiling here.
+        if self._loop_task is not None:
+            return
         self._loop_task = asyncio.create_task(self._profile_loop())
 
     @override
     async def stop(self) -> None:
-        if self._loop_task is None:
+        task = self._loop_task
+        if task is None:
             return
-        self._loop_task.cancel()
+        task.cancel()
+        try:
+            with suppress(asyncio.CancelledError):
+                await task
+        finally:
+            self._loop_task = None

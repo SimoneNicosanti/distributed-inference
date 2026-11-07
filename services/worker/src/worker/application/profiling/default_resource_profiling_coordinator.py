@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import suppress
 from typing import override
 
@@ -20,6 +21,8 @@ from worker.application.profiling.abc.resource_profiling_coordinator import (
     ResourceProfilingCoordinator,
 )
 from worker.domain.profiling.resource_profile import ResourceProfile
+
+logger = logging.getLogger(__name__)
 
 RESOURCE_PROFILING_INTERVAL_S = 60 * 5  # 5 minutes
 
@@ -64,7 +67,10 @@ class DefaultResourceProfilingCoordinator(ResourceProfilingCoordinator, AsyncLif
 
     async def _profile_loop(self) -> None:
         while True:
-            await self._coordinate_resource_profiling()
+            try:
+                await self._coordinate_resource_profiling()
+            except Exception:
+                logger.exception("Resource profiling round failed")
             await asyncio.sleep(RESOURCE_PROFILING_INTERVAL_S)
 
     @override

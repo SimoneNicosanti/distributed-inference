@@ -2,6 +2,7 @@ from typing import override
 
 from worker.application.activity.abc.activity_request_factory import (
     ActivityRequestFactory,
+    InvalidActivityTypeError,
 )
 from worker.domain.activity.activity_request import (
     ActivityRequest,
@@ -37,7 +38,9 @@ class DefaultActivityRequestFactory(ActivityRequestFactory):
                     DefaultActivityRequestFactory._build_execution_profiling_request()
                 )
             case _:
-                raise ValueError(f"Invalid activity type: {activity_type}")
+                raise InvalidActivityTypeError(
+                    f"Invalid activity type: {activity_type}"
+                )
 
     ## TODO: Check coherence with the activity manager
     @staticmethod

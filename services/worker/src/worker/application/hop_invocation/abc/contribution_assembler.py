@@ -5,6 +5,10 @@ from worker.domain.hop.hop_invocation import HopInvocationRequest
 from worker.domain.hop.hop_invocation_contribution import HopInvocationContribution
 
 
+class ContributionAssemblingError(Exception):
+    pass
+
+
 class ContributionAssembler(ABC):
     @abstractmethod
     async def assemble(

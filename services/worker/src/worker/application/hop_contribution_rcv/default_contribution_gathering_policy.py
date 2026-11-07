@@ -6,7 +6,7 @@ from worker.application.hop_contribution_rcv.abc.contribution_gathering_policy i
     ContributionGatheringPolicy,
     HopContributionCollection,
     HopContributionCollectionKey,
-    InvalidContributionCollectionError,
+    InvalidContributionError,
 )
 from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import (
     HopRoutingPlanReader,
@@ -14,7 +14,12 @@ from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import
 from worker.domain.hop.hop_invocation_contribution import (
     HopInvocationContribution,
 )
-from worker.domain.plan.hop_routing_plan import HopAddress
+from worker.domain.plan.hop_routing_plan import (
+    HopAddress,
+    NotExistentHopRoutingError,
+    UnexpectedSourcesError,
+    UnexpectedTensorsFromSourceError,
+)
 
 
 class DefaultContributionGatheringPolicy(ContributionGatheringPolicy):
@@ -51,12 +56,6 @@ class DefaultContributionGatheringPolicy(ContributionGatheringPolicy):
             return False
 
         first = contributions[0]
-        key = await self.key_of(first)
-        key_inequalities = [
-            await self.key_of(contribution) != key for contribution in contributions[1:]
-        ]
-        if any(key_inequalities):
-            raise ValueError("Contributions belong to different collections")
 
         routing_plan = await self._routing_plan_reader.get_hop_routing_plan_by_version(
             first.plan_version
@@ -91,7 +90,7 @@ class DefaultContributionGatheringPolicy(ContributionGatheringPolicy):
             for contribution in other_contributions
         ]
         if any(key_inequalities):
-            raise InvalidContributionCollectionError(
+            raise InvalidContributionError(
                 "Contribution belong to different collections"
             )
 
@@ -103,14 +102,25 @@ class DefaultContributionGatheringPolicy(ContributionGatheringPolicy):
             flow_id=flow_id,
             hop=new_contribution.destination_hop,
         )
-        routings = routing_plan.get_routings_for_hop_address(destination)
+        try:
+            routings = routing_plan.get_routings_for_hop_address(destination)
+        except NotExistentHopRoutingError as error:
+            raise InvalidContributionError(
+                f"Contribution destination {destination} has no routing"
+            ) from error
 
         source = HopAddress(
             flow_id=flow_id,
             hop=new_contribution.source_hop,
         )
         new_tensors = new_contribution.bundle.get_tensor_names()
-        routings.check_inputs_ready({source: new_tensors})
+
+        try:
+            routings.check_valid_sources({source: new_tensors})
+        except (UnexpectedSourcesError, UnexpectedTensorsFromSourceError) as e:
+            raise InvalidContributionError(
+                "Contribution does not respect routing contract"
+            ) from e
 
         received_tensors = {
             tensor
@@ -119,4 +129,4 @@ class DefaultContributionGatheringPolicy(ContributionGatheringPolicy):
         }
         duplicates = new_tensors & received_tensors
         if duplicates:
-            raise ValueError(f"Duplicate input tensors: {duplicates}")
+            raise InvalidContributionError(f"Duplicate input tensors: {duplicates}")

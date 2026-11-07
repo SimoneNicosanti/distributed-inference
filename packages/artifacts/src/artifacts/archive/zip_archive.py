@@ -6,11 +6,11 @@ from pathlib import Path
 
 import aiofiles
 
+from artifacts.contracts.artifact_bundle import ArtifactBundle
 from artifacts.contracts.artifact_manifest import (
     MANIFEST_FILE_NAME,
     ArtifactManifest,
 )
-from artifacts.contracts.artifact_bundle import ArtifactBundle
 
 
 @asynccontextmanager

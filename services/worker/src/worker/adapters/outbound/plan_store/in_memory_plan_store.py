@@ -1,16 +1,16 @@
 from typing import Protocol, override
 
 from shared.plan.plan_version import PlanVersion
+from worker.application.ports.outbound.plan_store.plan_store_errors import (
+    DuplicatePlanError,
+    NotExistentPlanError,
+    NotExistingActivePlanError,
+)
 from worker.application.ports.outbound.plan_store.plan_store_reader import (
     PlanStoreReader,
 )
 from worker.application.ports.outbound.plan_store.plan_store_writer import (
     PlanStoreWriter,
-)
-from worker.application.ports.outbound.plan_store.plan_store_errors import (
-    DuplicatePlanError,
-    NotExistingActivePlanError,
-    NotExistingPlanError,
 )
 
 
@@ -42,12 +42,12 @@ class InMemoryPlanStore[PlanT: VersionedPlan](
     ) -> PlanT:
         if version in self._plans_by_version:
             return self._plans_by_version[version]
-        raise NotExistingPlanError(f"No plan found for plan version {version}")
+        raise NotExistentPlanError(f"No plan found for plan version {version}")
 
     @override
     async def activate_plan(self, version: PlanVersion) -> None:
         if version not in self._plans_by_version:
-            raise NotExistingPlanError(f"Plan version {version} does not exist")
+            raise NotExistentPlanError(f"Plan version {version} does not exist")
 
         self._active_version = version
 

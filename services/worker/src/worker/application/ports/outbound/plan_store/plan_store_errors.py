@@ -2,7 +2,7 @@ class DuplicatePlanError(Exception):
     pass
 
 
-class NotExistingPlanError(Exception):
+class NotExistentPlanError(Exception):
     pass
 
 

@@ -1,4 +1,5 @@
 import asyncio
+import struct
 import time
 from contextlib import closing
 from statistics import median
@@ -25,6 +26,7 @@ from integration.worker.profiling.general_network_probe_integration import (
 )
 from worker.application.ports.outbound.profiling.network.network_probe_client import (
     NetworkProbeClient,
+    NetworkProbeError,
 )
 from worker.domain.profiling.network_profile import ConnectionInfo
 
@@ -33,27 +35,39 @@ class ArrowNetworkProbeClient(NetworkProbeClient):
     @override
     async def probe_connection(self, worker_instance: WorkerInstance) -> ConnectionInfo:
 
-        network_probe_capabilities = worker_instance.get_capabilities_by_type(
-            CapabilityType.IN_NETWORK_PROFILING
-        )
-
-        if len(network_probe_capabilities) == 0:
-            raise ValueError("No network probe capabilities found")
-
-        arrow_net_probe_interfaces = []
-        for capability in network_probe_capabilities:
-            arrow_net_probe_interfaces.extend(
-                capability.get_interfaces_by_protocol(CapabilityProtocol.ARROW)
+        try:
+            network_probe_capabilities = worker_instance.get_capabilities_by_type(
+                CapabilityType.IN_NETWORK_PROFILING
             )
 
-        if len(arrow_net_probe_interfaces) == 0:
-            raise ValueError("No Arrow capability found")
+            if len(network_probe_capabilities) == 0:
+                raise ValueError("No network probe capabilities found")
 
-        capability_interface = arrow_net_probe_interfaces[0]
+            arrow_net_probe_interfaces = []
+            for capability in network_probe_capabilities:
+                arrow_net_probe_interfaces.extend(
+                    capability.get_interfaces_by_protocol(CapabilityProtocol.ARROW)
+                )
 
-        return await asyncio.to_thread(
-            self._sync_network_probe_call, capability_interface
-        )
+            if len(arrow_net_probe_interfaces) == 0:
+                raise ValueError("No Arrow capability found")
+
+            capability_interface = arrow_net_probe_interfaces[0]
+
+            return await asyncio.to_thread(
+                self._sync_network_probe_call, capability_interface
+            )
+        except (
+            pa.ArrowException,
+            flight.FlightError,
+            OSError,
+            ValueError,
+            RuntimeError,
+            struct.error,
+        ) as error:
+            raise NetworkProbeError(
+                f"Unable to probe worker {worker_instance.service_id}"
+            ) from error
 
     def _sync_network_probe_call(
         self, capability_interface: CapabilityInterface

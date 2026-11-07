@@ -2,7 +2,10 @@ from typing import override
 
 from pydantic import ValidationError
 
-from catalog.api.service.service_directory import ServiceDirectory
+from catalog.api.service.service_directory import (
+    ServiceDirectory,
+    ServiceInstanceReadError,
+)
 from catalog.api.worker.worker_directory import (
     WorkerDirectory,
 )
@@ -43,12 +46,12 @@ class DefaultWorkerDirectory(WorkerDirectory):
             worker_instance = WorkerInstance.model_validate(service_instance_dump)
 
             if worker_instance.service_id != worker_id:
-                raise ValueError(
+                raise ServiceInstanceReadError(
                     "Discovered worker identity does not match requested worker"
                 )
 
             return worker_instance
         except ValidationError as e:
-            raise ValueError(
+            raise ServiceInstanceReadError(
                 f"Could not find worker instance for worker id {worker_id}"
             ) from e

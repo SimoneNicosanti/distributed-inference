@@ -8,6 +8,10 @@ from shared.model.keys import TensorKey
 from worker.domain.tensor.tensor import Tensor
 
 
+class TensorBundleMergeError(Exception):
+    pass
+
+
 @dataclass(frozen=True, slots=True, eq=False)
 class TensorBundle:
     bundle: Mapping[TensorKey, Tensor]
@@ -31,7 +35,7 @@ class TensorBundle:
 
     def merge(self, other: TensorBundle) -> TensorBundle:
         if not isinstance(other, TensorBundle):
-            raise TypeError("other must be a TensorBundle")
+            raise TensorBundleMergeError("other must be a TensorBundle")
         return TensorBundle(bundle={**self.bundle, **other.bundle})
 
     def get_tensor_names(self) -> set[str]:

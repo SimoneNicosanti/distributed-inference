@@ -8,6 +8,18 @@ from worker.application.ports.outbound.partition_execution.partition_executor im
 )
 
 
+class PartitionExecutorRegistrationError(Exception):
+    pass
+
+
+class PartitionExecutorUnregistrationError(Exception):
+    pass
+
+
+class PartitionExecutionAcquisitionError(Exception):
+    pass
+
+
 class PartitionExecutorRegistry(ABC):
     @abstractmethod
     async def register_partition_executor(

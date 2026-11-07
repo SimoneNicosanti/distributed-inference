@@ -3,6 +3,10 @@ from abc import ABC, abstractmethod
 from worker.domain.activity.activity_request import ActivityRequest, ActivityType
 
 
+class InvalidActivityTypeError(Exception):
+    pass
+
+
 class ActivityRequestFactory(ABC):
     @staticmethod
     @abstractmethod

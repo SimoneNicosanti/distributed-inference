@@ -6,15 +6,20 @@ from worker.application.hop_contribution_rcv.abc.contribution_gathering_policy i
     ContributionGatheringPolicy,
     HopContributionCollection,
     HopContributionCollectionKey,
+    InvalidContributionError,
 )
 from worker.application.hop_contribution_rcv.abc.contribution_pipeline import (
     CollectionHandle,
     ContributionPipeline,
+    ContributionSubmissionError,
 )
 from worker.application.ports.outbound.contribution.contribution_store import (
     ContributionStore,
 )
-from worker.application.postbox.abc.outbox import Outbox
+from worker.application.ports.outbound.plan_store.plan_store_errors import (
+    NotExistentPlanError,
+)
+from worker.application.postbox.abc.outbox import InvalidOutboxDepositError, Outbox
 from worker.domain.hop.hop_invocation_contribution import HopInvocationContribution
 
 
@@ -47,31 +52,56 @@ class DefaultContributionPipeline(ContributionPipeline):
 
         try:
             async with lock_slot.lock:
-                handle = self._handles.get(key)
-                if handle is not None and handle.future.done():
+                handle = self._get_or_build_handle(key)
+                if handle.future.done():
                     return handle
 
-                old_contributions = list(await self._contribution_store.get_all(key))
-                await self._gathering_policy.validate(old_contributions, contribution)
+                try:
+                    await self._submit_pipeline(key, contribution, handle)
+                    return handle
+                except NotExistentPlanError as cause:
+                    error = ContributionSubmissionError("Plan version does not exist")
+                    error.__cause__ = cause
+                    if not handle.future.done():
+                        handle.future.set_exception(error)
 
-                candidate = [*old_contributions, contribution]
+                    return handle
+                except InvalidContributionError as cause:
+                    raise ContributionSubmissionError(
+                        "Contribution is invalid"
+                    ) from cause
+                except InvalidOutboxDepositError as cause:
+                    raise ContributionSubmissionError(
+                        "Invocation already submitted"
+                    ) from cause
 
-                if not await self._gathering_policy.is_ready(candidate):
-                    await self._contribution_store.put(key, contribution)
-                    return self._get_or_create_handle(key)
-
-                collected = await self._gathering_policy.gather(candidate)
-                await self._outbox.deposit(collected)
-                await self._contribution_store.discard(key)
-
-                handle = self._get_or_create_handle(key)
-                handle.future.set_result(None)
-                return handle
-            pass
         finally:
             self._release_lock_slot(key, lock_slot)
 
-    def _get_or_create_handle(
+    async def _submit_pipeline(
+        self,
+        key: HopContributionCollectionKey,
+        contribution: HopInvocationContribution,
+        handle: CollectionHandle,
+    ) -> None:
+        old_contributions = list(await self._contribution_store.get_all(key))
+        await self._gathering_policy.validate(old_contributions, contribution)
+        self._handles.setdefault(key, handle)
+
+        candidate = [*old_contributions, contribution]
+
+        if await self._gathering_policy.is_ready(candidate):
+            collected = await self._gathering_policy.gather(candidate)
+            await self._outbox.deposit(collected)
+            await self._contribution_store.discard(key)
+
+            if not handle.future.done():
+                handle.future.set_result(None)
+
+        else:
+            await self._contribution_store.put(key, contribution)
+
+    def _get_or_build_handle(
         self, key: HopContributionCollectionKey
     ) -> CollectionHandle:
         handle = self._handles.get(key)
@@ -79,7 +109,6 @@ class DefaultContributionPipeline(ContributionPipeline):
             handle = CollectionHandle(
                 future=asyncio.get_running_loop().create_future(),
             )
-            self._handles[key] = handle
 
         return handle
 

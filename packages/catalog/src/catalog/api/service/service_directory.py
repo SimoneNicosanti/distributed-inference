@@ -6,6 +6,10 @@ from integration.service_instance.service_instance import (
 from shared.service.service import ServiceId
 
 
+class ServiceInstanceReadError(Exception):
+    pass
+
+
 class ServiceDirectory(ABC):
     @abstractmethod
     async def get_service_instance_by_service_id(

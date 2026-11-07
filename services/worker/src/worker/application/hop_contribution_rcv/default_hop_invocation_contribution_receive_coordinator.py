@@ -1,3 +1,4 @@
+import asyncio
 from typing import override
 
 from worker.application.hop_contribution_rcv.abc.contribution_pipeline import (
@@ -26,7 +27,7 @@ class DefaultHopInvocationContributionReceiveCoordinator(
 
         handle = await self._contribution_pipeline.submit(contribution)
 
-        await handle.future
+        await asyncio.shield(handle.future)
 
         return HopInvocationContributionAck(
             source_context=contribution.source_context,

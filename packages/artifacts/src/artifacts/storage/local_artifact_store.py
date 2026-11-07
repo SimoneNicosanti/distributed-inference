@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import shutil
+import stat
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -8,16 +9,20 @@ from typing import override
 
 import aiofiles
 import aiofiles.os
-import aiofiles.ospath
 import aiorwlock
 
+from artifacts.contracts.artifact_bundle import ArtifactBundle
 from artifacts.contracts.artifact_manifest import (
     MANIFEST_FILE_NAME,
     ArtifactManifest,
 )
+from artifacts.storage.artifact_store import (
+    ArtifactCheckError,
+    ArtifactDownloadError,
+    ArtifactStore,
+    ArtifactUploadError,
+)
 from shared.artifact.artifact_ref import ArtifactRef
-from artifacts.storage.artifact_store import ArtifactStore
-from artifacts.contracts.artifact_bundle import ArtifactBundle
 
 
 class LocalArtifactStore(ArtifactStore):
@@ -27,7 +32,7 @@ class LocalArtifactStore(ArtifactStore):
         self._locks: dict[ArtifactRef, aiorwlock.RWLock] = {}
 
     @override
-    async def put_artifact(
+    async def upload_artifact(
         self,
         artifact_ref: ArtifactRef,
         bundle: ArtifactBundle,
@@ -35,16 +40,21 @@ class LocalArtifactStore(ArtifactStore):
         artifact_lock = self._locks.setdefault(artifact_ref, aiorwlock.RWLock())
 
         async with artifact_lock.writer_lock:
-            artifact_root_path = self._build_artifact_root_path(artifact_ref)
-            await self._copy_artifact_files(
-                bundle.root_path,
-                artifact_root_path,
-                bundle.manifest,
-            )
+            try:
+                artifact_root_path = self._build_artifact_root_path(artifact_ref)
+                await self._copy_artifact_files(
+                    bundle.root_path,
+                    artifact_root_path,
+                    bundle.manifest,
+                )
 
-            manifest_path = artifact_root_path.joinpath(MANIFEST_FILE_NAME)
-            async with aiofiles.open(manifest_path, "w") as manifest_file:
-                await manifest_file.write(bundle.manifest.model_dump_json())
+                manifest_path = artifact_root_path.joinpath(MANIFEST_FILE_NAME)
+                async with aiofiles.open(manifest_path, "w") as manifest_file:
+                    await manifest_file.write(bundle.manifest.model_dump_json())
+            except (OSError, ValueError) as error:
+                raise ArtifactUploadError(
+                    f"Unable to upload artifact {artifact_ref}"
+                ) from error
 
     @override
     @asynccontextmanager
@@ -55,37 +65,51 @@ class LocalArtifactStore(ArtifactStore):
         artifact_lock = self._locks.setdefault(artifact_ref, aiorwlock.RWLock())
 
         async with artifact_lock.reader_lock:
-            manifest = await self._build_manifest(artifact_ref)
-            yield ArtifactBundle(
-                manifest=manifest,
-                root_path=self._build_artifact_root_path(artifact_ref),
-            )
+            try:
+                manifest = await self._build_manifest(artifact_ref)
+                bundle = ArtifactBundle(
+                    manifest=manifest,
+                    root_path=self._build_artifact_root_path(artifact_ref),
+                )
+            except (OSError, ValueError) as error:
+                raise ArtifactDownloadError(
+                    f"Unable to download artifact {artifact_ref}"
+                ) from error
+
+            yield bundle
 
     @override
     async def check_artifact_existence(self, artifact_ref: ArtifactRef) -> bool:
         artifact_lock = self._locks.setdefault(artifact_ref, aiorwlock.RWLock())
 
         async with artifact_lock.reader_lock:
-            artifact_root_path = self._build_artifact_root_path(artifact_ref)
-            manifest_path = artifact_root_path.joinpath(MANIFEST_FILE_NAME)
-            if not await aiofiles.ospath.isdir(
-                artifact_root_path
-            ) or not await aiofiles.ospath.isfile(manifest_path):
-                return False
-
             try:
-                manifest = await self._build_manifest(artifact_ref)
-            except OSError, ValueError:
-                return False
+                artifact_root_path = self._build_artifact_root_path(artifact_ref)
+                manifest_path = artifact_root_path.joinpath(MANIFEST_FILE_NAME)
+                if not await self._is_file(manifest_path):
+                    return False
 
-            return all(
-                [
-                    await aiofiles.ospath.isfile(
-                        artifact_root_path.joinpath(*file_info.file_ppp.parts)
-                    )
-                    for file_info in manifest.files_info
-                ]
-            )
+                manifest = await self._build_manifest(artifact_ref)
+                return all(
+                    [
+                        await self._is_file(
+                            artifact_root_path.joinpath(*file_info.file_ppp.parts)
+                        )
+                        for file_info in manifest.files_info
+                    ]
+                )
+            except (OSError, ValueError) as error:
+                raise ArtifactCheckError(
+                    f"Unable to check artifact {artifact_ref}"
+                ) from error
+
+    @staticmethod
+    async def _is_file(path: Path) -> bool:
+        try:
+            path_stat = await aiofiles.os.stat(path)
+        except (FileNotFoundError, NotADirectoryError):
+            return False
+        return stat.S_ISREG(path_stat.st_mode)
 
     def _build_artifact_root_path(self, artifact_ref: ArtifactRef) -> Path:
         ref_hash = hashlib.sha256(artifact_ref.value.encode("utf-8")).hexdigest()

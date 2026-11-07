@@ -18,7 +18,7 @@ class HopContributionCollection:
     collection: tuple[HopInvocationContribution, ...]
 
 
-class InvalidContributionCollectionError(Exception):
+class InvalidContributionError(Exception):
     pass
 
 
@@ -43,9 +43,4 @@ class ContributionGatheringPolicy(ABC):
         self,
         other_contributions: list[HopInvocationContribution],
         new_contribution: HopInvocationContribution,
-    ) -> None:
-        """
-        Raises:
-            InvalidContributionCollectionError
-        """
-        ...
+    ) -> None: ...

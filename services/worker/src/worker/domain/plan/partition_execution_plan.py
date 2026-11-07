@@ -4,6 +4,10 @@ from shared.model.keys import TensorKey
 from shared.model.model_partition import ModelPartitionId
 
 
+class NotExistentPartitionIOSchemeError(Exception):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class PartitionIOScheme:
     inputs: tuple[TensorKey, ...]
@@ -25,4 +29,7 @@ class PartitionExecutionPlan:
     def get_scheme_by_partition_id(
         self, partition_id: ModelPartitionId
     ) -> PartitionIOScheme:
-        return self.schemes[self.partition_ids.index(partition_id)]
+        try:
+            return self.schemes[self.partition_ids.index(partition_id)]
+        except ValueError as e:
+            raise NotExistentPartitionIOSchemeError() from e

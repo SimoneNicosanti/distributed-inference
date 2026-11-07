@@ -1,4 +1,4 @@
-import contextlib
+import logging
 from typing import override
 
 from pydantic import ValidationError
@@ -24,6 +24,8 @@ from worker.domain.profiling.model_execution.model_static_profile import (
     ModelStaticProfile,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class RedisModelStaticProfileReader(ModelStaticProfileReader):
     def __init__(
@@ -41,15 +43,23 @@ class RedisModelStaticProfileReader(ModelStaticProfileReader):
         ids_key = self._profiled_model_variant_key_factory_cls.build_profiled_model_variant_ids_key()
 
         try:
-            ids = []
+            ids: list[ModelVariantId] = []
             async for value in self._redis.sscan_iter(ids_key):
-                with contextlib.suppress(ValidationError):
-                    ids.append(model_variant_id_from_json(value))
+                self._append_id_to_list_from_value(ids, value)
             return ids
         except RedisError as e:
             raise ModelStaticProfileReadError(
                 "Unable to read model static profile IDs"
             ) from e
+
+    def _append_id_to_list_from_value(
+        self, ids: list[ModelVariantId], value: str | bytes
+    ) -> None:
+        try:
+            id = model_variant_id_from_json(value)
+            ids.append(id)
+        except ValidationError:
+            logger.exception("Skipping wrong formatted model variant id")
 
     @override
     async def get_model_static_profile(

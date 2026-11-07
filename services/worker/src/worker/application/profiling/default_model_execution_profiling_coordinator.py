@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import aclosing, suppress
 from typing import override
 
@@ -24,6 +25,8 @@ from worker.application.profiling.abc.pending_models_poller import (
 from worker.domain.profiling.model_execution.model_execution_profile import (
     ModelExecutionProfile,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class DefaultModelExecutionProfilingCoordinator(
@@ -77,12 +80,20 @@ class DefaultModelExecutionProfilingCoordinator(
     async def _coordinate_model_execution_profiling(
         self, model_variant_id: ModelVariantId
     ) -> None:
-        model_execution_profile = await self.profile_model_execution(
-            model_variant_id=model_variant_id
-        )
-        await self._model_exec_profile_storage.puplish_model_execution_profile(
-            worker_id=self._worker_id, model_execution_profile=model_execution_profile
-        )
+        try:
+            model_execution_profile = await self.profile_model_execution(
+                model_variant_id=model_variant_id
+            )
+            await self._model_exec_profile_storage.puplish_model_execution_profile(
+                worker_id=self._worker_id,
+                model_execution_profile=model_execution_profile,
+            )
+        except Exception:
+            logger.exception(
+                "Model execution profiling or publication failed: worker=%s, model=%s",
+                self._worker_id,
+                model_variant_id,
+            )
 
     async def _profile_loop(self) -> None:
         async with aclosing(

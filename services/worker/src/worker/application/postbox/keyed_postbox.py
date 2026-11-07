@@ -2,8 +2,8 @@ import asyncio
 from collections.abc import Callable
 from typing import override
 
-from worker.application.postbox.abc.inbox import KeyedInbox
-from worker.application.postbox.abc.outbox import Outbox
+from worker.application.postbox.abc.inbox import InvalidInboxExtractionError, KeyedInbox
+from worker.application.postbox.abc.outbox import InvalidOutboxDepositError, Outbox
 
 
 class KeyedPostbox[KeyT, ValT](
@@ -23,7 +23,7 @@ class KeyedPostbox[KeyT, ValT](
 
         async with self._condition:
             if key in self._available or key in self._extracted:
-                raise ValueError(f"Duplicate value: {key}")
+                raise InvalidOutboxDepositError(f"Duplicate key: {key}")
 
             self._available[key] = value
             self._condition.notify_all()
@@ -36,7 +36,7 @@ class KeyedPostbox[KeyT, ValT](
             )
 
             if key in self._extracted:
-                raise ValueError(f"Key already extracted: {key}")
+                raise InvalidInboxExtractionError(f"Key {key} already extracted")
 
             value = self._available.pop(key)
             self._extracted.add(key)

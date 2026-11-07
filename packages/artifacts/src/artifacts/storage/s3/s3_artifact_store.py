@@ -3,17 +3,24 @@ import hashlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path, PurePosixPath
-from tempfile import TemporaryDirectory
 from typing import override
 
 import aiofiles
+from boto3.exceptions import S3UploadFailedError
+from boto3.s3.transfer import RetriesExceededError
+from botocore.exceptions import BotoCoreError, ClientError
 
 from artifacts.contracts.artifact_bundle import ArtifactBundle
 from artifacts.contracts.artifact_manifest import (
     MANIFEST_FILE_NAME,
     ArtifactManifest,
 )
-from artifacts.storage.artifact_store import ArtifactStore
+from artifacts.storage.artifact_store import (
+    ArtifactCheckError,
+    ArtifactDownloadError,
+    ArtifactStore,
+    ArtifactUploadError,
+)
 from artifacts.storage.s3.s3_client import S3Client
 from shared.artifact.artifact_ref import ArtifactRef
 
@@ -24,29 +31,41 @@ class S3ArtifactStore(ArtifactStore):
         self._bucket_name = bucket_name
 
     @override
-    async def put_artifact(
+    async def upload_artifact(
         self,
         artifact_ref: ArtifactRef,
         bundle: ArtifactBundle,
     ) -> None:
-        for file_info in bundle.manifest.files_info:
-            source_path = bundle.root_path.joinpath(*file_info.file_ppp.parts)
-            await self._upload_file(
-                source_path,
-                self._build_object_key(artifact_ref, file_info.file_ppp),
-            )
+        try:
+            for file_info in bundle.manifest.files_info:
+                source_path = bundle.root_path.joinpath(*file_info.file_ppp.parts)
+                await self._upload_file(
+                    source_path,
+                    self._build_object_key(artifact_ref, file_info.file_ppp),
+                )
 
-        with TemporaryDirectory() as temporary_directory:
-            manifest_path = Path(temporary_directory, MANIFEST_FILE_NAME)
-            async with aiofiles.open(manifest_path, "w") as manifest_file:
-                await manifest_file.write(bundle.manifest.model_dump_json())
-            await self._upload_file(
-                manifest_path,
-                self._build_object_key(
-                    artifact_ref,
-                    PurePosixPath(MANIFEST_FILE_NAME),
-                ),
-            )
+            async with aiofiles.tempfile.TemporaryDirectory() as temporary_directory:
+                manifest_path = Path(temporary_directory, MANIFEST_FILE_NAME)
+                async with aiofiles.open(manifest_path, "w") as manifest_file:
+                    await manifest_file.write(bundle.manifest.model_dump_json())
+                await self._upload_file(
+                    manifest_path,
+                    self._build_object_key(
+                        artifact_ref,
+                        PurePosixPath(MANIFEST_FILE_NAME),
+                    ),
+                )
+        except (
+            BotoCoreError,
+            ClientError,
+            S3UploadFailedError,
+            RetriesExceededError,
+            OSError,
+            ValueError,
+        ) as error:
+            raise ArtifactUploadError(
+                f"Unable to upload artifact {artifact_ref}"
+            ) from error
 
     @override
     @asynccontextmanager
@@ -54,31 +73,44 @@ class S3ArtifactStore(ArtifactStore):
         self,
         artifact_ref: ArtifactRef,
     ) -> AsyncGenerator[ArtifactBundle]:
-        with TemporaryDirectory() as temporary_directory:
-            root_path = Path(temporary_directory)
-            manifest_path = root_path.joinpath(MANIFEST_FILE_NAME)
-            await self._download_file(
-                self._build_object_key(
-                    artifact_ref,
-                    PurePosixPath(MANIFEST_FILE_NAME),
-                ),
-                manifest_path,
-            )
-
-            async with aiofiles.open(manifest_path) as manifest_file:
-                manifest = ArtifactManifest.model_validate_json(
-                    await manifest_file.read()
-                )
-
-            for file_info in manifest.files_info:
-                destination_path = root_path.joinpath(*file_info.file_ppp.parts)
-                destination_path.parent.mkdir(parents=True, exist_ok=True)
+        async with aiofiles.tempfile.TemporaryDirectory() as temporary_directory:
+            try:
+                root_path = Path(temporary_directory)
+                manifest_path = root_path.joinpath(MANIFEST_FILE_NAME)
                 await self._download_file(
-                    self._build_object_key(artifact_ref, file_info.file_ppp),
-                    destination_path,
+                    self._build_object_key(
+                        artifact_ref,
+                        PurePosixPath(MANIFEST_FILE_NAME),
+                    ),
+                    manifest_path,
                 )
 
-            yield ArtifactBundle(manifest=manifest, root_path=root_path)
+                async with aiofiles.open(manifest_path) as manifest_file:
+                    manifest = ArtifactManifest.model_validate_json(
+                        await manifest_file.read()
+                    )
+
+                for file_info in manifest.files_info:
+                    destination_path = root_path.joinpath(*file_info.file_ppp.parts)
+                    destination_path.parent.mkdir(parents=True, exist_ok=True)
+                    await self._download_file(
+                        self._build_object_key(artifact_ref, file_info.file_ppp),
+                        destination_path,
+                    )
+
+                bundle = ArtifactBundle(manifest=manifest, root_path=root_path)
+            except (
+                BotoCoreError,
+                ClientError,
+                RetriesExceededError,
+                OSError,
+                ValueError,
+            ) as error:
+                raise ArtifactDownloadError(
+                    f"Unable to download artifact {artifact_ref}"
+                ) from error
+
+            yield bundle
 
     @override
     async def check_artifact_existence(
@@ -95,10 +127,16 @@ class S3ArtifactStore(ArtifactStore):
                 Bucket=self._bucket_name,
                 Key=manifest_key,
             )
-        except Exception as error:
+        except ClientError as error:
             if self._is_missing_object_error(error):
                 return False
-            raise
+            raise ArtifactCheckError(
+                f"Unable to check artifact {artifact_ref}"
+            ) from error
+        except BotoCoreError as error:
+            raise ArtifactCheckError(
+                f"Unable to check artifact {artifact_ref}"
+            ) from error
         return True
 
     async def _upload_file(self, source_path: Path, key: str) -> None:

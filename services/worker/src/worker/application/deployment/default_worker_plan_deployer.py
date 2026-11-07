@@ -1,20 +1,35 @@
 from typing import override
 
-from artifacts.storage.artifact_store import ArtifactStore
+from artifacts.storage.artifact_store import (
+    ArtifactDownloadError,
+    ArtifactStore,
+)
 from catalog.api.hop.hop_deployment_registrar import (
     HopDeploymentRegistrar,
+    HopDeploymentRegistrationError,
 )
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import WorkerId
 from worker.application.hop_handler.abc.partition_executor_registry import (
+    PartitionExecutorRegistrationError,
     PartitionExecutorRegistry,
 )
-from worker.application.ports.inbound.deployment.plan_deployer import PlanDeployer
+from worker.application.ports.inbound.deployment.plan_deployer import (
+    PlanApplicationError,
+    PlanDeployer,
+    PlanPreparationError,
+)
 from worker.application.ports.outbound.model_metadata.model_partition_metadata_reader import (
+    ArtifactReferenceReadError,
     ModelPartitionMetadataReader,
 )
 from worker.application.ports.outbound.partition_execution.partition_executor_factory import (
+    PartitionExecutorCreationError,
     PartitionExecutorFactory,
+)
+from worker.application.ports.outbound.plan_store.plan_store_errors import (
+    DuplicatePlanError,
+    NotExistentPlanError,
 )
 from worker.application.ports.outbound.plan_store.plan_store_writer import (
     PlanStoreWriter,
@@ -43,9 +58,19 @@ class DefaultWorkerPlanDeployer(PlanDeployer[WorkerPlan]):
 
     @override
     async def prepare_plan(self, plan: WorkerPlan) -> None:
-        await self._create_partition_executors(plan)
-        await self._register_hop_deployments(plan)
-        await self._worker_plan_store.put_plan(plan)
+        try:
+            await self._create_partition_executors(plan)
+            await self._register_hop_deployments(plan)
+            await self._worker_plan_store.put_plan(plan)
+        except (
+            DuplicatePlanError,
+            HopDeploymentRegistrationError,
+            ArtifactReferenceReadError,
+            ArtifactDownloadError,
+            PartitionExecutorCreationError,
+            PartitionExecutorRegistrationError,
+        ) as e:
+            raise PlanPreparationError("Could not prepare plan") from e
 
     async def _create_partition_executors(self, worker_plan: WorkerPlan) -> None:
         deployment_plan = worker_plan.deployment_plan
@@ -79,7 +104,7 @@ class DefaultWorkerPlanDeployer(PlanDeployer[WorkerPlan]):
 
     async def _register_hop_deployments(self, worker_plan: WorkerPlan) -> None:
         planned_hops = worker_plan.deployment_plan.planned_hops
-        await self._hop_deployment_registrar.register_worker_for_planned_invocable_hop(
+        await self._hop_deployment_registrar.register_worker_for_planned_invocable_hops(
             plan_version=worker_plan.plan_version,
             planned_hops=planned_hops,
             worker_id=self._worker_id,
@@ -87,4 +112,7 @@ class DefaultWorkerPlanDeployer(PlanDeployer[WorkerPlan]):
 
     @override
     async def apply_plan(self, plan_version: PlanVersion) -> None:
-        await self._worker_plan_store.activate_plan(plan_version)
+        try:
+            await self._worker_plan_store.activate_plan(plan_version)
+        except NotExistentPlanError as e:
+            raise PlanApplicationError("Could not apply plan") from e

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections.abc import AsyncGenerator
 from typing import override
 
@@ -13,6 +14,8 @@ from worker.application.ports.outbound.profiling.model_execution.model_static_pr
 from worker.application.profiling.abc.pending_models_poller import (
     PendingModelsPoller,
 )
+
+logger = logging.getLogger(__name__)
 
 POLLING_TIME_INTERVAL_S = 1 * 60  # 1 minute
 
@@ -32,21 +35,22 @@ class DefaultPendingModelsPoller(PendingModelsPoller):
     @override
     async def pending_model_ids(self) -> AsyncGenerator[ModelVariantId]:
         while True:
-            available_ids, profiled_ids = await asyncio.gather(
-                self._model_static_profile_reader.get_all_model_static_profile_ids(),
-                self._model_execution_profile_reader.get_all_profiled_model_ids_by_worker_id(
-                    self._worker_id
-                ),
-            )
-            pending_ids = set(available_ids) - set(profiled_ids)
-
-            if not pending_ids:
-                await asyncio.sleep(POLLING_TIME_INTERVAL_S)
-                continue
-
-            for model_id in pending_ids:
-                already_profiled = await self._model_execution_profile_reader.check_model_execution_profile_exists(
-                    self._worker_id, model_id
+            try:
+                available_ids, profiled_ids = await asyncio.gather(
+                    self._model_static_profile_reader.get_all_model_static_profile_ids(),
+                    self._model_execution_profile_reader.get_all_profiled_model_ids_by_worker_id(
+                        self._worker_id
+                    ),
                 )
-                if not already_profiled:
-                    yield model_id
+                pending_ids = set(available_ids) - set(profiled_ids)
+
+                for model_id in pending_ids:
+                    already_profiled = await self._model_execution_profile_reader.check_model_execution_profile_exists(
+                        self._worker_id, model_id
+                    )
+                    if not already_profiled:
+                        yield model_id
+            except Exception:
+                logger.exception("Pending models retrieval round failed")
+
+            await asyncio.sleep(POLLING_TIME_INTERVAL_S)

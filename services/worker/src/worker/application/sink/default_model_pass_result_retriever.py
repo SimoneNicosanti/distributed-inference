@@ -1,4 +1,4 @@
-from typing import cast, override
+from typing import override
 
 from shared.context.model_pass_context import ModelPassId
 from worker.application.ports.inbound.sink.model_pass_result_retriever import (
@@ -30,4 +30,4 @@ class DefaultModelPassResultRetriever(ModelPassResultRetriever):
         if isinstance(outcome, ModelPassError):
             raise RuntimeError(f"Model pass {request_id} failed: {outcome.message}")
 
-        return cast(ModelPassResult, outcome)
+        return outcome

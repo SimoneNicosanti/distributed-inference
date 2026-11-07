@@ -3,13 +3,25 @@
 from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager
 
-from shared.artifact.artifact_ref import ArtifactRef
 from artifacts.contracts.artifact_bundle import ArtifactBundle
+from shared.artifact.artifact_ref import ArtifactRef
+
+
+class ArtifactUploadError(Exception):
+    pass
+
+
+class ArtifactDownloadError(Exception):
+    pass
+
+
+class ArtifactCheckError(Exception):
+    pass
 
 
 class ArtifactStore(ABC):
     @abstractmethod
-    async def put_artifact(
+    async def upload_artifact(
         self,
         artifact_ref: ArtifactRef,
         bundle: ArtifactBundle,

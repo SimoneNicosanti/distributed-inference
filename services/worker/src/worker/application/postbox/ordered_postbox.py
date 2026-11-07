@@ -3,7 +3,7 @@ from collections.abc import Callable
 from typing import override
 
 from worker.application.postbox.abc.inbox import OrderedInbox
-from worker.application.postbox.abc.outbox import Outbox
+from worker.application.postbox.abc.outbox import InvalidOutboxDepositError, Outbox
 
 
 class OrderedPostbox[KeyT, ValT](
@@ -21,7 +21,7 @@ class OrderedPostbox[KeyT, ValT](
         key = self._key_compute_callable(value)
 
         if key in self._all_keys:
-            raise ValueError(f"Duplicate value: {key}")
+            raise InvalidOutboxDepositError(f"Duplicate key: {key}")
 
         self._all_keys.add(key)
         await self._queue.put(value)

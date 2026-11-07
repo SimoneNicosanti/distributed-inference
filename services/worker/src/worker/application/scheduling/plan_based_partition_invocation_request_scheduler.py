@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from scheduling.queue_request import QueueRequest
+from shared.plan.hop import PlannedExecutableHopId
 from shared.plan.plan_version import PlanVersion
 from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import (
     SchedulingPlanReader,
@@ -13,7 +14,6 @@ from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import
 from worker.application.scheduling.abc.partition_invocation_request_scheduler import (
     HopInvocationRequestScheduler,
 )
-from shared.plan.hop import PlannedExecutableHopId
 from worker.domain.hop.hop_invocation import (
     HopInvocationRequest,
 )
