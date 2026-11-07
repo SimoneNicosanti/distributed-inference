@@ -2,6 +2,8 @@ import asyncio
 from typing import override
 
 from worker.application.ports.outbound.activity_manager.activity_manager import (
+    ActivityGrantAcquisitionError,
+    ActivityGrantReleaseError,
     ActivityManager,
 )
 from worker.domain.activity.activity_request import (
@@ -24,7 +26,6 @@ class LocalActivityManagerAdapter(ActivityManager):
         self._current_available_res: dict[ResourceType, float] = (
             available_resources.copy()
         )
-        # self._semaphores: dict[ResourceType, sysv_ipc.Semaphore] = {}
         self._grants: dict[ActivityGrantId, dict[ResourceType, float]] = {}
 
     @override
@@ -33,26 +34,37 @@ class LocalActivityManagerAdapter(ActivityManager):
         request: ActivityRequest,
     ) -> ActivityGrant:
 
-        required_allocation = {
-            resource_type: self._all_res[resource_type]
-            if requirement.exclusive
-            else requirement.quantity
-            for resource_type, requirement in request.resource_requirements.items()
-        }
+        required_allocations: dict[ResourceType, float] = {}
+        for resource_type, requirement in request.resource_requirements.items():
+            capacity = self._all_res.get(resource_type)
+            if capacity is None:
+                raise ActivityGrantAcquisitionError(
+                    f"Invalid resource type: {resource_type}"
+                )
+
+            required_allocation = (
+                capacity if requirement.exclusive else requirement.quantity
+            )
+            if required_allocation > capacity:
+                raise ActivityGrantAcquisitionError(
+                    f"Requested quantity exceeds total capacity: {resource_type}"
+                )
+
+            required_allocations[resource_type] = required_allocation
 
         async with self._condition:
             await self._condition.wait_for(
                 lambda: all(
                     self._current_available_res[resource_type] >= required_quantity
-                    for resource_type, required_quantity in required_allocation.items()
+                    for resource_type, required_quantity in required_allocations.items()
                 )
             )
 
-            for resource_type, requirement in required_allocation.items():
-                self._current_available_res[resource_type] -= requirement
+            for resource_type, requirement_val in required_allocations.items():
+                self._current_available_res[resource_type] -= requirement_val
 
             grant_id = ActivityGrantId()
-            self._grants[grant_id] = required_allocation
+            self._grants[grant_id] = required_allocations
 
         return ActivityGrant(
             activity_grant_info=ActivityGrantInfo(activity_grant_id=grant_id),
@@ -65,7 +77,12 @@ class LocalActivityManagerAdapter(ActivityManager):
         activity_grant_id: ActivityGrantId,
     ) -> None:
         async with self._condition:
-            allocation = self._grants.pop(activity_grant_id)
+            allocation = self._grants.pop(activity_grant_id, None)
+            if allocation is None:
+                raise ActivityGrantReleaseError(
+                    f"Unknown activity grant: {activity_grant_id}"
+                )
+
             for resource_type, requirement in allocation.items():
                 self._current_available_res[resource_type] += requirement
 

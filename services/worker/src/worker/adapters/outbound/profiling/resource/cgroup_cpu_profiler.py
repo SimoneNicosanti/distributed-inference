@@ -7,6 +7,9 @@ from typing import override
 from worker.application.ports.outbound.profiling.resource.cpu_profiler import (
     CpuProfiler,
 )
+from worker.application.ports.outbound.profiling.resource.resource_profiling_error import (
+    ResourceProfilingError,
+)
 from worker.domain.profiling.resource_profile import CpuProfile
 
 
@@ -26,44 +29,47 @@ class CgroupCpuProfiler(CpuProfiler):
 
     @override
     async def profile_cpu(self) -> CpuProfile:
-        logical_cpu_count = self._get_logical_cpu_count()
-        capacity_cores = self._get_capacity_cores(logical_cpu_count)
-        usage_usec = self._get_usage_usec()
-        sample_ns = self._clock_ns()
+        try:
+            logical_cpu_count = self._get_logical_cpu_count()
+            capacity_cores = self._get_capacity_cores(logical_cpu_count)
+            usage_usec = self._get_usage_usec()
+            sample_ns = self._clock_ns()
 
-        utilization_ratio: float | None = None
-        sample_duration_s: float | None = None
+            utilization_ratio: float | None = None
+            sample_duration_s: float | None = None
 
-        if (
-            self._previous_usage_usec is not None
-            and self._previous_sample_ns is not None
-            and self._previous_capacity_cores == capacity_cores
-        ):
-            elapsed_ns = sample_ns - self._previous_sample_ns
-            used_usec = usage_usec - self._previous_usage_usec
+            if (
+                self._previous_usage_usec is not None
+                and self._previous_sample_ns is not None
+                and self._previous_capacity_cores == capacity_cores
+            ):
+                elapsed_ns = sample_ns - self._previous_sample_ns
+                used_usec = usage_usec - self._previous_usage_usec
 
-            if elapsed_ns > 0 and used_usec >= 0:
-                sample_duration_s = elapsed_ns / 1_000_000_000
-                utilization_ratio = min(
-                    used_usec / 1_000_000 / sample_duration_s / capacity_cores,
-                    1.0,
-                )
+                if elapsed_ns > 0 and used_usec >= 0:
+                    sample_duration_s = elapsed_ns / 1_000_000_000
+                    utilization_ratio = min(
+                        used_usec / 1_000_000 / sample_duration_s / capacity_cores,
+                        1.0,
+                    )
 
-        self._previous_usage_usec = usage_usec
-        self._previous_sample_ns = sample_ns
-        self._previous_capacity_cores = capacity_cores
+            self._previous_usage_usec = usage_usec
+            self._previous_sample_ns = sample_ns
+            self._previous_capacity_cores = capacity_cores
 
-        return CpuProfile(
-            logical_cpu_count=logical_cpu_count,
-            capacity_cores=capacity_cores,
-            utilization_ratio=utilization_ratio,
-            sample_duration_s=sample_duration_s,
-        )
+            return CpuProfile(
+                logical_cpu_count=logical_cpu_count,
+                capacity_cores=capacity_cores,
+                utilization_ratio=utilization_ratio,
+                sample_duration_s=sample_duration_s,
+            )
+        except (ValueError, RuntimeError, OSError) as e:
+            raise ResourceProfilingError("Unable to collect CPU profile") from e
 
     @staticmethod
     def _get_logical_cpu_count() -> int:
         logical_cpu_count = os.process_cpu_count()
-        if logical_cpu_count <= 0:
+        if logical_cpu_count is None or logical_cpu_count <= 0:
             raise RuntimeError("Unable to determine the process CPU count")
         return logical_cpu_count
 

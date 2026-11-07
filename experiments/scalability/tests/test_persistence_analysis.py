@@ -82,6 +82,7 @@ def test_aggregation_keeps_timeouts_and_missing_data_explicit() -> None:
         assert row["completed_count"] == 3
         assert row["runtime_observed_count"] == 2
         assert row["runtime_mean_s"] == 150.5
+        assert row["runtime_median_s"] == 150.5
         assert row["timeout_rate"] == 1 / 3
         assert row["gap_observed_count"] == 1
 
@@ -156,8 +157,17 @@ def test_offline_plot_generation(tmp_path: Path) -> None:
         store.append(record("plot"))
     analyze(tmp_path)
     assert (tmp_path / "analysis/aggregated.csv").is_file()
-    assert len(list((tmp_path / "analysis").glob("*.pdf"))) == 3
-    assert len(list((tmp_path / "analysis").glob("*.png"))) == 3
+    assert len(list((tmp_path / "analysis").glob("*.pdf"))) == 7
+    assert len(list((tmp_path / "analysis").glob("*.png"))) == 7
+    for extension in ("pdf", "png"):
+        assert (
+            tmp_path
+            / f"analysis/main-unspecified-load-0.6-runtime-progression.{extension}"
+        ).is_file()
+        for kind in ("time-boxplots", "time-cdf", "time-heatmaps"):
+            assert (
+                tmp_path / f"analysis/main-unspecified-load-0.6-{kind}.{extension}"
+            ).is_file()
 
 
 def test_offline_incumbent_plot_generation(tmp_path: Path) -> None:
@@ -186,9 +196,18 @@ def test_offline_incumbent_plot_generation(tmp_path: Path) -> None:
     for extension in ("pdf", "png"):
         assert (
             destination
-            / f"main-deadline_violations-load-0.6-time-to-first-incumbent.{extension}"
+            / f"main-deadline_violations-load-0.6-runtime-progression.{extension}"
         ).is_file()
-        assert (destination / f"incumbents/traced.{extension}").is_file()
+        assert (
+            destination
+            / f"main-deadline_violations-load-0.6-time-to-first-incumbent.{extension}"
+        ).exists() is False
+        for objective in ("deadline_violations", "unspecified"):
+            for kind in ("time-boxplots", "time-cdf", "time-heatmaps"):
+                assert (
+                    destination / f"main-{objective}-load-0.6-{kind}.{extension}"
+                ).is_file()
+        assert not (destination / f"incumbents/traced.{extension}").exists()
         assert not (destination / f"incumbents/historic.{extension}").exists()
     with (destination / "aggregated.csv").open(newline="") as handle:
         observed = [

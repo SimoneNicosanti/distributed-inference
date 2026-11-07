@@ -17,6 +17,7 @@ dependencies = [
   "aiofiles>=25.1.0",
   "aiorwlock>=1.5.1",
   "boto3>=1.43.116",
+  "bubble-analysis[lsp]>=0.3.5",
   "fastapi>=0.139.2",
   "httpx>=0.28.1",
   "numpy>=2.0",

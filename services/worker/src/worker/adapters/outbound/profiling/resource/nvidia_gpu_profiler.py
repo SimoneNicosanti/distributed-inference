@@ -7,6 +7,9 @@ from typing import Protocol, cast, override
 from worker.application.ports.outbound.profiling.resource.gpu_profiler import (
     GpuProfiler,
 )
+from worker.application.ports.outbound.profiling.resource.resource_profiling_error import (
+    ResourceProfilingError,
+)
 from worker.domain.profiling.resource_profile import GpuProfile
 
 
@@ -23,6 +26,7 @@ class _Utilization(Protocol):
 
 class _NvmlApi(Protocol):
     NVMLError_NotSupported: type[BaseException]
+    NVMLError: type[Exception]
 
     def nvmlInit(self) -> None: ...
 
@@ -44,9 +48,7 @@ class _NvmlApi(Protocol):
 class NvidiaGpuProfiler(GpuProfiler):
     def __init__(self, nvml_api: _NvmlApi | None = None) -> None:
         self._nvml = (
-            cast(_NvmlApi, import_module("pynvml"))
-            if nvml_api is None
-            else nvml_api
+            cast(_NvmlApi, import_module("pynvml")) if nvml_api is None else nvml_api
         )
         self._initialized = False
         self._nvml.nvmlInit()
@@ -54,17 +56,23 @@ class NvidiaGpuProfiler(GpuProfiler):
 
     @override
     async def profile_gpus(self) -> tuple[GpuProfile, ...]:
+
+        try:
+            device_count = self._get_device_count()
+            return tuple(
+                self._profile_gpu(device_index) for device_index in range(device_count)
+            )
+        except (ValueError, RuntimeError, self._nvml.NVMLError) as e:
+            raise ResourceProfilingError("Unable to collect GPU profile") from e
+
+    def _get_device_count(self) -> int:
         if not self._initialized:
             raise RuntimeError("The NVIDIA GPU profiler is closed")
 
         device_count = self._nvml.nvmlDeviceGetCount()
         if device_count < 0:
             raise ValueError("NVML returned a negative GPU count")
-
-        return tuple(
-            self._profile_gpu(device_index)
-            for device_index in range(device_count)
-        )
+        return device_count
 
     def close(self) -> None:
         if not self._initialized:
@@ -87,14 +95,12 @@ class NvidiaGpuProfiler(GpuProfiler):
     def _profile_gpu(self, device_index: int) -> GpuProfile:
         handle = self._nvml.nvmlDeviceGetHandleByIndex(device_index)
         memory = self._nvml.nvmlDeviceGetMemoryInfo(handle)
-        self._validate_memory(memory, device_index)
 
         try:
+            self._validate_memory(memory, device_index)
             utilization = self._nvml.nvmlDeviceGetUtilizationRates(handle)
             compute_utilization_ratio = self._percentage_to_ratio(utilization.gpu)
-            memory_io_utilization_ratio = self._percentage_to_ratio(
-                utilization.memory
-            )
+            memory_io_utilization_ratio = self._percentage_to_ratio(utilization.memory)
         except self._nvml.NVMLError_NotSupported:
             compute_utilization_ratio = None
             memory_io_utilization_ratio = None

@@ -8,3 +8,7 @@ class NetworkProfilePublisher(ABC):
     async def publish_network_profile(
         self, network_profile: NetworkProfile
     ) -> None: ...
+
+
+class NetworkProfileWriteError(Exception):
+    pass

@@ -5,7 +5,7 @@ from integration.dto.worker_profiles.execution_profile_dto import (
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import ServiceId
-from worker.adapters.outbound.profiling.model_execution.mappers.model_execution_profile_mapper import (
+from worker.adapters.outbound.profiling.store.mappers.model_execution_profile_mapper import (
     ModelExecutionProfileMapper,
 )
 from worker.domain.profiling.model_execution.model_execution_profile import (

@@ -7,6 +7,10 @@ from worker.application.ports.outbound.partition_execution.partition_executor im
 from worker.domain.plan.deployment_plan import ResourceAllocation
 
 
+class PartitionExecutorCreationError(Exception):
+    pass
+
+
 class PartitionExecutorFactory(ABC):
     @abstractmethod
     async def create(

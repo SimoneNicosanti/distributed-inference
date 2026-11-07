@@ -7,6 +7,10 @@ from worker.domain.hop.hop_execution import (
 )
 
 
+class PartitionExecutionError(Exception):
+    pass
+
+
 ## Executes a single model partition.
 class PartitionExecutor(ABC):
     @abstractmethod

@@ -13,6 +13,10 @@ from worker.domain.profiling.model_execution.model_static_profile import (
 )
 
 
+class ModelExecutionProfilingError(Exception):
+    pass
+
+
 class EngineModelExecutionProfiler(ABC):
     @abstractmethod
     async def profile_model_execution_on_backend_with_input_shapes(

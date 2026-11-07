@@ -15,6 +15,7 @@ from worker.application.ports.outbound.partition_execution.partition_executor im
     PartitionExecutor,
 )
 from worker.application.ports.outbound.partition_execution.partition_executor_factory import (
+    PartitionExecutorCreationError,
     PartitionExecutorFactory,
 )
 from worker.domain.plan.deployment_plan import ResourceAllocation
@@ -27,9 +28,8 @@ class OnnxInferenceSessionBuilder:
         bundle: ArtifactBundle,
         resource_allocation: ResourceAllocation,
     ) -> ort.InferenceSession:
-        ## TODO: We need should check for the different deployment options
+        ## TODO: We should check for the different deployment options
         ## TODO: Here we should apply all the optimizations needed
-        ## We can call the optimizer we have built for the graph extraction pipeline
 
         provider = (
             "CUDAExecutionProvider"
@@ -56,22 +56,22 @@ class OnnxPartitionExecutorFactory(PartitionExecutorFactory):
         bundle: ArtifactBundle,
         resource_allocation: ResourceAllocation,
     ) -> PartitionExecutor:
+        try:
+            inference_session = await asyncio.to_thread(
+                OnnxInferenceSessionBuilder.build_inference_session,
+                bundle,
+                resource_allocation,
+            )
 
-        ## Call inference session builder based on path and other options
-        ## Create the inference worker
-        ## Return it
+            options = OnnxPartitionExecutorOptions(
+                device_type=OnnxDeviceType.CUDA
+                if resource_allocation.use_gpu
+                else OnnxDeviceType.CPU,
+                device_id=0,
+            )
 
-        inference_session = await asyncio.to_thread(
-            OnnxInferenceSessionBuilder.build_inference_session,
-            bundle,
-            resource_allocation,
-        )
-
-        options = OnnxPartitionExecutorOptions(
-            device_type=OnnxDeviceType.CUDA
-            if resource_allocation.use_gpu
-            else OnnxDeviceType.CPU,
-            device_id=0,
-        )
-
-        return OnnxPartitionExecutor(inference_session, options)
+            return OnnxPartitionExecutor(inference_session, options)
+        except Exception as e:
+            raise PartitionExecutorCreationError(
+                "Unable to create ONNX partition executor"
+            ) from e

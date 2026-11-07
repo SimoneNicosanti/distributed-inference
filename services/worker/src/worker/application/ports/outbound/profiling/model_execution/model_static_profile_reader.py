@@ -17,3 +17,7 @@ class ModelStaticProfileReader(ABC):
         self,
         model_variant_id: ModelVariantId,
     ) -> ModelStaticProfile: ...
+
+
+class ModelStaticProfileReadError(Exception):
+    pass

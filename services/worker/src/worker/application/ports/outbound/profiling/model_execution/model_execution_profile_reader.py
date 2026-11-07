@@ -27,3 +27,7 @@ class ModelExecutionProfileReader(ABC):
     async def check_model_execution_profile_exists(
         self, worker_id: WorkerId, model_version_id: ModelVariantId
     ) -> bool: ...
+
+
+class ModelExecutionProfileReadError(Exception):
+    pass

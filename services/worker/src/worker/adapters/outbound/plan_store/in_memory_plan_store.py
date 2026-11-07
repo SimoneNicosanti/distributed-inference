@@ -7,6 +7,11 @@ from worker.application.ports.outbound.plan_store.plan_store_reader import (
 from worker.application.ports.outbound.plan_store.plan_store_writer import (
     PlanStoreWriter,
 )
+from worker.application.ports.outbound.plan_store.plan_store_errors import (
+    DuplicatePlanError,
+    NotExistingActivePlanError,
+    NotExistingPlanError,
+)
 
 
 class VersionedPlan(Protocol):
@@ -26,7 +31,7 @@ class InMemoryPlanStore[PlanT: VersionedPlan](
     async def put_plan(self, plan: PlanT) -> None:
         existing = self._plans_by_version.get(plan.plan_version)
         if existing is not None and existing != plan:
-            raise ValueError(f"Plan version {plan.plan_version} already exists")
+            raise DuplicatePlanError(f"Plan version {plan.plan_version} already exists")
 
         self._plans_by_version[plan.plan_version] = plan
 
@@ -37,17 +42,17 @@ class InMemoryPlanStore[PlanT: VersionedPlan](
     ) -> PlanT:
         if version in self._plans_by_version:
             return self._plans_by_version[version]
-        raise KeyError(f"No plan found for plan version {version}")
+        raise NotExistingPlanError(f"No plan found for plan version {version}")
 
     @override
     async def activate_plan(self, version: PlanVersion) -> None:
         if version not in self._plans_by_version:
-            raise ValueError(f"Plan version {version} does not exist")
+            raise NotExistingPlanError(f"Plan version {version} does not exist")
 
         self._active_version = version
 
     @override
     async def get_active_plan_version(self) -> PlanVersion:
         if self._active_version is None:
-            raise ValueError("No active plan found")
+            raise NotExistingActivePlanError("No active plan found")
         return self._active_version

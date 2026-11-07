@@ -8,3 +8,7 @@ class ResourceProfilePublisher(ABC):
     async def publish_resource_profile(
         self, resource_profile: ResourceProfile
     ) -> None: ...
+
+
+class ResourceProfileWriteError(Exception):
+    pass

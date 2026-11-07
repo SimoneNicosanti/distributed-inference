@@ -6,6 +6,7 @@ from worker.application.hop_contribution_rcv.abc.contribution_gathering_policy i
     ContributionGatheringPolicy,
     HopContributionCollection,
     HopContributionCollectionKey,
+    InvalidContributionCollectionError,
 )
 from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import (
     HopRoutingPlanReader,
@@ -90,7 +91,9 @@ class DefaultContributionGatheringPolicy(ContributionGatheringPolicy):
             for contribution in other_contributions
         ]
         if any(key_inequalities):
-            raise ValueError("Contributions belong to different collections")
+            raise InvalidContributionCollectionError(
+                "Contribution belong to different collections"
+            )
 
         routing_plan = await self._routing_plan_reader.get_hop_routing_plan_by_version(
             new_contribution.plan_version

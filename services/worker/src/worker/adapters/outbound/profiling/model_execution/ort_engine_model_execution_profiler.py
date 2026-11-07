@@ -10,9 +10,9 @@ import onnxruntime as ort
 
 from artifacts.contracts.artifact_bundle import ArtifactBundle
 from shared.model.keys import LayerKey
-from shared.model.model_variant import ModelVariantId
 from worker.application.ports.outbound.profiling.model_execution.engine_model_execution_profiler import (
     EngineModelExecutionProfiler,
+    ModelExecutionProfilingError,
 )
 from worker.domain.profiling.model_execution.model_execution_profile import (
     Backend,
@@ -64,9 +64,6 @@ class OrtInputInfoProvider(Protocol):
     def get_inputs(self) -> list[OrtInputInfo]: ...
 
 
-type BackendSessionKey = tuple[Backend, ModelVariantId]
-
-
 class OrtModelExecutionProfiler(EngineModelExecutionProfiler):
     def __init__(self) -> None:
         pass
@@ -80,13 +77,20 @@ class OrtModelExecutionProfiler(EngineModelExecutionProfiler):
         input_shapes: ModelInputConcreteShapes,
     ) -> BackendExecutionProfile:
 
-        return await asyncio.to_thread(
-            self._sync_profile_model_execution_on_backend_with_input_shapes,
-            model_static_profile,
-            artifact_bundle,
-            backend,
-            input_shapes,
-        )
+        try:
+            return await asyncio.to_thread(
+                self._sync_profile_model_execution_on_backend_with_input_shapes,
+                model_static_profile,
+                artifact_bundle,
+                backend,
+                input_shapes,
+            )
+        except Exception as e:
+            raise ModelExecutionProfilingError(
+                f"Unable to profile model {model_static_profile.model_variant_id} "
+                f"on backend {backend.value}"
+                f"for shape {input_shapes.input_shapes}"
+            ) from e
 
     def _sync_profile_model_execution_on_backend_with_input_shapes(
         self,

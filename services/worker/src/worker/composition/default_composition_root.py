@@ -51,7 +51,7 @@ from shared.context.model_pass_context import ModelPassId
 from worker.adapters.outbound.activity_manager.local_activity_manager import (
     LocalActivityManagerAdapter,
 )
-from worker.adapters.outbound.contribution.in_memory_contribution_store import (
+from worker.adapters.outbound.contribution_store.in_memory_contribution_store import (
     InMemoryContributionStore,
 )
 from worker.adapters.outbound.hop_contribution.arrow.arrow_hop_invocation_contribution_sender import (
@@ -69,16 +69,16 @@ from worker.adapters.outbound.plan_store.in_memory_worker_plan_store import (
 from worker.adapters.outbound.profiling.model_execution.ort_engine_model_execution_profiler import (
     OrtModelExecutionProfiler,
 )
-from worker.adapters.outbound.profiling.model_execution.redis_model_execution_profile_store import (
+from worker.adapters.outbound.profiling.store.redis_model_execution_profile_store import (
     RedisModelExecutionProfileStore,
 )
-from worker.adapters.outbound.profiling.model_execution.redis_model_static_profile_reader import (
+from worker.adapters.outbound.profiling.store.redis_model_static_profile_reader import (
     RedisModelStaticProfileReader,
 )
 from worker.adapters.outbound.profiling.network.arrow.arrow_network_probe_client import (
     ArrowNetworkProbeClient,
 )
-from worker.adapters.outbound.profiling.network.publisher.redis_network_profile_publisher import (
+from worker.adapters.outbound.profiling.publisher.redis_network_profile_publisher import (
     RedisNetworkProfilePublisher,
 )
 from worker.adapters.outbound.profiling.resource.cgroup_cpu_profiler import (
@@ -91,7 +91,7 @@ from worker.adapters.outbound.profiling.resource.no_gpu_profiler import NoGpuPro
 from worker.adapters.outbound.profiling.resource.nvidia_gpu_profiler import (
     NvidiaGpuProfiler,
 )
-from worker.adapters.outbound.profiling.resource.publisher.redis_resource_profile_publisher import (
+from worker.adapters.outbound.profiling.publisher.redis_resource_profile_publisher import (
     RedisResourceProfilePublisher,
 )
 from worker.adapters.outbound.profiling.utils.nvidia_gpu_availability_checker import (

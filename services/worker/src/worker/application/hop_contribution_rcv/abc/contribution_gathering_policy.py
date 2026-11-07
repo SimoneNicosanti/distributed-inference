@@ -18,6 +18,10 @@ class HopContributionCollection:
     collection: tuple[HopInvocationContribution, ...]
 
 
+class InvalidContributionCollectionError(Exception):
+    pass
+
+
 class ContributionGatheringPolicy(ABC):
     @abstractmethod
     async def key_of(
@@ -39,4 +43,9 @@ class ContributionGatheringPolicy(ABC):
         self,
         other_contributions: list[HopInvocationContribution],
         new_contribution: HopInvocationContribution,
-    ) -> None: ...
+    ) -> None:
+        """
+        Raises:
+            InvalidContributionCollectionError
+        """
+        ...

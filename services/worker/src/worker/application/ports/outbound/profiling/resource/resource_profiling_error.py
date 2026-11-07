@@ -1,0 +1,2 @@
+class ResourceProfilingError(Exception):
+    pass

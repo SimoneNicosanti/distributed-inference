@@ -17,8 +17,8 @@ class InMemoryContributionStore[KeyT, ConT](ContributionStore[KeyT, ConT]):
         self._in_memory_store[key].append(contribution)
 
     @override
-    async def get(self, key: KeyT) -> tuple[ConT, ...]:
-        contributions = self._in_memory_store.get(key)
+    async def get_all(self, key: KeyT) -> tuple[ConT, ...]:
+        contributions = self._in_memory_store.get(key, None)
         if contributions is None:
             return ()
         return tuple(contributions)

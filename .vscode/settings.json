@@ -1,2 +1,11 @@
 {
+  "simpleLspClient.servers": {
+    "bubble": {
+      "cmd": [
+        "/opt/venv/bin/bubble-lsp"
+      ],
+      "filetypes": ["python"],
+      "formatting": false
+    }
+  }
 }

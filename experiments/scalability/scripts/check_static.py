@@ -175,10 +175,19 @@ def main() -> None:
     }
     assert {
         "read_journal",
-        "plot_first_incumbent",
-        "plot_incumbent_history",
+        "plot_runtime_progression",
+        "plot_aggregate_times",
     } <= analysis_calls
     assert not {"execute_solver", "GurobiSolver"} & analysis_calls
+    assert not {"plot_first_incumbent", "plot_incumbent_history"} & analysis_calls
+    aggregate_plots = ast.parse(
+        (experiment / "src/scalability_benchmark/aggregate_time_plots.py").read_text()
+    )
+    assert {
+        node.func.attr
+        for node in ast.walk(aggregate_plots)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    } >= {"boxplot", "step", "imshow", "savefig"}
     assert any(
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Attribute)

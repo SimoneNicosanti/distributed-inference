@@ -68,10 +68,10 @@ from shared.model.model_variant import (
     QuantizationType,
 )
 from shared.service.service import ServiceId
-from worker.adapters.outbound.profiling.model_execution.mappers.model_execution_profile_mapper import (
+from worker.adapters.outbound.profiling.store.mappers.model_execution_profile_mapper import (
     ModelExecutionProfileMapper,
 )
-from worker.adapters.outbound.profiling.model_execution.mappers.model_static_profile_mapper import (
+from worker.adapters.outbound.profiling.store.mappers.model_static_profile_mapper import (
     ModelStaticProfileMapper,
 )
 from worker.adapters.outbound.profiling.model_execution.ort_engine_model_execution_profiler import (

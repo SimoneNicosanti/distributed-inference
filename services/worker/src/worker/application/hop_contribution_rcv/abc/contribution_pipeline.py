@@ -10,8 +10,15 @@ class CollectionHandle:
     future: asyncio.Future[None]
 
 
+class ContributionRejectedError(Exception):
+    """Contribution cannot be acepted"""
+
+
 class ContributionPipeline(ABC):
     @abstractmethod
-    async def submit(
-        self, contribution: HopInvocationContribution
-    ) -> CollectionHandle: ...
+    async def submit(self, contribution: HopInvocationContribution) -> CollectionHandle:
+        """
+        Raises:
+            ContributionRejectedError
+        """
+        ...

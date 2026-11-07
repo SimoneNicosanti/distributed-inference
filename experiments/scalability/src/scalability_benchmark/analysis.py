@@ -7,6 +7,7 @@ from pathlib import Path
 from statistics import median
 from typing import Any
 
+from scalability_benchmark.aggregate_time_plots import plot_aggregate_times
 from scalability_benchmark.persistence import read_journal, write_summary
 
 DIMENSIONS = {
@@ -166,9 +167,16 @@ def analyze(directory: Path) -> None:
             and record["load"] == load
             and record_objective(record) == objective
         ]
-        plot_first_incumbent(selected, rows, destination, campaign, load, objective)
-        for record in selected:
-            plot_incumbent_history(record, destination)
+        plot_runtime_progression(selected, rows, destination, campaign, load, objective)
+        plot_aggregate_times(
+            selected,
+            destination,
+            f"{campaign}-{objective}-load-{load}",
+            f"{campaign}; objective={objective}; reference load={load}",
+            DIMENSIONS,
+        )
+        # for record in selected:
+        #     plot_incumbent_history(record, destination)
         for dimension, label in DIMENSIONS.items():
             subset = [
                 row
@@ -336,4 +344,76 @@ def plot_incumbent_history(record: dict[str, Any], destination: Path) -> None:
     )
     for extension in ("pdf", "png"):
         figure.savefig(directory / f"{record['run_id']}.{extension}")
+    plt.close(figure)
+
+
+def plot_runtime_progression(
+    records: list[dict[str, Any]],
+    rows: list[dict[str, object]],
+    destination: Path,
+    campaign: str,
+    load: float,
+    objective: str,
+) -> None:
+    """Show runtime scaling with pooled observed medians and explicit timeouts."""
+    import matplotlib.pyplot as plt
+
+    figure, axes = plt.subplots(1, 3, figsize=(14, 4), constrained_layout=True)
+    observed = [
+        record
+        for record in records
+        if record["termination"] != "solver_error"
+        and finite_number(record.get("solver_runtime_s")) is not None
+    ]
+    for axis, (dimension, label) in zip(axes, DIMENSIONS.items(), strict=True):
+        for timeout, marker, color, legend in (
+            (False, "o", "tab:blue", "Before timeout"),
+            (True, "x", "tab:orange", "Timeout"),
+        ):
+            subset = [
+                record for record in observed if record["timeout_reached"] == timeout
+            ]
+            axis.scatter(
+                [record[dimension] for record in subset],
+                [record["solver_runtime_s"] for record in subset],
+                marker=marker,
+                color=color,
+                alpha=0.4,
+                label=legend,
+            )
+        summaries = [
+            row
+            for row in rows
+            if row["campaign"] == campaign
+            and row["objective"] == objective
+            and row["load"] == load
+            and row["dimension"] == dimension
+        ]
+        axis.plot(
+            [row["size"] for row in summaries],
+            [
+                row["runtime_median_s"]
+                if row["runtime_median_s"] is not None
+                else math.nan
+                for row in summaries
+            ],
+            color="black",
+            marker="o",
+            linewidth=2,
+            label="Observed median (including timeouts)",
+        )
+        axis.set_xlabel(label)
+        axis.set_ylabel("Solver runtime (s)")
+        axis.set_xticks(sorted({record[dimension] for record in records}))
+        axis.set_ylim(bottom=0)
+        axis.legend(fontsize=8)
+    figure.suptitle(
+        f"{campaign}; objective={objective}; reference load={load}; "
+        f"runtimes observed={len(observed)}/{len(records)}; other factors pooled"
+    )
+    for extension in ("pdf", "png"):
+        figure.savefig(
+            destination
+            / f"{campaign}-{objective}-load-{load}-runtime-progression.{extension}"
+        )
     plt.close(figure)

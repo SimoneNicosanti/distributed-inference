@@ -51,7 +51,7 @@ class DefaultContributionPipeline(ContributionPipeline):
                 if handle is not None and handle.future.done():
                     return handle
 
-                old_contributions = list(await self._contribution_store.get(key))
+                old_contributions = list(await self._contribution_store.get_all(key))
                 await self._gathering_policy.validate(old_contributions, contribution)
 
                 candidate = [*old_contributions, contribution]
@@ -67,6 +67,7 @@ class DefaultContributionPipeline(ContributionPipeline):
                 handle = self._get_or_create_handle(key)
                 handle.future.set_result(None)
                 return handle
+            pass
         finally:
             self._release_lock_slot(key, lock_slot)
 

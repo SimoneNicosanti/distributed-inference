@@ -11,3 +11,7 @@ class ModelExecutionProfilePublisher(ABC):
     async def puplish_model_execution_profile(
         self, worker_id: WorkerId, model_execution_profile: ModelExecutionProfile
     ) -> None: ...
+
+
+class ModelExecutionProfileWriteError(Exception):
+    pass

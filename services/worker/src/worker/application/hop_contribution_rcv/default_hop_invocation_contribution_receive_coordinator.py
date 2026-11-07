@@ -23,6 +23,7 @@ class DefaultHopInvocationContributionReceiveCoordinator(
     async def pass_hop_invocation_contribution(
         self, contribution: HopInvocationContribution
     ) -> HopInvocationContributionAck:
+
         handle = await self._contribution_pipeline.submit(contribution)
 
         await handle.future

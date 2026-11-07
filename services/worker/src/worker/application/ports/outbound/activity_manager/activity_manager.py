@@ -1,28 +1,26 @@
 from abc import ABC, abstractmethod
 
-from utils.raises.raises import raises
 from worker.domain.activity.activity_request import (
     ActivityGrant,
     ActivityGrantId,
     ActivityRequest,
 )
-from worker.domain.activity.error.activity_grant_acquisition_error import (
-    ActivityGrantAcquisitionError,
-)
+
+
+class ActivityGrantAcquisitionError(Exception):
+    "Failure upon acquisition of activity grant"
+
+
+class ActivityGrantReleaseError(Exception):
+    "Failure upon release of activity grant"
 
 
 class ActivityManager(ABC):
     @abstractmethod
-    @raises(ActivityGrantAcquisitionError)
     async def acquire_activity_grant(
         self,
         request: ActivityRequest,
-    ) -> ActivityGrant:
-        """
-        ## Raises:
-            ActivityGrantAcquisitionError
-        """
-        ...
+    ) -> ActivityGrant: ...
 
     @abstractmethod
     async def release_activity_grant(

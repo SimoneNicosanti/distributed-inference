@@ -6,6 +6,47 @@ pilot/campaign execution, plots, Docker or microservices. No environment sync or
 package installation was performed. The experiment lockfile was resolved and
 checked; this validates dependency resolution, not installation or runtime.
 
+## Aggregate time distribution verification (2026-11-06)
+
+Offline analysis now writes three additional PDF/PNG figures for each
+campaign/objective/load: grouped boxplots, conditional empirical CDFs and pairwise
+median heatmaps. Each covers both time to first incumbent and native runtime.
+Observed/total counts make missing measurements explicit. Valid zero times are
+retained; runtime observations from solver errors are excluded, while timeout
+runtimes remain measured termination times. CDFs use the observed count within
+each labeled subset and do not infer time to optimality or impute a missing first
+incumbent at the timeout limit. Heatmaps pool the remaining scaling dimension,
+share a color scale per metric and distinguish absent cells from cells with no
+measurements. Time-to-first-incumbent progression output is disabled; the
+already-commented per-run incumbent plotting loop remains disabled.
+
+Static verification covers the new offline entry point and compilation of 41
+Python files, plus Ruff lint/format, focused strict mypy on five changed Python
+files and `git diff --check`. Test definitions cover zero/tied CDF samples,
+missing/invalid measurements, timeout/error treatment, pairwise coverage,
+objective-separated file names and the absence of first-incumbent progression
+and per-run curve output. No tests, benchmark functions, plotting or solver runs
+were executed. Appearance and runtime behavior remain unverified.
+
+## Runtime progression verification (2026-11-06)
+
+The existing runtime panels displayed individual points only. Offline analysis
+now also writes a dedicated `*-runtime-progression.pdf` and PNG per
+campaign/objective/load, with worker/flow/model panels and connected observed
+median curves. Timeouts retain their measured runtimes and use distinct markers;
+the median includes them. Other factors and seeds remain pooled, explicitly
+stated in the title, so the curve describes that mixture rather than a comparison
+at fixed values of every other factor. Missing/error runtimes are excluded;
+missing medians become gaps and coverage is reported in the title.
+
+Ruff lint/format, focused strict mypy on the three changed Python files, the
+39-file syntax/grid/solver-flow checker and `git diff --check` passed. Static
+checks cover the new entry point in `analyze`. Existing plotting test definitions
+now expect the extra PDF/PNG files and check objective-separated file names;
+the aggregation contract retains timeout runtimes in the median. No tests,
+benchmark execution or plot rendering were run. Appearance and runtime behavior
+remain unverified.
+
 ## Incumbent plotting verification (2026-11-05)
 
 `analyze` now adds a time-to-first-incumbent figure per campaign/objective/load,

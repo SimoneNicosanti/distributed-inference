@@ -12,6 +12,7 @@ from worker.adapters.outbound.partition_execution.onnx.onnx_partition_executor_o
     OnnxPartitionExecutorOptions,
 )
 from worker.application.ports.outbound.partition_execution.partition_executor import (
+    PartitionExecutionError,
     PartitionExecutor,
 )
 from worker.domain.hop.hop_execution import (
@@ -62,12 +63,13 @@ class OnnxPartitionExecutor(PartitionExecutor):
 
         ## We just need a way to call await, otherwise we would block the main loop
         ## For now we use to thread, then maybe we can evaluate other options
-
-        partition_execution_output = await asyncio.to_thread(
-            self._execute_sync, partition_execution_input
-        )
-
-        return partition_execution_output
+        try:
+            partition_execution_output = await asyncio.to_thread(
+                self._execute_sync, partition_execution_input
+            )
+            return partition_execution_output
+        except Exception as e:
+            raise PartitionExecutionError("Unable to execute ONNX partition") from e
 
     def _execute_sync(
         self, partition_execution_input: HopExecutionInput[PlannedPartitionReplicaId]
@@ -120,11 +122,10 @@ class OnnxPartitionExecutor(PartitionExecutor):
         return partition_execution_output
 
     def _map_device_type(self, device_type: OnnxDeviceType) -> str:
-        if device_type == OnnxDeviceType.CUDA:
-            return "cuda"
-
-        elif device_type == OnnxDeviceType.CPU:
-            return "cpu"
-
-        else:
-            raise ValueError(f"Unknown device type: {device_type}")
+        match device_type:
+            case OnnxDeviceType.CUDA:
+                return "cuda"
+            case OnnxDeviceType.CPU:
+                return "cpu"
+            case _:
+                raise ValueError(f"Unknown device type: {device_type}")
