@@ -43,7 +43,7 @@ from controller.adapters.outbound.store.redis_flow_plan_publisher import (
 )
 from controller.application.deployment.abc.actuation_manager import ActuationManager
 from controller.application.deployment.abc.solution_observer import SolutionObserver
-from controller.application.deployment.builder.plan_version_builder import (
+from controller.application.ports.outbound.plan_version.plan_version_factory import (
     PlanVersionBuilder,
 )
 from controller.application.deployment.default_actuation_manager import (

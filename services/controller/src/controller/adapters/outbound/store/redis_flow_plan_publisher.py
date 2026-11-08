@@ -13,8 +13,6 @@ from shared.flow.flow import FlowId
 
 
 class RedisFlowPlanPublisher(FlowPlanPublisher):
-    """Publish a batch in one transaction, without rollback on Redis command errors."""
-
     def __init__(
         self, redis: asyncio_redis.Redis, key_factory: FlowPlanKeyFactory
     ) -> None:

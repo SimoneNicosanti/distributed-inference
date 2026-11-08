@@ -12,13 +12,13 @@ from controller.application.deployment.abc.solution_to_plan_converter import (
 from controller.application.deployment.builder.model_partition_id_builder import (
     ModelPartitionIdBuilder,
 )
-from controller.application.deployment.builder.plan_version_builder import (
-    PlanVersionBuilder,
-)
 from controller.application.ports.outbound.partition.partition_builder_gateway import (
     PartitionBuilderGateway,
 )
 from controller.application.ports.outbound.plan_share_gateway import PlanShareGateway
+from controller.application.ports.outbound.plan_version.plan_version_factory import (
+    PlanVersionFactory,
+)
 from controller.application.ports.outbound.store.flow_plan_publisher import (
     FlowPlanPublisher,
 )
@@ -37,7 +37,7 @@ class DefaultActuationManager(ActuationManager, AsyncLifecycle):
         self,
         solution_observer: SolutionObserver,
         partition_builder_gateway: PartitionBuilderGateway,
-        plan_version_builder: PlanVersionBuilder,
+        plan_version_factory: PlanVersionFactory,
         worker_plan_builder: SolutionToPlanConverter,
         plan_share_gateway: PlanShareGateway,
         flow_plan_publisher: FlowPlanPublisher,
@@ -46,14 +46,13 @@ class DefaultActuationManager(ActuationManager, AsyncLifecycle):
 
         self._partition_builder_gateway = partition_builder_gateway
 
-        self._plan_version_builder = plan_version_builder
+        self._plan_version_factory = plan_version_factory
         self._worker_plan_builder = worker_plan_builder
 
         self._plan_share_gateway = plan_share_gateway
         self._flow_plan_publisher = flow_plan_publisher
 
         self._observer_task: asyncio.Task[None] | None = None
-        pass
 
     @override
     async def actuate_solution(self, solution: EnrichedOptimizationSolution) -> None:
@@ -69,7 +68,7 @@ class DefaultActuationManager(ActuationManager, AsyncLifecycle):
             model_partition_ids,
         )
 
-        plan_version = self._plan_version_builder.build_next_plan_version()
+        plan_version = await self._plan_version_factory.build_next_plan_version()
 
         (
             worker_plans_by_worker_id,
