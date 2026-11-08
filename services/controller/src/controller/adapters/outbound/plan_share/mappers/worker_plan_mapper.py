@@ -11,6 +11,7 @@ from integration.dto.context.context_dto import (
 from integration.dto.worker_plan.worker_plan_dto import (
     DeploymentPlanDto,
     DestinationHopAddressDto,
+    FailurePlanDto,
     HopInputRoutingDto,
     HopOutputRoutingDto,
     HopRoutingPlanDto,
@@ -36,6 +37,10 @@ class WorkerPlanMapper:
     def to_worker_plan_dto(plan: WorkerPlan) -> WorkerPlanDto:
         return WorkerPlanDto(
             plan_version=plan.plan_version,
+            failure_plan=FailurePlanDto(
+                flow_ids=plan.failure_plan.flow_ids,
+                sink_replica_ids=plan.failure_plan.sink_replica_ids,
+            ),
             deployment_plan=DeploymentPlanDto(
                 executable_hops=plan.deployment_plan.executable_hops,
                 allocations=tuple(

@@ -20,6 +20,7 @@ from controller.domain.optimization.solving.optimization_solution import (
     OptimizationSolution,
 )
 from controller.domain.plan.deployment_plan import DeploymentPlan, ResourceAllocation
+from controller.domain.plan.failure_plan import FailurePlan
 from controller.domain.plan.hop_routing_plan import (
     HopAddress,
     HopInputRouting,
@@ -33,6 +34,7 @@ from controller.domain.plan.partition_execution_plan import (
 )
 from controller.domain.plan.scheduling_plan import PriorityKey, SchedulingPlan
 from controller.domain.plan.worker_plan import WorkerPlan
+from shared.flow.flow import FlowId
 from shared.model.model_partition import ModelPartitionId
 from shared.plan.hop_logical_id import (
     PlannedIngressReplicaId,
@@ -71,6 +73,9 @@ class DefaultWorkerPlanBuilder:
         schemes_by_worker: dict[WorkerId, dict[ModelPartitionId, PartitionIOScheme]] = (
             defaultdict(dict)
         )
+        failure_sinks_by_worker: dict[WorkerId, dict[FlowId, PlannedSinkReplicaId]] = (
+            defaultdict(dict)
+        )
 
         for flow_solution in solution.flow_solutions:
             involved_workers.setdefault(flow_solution.ingress_worker_id, None)
@@ -79,6 +84,15 @@ class DefaultWorkerPlanBuilder:
             ingress_by_worker[flow_solution.ingress_worker_id].append(endpoints.ingress)
             sink_by_worker[flow_solution.sink_worker_id].append(endpoints.sink)
             components = executable_components(flow_solution)
+            flow_workers = {
+                flow_solution.ingress_worker_id,
+                flow_solution.sink_worker_id,
+                *(component.worker_id for component in components),
+            }
+            for worker_id in flow_workers:
+                failure_sinks_by_worker[worker_id][flow_solution.flow_id] = (
+                    endpoints.sink
+                )
             replicas = tuple(
                 replica_ids_by_flow[flow_solution.flow_id][component.component_index]
                 for component in components
@@ -201,6 +215,7 @@ class DefaultWorkerPlanBuilder:
                 priority_keys=priority_keys_by_worker[worker_id],
                 priorities=priorities_by_worker[worker_id],
                 schemes=schemes_by_worker[worker_id],
+                failure_sinks=failure_sinks_by_worker[worker_id],
             )
             for worker_id in involved_workers
         }
@@ -235,10 +250,15 @@ class DefaultWorkerPlanBuilder:
         priority_keys: Sequence[PriorityKey],
         priorities: Sequence[int],
         schemes: dict[ModelPartitionId, PartitionIOScheme],
+        failure_sinks: dict[FlowId, PlannedSinkReplicaId],
     ) -> WorkerPlan:
         replica_ids = tuple(replicas)
         return WorkerPlan(
             plan_version=plan_version,
+            failure_plan=FailurePlan(
+                flow_ids=tuple(failure_sinks),
+                sink_replica_ids=tuple(failure_sinks.values()),
+            ),
             deployment_plan=DeploymentPlan(
                 executable_hops=replica_ids,
                 allocations=tuple(allocations),

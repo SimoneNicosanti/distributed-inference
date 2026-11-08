@@ -11,6 +11,7 @@ from controller.application.ports.outbound.directory.worker_directory_gateway im
     WorkerDirectoryGateway,
 )
 from controller.domain.plan.deployment_plan import DeploymentPlan
+from controller.domain.plan.failure_plan import FailurePlan
 from controller.domain.plan.hop_routing_plan import HopRoutingPlan
 from controller.domain.plan.partition_execution_plan import PartitionExecutionPlan
 from controller.domain.plan.scheduling_plan import SchedulingPlan
@@ -56,6 +57,7 @@ def _worker_plan(plan_version: PlanVersion) -> WorkerPlan:
         scheduling_plan=SchedulingPlan(priority_keys=(), priorities=()),
         partition_execution_plan=PartitionExecutionPlan(partition_ids=(), schemes=()),
         hop_routing_plan=HopRoutingPlan(hop_addresses=(), routings=()),
+        failure_plan=FailurePlan(flow_ids=(), sink_replica_ids=()),
     )
 
 
@@ -69,6 +71,7 @@ def _worker_instance(
             CapabilityType.HOP_INVOCATION,
             CapabilityType.IN_NETWORK_PROFILING,
             CapabilityType.RESULT_RETRIEVE,
+            CapabilityType.FAILURE_RECEIVE,
         )
     ]
     capabilities.append(
@@ -122,6 +125,8 @@ async def test_sends_prepare_and_apply_to_discovered_worker_endpoint() -> None:
     assert request.worker_plan.plan_version == plan_version
     assert set(request.model_dump()) == {"worker_plan"}
     assert request.worker_plan.deployment_plan.executable_hops == ()
+    assert request.worker_plan.failure_plan.flow_ids == ()
+    assert request.worker_plan.failure_plan.sink_replica_ids == ()
 
 
 @pytest.mark.asyncio

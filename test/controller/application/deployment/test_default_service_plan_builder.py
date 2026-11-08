@@ -173,6 +173,15 @@ async def test_maps_solution_to_all_involved_workers() -> None:
     )
 
     assert set(plans) == {ingress_one, ingress_two, sink_one, compute_one, compute_two}
+    for worker_id in (ingress_one, sink_one, compute_one, compute_two):
+        assert plans[worker_id].failure_plan.flow_ids == (first_flow_id,)
+        assert plans[worker_id].failure_plan.sink_replica_ids == (
+            flow_plans[first_flow_id].sink_replica_id,
+        )
+    assert plans[ingress_two].failure_plan.flow_ids == (second_flow_id,)
+    assert plans[ingress_two].failure_plan.sink_replica_ids == (
+        flow_plans[second_flow_id].sink_replica_id,
+    )
     for endpoint_worker in (ingress_one, sink_one):
         assert plans[endpoint_worker].deployment_plan.executable_hops == ()
         assert plans[endpoint_worker].deployment_plan.allocations == ()
@@ -414,6 +423,14 @@ async def test_shared_compute_worker_keeps_flow_replicas_and_deduplicates_scheme
     )
 
     compute_plan = plans[compute]
+    assert compute_plan.failure_plan.flow_ids == (
+        first_flow.flow_id,
+        second_flow.flow_id,
+    )
+    assert compute_plan.failure_plan.sink_replica_ids == (
+        flow_plans[first_flow.flow_id].sink_replica_id,
+        flow_plans[second_flow.flow_id].sink_replica_id,
+    )
     replicas = compute_plan.deployment_plan.executable_hops
     assert len(replicas) == 2
     assert tuple(replica.replica_idx for replica in replicas) == (0, 1)
@@ -466,6 +483,16 @@ def _assert_flow_plans(
     worker_plans: Mapping[ServiceId, WorkerPlan],
     flow_plans: Mapping[FlowId, FlowPlan],
 ) -> None:
+    for worker_plan in worker_plans.values():
+        failure_plan = worker_plan.failure_plan
+        local_flows = {
+            address.flow_id for address in worker_plan.hop_routing_plan.hop_addresses
+        }
+        assert set(failure_plan.flow_ids) == local_flows
+        assert len(failure_plan.flow_ids) == len(local_flows)
+        assert dict(
+            zip(failure_plan.flow_ids, failure_plan.sink_replica_ids, strict=True)
+        ) == {flow_id: flow_plans[flow_id].sink_replica_id for flow_id in local_flows}
     addresses = {
         address
         for plan in worker_plans.values()
@@ -521,6 +548,10 @@ def _assert_worker_round_trip(plan: WorkerPlan) -> None:
     received = PrepareWorkerPlanRequest.model_validate_json(request.model_dump_json())
     worker_plan = worker_plan_from_dto(received.worker_plan)
     assert worker_plan.plan_version == plan.plan_version
+    assert worker_plan.failure_plan.flow_ids == plan.failure_plan.flow_ids
+    assert (
+        worker_plan.failure_plan.sink_replica_ids == plan.failure_plan.sink_replica_ids
+    )
     assert (
         worker_plan.deployment_plan.planned_hops == plan.deployment_plan.deployed_hops
     )
