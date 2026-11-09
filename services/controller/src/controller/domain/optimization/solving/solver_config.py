@@ -9,6 +9,7 @@ class ObjectiveKind(StrEnum):
     ARRIVAL_WEIGHTED_ACCURACY = auto()
     DEADLINE_VIOLATIONS = auto()
     ARRIVAL_WEIGHTED_NORMALIZED_DELAY = auto()
+    CONSTANT = auto()
 
 
 class FormulationKind(StrEnum):

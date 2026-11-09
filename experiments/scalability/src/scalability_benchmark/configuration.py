@@ -198,9 +198,7 @@ class ExperimentConfig(Settings):
             raise ValueError("The device must be CPU-only")
         if any(self.hardware[tier].backend != "gpu" for tier in ("edge", "cloud")):
             raise ValueError("Edge and cloud must provide GPUs")
-        progression = tuple((i, 0) for i in range(6)) + tuple(
-            (5, i) for i in range(1, 6)
-        )
+        progression = tuple((i, 0) for i in range(11))
         if self.infrastructure != progression:
             raise ValueError(
                 "Infrastructure must preserve all 11 ordered configurations"

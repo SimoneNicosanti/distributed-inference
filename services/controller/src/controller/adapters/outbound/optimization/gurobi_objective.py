@@ -115,6 +115,8 @@ def set_objective(
             )
             for flow in p.flows
         )
+    elif objective_kind == ObjectiveKind.CONSTANT:
+        objective = 0
     else:
         raise AssertionError(f"Unknown objective: {objective_kind!r}")
 

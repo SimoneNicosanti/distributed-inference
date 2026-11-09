@@ -23,7 +23,7 @@ hardware:
   device: {backend: cpu, cpu_cores: 4, ram_gib: 8, vram_gib: 0, compute_flops_s: 80000000000, memory_bytes_s: 20000000000, overhead_s: 0.000005}
   edge: {backend: gpu, cpu_cores: 8, ram_gib: 16, vram_gib: 8, compute_flops_s: 3000000000000, memory_bytes_s: 120000000000, overhead_s: 0.000025}
   cloud: {backend: gpu, cpu_cores: 16, ram_gib: 64, vram_gib: 24, compute_flops_s: 12000000000000, memory_bytes_s: 450000000000, overhead_s: 0.000035}
-infrastructure: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [5, 1], [5, 2], [5, 3], [5, 4], [5, 5]]
+infrastructure: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7,0], [8,0], [9,0], [10,0]]
 execution:
   jitter_fraction: 0.1
   service_scv: 0
@@ -69,7 +69,7 @@ solver:
   output_flag: false
 main:
   enabled: true
-  loads: [0.75]
+  loads: [0.7]
   flows: [1, 2, 3, 4, 5, 6, 7]
   models: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 sensitivity:
@@ -79,7 +79,7 @@ sensitivity:
   models: [1, 5, 10]
 pilot:
   timeout_s: 60
-  load: 0.75
+  load: 0.7
   cases:
     - {flows: 1, models: 1, infrastructure_index: 0}
     - {flows: 1, models: 5, infrastructure_index: 3}

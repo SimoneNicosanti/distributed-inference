@@ -38,7 +38,7 @@ class SyntheticWorker:
 
 def worker_pool(config: ExperimentConfig, seed: int) -> tuple[SyntheticWorker, ...]:
     workers = []
-    for tier, count in (("device", 1), ("edge", 5), ("cloud", 5)):
+    for tier, count in (("device", 1), ("edge", 10)):
         hardware = config.hardware[tier]
         memory = int(
             (hardware.vram_gib if hardware.backend == "gpu" else hardware.ram_gib)

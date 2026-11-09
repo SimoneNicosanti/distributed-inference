@@ -175,6 +175,7 @@ def analyze(directory: Path) -> None:
             f"{campaign}; objective={objective}; reference load={load}",
             DIMENSIONS,
         )
+        plot_first_incumbent(selected, rows, destination, campaign, load, objective)
         # for record in selected:
         #     plot_incumbent_history(record, destination)
         for dimension, label in DIMENSIONS.items():
