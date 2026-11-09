@@ -1,4 +1,4 @@
-from controller.domain.plan.front_end_plan import FlowPlan
+from controller.domain.plan.flow_plan import FlowPlan
 from integration.dto.flow_plan.flow_plan_dto import (
     FlowPlanDto,
     InputSpecDto,

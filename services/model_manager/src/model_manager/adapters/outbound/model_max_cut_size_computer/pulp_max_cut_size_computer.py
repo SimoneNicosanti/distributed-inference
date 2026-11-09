@@ -15,7 +15,7 @@ from model_manager.domain.input_shape_variable_properties import (
 from model_manager.domain.model_variant_topology import ModelVariantTopology
 from shared.model.keys import TensorKey
 
-BYTES_PER_MIB = 1024 * 1024
+BYTES_PER_MB = 1024 * 1024
 
 
 class PulpMaxCutSizeComputer(MaxCutSizeComputer):
@@ -43,15 +43,15 @@ class PulpMaxCutSizeComputer(MaxCutSizeComputer):
         ],
         variable_tensor_properties: dict[TensorKey, InputShapeVariableTensorProperties],
     ) -> float:
-        problem, fallback = PulpMaxCutSizeComputer._build_cut_problem(
+        problem, fallback = PulpMaxCutSizeComputer._build_max_cut_problem(
             model_variant_topology,
             invariable_tensor_properties,
             variable_tensor_properties,
         )
-        return PulpMaxCutSizeComputer._solve_cut_problem(problem, fallback=fallback)
+        return PulpMaxCutSizeComputer._solve_max_cut_problem(problem, fallback=fallback)
 
     @staticmethod
-    def _build_cut_problem(
+    def _build_max_cut_problem(
         model_variant_topology: ModelVariantTopology,
         invariable_tensor_properties: dict[
             TensorKey, InputShapeInvariableTensorProperties
@@ -94,7 +94,7 @@ class PulpMaxCutSizeComputer(MaxCutSizeComputer):
             datasize_in_bytes = invariable_tensor_properties[
                 tensor
             ].data_type_size_in_bytes
-            sizes_mib[tensor] = tensor_elems_num * datasize_in_bytes / BYTES_PER_MIB
+            sizes_mib[tensor] = tensor_elems_num * datasize_in_bytes / BYTES_PER_MB
 
         problem += pulp.lpSum(
             size * c_dict[tensor] for tensor, size in sizes_mib.items()
@@ -102,10 +102,10 @@ class PulpMaxCutSizeComputer(MaxCutSizeComputer):
         return problem, sum(sizes_mib.values())
 
     @staticmethod
-    def _solve_cut_problem(problem: pulp.LpProblem, *, fallback: float) -> float:
+    def _solve_max_cut_problem(problem: pulp.LpProblem, *, fallback: float) -> float:
         for mip in (True, False):
             try:
-                solved = problem.solve(pulp.HiGHS(msg=True, mip=mip, timeLimit=30))
+                solved = problem.solve(pulp.HiGHS(msg=True, mip=mip, timeLimit=60))
             except pulp.PulpSolverError:
                 continue
             if (

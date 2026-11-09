@@ -267,14 +267,14 @@ def test_mixed_cpu_gpu_solution_survives_worker_plan_transport() -> None:
     from controller.adapters.outbound.plan_share.mappers.worker_plan_mapper import (
         WorkerPlanMapper,
     )
-    from controller.application.deployment.builder.default_worker_plan_builder import (
-        DefaultWorkerPlanBuilder,
-    )
     from controller.application.deployment.builder.endpoint_replica_id_builder import (
         EndpointReplicaIdBuilder,
     )
     from controller.application.deployment.builder.partition_replica_id_builder import (
         PartitionReplicaIdBuilder,
+    )
+    from controller.application.deployment.builder.worker_plan_builder import (
+        WorkerPlanBuilder,
     )
     from integration.worker.deployment.http.service_plan_http_schema import (
         PrepareWorkerPlanRequest,
@@ -300,12 +300,10 @@ def test_mixed_cpu_gpu_solution_survives_worker_plan_transport() -> None:
     )
     assert components[1].mean_execution_time_s == pytest.approx(0.1)
 
-    plans = DefaultWorkerPlanBuilder().build_all(
+    plans = WorkerPlanBuilder().build_all(
         PlanVersion(version_number=1),
         solution,
-        PartitionReplicaIdBuilder().build_all_partition_replica_ids_from_solution(
-            solution
-        ),
+        PartitionReplicaIdBuilder().build_all(solution),
         EndpointReplicaIdBuilder().build_all(solution),
     )
     assert plans[cpu].deployment_plan.allocations == ()

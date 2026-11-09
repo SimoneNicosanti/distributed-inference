@@ -1,9 +1,6 @@
 from collections import defaultdict
 from collections.abc import Mapping
 
-from controller.application.deployment.builder.flow_solution_routes import (
-    executable_components,
-)
 from controller.domain.optimization.solving.optimization_solution import (
     OptimizationSolution,
 )
@@ -17,19 +14,16 @@ type ReplicaIdsByFlow = Mapping[FlowId, ReplicaIdsByComponentIndex]
 
 class PartitionReplicaIdBuilder:
     @staticmethod
-    def build_all_partition_replica_ids_from_solution(
+    def build_all(
         solution: OptimizationSolution,
     ) -> ReplicaIdsByFlow:
-        flow_ids = [flow.flow_id for flow in solution.flow_solutions]
-        if len(flow_ids) != len(set(flow_ids)):
-            raise ValueError("Flow ids in an optimization solution must be unique")
 
         next_replica_index: dict[ModelPartitionId, int] = defaultdict(int)
         replica_ids_by_flow: dict[FlowId, dict[int, PlannedPartitionReplicaId]] = {}
 
         for flow_solution in solution.flow_solutions:
             replica_ids_by_component: dict[int, PlannedPartitionReplicaId] = {}
-            for component in executable_components(flow_solution):
+            for component in flow_solution.executable_components:
                 partition_id = ModelPartitionId(
                     model_variant_id=flow_solution.model_variant_id,
                     layers=component.executable_layer_keys,

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 
-from controller.domain.plan.front_end_plan import FlowPlan
+from controller.domain.plan.flow_plan import FlowPlan
 from shared.flow.flow import FlowId
 
 

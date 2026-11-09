@@ -7,7 +7,7 @@ from controller.adapters.outbound.store.mappers.flow_plan_mapper import FlowPlan
 from controller.application.ports.outbound.store.flow_plan_publisher import (
     FlowPlanPublisher,
 )
-from controller.domain.plan.front_end_plan import FlowPlan
+from controller.domain.plan.flow_plan import FlowPlan
 from integration.redis.front_end_plan.keys_factory import FlowPlanKeyFactory
 from shared.flow.flow import FlowId
 

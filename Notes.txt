@@ -1,7 +1,6 @@
 
 
 ## Other TODO
-- Cambiare il domain per Tensor e TensorBundle: Passare a dataclasses probabilmente
 - Analizzare le funzionalità di semplificazione di onnx_tool
 
 

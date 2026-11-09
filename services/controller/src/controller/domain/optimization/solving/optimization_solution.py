@@ -116,6 +116,8 @@ class FlowOptimizationSolution:
     mean_response_time_s: float
 
     def __post_init__(self) -> None:
+        # TODO: Validate exactly one cut for each consecutive component pair,
+        # with no duplicate cuts or references to components outside this flow.
         if not self.components:
             raise ValueError("A flow solution must contain at least one component")
         if self.components[0].worker_id != self.ingress_worker_id:
@@ -126,9 +128,94 @@ class FlowOptimizationSolution:
         if any(not math.isfinite(value) or value < 0 for value in times):
             raise ValueError("Flow times must be finite and non-negative")
 
+        component_indexes = [component.component_index for component in self.components]
+        if component_indexes != sorted(component_indexes):
+            raise ValueError("Flow components must be ordered by component index")
+        if len(component_indexes) != len(set(component_indexes)):
+            raise ValueError("Flow component indexes must be unique")
+        if not self.executable_components:
+            raise ValueError(f"Flow {self.flow_id} has no executable components")
+
+    @property
+    def executable_components(self) -> tuple[ComponentSolution, ...]:
+        return tuple(
+            component
+            for component in self.components
+            if component.executable_layer_keys
+        )
+
+    @property
+    def input_tensors(self) -> tuple[TensorKey, ...]:
+        first_executable = self.executable_components[0]
+        position = self.components.index(first_executable)
+
+        if position == 0:
+            return first_executable.tensor_contract.input_tensor_keys
+
+        return self._cut_tensors(
+            self.components[position - 1],
+            first_executable,
+        )
+
+    @property
+    def result_tensors(self) -> tuple[TensorKey, ...]:
+        last_executable = self.executable_components[-1]
+        position = self.components.index(last_executable)
+        if position + 1 == len(self.components):
+            return last_executable.tensor_contract.output_tensor_keys
+
+        return self._cut_tensors(
+            last_executable,
+            self.components[position + 1],
+        )
+
+    def tensors_between(
+        self,
+        source: ComponentSolution,
+        destination: ComponentSolution,
+    ) -> tuple[TensorKey, ...]:
+        # TODO: Reject executable components between source and destination
+        # when collapsing the intermediate components into a direct route.
+        source_position = self.components.index(source)
+        destination_position = self.components.index(destination)
+        if source_position >= destination_position:
+            raise ValueError("Source must precede destination")
+        cuts = tuple(
+            self._cut_tensors(
+                self.components[position],
+                self.components[position + 1],
+            )
+            for position in range(source_position, destination_position)
+        )
+        if any(tensors != cuts[0] for tensors in cuts[1:]):
+            raise ValueError(
+                "Cannot collapse a non-executable component that changes routed tensors"
+            )
+        return cuts[0]
+
+    def _cut_tensors(
+        self,
+        source: ComponentSolution,
+        destination: ComponentSolution,
+    ) -> tuple[TensorKey, ...]:
+        matching = tuple(
+            cut
+            for cut in self.cuts
+            if cut.source_component_index == source.component_index
+            and cut.destination_component_index == destination.component_index
+        )
+        if len(matching) != 1:
+            raise ValueError("Each adjacent component pair must have exactly one cut")
+        return matching[0].tensor_keys
+
 
 @dataclass(frozen=True, slots=True)
 class OptimizationSolution:
     flow_solutions: tuple[FlowOptimizationSolution, ...]
     objective_value: float
     is_optimal: bool
+
+    def __post_init__(self) -> None:
+        flow_ids = [flow_solution.flow_id for flow_solution in self.flow_solutions]
+        if len(flow_ids) != len(set(flow_ids)):
+            raise ValueError("Flow ids in an optimization solution must be unique")

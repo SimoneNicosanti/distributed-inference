@@ -7,19 +7,19 @@ from controller.application.deployment.abc.solution_observer import SolutionObse
 from controller.application.deployment.abc.solution_to_plan_converter import (
     SolutionToPlanConverter,
 )
-from controller.application.ports.outbound.plan_version.plan_version_factory import (
-    PlanVersionBuilder,
-)
 from controller.application.deployment.default_actuation_manager import (
     DefaultActuationManager,
 )
-from controller.application.deployment.default_all_worker_plan_builder import (
+from controller.application.deployment.default_solution_to_plan_converter import (
     DefaultSolutionToPlanConverter,
 )
 from controller.application.ports.outbound.partition.partition_builder_gateway import (
     PartitionBuilderGateway,
 )
 from controller.application.ports.outbound.plan_share_gateway import PlanShareGateway
+from controller.application.ports.outbound.plan_version.plan_version_factory import (
+    PlanVersionFactory,
+)
 from controller.application.ports.outbound.store.flow_plan_publisher import (
     FlowPlanPublisher,
 )
@@ -34,7 +34,7 @@ from controller.domain.optimization.solving.optimization_solution import (
     FlowOptimizationSolution,
     OptimizationSolution,
 )
-from controller.domain.plan.front_end_plan import FlowPlan
+from controller.domain.plan.flow_plan import FlowPlan
 from controller.domain.plan.worker_plan import WorkerPlan
 from controller.domain.profile.model_variant_static_profile import TensorProperty
 from shared.flow.flow import FlowId
@@ -132,8 +132,11 @@ async def test_prepares_all_workers_including_endpoints_before_applying(
     manager = DefaultActuationManager(
         solution_observer=Mock(spec=SolutionObserver),
         partition_builder_gateway=partition_gateway,
-        plan_version_builder=PlanVersionBuilder(),
-        worker_plan_builder=DefaultSolutionToPlanConverter(),
+        plan_version_factory=AsyncMock(
+            spec=PlanVersionFactory,
+            build_next_plan_version=AsyncMock(return_value=PlanVersion(1)),
+        ),
+        solution_to_plan_converter=DefaultSolutionToPlanConverter(),
         plan_share_gateway=share_gateway,
         flow_plan_publisher=publisher,
     )
@@ -166,8 +169,11 @@ async def test_passes_enriched_solution_to_plan_conversion() -> None:
     manager = DefaultActuationManager(
         solution_observer=Mock(spec=SolutionObserver),
         partition_builder_gateway=partition_gateway,
-        plan_version_builder=PlanVersionBuilder(),
-        worker_plan_builder=converter,
+        plan_version_factory=AsyncMock(
+            spec=PlanVersionFactory,
+            build_next_plan_version=AsyncMock(return_value=PlanVersion(1)),
+        ),
+        solution_to_plan_converter=converter,
         plan_share_gateway=share_gateway,
         flow_plan_publisher=publisher,
     )

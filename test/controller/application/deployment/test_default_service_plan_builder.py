@@ -6,7 +6,7 @@ import pytest
 from controller.adapters.outbound.plan_share.mappers.worker_plan_mapper import (
     WorkerPlanMapper,
 )
-from controller.application.deployment.default_all_worker_plan_builder import (
+from controller.application.deployment.default_solution_to_plan_converter import (
     DefaultSolutionToPlanConverter,
 )
 from controller.domain.backend import Backend
@@ -21,7 +21,7 @@ from controller.domain.optimization.solving.optimization_solution import (
     FlowOptimizationSolution,
     OptimizationSolution,
 )
-from controller.domain.plan.front_end_plan import FlowPlan
+from controller.domain.plan.flow_plan import FlowPlan
 from controller.domain.plan.hop_routing_plan import HopAddress
 from controller.domain.plan.worker_plan import WorkerPlan
 from controller.domain.profile.model_variant_static_profile import TensorProperty

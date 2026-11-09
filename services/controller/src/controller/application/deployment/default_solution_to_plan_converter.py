@@ -1,21 +1,23 @@
 from typing import override
 
-from controller.application.deployment.abc.solution_to_plan_converter import (
+from controller.application.deployment.abc.plan_mappings_builder import (
     FlowPlanMapping,
-    SolutionToPlanConverter,
     WorkerPlanMapping,
 )
-from controller.application.deployment.builder.default_flow_plan_builder import (
-    DefaultFlowPlanBuilder,
-)
-from controller.application.deployment.builder.default_worker_plan_builder import (
-    DefaultWorkerPlanBuilder,
+from controller.application.deployment.abc.solution_to_plan_converter import (
+    SolutionToPlanConverter,
 )
 from controller.application.deployment.builder.endpoint_replica_id_builder import (
     EndpointReplicaIdBuilder,
 )
+from controller.application.deployment.builder.flow_plan_builder import (
+    FlowPlanBuilder,
+)
 from controller.application.deployment.builder.partition_replica_id_builder import (
     PartitionReplicaIdBuilder,
+)
+from controller.application.deployment.builder.worker_plan_builder import (
+    WorkerPlanBuilder,
 )
 from controller.domain.optimization.solving.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
@@ -26,8 +28,8 @@ from shared.plan.plan_version import PlanVersion
 class DefaultSolutionToPlanConverter(SolutionToPlanConverter):
     def __init__(self) -> None:
         self._replica_id_builder = PartitionReplicaIdBuilder()
-        self._worker_plan_builder = DefaultWorkerPlanBuilder()
-        self._flow_plan_builder = DefaultFlowPlanBuilder()
+        self._worker_plan_builder = WorkerPlanBuilder()
+        self._flow_plan_builder = FlowPlanBuilder()
         self._endpoint_id_builder = EndpointReplicaIdBuilder()
 
     @override
@@ -37,11 +39,7 @@ class DefaultSolutionToPlanConverter(SolutionToPlanConverter):
         solution: EnrichedOptimizationSolution,
     ) -> tuple[WorkerPlanMapping, FlowPlanMapping]:
         optimization_solution = solution.solution
-        replica_ids_by_flow = (
-            self._replica_id_builder.build_all_partition_replica_ids_from_solution(
-                optimization_solution
-            )
-        )
+        replica_ids_by_flow = self._replica_id_builder.build_all(optimization_solution)
         endpoint_ids_by_flow = self._endpoint_id_builder.build_all(
             optimization_solution
         )

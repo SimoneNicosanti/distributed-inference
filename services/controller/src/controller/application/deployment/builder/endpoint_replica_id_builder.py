@@ -20,7 +20,8 @@ type EndpointIdsByFlow = Mapping[FlowId, EndpointReplicaIds]
 
 
 class EndpointReplicaIdBuilder:
-    def build_all(self, solution: OptimizationSolution) -> EndpointIdsByFlow:
+    @staticmethod
+    def build_all(solution: OptimizationSolution) -> EndpointIdsByFlow:
         endpoints: dict[FlowId, EndpointReplicaIds] = {}
         indexes: dict[ModelVariantId, int] = defaultdict(int)
         for flow in solution.flow_solutions:

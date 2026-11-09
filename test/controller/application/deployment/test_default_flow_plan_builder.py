@@ -1,10 +1,10 @@
 import pytest
 
-from controller.application.deployment.builder.default_flow_plan_builder import (
-    DefaultFlowPlanBuilder,
-)
 from controller.application.deployment.builder.endpoint_replica_id_builder import (
     EndpointReplicaIdBuilder,
+)
+from controller.application.deployment.builder.flow_plan_builder import (
+    FlowPlanBuilder,
 )
 from controller.domain.backend import Backend
 from controller.domain.optimization.solving.enriched_optimization_solution import (
@@ -16,7 +16,7 @@ from controller.domain.optimization.solving.optimization_solution import (
     FlowOptimizationSolution,
     OptimizationSolution,
 )
-from controller.domain.plan.front_end_plan import FlowPlan
+from controller.domain.plan.flow_plan import FlowPlan
 from controller.domain.profile.model_variant_static_profile import TensorProperty
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
@@ -77,7 +77,7 @@ def test_uses_selected_variant_metadata_and_shared_endpoint_ids_for_each_flow() 
     version = PlanVersion(version_number=7)
     endpoints = EndpointReplicaIdBuilder().build_all(solution.solution)
 
-    plans = DefaultFlowPlanBuilder().build_all(version, solution, endpoints)
+    plans = FlowPlanBuilder().build_all(version, solution, endpoints)
 
     assert set(plans) == {flow.flow_id for flow in solution.solution.flow_solutions}
     for flow in solution.solution.flow_solutions:
@@ -105,17 +105,14 @@ def test_rejects_endpoint_mapping_that_does_not_match_the_flows(
         endpoints.pop(next(iter(endpoints)))
 
     with pytest.raises(ValueError, match="Endpoint ids must match the flows"):
-        DefaultFlowPlanBuilder().build_all(
-            PlanVersion(version_number=1), solution, endpoints
-        )
+        FlowPlanBuilder().build_all(PlanVersion(version_number=1), solution, endpoints)
 
 
 def test_empty_solution_produces_no_flow_plans() -> None:
     solution = EnrichedOptimizationSolution(OptimizationSolution((), 0, True), {})
 
     assert (
-        DefaultFlowPlanBuilder().build_all(PlanVersion(version_number=1), solution, {})
-        == {}
+        FlowPlanBuilder().build_all(PlanVersion(version_number=1), solution, {}) == {}
     )
 
 

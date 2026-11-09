@@ -12,7 +12,7 @@ from controller.adapters.outbound.store.redis_flow_plan_publisher import (
 from controller.application.ports.outbound.store.flow_plan_publisher import (
     FlowPlanPublisher,
 )
-from controller.domain.plan.front_end_plan import FlowPlan
+from controller.domain.plan.flow_plan import FlowPlan
 from controller.domain.profile.model_variant_static_profile import TensorProperty
 from front_end.adapters.outbound.inference.redis_flow_plan_reader import (
     RedisFlowPlanReader,

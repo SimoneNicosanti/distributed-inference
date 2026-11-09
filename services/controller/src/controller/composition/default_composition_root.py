@@ -23,6 +23,9 @@ from controller.adapters.outbound.partition_builder.http_partition_builder_gatew
 from controller.adapters.outbound.plan_share.http_plan_share_gateway import (
     HttpPlanShareGateway,
 )
+from controller.adapters.outbound.plan_version.redis_plan_version_factory import (
+    RedisPlanVersionFactory,
+)
 from controller.adapters.outbound.profile.redis_execution_profile_store_gateway import (
     RedisExecutionProfileStoreGateway,
 )
@@ -43,13 +46,10 @@ from controller.adapters.outbound.store.redis_flow_plan_publisher import (
 )
 from controller.application.deployment.abc.actuation_manager import ActuationManager
 from controller.application.deployment.abc.solution_observer import SolutionObserver
-from controller.application.ports.outbound.plan_version.plan_version_factory import (
-    PlanVersionBuilder,
-)
 from controller.application.deployment.default_actuation_manager import (
     DefaultActuationManager,
 )
-from controller.application.deployment.default_all_worker_plan_builder import (
+from controller.application.deployment.default_solution_to_plan_converter import (
     DefaultSolutionToPlanConverter,
 )
 from controller.application.optimization.abc.optimization_context_builder import (
@@ -198,13 +198,13 @@ class DefaultCompositionRoot(CompositionRoot):
                 worker_directory_gateway,
             )
 
-            plan_version_builder = PlanVersionBuilder()
+            plan_version_factory = RedisPlanVersionFactory(redis)
             service_plan_builder = DefaultSolutionToPlanConverter()
 
             actuation_manager = DefaultActuationManager(
                 solution_observer,
                 partition_builder_gateway,
-                plan_version_builder,
+                plan_version_factory,
                 service_plan_builder,
                 plan_share_gateway,
                 RedisFlowPlanPublisher(redis, StringFlowPlanKeyFactory()),

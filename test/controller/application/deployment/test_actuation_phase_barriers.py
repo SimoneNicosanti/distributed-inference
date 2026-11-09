@@ -10,9 +10,6 @@ from controller.application.deployment.abc.solution_observer import SolutionObse
 from controller.application.deployment.abc.solution_to_plan_converter import (
     SolutionToPlanConverter,
 )
-from controller.application.ports.outbound.plan_version.plan_version_factory import (
-    PlanVersionBuilder,
-)
 from controller.application.deployment.default_actuation_manager import (
     DefaultActuationManager,
 )
@@ -20,6 +17,9 @@ from controller.application.ports.outbound.partition.partition_builder_gateway i
     PartitionBuilderGateway,
 )
 from controller.application.ports.outbound.plan_share_gateway import PlanShareGateway
+from controller.application.ports.outbound.plan_version.plan_version_factory import (
+    PlanVersionFactory,
+)
 from controller.application.ports.outbound.store.flow_plan_publisher import (
     FlowPlanPublisher,
 )
@@ -30,6 +30,7 @@ from controller.domain.optimization.solving.optimization_solution import (
     OptimizationSolution,
 )
 from controller.domain.plan.worker_plan import WorkerPlan
+from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId, WorkerId
 
 
@@ -57,8 +58,11 @@ def setup() -> _Setup:
     manager = DefaultActuationManager(
         solution_observer=observer,
         partition_builder_gateway=AsyncMock(spec=PartitionBuilderGateway),
-        plan_version_builder=PlanVersionBuilder(),
-        worker_plan_builder=converter,
+        plan_version_factory=AsyncMock(
+            spec=PlanVersionFactory,
+            build_next_plan_version=AsyncMock(return_value=PlanVersion(1)),
+        ),
+        solution_to_plan_converter=converter,
         plan_share_gateway=gateway,
         flow_plan_publisher=publisher,
     )

@@ -4,14 +4,14 @@ from controller.application.deployment.builder.endpoint_replica_id_builder impor
 from controller.domain.optimization.solving.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
-from controller.domain.plan.front_end_plan import FlowPlan
+from controller.domain.plan.flow_plan import FlowPlan
 from shared.flow.flow import FlowId
 from shared.plan.plan_version import PlanVersion
 
 
-class DefaultFlowPlanBuilder:
+class FlowPlanBuilder:
+    @staticmethod
     def build_all(
-        self,
         plan_version: PlanVersion,
         solution: EnrichedOptimizationSolution,
         endpoint_ids_by_flow: EndpointIdsByFlow,
