@@ -1,6 +1,10 @@
 from dataclasses import replace
 
 import pytest
+from controller.adapters.outbound.optimization.gurobi_solver import (
+    GurobiSolver,
+    OptimizationInfeasibleError,
+)
 from test.controller.adapters.outbound.optimization.test_gurobi_solver import (
     _MODEL_VARIANT_ID,
     _context,
@@ -10,24 +14,22 @@ from test.controller.adapters.outbound.optimization.test_gurobi_solver import (
     _worker,
 )
 
-from controller.adapters.outbound.optimization.gurobi_problem_builder import (
-    DefaultGurobiProblemBuilder,
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
 )
-from controller.adapters.outbound.optimization.gurobi_profile_data import (
-    GurobiProfileDataError,
+from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
+    CompactFormulationDataBuilder,
+)
+from controller.application.optimization.formulation.compact.profile_data import (
+    ProfileDataError,
     layer_execution_profiles,
 )
-from controller.adapters.outbound.optimization.gurobi_solver import (
-    GurobiSolver,
-    OptimizationInfeasibleError,
-)
 from controller.domain.backend import Backend
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
+)
 from controller.domain.optimization.solving.optimization_context import (
     OptimizationContext,
-)
-from controller.domain.optimization.solving.solver_config import (
-    ObjectiveKind,
-    SolverConfig,
 )
 from controller.domain.profile.model_variant_execution_profile import (
     BackendExecutionProfile,
@@ -158,7 +160,7 @@ def test_problem_queue_bounds_use_gpu_execution_times() -> None:
     request = _request(
         worker, arrival_rate=0.1, max_response_time_s=10, flow_id=_flow(1)
     )
-    problem = DefaultGurobiProblemBuilder().build(
+    problem = CompactFormulationDataBuilder().build_formulation_data(
         {request.flow_id: request}, context, _problem_config(1)
     )
 
@@ -190,7 +192,7 @@ def test_duplicate_gpu_profile_is_rejected() -> None:
         execution_profiles_by_worker=executions,
     )
 
-    with pytest.raises(GurobiProfileDataError, match="Duplicate GPU"):
+    with pytest.raises(ProfileDataError, match="Duplicate GPU"):
         layer_execution_profiles(context, _MODEL_VARIANT_ID, worker)
 
 
@@ -214,7 +216,9 @@ def test_gpu_memory_uses_vram_instead_of_ram(
     request = _request(
         worker, arrival_rate=0.1, max_response_time_s=10, flow_id=_flow(1)
     )
-    solver = GurobiSolver(SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME))
+    solver = GurobiSolver(
+        GurobiSolverConfig(CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
+    )
     if not feasible:
         with pytest.raises(OptimizationInfeasibleError):
             solver._solve({request.flow_id: request}, context, _problem_config(1))
@@ -232,9 +236,9 @@ def test_gpu_worker_without_gpu_execution_profile_is_incompatible() -> None:
     )
 
     with pytest.raises(OptimizationInfeasibleError):
-        GurobiSolver(SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME))._solve(
-            {request.flow_id: request}, context, _problem_config(1)
-        )
+        GurobiSolver(
+            GurobiSolverConfig(CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
+        )._solve({request.flow_id: request}, context, _problem_config(1))
 
 
 @pytest.mark.parametrize(
@@ -249,7 +253,9 @@ def test_gpu_queue_stability_uses_gpu_service_time(
     request = _request(
         worker, arrival_rate=0.1, max_response_time_s=100, flow_id=_flow(1)
     )
-    solver = GurobiSolver(SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME))
+    solver = GurobiSolver(
+        GurobiSolverConfig(CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
+    )
     if not feasible:
         with pytest.raises(OptimizationInfeasibleError):
             solver._solve({request.flow_id: request}, context, _problem_config(1))
@@ -288,7 +294,7 @@ def test_mixed_cpu_gpu_solution_survives_worker_plan_transport() -> None:
     context = _with_gpu(_context({cpu: 0.6, gpu: 0.001}), gpu, gpu_time_s=0.1)
     request = _request(cpu, arrival_rate=0.1, max_response_time_s=10, flow_id=_flow(1))
     solution = GurobiSolver(
-        SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
+        GurobiSolverConfig(CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
     )._solve({request.flow_id: request}, context, _problem_config(3))
 
     components = solution.flow_solutions[0].components

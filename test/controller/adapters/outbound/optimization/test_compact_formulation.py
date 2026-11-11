@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import gurobipy as gp
 import pytest
+from controller.adapters.outbound.optimization.gurobi_solver import GurobiSolver
 from test.controller.adapters.outbound.optimization.test_gurobi_solver import (
     _context,
     _flow,
@@ -12,11 +13,14 @@ from test.controller.adapters.outbound.optimization.test_gurobi_solver import (
     _worker,
 )
 
-from controller.adapters.outbound.optimization.gurobi_solver import GurobiSolver
-from controller.domain.optimization.solving.solver_config import (
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
     FormulationKind,
-    ObjectiveKind,
-    SolverConfig,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
 )
 
 
@@ -25,8 +29,8 @@ def solve(formulation=FormulationKind.COMPACT, *, components=1, priorities=1):
     worker = _worker(1)
     request = _request(worker, arrival_rate=1, max_response_time_s=10, flow_id=_flow(1))
     solution = GurobiSolver(
-        SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        GurobiSolverConfig(
+            CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=formulation,
             observer=observations.append,
             threads=1,
@@ -41,7 +45,7 @@ def solve(formulation=FormulationKind.COMPACT, *, components=1, priorities=1):
 
 
 def test_formulation_configuration():
-    config = SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
+    config = GurobiSolverConfig(CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
     assert config.formulation is FormulationKind.COMPACT
     assert list(FormulationKind) == [FormulationKind.COMPACT]
     assert replace(config, formulation="compact").formulation is FormulationKind.COMPACT
@@ -84,15 +88,15 @@ def test_implicit_integrality_from_binary_layer_and_priority_assignments(monkeyp
 
 @pytest.mark.parametrize("selected", [False, True])
 def test_execution_epigraph_cannot_underestimate_physical_time(selected):
-    from controller.adapters.outbound.optimization.compact_execution import (
-        add_compact_execution_constraints,
-    )
-    from controller.adapters.outbound.optimization.gurobi_problem_builder import (
-        DefaultGurobiProblemBuilder,
-    )
-    from controller.adapters.outbound.optimization.gurobi_variables import (
+    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.assignment_builder import (
         _add_assignment_variables,
+    )
+    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.execution.execution_builder import (
+        CompactExecutionBuilder,
         _add_execution_variables,
+    )
+    from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
+        CompactFormulationDataBuilder,
     )
 
     workers = (_worker(1), _worker(2))
@@ -101,27 +105,21 @@ def test_execution_epigraph_cannot_underestimate_physical_time(selected):
     )
     context = _context(dict.fromkeys(workers, 0.1))
     requests = {request.flow_id: request}
-    problem = DefaultGurobiProblemBuilder().build(requests, context, _problem_config(1))
+    problem = CompactFormulationDataBuilder().build_formulation_data(
+        requests, context, _problem_config(1)
+    )
     variant = problem.models_by_flow[request.flow_id][0]
     with gp.Model() as model:
         model.Params.OutputFlag = 0
-        assignment = _add_assignment_variables(
-            model, problem, context, max_components=1
-        )
+        assignment = _add_assignment_variables(model, problem, max_components=1)
         execution = _add_execution_variables(model, problem, max_components=1)
         for x in assignment.layer_component.values():
             x.LB = x.UB = 1
         for worker, chosen in zip(workers, (selected, not selected), strict=True):
             e = assignment.component_worker[request.flow_id, 1, worker]
             e.LB = e.UB = int(chosen)
-        add_compact_execution_constraints(
-            model,
-            problem,
-            assignment,
-            execution,
-            context=context,
-            requests_by_flow=requests,
-            max_components=1,
+        CompactExecutionBuilder().add_constraints(
+            model, problem, assignment=assignment, execution=execution
         )
         time = execution.execution_time_s[request.flow_id, variant, 1, workers[0]]
         model.setObjective(time)
@@ -133,14 +131,14 @@ def test_execution_epigraph_cannot_underestimate_physical_time(selected):
 
 @pytest.mark.parametrize("missing_link", [False, True])
 def test_transmission_link_latency_and_sparse_topology(missing_link):
-    from controller.adapters.outbound.optimization.compact_transmission import (
-        add_compact_transmission_constraints,
+    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.constraints import (
+        add_transmission_constraints,
     )
-    from controller.adapters.outbound.optimization.compact_variables import (
-        add_compact_variables,
+    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.gurobi_compact_formulation_compiler import (
+        GurobiCompactFormulationCompiler,
     )
-    from controller.adapters.outbound.optimization.gurobi_problem_builder import (
-        DefaultGurobiProblemBuilder,
+    from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
+        CompactFormulationDataBuilder,
     )
     from controller.domain.profile.network_topology import NetworkTopology
 
@@ -162,20 +160,13 @@ def test_transmission_link_latency_and_sparse_topology(missing_link):
             resource_profiles_by_worker=context.resource_profiles_by_worker,
         )
     config = _problem_config(2)
-    problem = DefaultGurobiProblemBuilder().build(requests, context, config)
+    problem = CompactFormulationDataBuilder().build_formulation_data(
+        requests, context, config
+    )
     variant = problem.models_by_flow[request.flow_id][0]
     with gp.Model() as model:
         model.Params.OutputFlag = 0
-        variables = add_compact_variables(
-            model,
-            problem,
-            context=context,
-            requests_by_flow=requests,
-            max_components=2,
-            priority_count=1,
-            compute_utilization_limit=0.9,
-            network_utilization_limit=0.9,
-        )
+        variables = GurobiCompactFormulationCompiler()._create_variables(model, problem)
         for (
             _flow_id,
             component,
@@ -189,14 +180,8 @@ def test_transmission_link_latency_and_sparse_topology(missing_link):
             component,
         ), x in variables.assignment.layer_component.items():
             x.LB = x.UB = int(component == (1 if layer == "input" else 2))
-        add_compact_transmission_constraints(
-            model,
-            problem,
-            variables.assignment,
-            variables.network,
-            context=context,
-            requests_by_flow=requests,
-            max_components=2,
+        add_transmission_constraints(
+            model, problem, assignment=variables.assignment, network=variables.network
         )
         times = variables.network.transmission_time_s
         model.setObjective(gp.quicksum(times.values()))
@@ -215,34 +200,34 @@ def test_transmission_link_latency_and_sparse_topology(missing_link):
 
 @pytest.mark.parametrize("selected", [False, True])
 def test_memory_uses_profiled_maximum_cut_and_one_server_activation(selected):
-    from controller.adapters.outbound.optimization.compact_memory import (
-        add_compact_memory_constraints,
-        add_compact_memory_variables,
-    )
-    from controller.adapters.outbound.optimization.gurobi_problem_builder import (
-        DefaultGurobiProblemBuilder,
-    )
-    from controller.adapters.outbound.optimization.gurobi_variables import (
+    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.assignment_builder import (
         _add_assignment_variables,
+    )
+    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.memory.memory_builder import (
+        CompactMemoryBuilder,
+        _add_compact_memory_variables,
+    )
+    from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
+        CompactFormulationDataBuilder,
     )
 
     worker = _worker(1)
     request = _request(worker, arrival_rate=1, max_response_time_s=10, flow_id=_flow(1))
     requests = {request.flow_id: request}
     context = _context({worker: 0.1})
-    problem = DefaultGurobiProblemBuilder().build(requests, context, _problem_config(2))
+    problem = CompactFormulationDataBuilder().build_formulation_data(
+        requests, context, _problem_config(2)
+    )
     with gp.Model() as model:
         model.Params.OutputFlag = 0
-        assignment = _add_assignment_variables(
-            model, problem, context, max_components=2
-        )
-        memory = add_compact_memory_variables(model, problem, context, max_components=2)
+        assignment = _add_assignment_variables(model, problem, max_components=2)
+        memory = _add_compact_memory_variables(model, problem, max_components=2)
         for e in assignment.component_worker.values():
             e.LB = e.UB = int(selected)
         for u in assignment.model_selected.values():
             u.LB = u.UB = 1
-        add_compact_memory_constraints(
-            model, problem, assignment, memory, context=context, max_components=2
+        CompactMemoryBuilder().add_constraints(
+            model, problem, assignment=assignment, memory=memory
         )
         model.setObjective(memory.max_activation_mb[worker])
         model.optimize()
@@ -272,11 +257,11 @@ def test_compact_priority_queue_matches_physical_first_priority(priorities):
 
 
 def test_queue_bounds_use_full_profile_and_stability_without_deadline_clipping():
-    from controller.adapters.outbound.optimization.compact_bounds import (
+    from controller.application.optimization.formulation.compact.bounds import (
         prepare_compact_problem,
     )
-    from controller.adapters.outbound.optimization.gurobi_problem_builder import (
-        DefaultGurobiProblemBuilder,
+    from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
+        CompactFormulationDataBuilder,
     )
 
     worker = _worker(1)
@@ -286,27 +271,24 @@ def test_queue_bounds_use_full_profile_and_stability_without_deadline_clipping()
     )
     requests = {request.flow_id: request}
     config = _problem_config(1)
-    problem = DefaultGurobiProblemBuilder().build(requests, context, config)
-    bounded = prepare_compact_problem(
-        problem, context=context, requests_by_flow=requests, problem_config=config
+    problem = CompactFormulationDataBuilder().build_formulation_data(
+        requests, context, config
     )
+    bounded = prepare_compact_problem(problem)
     expected = min(1 * 100**2, config.compute_utilization_limit * 100) / (
         2 * (1 - config.compute_utilization_limit) ** 2
     )
     assert bounded.max_queue_wait_s_by_worker[worker] == pytest.approx(expected)
     assert bounded.max_queue_wait_s_by_flow[request.flow_id] == pytest.approx(expected)
-    assert (
-        problem.max_queue_wait_s_by_worker[worker]
-        > bounded.max_queue_wait_s_by_worker[worker]
-    )
+    assert problem.max_queue_wait_s_by_worker == bounded.max_queue_wait_s_by_worker
 
 
 def test_queue_bound_keeps_models_even_when_batch_fill_exceeds_deadline():
-    from controller.adapters.outbound.optimization.compact_bounds import (
+    from controller.application.optimization.formulation.compact.bounds import (
         prepare_compact_problem,
     )
-    from controller.adapters.outbound.optimization.gurobi_problem_builder import (
-        DefaultGurobiProblemBuilder,
+    from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
+        CompactFormulationDataBuilder,
     )
 
     worker = _worker(1)
@@ -314,30 +296,30 @@ def test_queue_bound_keeps_models_even_when_batch_fill_exceeds_deadline():
     request = _request(worker, arrival_rate=1, max_response_time_s=1, flow_id=_flow(1))
     requests = {request.flow_id: request}
     config = _problem_config(1)
-    problem = DefaultGurobiProblemBuilder().build(requests, context, config)
+    problem = CompactFormulationDataBuilder().build_formulation_data(
+        requests, context, config
+    )
     problem = replace(
         problem, batch_fill_time_s=dict.fromkeys(problem.batch_fill_time_s, 2.0)
     )
-    bounded = prepare_compact_problem(
-        problem, context=context, requests_by_flow=requests, problem_config=config
-    )
+    bounded = prepare_compact_problem(problem)
     expected = 0.1**2 / (2 * (1 - config.compute_utilization_limit) ** 2)
     assert bounded.max_queue_wait_s_by_worker[worker] == pytest.approx(expected)
     assert bounded.max_queue_wait_s_by_flow[request.flow_id] == pytest.approx(expected)
 
 
 def test_two_priority_queue_uses_upper_bin_endpoint_and_unscaled_wait():
-    from controller.adapters.outbound.optimization.compact_bounds import (
+    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.compute_queue.compute_queue_builder import (
+        CompactComputeQueueBuilder,
+    )
+    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.gurobi_compact_formulation_compiler import (
+        GurobiCompactFormulationCompiler,
+    )
+    from controller.application.optimization.formulation.compact.bounds import (
         prepare_compact_problem,
     )
-    from controller.adapters.outbound.optimization.compact_execution_queue import (
-        add_compact_execution_queue_constraints,
-    )
-    from controller.adapters.outbound.optimization.compact_variables import (
-        add_compact_variables,
-    )
-    from controller.adapters.outbound.optimization.gurobi_problem_builder import (
-        DefaultGurobiProblemBuilder,
+    from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
+        CompactFormulationDataBuilder,
     )
 
     worker = _worker(1)
@@ -351,24 +333,14 @@ def test_two_priority_queue_uses_upper_bin_endpoint_and_unscaled_wait():
     }
     config = _problem_config(1, priority_count=2)
     problem = prepare_compact_problem(
-        DefaultGurobiProblemBuilder().build(requests, context, config),
-        context=context,
-        requests_by_flow=requests,
-        problem_config=config,
+        CompactFormulationDataBuilder().build_formulation_data(
+            requests, context, config
+        ),
     )
     with gp.Model() as model:
         model.Params.OutputFlag = 0
         model.Params.NonConvex = 0
-        variables = add_compact_variables(
-            model,
-            problem,
-            context=context,
-            requests_by_flow=requests,
-            max_components=1,
-            priority_count=2,
-            compute_utilization_limit=0.9,
-            network_utilization_limit=0.9,
-        )
+        variables = GurobiCompactFormulationCompiler()._create_variables(model, problem)
         for e in variables.assignment.component_worker.values():
             e.LB = e.UB = 1
         for active in variables.assignment.component_active.values():
@@ -382,15 +354,12 @@ def test_two_priority_queue_uses_upper_bin_endpoint_and_unscaled_wait():
             r.LB = r.UB = int(priority == (1 if flow == _flow(1) else 2))
         for time in variables.execution.execution_time_s.values():
             time.LB = time.UB = 0.1
-        add_compact_execution_queue_constraints(
+        CompactComputeQueueBuilder().add_constraints(
             model,
             problem,
-            variables.assignment,
-            variables.execution,
-            variables.compute_queue,
-            max_components=1,
-            priority_count=2,
-            compute_utilization_limit=0.9,
+            assignment=variables.assignment,
+            execution=variables.execution,
+            compute_queue=variables.compute_queue,
         )
         model.setObjective(
             gp.quicksum(variables.compute_queue.component_queue_wait_s.values())
@@ -412,7 +381,7 @@ def test_two_priority_queue_uses_upper_bin_endpoint_and_unscaled_wait():
 )
 @pytest.mark.parametrize("nominal", [0, 0.2, 0.7, 1])
 def test_projected_ps_matches_independent_disaggregated_lp(selected, nominal):
-    from controller.adapters.outbound.optimization.compact_network_queue import (
+    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.constraints import (
         add_projected_ps_epigraph,
     )
 

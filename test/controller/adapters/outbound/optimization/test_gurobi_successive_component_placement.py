@@ -5,13 +5,19 @@ import gurobipy as gp
 import pytest
 from gurobipy import GRB
 
-from controller.adapters.outbound.optimization.gurobi_problem import GurobiProblem
-from controller.adapters.outbound.optimization.gurobi_structure_constraints import (
-    _successive_components_use_different_workers,
-)
-from controller.adapters.outbound.optimization.gurobi_variables import (
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.assignment_variables import (
     AssignmentVariables,
 )
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.constraints import (
+    _successive_components_use_different_workers,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
+)
+from controller.domain.profile.network_topology import NetworkTopology
 from shared.flow.flow import FlowId
 from shared.service.service import ServiceId, WorkerId
 from shared.user.user import UserId
@@ -22,8 +28,22 @@ _WORKER_B = cast(WorkerId, ServiceId(id=UUID(int=4)))
 _WORKERS = (_WORKER_A, _WORKER_B)
 
 
-def _problem() -> GurobiProblem:
-    return GurobiProblem(
+def _problem() -> CompactFormulationData:
+    return CompactFormulationData(
+        max_components=2,
+        priority_count=1,
+        compute_utilization_limit=0.9,
+        network_utilization_limit=0.9,
+        objective_kind=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        static_profiles_by_variant={},
+        resource_profiles_by_worker={},
+        network_topology=NetworkTopology(workers=_WORKERS, connections=()),
+        layer_execution_profiles_by_model_worker={},
+        arrival_rate_per_s={},
+        max_response_time_s_by_flow={},
+        performance_requirement_by_flow={},
+        endpoint_placement_by_flow={},
+        local_worker_config_by_flow={},
         flows=(_FLOW,),
         workers=_WORKERS,
         workers_by_flow={_FLOW: _WORKERS},

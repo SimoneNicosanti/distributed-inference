@@ -4,7 +4,7 @@ import math
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 
-from controller.adapters.outbound.optimization.gurobi_profile_data import (
+from controller.application.optimization.formulation.compact.profile_data import (
     tensor_size_bytes,
 )
 from controller.domain.profile.model_variant_static_profile import (

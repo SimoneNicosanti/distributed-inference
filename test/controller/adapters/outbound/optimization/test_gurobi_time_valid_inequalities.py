@@ -5,11 +5,19 @@ import gurobipy as gp
 import pytest
 from gurobipy import GRB
 
-from controller.adapters.outbound.optimization.compact_network_queue import (
-    CompactNetworkVariables,
-    add_compact_network_queue_constraints,
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.constraints import (
+    add_network_queue_constraints,
 )
-from controller.adapters.outbound.optimization.gurobi_problem import GurobiProblem
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.network_variables import (
+    NetworkVariables,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
+)
+from controller.domain.profile.network_topology import NetworkTopology
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -26,8 +34,22 @@ _WORKERS = (_WORKER_A, _WORKER_B)
 _MAX_COMPONENTS = 3
 
 
-def _problem() -> GurobiProblem:
-    return GurobiProblem(
+def _problem() -> CompactFormulationData:
+    return CompactFormulationData(
+        max_components=_MAX_COMPONENTS,
+        priority_count=1,
+        compute_utilization_limit=0.9,
+        network_utilization_limit=0.9,
+        objective_kind=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        static_profiles_by_variant={},
+        resource_profiles_by_worker={},
+        network_topology=NetworkTopology(workers=_WORKERS, connections=()),
+        layer_execution_profiles_by_model_worker={},
+        arrival_rate_per_s={},
+        max_response_time_s_by_flow={},
+        performance_requirement_by_flow={},
+        endpoint_placement_by_flow={},
+        local_worker_config_by_flow={},
         flows=(_FLOW,),
         workers=_WORKERS,
         workers_by_flow={_FLOW: _WORKERS},
@@ -50,7 +72,7 @@ def _problem() -> GurobiProblem:
     )
 
 
-def _network_variables(model: gp.Model) -> CompactNetworkVariables:
+def _network_variables(model: gp.Model) -> NetworkVariables:
     nominal_values = {
         (_MODEL_A, 1, _WORKER_A): 0.2,
         (_MODEL_B, 1, _WORKER_B): 0.2,
@@ -64,7 +86,7 @@ def _network_variables(model: gp.Model) -> CompactNetworkVariables:
         for cut in range(1, _MAX_COMPONENTS)
         for worker in _WORKERS
     }
-    return CompactNetworkVariables(
+    return NetworkVariables(
         tensor_crossing_auxiliary={},
         adjacent_component_workers={},
         transmission_time_s=transmission_time_s,
@@ -92,13 +114,7 @@ def test_projected_network_queue_sums_fractional_source_responses() -> None:
         model.update()
         variable_count = model.NumVars
 
-        add_compact_network_queue_constraints(
-            model,
-            problem,
-            network,
-            max_components=_MAX_COMPONENTS,
-            network_utilization_limit=0.1,
-        )
+        add_network_queue_constraints(model, problem, network=network)
         model.setObjective(
             gp.quicksum(network.component_transmission_response_s.values())
         )

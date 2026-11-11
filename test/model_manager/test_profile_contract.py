@@ -8,17 +8,17 @@ from onnx import TensorProto, helper, numpy_helper
 
 from artifacts.contracts.artifact_bundle import ArtifactBundle
 from artifacts.contracts.artifact_workspace import ArtifactWorkspace
-from controller.adapters.outbound.optimization.gurobi_profile_data import (
-    batch_size,
-    layer_execution_profiles,
-    layer_weight_size_bytes,
-    tensor_size_bytes,
-)
 from controller.adapters.outbound.profile.mappers.model_variant_execution_profile_mapper import (
     ModelVariantExecutionProfileMapper,
 )
 from controller.adapters.outbound.profile.mappers.model_variant_static_profile_mapper import (
     ModelVariantStaticProfileMapper,
+)
+from controller.application.optimization.formulation.compact.profile_data import (
+    batch_size,
+    layer_execution_profiles,
+    layer_weight_size_bytes,
+    tensor_size_bytes,
 )
 from controller.domain.optimization.solving.optimization_context import (
     OptimizationContext,
@@ -68,14 +68,14 @@ from shared.model.model_variant import (
     QuantizationType,
 )
 from shared.service.service import ServiceId
+from worker.adapters.outbound.profiling.model_execution.ort_engine_model_execution_profiler import (
+    OrtModelExecutionProfiler,
+)
 from worker.adapters.outbound.profiling.store.mappers.model_execution_profile_mapper import (
     ModelExecutionProfileMapper,
 )
 from worker.adapters.outbound.profiling.store.mappers.model_static_profile_mapper import (
     ModelStaticProfileMapper,
-)
-from worker.adapters.outbound.profiling.model_execution.ort_engine_model_execution_profiler import (
-    OrtModelExecutionProfiler,
 )
 from worker.domain.profiling.model_execution.model_execution_profile import (
     Backend,

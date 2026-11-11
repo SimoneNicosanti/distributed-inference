@@ -3,6 +3,10 @@
 from dataclasses import replace
 
 import pytest
+from controller.adapters.outbound.optimization.gurobi_solver import (
+    GurobiSolver,
+    OptimizationInfeasibleError,
+)
 from test.controller.adapters.outbound.optimization.test_gurobi_solver import (
     _context,
     _flow,
@@ -11,9 +15,11 @@ from test.controller.adapters.outbound.optimization.test_gurobi_solver import (
     _worker,
 )
 
-from controller.adapters.outbound.optimization.gurobi_solver import (
-    GurobiSolver,
-    OptimizationInfeasibleError,
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_run_statistics import (
+    GurobiRunStatistics,
+)
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
 )
 from controller.domain.optimization.request.local_worker_config import (
     ValidLocalWorkerConfig,
@@ -21,33 +27,33 @@ from controller.domain.optimization.request.local_worker_config import (
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
 )
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
+)
 from controller.domain.optimization.solving.optimization_context import (
     OptimizationContext,
-)
-from controller.domain.optimization.solving.solver_config import (
-    ObjectiveKind,
-    SolverConfig,
-    SolverRunStatistics,
 )
 from shared.model.model_variant import PerformanceMetric, PerformanceMetricType
 
 
-@pytest.mark.parametrize("objective", list(ObjectiveKind))
+@pytest.mark.parametrize("objective", list(CompactObjectiveKind))
 def test_response_time_and_accuracy_objectives_require_deadline(
-    objective: ObjectiveKind,
+    objective: CompactObjectiveKind,
 ) -> None:
     worker = _worker(1)
     context = _context({worker: 0.2})
     request = _request(
         worker, arrival_rate=0.1, max_response_time_s=0.001, flow_id=_flow(1)
     )
-    observed: list[SolverRunStatistics] = []
+    observed: list[GurobiRunStatistics] = []
     solver = GurobiSolver(
-        SolverConfig(objective, observer=observed.append, threads=1, seed=0, mip_gap=0)
+        GurobiSolverConfig(
+            objective, observer=observed.append, threads=1, seed=0, mip_gap=0
+        )
     )
     if objective in {
-        ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
-        ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
+        CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        CompactObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
     }:
         with pytest.raises(OptimizationInfeasibleError):
             solver._solve({request.flow_id: request}, context, _problem_config(1))
@@ -56,31 +62,33 @@ def test_response_time_and_accuracy_objectives_require_deadline(
     assert result.flow_solutions[0].mean_response_time_s > 0.001
     expected_response = 0.2 + 0.1 * 0.2**2 / (2 * (1 - 0.1 * 0.2))
     expected = {
-        ObjectiveKind.DEADLINE_VIOLATIONS: 1,
-        ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY: expected_response / 0.001 - 1,
+        CompactObjectiveKind.DEADLINE_VIOLATIONS: 1,
+        CompactObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY: expected_response
+        / 0.001
+        - 1,
     }
     assert result.objective_value == pytest.approx(expected[objective], abs=1e-5)
     assert observed[-1].objective == objective.value
     assert observed[-1].general_constraints == (
-        1 if objective == ObjectiveKind.DEADLINE_VIOLATIONS else 0
+        1 if objective == CompactObjectiveKind.DEADLINE_VIOLATIONS else 0
     )
 
 
 @pytest.mark.parametrize(
     "objective",
     [
-        ObjectiveKind.DEADLINE_VIOLATIONS,
-        ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY,
+        CompactObjectiveKind.DEADLINE_VIOLATIONS,
+        CompactObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY,
     ],
 )
 def test_satisfied_deadline_has_zero_violation_or_delay_cost(
-    objective: ObjectiveKind,
+    objective: CompactObjectiveKind,
 ) -> None:
     worker = _worker(1)
     request = _request(
         worker, arrival_rate=0.1, max_response_time_s=10, flow_id=_flow(1)
     )
-    result = GurobiSolver(SolverConfig(objective))._solve(
+    result = GurobiSolver(GurobiSolverConfig(objective))._solve(
         {request.flow_id: request}, _context({worker: 0.1}), _problem_config(1)
     )
     assert result.objective_value == pytest.approx(0, abs=1e-7)
@@ -127,9 +135,9 @@ def test_accuracy_uses_request_dataset_and_flow_arrival_weights() -> None:
             ),
         )
         requests[request.flow_id] = request
-    result = GurobiSolver(SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY))._solve(
-        requests, context, _problem_config(1)
-    )
+    result = GurobiSolver(
+        GurobiSolverConfig(CompactObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY)
+    )._solve(requests, context, _problem_config(1))
     assert result.objective_value == pytest.approx(0.25 * 0.7 + 0.75 * 0.9)
 
 
@@ -137,16 +145,16 @@ def test_accuracy_uses_request_dataset_and_flow_arrival_weights() -> None:
     "objective",
     [
         kind
-        for kind in ObjectiveKind
+        for kind in CompactObjectiveKind
         if kind
         in {
-            ObjectiveKind.DEADLINE_VIOLATIONS,
-            ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY,
+            CompactObjectiveKind.DEADLINE_VIOLATIONS,
+            CompactObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY,
         }
     ],
 )
 def test_soft_objectives_allow_network_response_above_deadline(
-    objective: ObjectiveKind,
+    objective: CompactObjectiveKind,
 ) -> None:
     worker, edge = _worker(1), _worker(2)
     context = _context({worker: 2, edge: 0.1}, throughput_bytes_per_s=4)
@@ -159,7 +167,7 @@ def test_soft_objectives_allow_network_response_above_deadline(
             worker_id=worker, is_inference_runner=False
         ),
     )
-    result = GurobiSolver(SolverConfig(objective, threads=1, seed=0))._solve(
+    result = GurobiSolver(GurobiSolverConfig(objective, threads=1, seed=0))._solve(
         {request.flow_id: request}, context, _problem_config(3)
     )
     flow = result.flow_solutions[0]

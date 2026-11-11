@@ -3,18 +3,22 @@
 from dataclasses import asdict
 from time import perf_counter
 
-from gurobipy import GRB
-
 from controller.adapters.outbound.optimization.gurobi_solver import (
     GurobiSolver,
     OptimizationInfeasibleError,
     OptimizationNotSolvedError,
 )
-from controller.domain.optimization.solving.solver_config import (
+from gurobipy import GRB
+
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
+)
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_run_statistics import (
+    GurobiRunStatistics,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
+    CompactFormulationConfig,
     FormulationKind,
-    ProblemConfig,
-    SolverConfig,
-    SolverRunStatistics,
 )
 from scalability_benchmark.campaigns import RunSpec
 from scalability_benchmark.configuration import ExperimentConfig
@@ -22,7 +26,7 @@ from scalability_benchmark.instances import Scenario, make_instance
 
 
 def classify(
-    statistics: SolverRunStatistics | None, error: Exception | None
+    statistics: GurobiRunStatistics | None, error: Exception | None
 ) -> dict[str, object]:
     status = statistics.status if statistics else None
     incumbent = statistics is not None and statistics.solution_count > 0
@@ -108,8 +112,8 @@ def classify(
 async def execute_solver(
     scenario: Scenario, spec: RunSpec, config: ExperimentConfig
 ) -> dict[str, object]:
-    observations: list[SolverRunStatistics] = []
-    solver_config = SolverConfig(
+    observations: list[GurobiRunStatistics] = []
+    solver_config = GurobiSolverConfig(
         formulation=FormulationKind(config.solver.formulation),
         objective=spec.objective,
         output_flag=True,
@@ -125,10 +129,10 @@ async def execute_solver(
     solution = None
     try:
         requests, context = make_instance(scenario, spec)
-        solution = await GurobiSolver(solver_config).solve(
+        solution = await GurobiSolver(solver_config).solve_model(
             requests,
             context,
-            ProblemConfig(
+            CompactFormulationConfig(
                 max_components=config.optimization.max_components,
                 priority_count=config.optimization.priority_count,
                 compute_utilization_limit=config.optimization.compute_utilization_limit,

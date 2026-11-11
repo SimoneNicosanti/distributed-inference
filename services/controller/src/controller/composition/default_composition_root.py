@@ -16,7 +16,27 @@ from catalog.view.worker.default_worker_directory import DefaultWorkerDirectory
 from controller.adapters.outbound.directory.default_worker_directory_gateway import (
     DefaultWorkerDirectoryGateway,
 )
-from controller.adapters.outbound.optimization.gurobi_solver import GurobiSolver
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
+)
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.compact_variables import (
+    CompactVariables,
+)
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.gurobi_compact_formulation_compiler import (
+    GurobiCompactFormulationCompiler,
+)
+from controller.adapters.outbound.optimization.gurobi.model_builder.gurobi_formulation_model_builder import (
+    GurobiFormulationModelBuilder,
+)
+from controller.adapters.outbound.optimization.gurobi.result_translation.formulations.compact.gurobi_compact_solved_formulation_model_translator import (
+    GurobiCompactSolvedFormulationModelTranslator,
+)
+from controller.adapters.outbound.optimization.gurobi.solver.gurobi_solver import (
+    GurobiSolver,
+)
+from controller.adapters.outbound.optimization.gurobi.solver_config_builder.gurobi_solver_config_builder import (
+    GurobiSolverConfigBuilder,
+)
 from controller.adapters.outbound.partition_builder.http_partition_builder_gateway import (
     HttpPartitionBuilderGateway,
 )
@@ -49,12 +69,22 @@ from controller.application.deployment.abc.solution_observer import SolutionObse
 from controller.application.deployment.default_actuation_manager import (
     DefaultActuationManager,
 )
+from controller.application.deployment.default_model_partition_build_manager import (
+    DefaultModelPartitionBuildManager,
+)
+from controller.application.deployment.default_plan_mappings_builder import (
+    DefaultPlanMappingsBuilder,
+)
+from controller.application.deployment.default_plan_three_phase_dispatcher import (
+    DefaultPlanThreePhaseDispatcher,
+)
 from controller.application.deployment.default_solution_to_plan_converter import (
     DefaultSolutionToPlanConverter,
 )
 from controller.application.optimization.abc.optimization_context_builder import (
     OptimizationContextBuilder,
 )
+from controller.application.optimization.abc.solver_strategy import SolverStrategy
 from controller.application.optimization.default_optimization_context_builder import (
     DefaultOptimizationContextBuilder,
 )
@@ -63,6 +93,12 @@ from controller.application.optimization.default_optimization_manager import (
 )
 from controller.application.optimization.default_optimization_solution_enricher import (
     DefaultOptimizationSolutionEnricher,
+)
+from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
+    CompactFormulationDataBuilder,
+)
+from controller.application.optimization.strategies.full_solver_strategy import (
+    FullSolverStrategy,
 )
 from controller.application.ports.inbound.optimization.optimization_manager import (
     OptimizationManager,
@@ -74,10 +110,14 @@ from controller.application.ports.outbound.store.optimization_solution_store imp
     OptimizationSolutionStore,
 )
 from controller.composition.composition_root import CompositionRoot
-from controller.domain.optimization.solving.solver_config import (
-    ObjectiveKind,
-    ProblemConfig,
-    SolverConfig,
+from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
+    CompactFormulationConfig,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
 )
 from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
 from integration.redis.model.keys_factory import StringModelKeyFactory
@@ -97,7 +137,7 @@ from integration.service_instance.service_instance import ServiceInstance
 
 
 class DefaultCompositionRoot(CompositionRoot):
-    def __init__(self, solver_config: SolverConfig | None = None) -> None:
+    def __init__(self, solver_config: GurobiSolverConfig | None = None) -> None:
         self._solver_config = solver_config
 
     @asynccontextmanager
@@ -144,27 +184,45 @@ class DefaultCompositionRoot(CompositionRoot):
         optimization_context_builder = self.build_optimization_context_builder(
             redis, worker_directory_gateway
         )
-        solver_config = self._solver_config or SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        solver_config = self._solver_config or GurobiSolverConfig(
             output_flag=True,
             time_limit_s=180,
         )
 
-        problem_config = ProblemConfig(
+        formulation_config = CompactFormulationConfig(
             max_components=5,
             priority_count=3,
             compute_utilization_limit=0.8,
             network_utilization_limit=0.8,
             relative_error=0.1,
+            objective=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
         )
 
-        solver = GurobiSolver(solver_config)
+        solver_strategy: SolverStrategy = FullSolverStrategy(
+            formulation_data_builder=CompactFormulationDataBuilder(),
+            formulation_model_builder=GurobiFormulationModelBuilder(
+                GurobiCompactFormulationCompiler(),
+                non_convex=0,
+                output_flag=solver_config.output_flag,
+            ),
+            solver_config_builder=GurobiSolverConfigBuilder(
+                output_flag=solver_config.output_flag,
+                time_limit_s=solver_config.time_limit_s,
+                mip_gap=solver_config.mip_gap,
+                threads=solver_config.threads,
+                seed=solver_config.seed,
+                observer=solver_config.observer,
+                record_incumbent_history=solver_config.record_incumbent_history,
+            ),
+            solver=GurobiSolver[CompactFormulationData, CompactVariables](),
+            solved_model_translator=GurobiCompactSolvedFormulationModelTranslator(),
+            formulation_config=formulation_config,
+        )
         optimization_manager = DefaultOptimizationManager(
             optimization_context_builder,
-            solver,
+            solver_strategy,
             DefaultOptimizationSolutionEnricher(),
             solution_store,
-            problem_config,
         )
 
         return optimization_manager
@@ -203,11 +261,12 @@ class DefaultCompositionRoot(CompositionRoot):
 
             actuation_manager = DefaultActuationManager(
                 solution_observer,
-                partition_builder_gateway,
-                plan_version_factory,
-                service_plan_builder,
-                plan_share_gateway,
-                RedisFlowPlanPublisher(redis, StringFlowPlanKeyFactory()),
+                DefaultModelPartitionBuildManager(partition_builder_gateway),
+                DefaultPlanMappingsBuilder(plan_version_factory, service_plan_builder),
+                DefaultPlanThreePhaseDispatcher(
+                    plan_share_gateway,
+                    RedisFlowPlanPublisher(redis, StringFlowPlanKeyFactory()),
+                ),
             )
 
             stack.push_async_callback(actuation_manager.stop)

@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from controller.adapters.outbound.optimization.gurobi_profile_data import (
+from controller.application.optimization.formulation.compact.profile_data import (
     layer_weight_size_bytes,
     tensor_size_bytes,
 )

@@ -7,18 +7,22 @@ from scalability_benchmark.campaigns import campaign_specs
 from scalability_benchmark.configuration import ExperimentConfig
 from scalability_benchmark.randomness import fingerprint
 
-from controller.domain.optimization.solving.solver_config import ObjectiveKind
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
+)
 
 
 def test_each_instance_has_independent_runs_for_all_objectives(
     config: ExperimentConfig,
 ) -> None:
     baseline = list(campaign_specs(config, "pilot"))
-    expanded = list(campaign_specs(config, "pilot", objectives=tuple(ObjectiveKind)))
+    expanded = list(
+        campaign_specs(config, "pilot", objectives=tuple(CompactObjectiveKind))
+    )
     assert len(expanded) == 4 * len(baseline)
     for index, original in enumerate(baseline):
         group = expanded[4 * index : 4 * index + 4]
-        assert tuple(spec.objective for spec in group) == tuple(ObjectiveKind)
+        assert tuple(spec.objective for spec in group) == tuple(CompactObjectiveKind)
         assert all(
             replace(spec, objective=original.objective) == original for spec in group
         )
@@ -39,8 +43,8 @@ def test_subset_selection_is_deduplicated_and_preserves_order(
     config: ExperimentConfig,
 ) -> None:
     selected = (
-        ObjectiveKind.DEADLINE_VIOLATIONS,
-        ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
+        CompactObjectiveKind.DEADLINE_VIOLATIONS,
+        CompactObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
     )
     specs = list(campaign_specs(config, "pilot", objectives=selected + selected))
     assert tuple(spec.objective for spec in specs[:2]) == selected

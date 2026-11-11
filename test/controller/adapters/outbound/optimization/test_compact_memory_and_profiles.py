@@ -1,6 +1,10 @@
 from dataclasses import replace
 
 import pytest
+from controller.adapters.outbound.optimization.gurobi_solver import (
+    GurobiSolver,
+    OptimizationInfeasibleError,
+)
 from test.controller.adapters.outbound.optimization.test_compact_formulation import (
     _context,
 )
@@ -14,24 +18,26 @@ from test.model_manager.test_profile_contract import (
     profiled_variant as profiled_variant,
 )
 
-from controller.adapters.outbound.optimization.compact_transmission import cut_upper_mb
-from controller.adapters.outbound.optimization.gurobi_profile_data import (
-    GurobiProfileDataError,
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
 )
-from controller.adapters.outbound.optimization.gurobi_solver import (
-    GurobiSolver,
-    OptimizationInfeasibleError,
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.profile_bounds import (
+    cut_upper_mb,
 )
 from controller.adapters.outbound.profile.mappers.model_variant_static_profile_mapper import (
     ModelVariantStaticProfileMapper,
 )
+from controller.application.optimization.formulation.compact.profile_data import (
+    ProfileDataError,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
+    FormulationKind,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
+)
 from controller.domain.optimization.solving.optimization_context import (
     OptimizationContext,
-)
-from controller.domain.optimization.solving.solver_config import (
-    FormulationKind,
-    ObjectiveKind,
-    SolverConfig,
 )
 from controller.domain.profile.model_variant_static_profile import (
     LayerProperty,
@@ -75,7 +81,7 @@ def test_compact_rejects_missing_profiled_cut_instead_of_inventing_a_bound():
             replace(shape, max_cut_size_mib=None) for shape in profile.shape_profiles
         ),
     )
-    with pytest.raises(GurobiProfileDataError, match="profiled max_cut_size_mib"):
+    with pytest.raises(ProfileDataError, match="profiled max_cut_size_mib"):
         cut_upper_mb(profile)
 
 
@@ -134,8 +140,8 @@ def test_resident_weights_sum_across_flows_but_activation_is_maximum(capacity):
         )
     }
     solver = GurobiSolver(
-        SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        GurobiSolverConfig(
+            CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=FormulationKind.COMPACT,
         )
     )
@@ -154,6 +160,6 @@ def test_profiled_cut_activation_fits_despite_larger_layer_activation_sum():
     )
 
     result = GurobiSolver(
-        SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
+        GurobiSolverConfig(CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
     )._solve({request.flow_id: request}, context, _problem_config(1))
     assert result.is_optimal

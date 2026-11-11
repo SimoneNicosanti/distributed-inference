@@ -3,7 +3,7 @@ from typing import cast
 import gurobipy as gp
 import pytest
 
-from controller.adapters.outbound.optimization.gurobi_variables import (
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.assignment_variables import (
     AssignmentVariables,
 )
 from shared.flow.flow import FlowId

@@ -1,21 +1,24 @@
+from dataclasses import replace
 from types import SimpleNamespace
 from typing import cast
 from uuid import UUID
 
 import gurobipy as gp
-import pytest
 from gurobipy import GRB
 
-import controller.adapters.outbound.optimization.compact_execution as structure_constraints
-from controller.adapters.outbound.optimization.compact_execution import (
-    add_compact_execution_constraints,
-)
-from controller.adapters.outbound.optimization.gurobi_problem import GurobiProblem
-from controller.adapters.outbound.optimization.gurobi_variables import (
-    AssignmentVariables,
-    ExecutionVariables,
+import controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.execution.constraints as structure_constraints
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.assignment_builder import (
     _add_assignment_variables,
+)
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.assignment_variables import (
+    AssignmentVariables,
+)
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.execution.execution_builder import (
+    CompactExecutionBuilder,
     _add_execution_variables,
+)
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.execution.execution_variables import (
+    ExecutionVariables,
 )
 from controller.domain.optimization.request.local_worker_config import (
     NoLocalWorkerConfig,
@@ -23,6 +26,12 @@ from controller.domain.optimization.request.local_worker_config import (
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
     OptimizationRequestsByFlow,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
 )
 from controller.domain.optimization.solving.optimization_context import (
     OptimizationContext,
@@ -37,6 +46,7 @@ from controller.domain.profile.model_variant_topology import (
     LayerDescription,
     ModelVariantTopology,
 )
+from controller.domain.profile.network_topology import NetworkTopology
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -86,8 +96,22 @@ def _profile() -> ModelVariantStaticProfile:
     return cast(ModelVariantStaticProfile, SimpleNamespace(topology=topology))
 
 
-def _problem() -> GurobiProblem:
-    return GurobiProblem(
+def _problem() -> CompactFormulationData:
+    return CompactFormulationData(
+        max_components=_MAX_COMPONENTS,
+        priority_count=1,
+        compute_utilization_limit=0.9,
+        network_utilization_limit=0.9,
+        objective_kind=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        static_profiles_by_variant={model: _profile() for model in _MODELS},
+        resource_profiles_by_worker={},
+        network_topology=NetworkTopology(workers=_WORKERS, connections=()),
+        layer_execution_profiles_by_model_worker={},
+        arrival_rate_per_s={},
+        max_response_time_s_by_flow={},
+        performance_requirement_by_flow={},
+        endpoint_placement_by_flow={},
+        local_worker_config_by_flow={_FLOW: NoLocalWorkerConfig()},
         flows=(_FLOW,),
         workers=_WORKERS,
         workers_by_flow={_FLOW: _WORKERS},
@@ -127,13 +151,12 @@ def _context(*, available_bytes: int = 1_000) -> OptimizationContext:
 
 def _variables(
     model: gp.Model,
-    problem: GurobiProblem,
+    problem: CompactFormulationData,
     context: OptimizationContext,
 ) -> tuple[AssignmentVariables, ExecutionVariables]:
     assignment = _add_assignment_variables(
         model,
         problem,
-        context,
         max_components=_MAX_COMPONENTS,
     )
     execution = _add_execution_variables(
@@ -166,9 +189,7 @@ def _variables(
     return assignment, execution
 
 
-def test_missing_layer_profile_still_forbids_placement(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_missing_layer_profile_still_forbids_placement() -> None:
     problem = _problem()
     context = _context()
 
@@ -181,23 +202,20 @@ def test_missing_layer_profile_still_forbids_placement(
             layer: LayerExecutionProfile(execution_time_s=1) for layer in _LAYERS[:-1]
         }
 
-    monkeypatch.setattr(
-        structure_constraints,
-        "layer_execution_profiles",
-        profiles_without_last_layer,
+    problem = replace(
+        problem,
+        layer_execution_profiles_by_model_worker={
+            (variant, worker): profiles_without_last_layer(context, variant, worker)
+            for variant in _MODELS
+            for worker in _WORKERS
+        },
     )
 
     with gp.Model() as model:
         model.Params.OutputFlag = 0
         assignment, execution = _variables(model, problem, context)
-        add_compact_execution_constraints(
-            model,
-            problem,
-            assignment,
-            execution,
-            context=context,
-            requests_by_flow=_requests_by_flow(),
-            max_components=_MAX_COMPONENTS,
+        CompactExecutionBuilder().add_constraints(
+            model, problem, assignment=assignment, execution=execution
         )
         model.optimize()
 
@@ -227,9 +245,7 @@ def test_minimum_execution_time_uses_only_compatible_workers() -> None:
     ) == {"a": 1}
 
 
-def test_execution_minimum_bound_supports_multiple_components_and_workers(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_execution_minimum_bound_supports_multiple_components_and_workers() -> None:
     problem = _problem()
     context = _context()
 
@@ -249,10 +265,13 @@ def test_execution_minimum_bound_supports_multiple_components_and_workers(
             "c": LayerExecutionProfile(execution_time_s=6),
         }
 
-    monkeypatch.setattr(
-        structure_constraints,
-        "layer_execution_profiles",
-        heterogeneous_profiles,
+    problem = replace(
+        problem,
+        layer_execution_profiles_by_model_worker={
+            (variant, worker): heterogeneous_profiles(context, variant, worker)
+            for variant in _MODELS
+            for worker in _WORKERS
+        },
     )
 
     with gp.Model() as model:
@@ -270,14 +289,8 @@ def test_execution_minimum_bound_supports_multiple_components_and_workers(
             component_worker.LB = value
             component_worker.UB = value
 
-        add_compact_execution_constraints(
-            model,
-            problem,
-            assignment,
-            execution,
-            context=context,
-            requests_by_flow=_requests_by_flow(),
-            max_components=_MAX_COMPONENTS,
+        CompactExecutionBuilder().add_constraints(
+            model, problem, assignment=assignment, execution=execution
         )
         model.setObjective(gp.quicksum(execution.execution_time_s.values()))
         model.optimize()

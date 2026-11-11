@@ -9,7 +9,7 @@ from controller.application.optimization.abc.optimization_context_builder import
 from controller.application.optimization.abc.optimization_solution_enricher import (
     OptimizationSolutionEnricher,
 )
-from controller.application.optimization.abc.solver import Solver
+from controller.application.optimization.abc.solver_strategy import SolverStrategy
 from controller.application.optimization.default_optimization_manager import (
     DefaultOptimizationManager,
 )
@@ -29,7 +29,6 @@ from controller.domain.optimization.solving.optimization_context import (
 from controller.domain.optimization.solving.optimization_solution import (
     OptimizationSolution,
 )
-from controller.domain.optimization.solving.solver_config import ProblemConfig
 from shared.flow.flow import FlowId
 
 
@@ -46,17 +45,10 @@ async def test_builds_context_then_solves_enriches_and_stores_solution(
     context.static_profiles_by_variant = {}
     solution = OptimizationSolution((), 0, True)
     enriched_solution = EnrichedOptimizationSolution(solution, {})
-    problem_config = ProblemConfig(
-        max_components=3,
-        priority_count=2,
-        compute_utilization_limit=0.9,
-        network_utilization_limit=0.8,
-        relative_error=0.1,
-    )
 
     context_builder = Mock(spec=OptimizationContextBuilder)
     context_builder.build_optimization_context = AsyncMock(return_value=context)
-    solver = Mock(spec=Solver)
+    solver = Mock(spec=SolverStrategy)
     solver.solve = AsyncMock(return_value=solution)
     enricher = Mock(spec=OptimizationSolutionEnricher)
     enricher.enrich_solution.return_value = enriched_solution
@@ -74,7 +66,6 @@ async def test_builds_context_then_solves_enriches_and_stores_solution(
         solver,
         enricher,
         solution_store,
-        problem_config,
     )
 
     if enrichment_fails:
@@ -89,14 +80,13 @@ async def test_builds_context_then_solves_enriches_and_stores_solution(
     solver.solve.assert_awaited_once_with(
         requests_by_flow,
         context,
-        problem_config,
     )
     enricher.enrich_solution.assert_called_once_with(
         solution, context.static_profiles_by_variant
     )
     expected_calls = [
         call.build_context(),
-        call.solve(requests_by_flow, context, problem_config),
+        call.solve(requests_by_flow, context),
         call.enrich(solution, context.static_profiles_by_variant),
     ]
     if not enrichment_fails:

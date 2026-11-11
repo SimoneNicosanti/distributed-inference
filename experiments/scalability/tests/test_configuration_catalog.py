@@ -12,7 +12,9 @@ from scalability_benchmark.catalog import (
 from scalability_benchmark.configuration import ExperimentConfig
 from scalability_benchmark.randomness import fingerprint, stream
 
-from controller.domain.optimization.solving.solver_config import ObjectiveKind
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
+)
 from shared.model.model_variant import PerformanceMetricType
 
 
@@ -46,7 +48,9 @@ def test_default_campaign_contract(config: ExperimentConfig) -> None:
     )
     assert len({fingerprint(spec.as_record()) for spec in main + sensitivity}) == 968
     assert (
-        len(list(campaign_specs(config, "main", objectives=tuple(ObjectiveKind))))
+        len(
+            list(campaign_specs(config, "main", objectives=tuple(CompactObjectiveKind)))
+        )
         == 3080
     )
     assert {spec.timeout_s for spec in campaign_specs(config, "pilot")} == {60}
@@ -118,9 +122,9 @@ def test_compact_is_default_and_legacy_is_rejected(config: ExperimentConfig) -> 
         ExperimentConfig.model_validate(raw)
 
 
-@pytest.mark.parametrize("objective", list(ObjectiveKind))
+@pytest.mark.parametrize("objective", list(CompactObjectiveKind))
 def test_all_four_objectives_are_accepted(
-    config: ExperimentConfig, objective: ObjectiveKind
+    config: ExperimentConfig, objective: CompactObjectiveKind
 ) -> None:
     raw = config.model_dump()
     raw["optimization"]["objective"] = objective.value

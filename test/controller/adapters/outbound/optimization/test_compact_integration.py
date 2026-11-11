@@ -5,22 +5,26 @@ from itertools import combinations
 
 import gurobipy as gp
 import pytest
+from controller.adapters.outbound.optimization.gurobi_solver import GurobiSolver
 from test.controller.adapters.outbound.optimization import (
     test_gurobi_solver as fixtures,
 )
 
-from controller.adapters.outbound.optimization.gurobi_profile_data import (
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
+)
+from controller.application.optimization.formulation.compact.profile_data import (
     layer_execution_profiles,
     tensor_size_bytes,
 )
-from controller.adapters.outbound.optimization.gurobi_solver import GurobiSolver
+from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
+    FormulationKind,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
+)
 from controller.domain.optimization.solving.optimization_context import (
     OptimizationContext,
-)
-from controller.domain.optimization.solving.solver_config import (
-    FormulationKind,
-    ObjectiveKind,
-    SolverConfig,
 )
 
 
@@ -99,8 +103,8 @@ async def test_existing_operational_cases_with_compact(monkeypatch, case):
         fixtures,
         "_solver",
         lambda: GurobiSolver(
-            SolverConfig(
-                ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+            GurobiSolverConfig(
+                CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
                 formulation=FormulationKind.COMPACT,
                 threads=1,
                 seed=0,
@@ -127,8 +131,8 @@ def test_compact_physical_times_and_response_aggregation(priorities):
         worker, arrival_rate=0.05, max_response_time_s=1, flow_id=fixtures._flow(1)
     )
     result = GurobiSolver(
-        SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        GurobiSolverConfig(
+            CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=FormulationKind.COMPACT,
             threads=1,
             seed=0,
@@ -209,9 +213,9 @@ def test_physical_network_queue_and_objective_at_well_scaled_tensor_sizes():
     )
     expected_wait = 0.05 * 0.04**2 / (2 * (1 - 0.05 * 0.04))
     expected = 0.04 + expected_wait + 2 * 0.01 / (1 - 0.5) + 0.002
-    objective = ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME
+    objective = CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME
     result = GurobiSolver(
-        SolverConfig(
+        GurobiSolverConfig(
             objective, formulation=FormulationKind.COMPACT, threads=1, seed=0, mip_gap=0
         )
     )._solve({request.flow_id: request}, context, fixtures._problem_config(3))
@@ -244,8 +248,8 @@ def test_relay_only_worker_keeps_endpoints_and_excludes_computation(inference_ru
         ),
     )
     result = GurobiSolver(
-        SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        GurobiSolverConfig(
+            CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=FormulationKind.COMPACT,
             threads=1,
             seed=0,

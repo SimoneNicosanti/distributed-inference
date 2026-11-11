@@ -6,7 +6,7 @@ from controller.application.optimization.abc.optimization_context_builder import
 from controller.application.optimization.abc.optimization_solution_enricher import (
     OptimizationSolutionEnricher,
 )
-from controller.application.optimization.abc.solver import Solver
+from controller.application.optimization.abc.solver_strategy import SolverStrategy
 from controller.application.ports.inbound.optimization.optimization_manager import (
     OptimizationManager,
 )
@@ -16,23 +16,20 @@ from controller.application.ports.outbound.store.optimization_solution_store imp
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
 )
-from controller.domain.optimization.solving.solver_config import ProblemConfig
 
 
 class DefaultOptimizationManager(OptimizationManager):
     def __init__(
         self,
         optimization_context_builder: OptimizationContextBuilder,
-        solver: Solver,
+        solver_strategy: SolverStrategy,
         solution_enricher: OptimizationSolutionEnricher,
         solution_store: OptimizationSolutionStore,
-        problem_config: ProblemConfig,
     ) -> None:
         self._optimization_context_builder = optimization_context_builder
-        self._solver = solver
+        self._solver_strategy = solver_strategy
         self._solution_enricher = solution_enricher
         self._solution_store = solution_store
-        self._problem_config = problem_config
 
     @override
     async def optimize_inference_distribution(
@@ -40,10 +37,9 @@ class DefaultOptimizationManager(OptimizationManager):
         requests_by_flow: OptimizationRequestsByFlow,
     ) -> None:
         context = await self._optimization_context_builder.build_optimization_context()
-        solution = await self._solver.solve(
+        solution = await self._solver_strategy.solve(
             requests_by_flow,
             context,
-            self._problem_config,
         )
         enriched_solution = self._solution_enricher.enrich_solution(
             solution,

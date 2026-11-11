@@ -3,6 +3,10 @@ from unittest.mock import Mock
 
 import gurobipy as gp
 import pytest
+from controller.adapters.outbound.optimization.gurobi_solver import (
+    GurobiSolver,
+    _observe_model,
+)
 from gurobipy import GRB
 from scalability_benchmark import solver as benchmark_solver
 from scalability_benchmark.campaigns import RunSpec
@@ -10,17 +14,17 @@ from scalability_benchmark.configuration import ExperimentConfig
 from scalability_benchmark.instances import Scenario
 from scalability_benchmark.solver import classify
 
-from controller.adapters.outbound.optimization.gurobi_problem_builder import (
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_run_statistics import (
+    GurobiRunStatistics,
+)
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
+)
+from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
     _is_metric_satisfied,
 )
-from controller.adapters.outbound.optimization.gurobi_solver import (
-    GurobiSolver,
-    _observe_model,
-)
-from controller.domain.optimization.solving.solver_config import (
-    ObjectiveKind,
-    SolverConfig,
-    SolverRunStatistics,
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
 )
 from shared.model.model_variant import PerformanceMetric, PerformanceMetricType
 
@@ -30,9 +34,9 @@ def statistics(
     solutions: int,
     gap: float | None = None,
     *,
-    objective: ObjectiveKind = ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
-) -> SolverRunStatistics:
-    return SolverRunStatistics(
+    objective: CompactObjectiveKind = CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+) -> GurobiRunStatistics:
+    return GurobiRunStatistics(
         status=status,
         runtime_s=300 if status == GRB.TIME_LIMIT else 1,
         solution_count=solutions,
@@ -112,11 +116,12 @@ def test_observer_guards_unavailable_attributes_and_captures_effective_parameter
     model.Params.MIPGap = 0.01
     model.Params.Threads = 0
     model.Params.Seed = 0
-    observed: list[SolverRunStatistics] = []
+    observed: list[GurobiRunStatistics] = []
     _observe_model(
         model,
-        SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME, observer=observed.append
+        GurobiSolverConfig(
+            CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+            observer=observed.append,
         ),
         0.2,
     )
@@ -137,30 +142,32 @@ def test_observer_guards_unavailable_attributes_and_captures_effective_parameter
 )
 def test_solver_rejects_invalid_settings(settings: dict[str, Any]) -> None:
     with pytest.raises(ValueError):
-        SolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME, **settings)
+        GurobiSolverConfig(
+            CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME, **settings
+        )
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("time_limit_s", [60, 300])
 @pytest.mark.parametrize("formulation", ["compact"])
-@pytest.mark.parametrize("objective", list(ObjectiveKind))
+@pytest.mark.parametrize("objective", list(CompactObjectiveKind))
 async def test_runner_invokes_existing_solver_with_explicit_limits(
     config: ExperimentConfig,
     monkeypatch: pytest.MonkeyPatch,
     time_limit_s: int,
     formulation: str,
-    objective: ObjectiveKind,
+    objective: CompactObjectiveKind,
 ) -> None:
     from unittest.mock import AsyncMock
 
-    configured: list[SolverConfig] = []
+    configured: list[GurobiSolverConfig] = []
     config = config.model_copy(
         update={"solver": config.solver.model_copy(update={"formulation": formulation})}
     )
     gateway = AsyncMock(spec=GurobiSolver)
     gateway.solve.return_value = Mock()
 
-    def factory(settings: SolverConfig) -> Any:
+    def factory(settings: GurobiSolverConfig) -> Any:
         configured.append(settings)
         assert settings.observer is not None
         settings.observer(statistics(GRB.OPTIMAL, 1, 0, objective=settings.objective))

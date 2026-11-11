@@ -2,13 +2,16 @@ from dataclasses import replace
 from uuid import UUID
 
 import pytest
-
-from controller.adapters.outbound.optimization.gurobi_profile_data import (
-    layer_execution_profiles,
-)
 from controller.adapters.outbound.optimization.gurobi_solver import (
     GurobiSolver,
     OptimizationInfeasibleError,
+)
+
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
+)
+from controller.application.optimization.formulation.compact.profile_data import (
+    layer_execution_profiles,
 )
 from controller.domain.optimization.request.flow_endpoint_placement import (
     FixedPlacement,
@@ -22,16 +25,17 @@ from controller.domain.optimization.request.optimization_request import (
 )
 from controller.domain.optimization.request.qos_constraints import QoSRequirements
 from controller.domain.optimization.request.stream_info import StreamInfo
+from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
+    CompactFormulationConfig,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
+)
 from controller.domain.optimization.solving.optimization_context import (
     OptimizationContext,
 )
 from controller.domain.optimization.solving.optimization_solution import (
     OptimizationSolution,
-)
-from controller.domain.optimization.solving.solver_config import (
-    ObjectiveKind,
-    ProblemConfig,
-    SolverConfig,
 )
 from controller.domain.profile.model_variant_execution_profile import (
     Backend,
@@ -490,8 +494,8 @@ def _problem_config(
     max_components: int,
     *,
     priority_count: int = 1,
-) -> ProblemConfig:
-    return ProblemConfig(
+) -> CompactFormulationConfig:
+    return CompactFormulationConfig(
         max_components=max_components,
         priority_count=priority_count,
         compute_utilization_limit=0.9,
@@ -502,8 +506,8 @@ def _problem_config(
 
 def _solver() -> GurobiSolver:
     return GurobiSolver(
-        SolverConfig(
-            objective=(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME),
+        GurobiSolverConfig(
+            objective=(CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME),
         )
     )
 
@@ -535,7 +539,7 @@ async def _solve_requests(
         priority_count=priority_count,
     )
     requests_by_flow = {request.flow_id: request for request in requests}
-    return await _solver().solve(
+    return await _solver().solve_model(
         requests_by_flow,
         context,
         problem_config,

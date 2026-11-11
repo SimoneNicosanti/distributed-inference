@@ -6,7 +6,9 @@ from typing import Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from controller.domain.optimization.solving.solver_config import ObjectiveKind
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
+)
 
 
 class Settings(BaseModel):
@@ -136,7 +138,7 @@ class OptimizationSettings(Settings):
     compute_utilization_limit: float = Field(gt=0, lt=1)
     network_utilization_limit: float = Field(gt=0, lt=1)
     relative_error: float = Field(gt=0)
-    objective: ObjectiveKind
+    objective: CompactObjectiveKind
 
 
 class SolverSettings(Settings):

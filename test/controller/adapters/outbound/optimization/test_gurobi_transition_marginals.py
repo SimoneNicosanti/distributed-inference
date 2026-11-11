@@ -1,27 +1,30 @@
 from collections.abc import Mapping
+from dataclasses import replace
 from itertools import product
-from types import SimpleNamespace
-from typing import Literal, cast
+from typing import Literal
 from uuid import UUID
 
 import gurobipy as gp
 import pytest
 from gurobipy import GRB
 
-from controller.adapters.outbound.optimization.gurobi_problem import GurobiProblem
-from controller.adapters.outbound.optimization.gurobi_structure_constraints import (
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.assignment_variables import (
+    AssignmentVariables,
+)
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.constraints import (
     _add_transition_marginal_constraints,
 )
-from controller.adapters.outbound.optimization.gurobi_variables import (
-    AssignmentVariables,
-    NetworkVariables,
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.network_builder import (
     _add_network_variables,
 )
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
+from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.network_variables import (
+    NetworkVariables,
 )
-from controller.domain.optimization.request.optimization_request import (
-    OptimizationRequestsByFlow,
+from controller.domain.optimization.solving.formulation.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
 )
 from controller.domain.profile.network_topology import (
     NetworkConnection,
@@ -44,7 +47,7 @@ _WORKER_C = ServiceId(id=UUID(int=6))
 
 def _problem(
     workers_by_flow: Mapping[FlowId, tuple[WorkerId, ...]],
-) -> GurobiProblem:
+) -> CompactFormulationData:
     flows = tuple(workers_by_flow)
     workers = tuple(
         dict.fromkeys(
@@ -53,7 +56,21 @@ def _problem(
             for worker in flow_workers
         )
     )
-    return GurobiProblem(
+    return CompactFormulationData(
+        max_components=2,
+        priority_count=1,
+        compute_utilization_limit=0.9,
+        network_utilization_limit=0.9,
+        objective_kind=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        static_profiles_by_variant={},
+        resource_profiles_by_worker={},
+        network_topology=NetworkTopology(workers=workers, connections=()),
+        layer_execution_profiles_by_model_worker={},
+        arrival_rate_per_s={},
+        max_response_time_s_by_flow={},
+        performance_requirement_by_flow={},
+        endpoint_placement_by_flow={},
+        local_worker_config_by_flow={},
         flows=flows,
         workers=workers,
         workers_by_flow=dict(workers_by_flow),
@@ -90,7 +107,7 @@ def _topology(workers: tuple[WorkerId, ...], arcs: frozenset[Arc]) -> NetworkTop
 
 def _transition_variables(
     model: gp.Model,
-    problem: GurobiProblem,
+    problem: CompactFormulationData,
     arcs_by_flow: dict[FlowId, frozenset[Arc]],
     *,
     max_components: int,
@@ -142,6 +159,8 @@ def _transition_variables(
             network_utilization={},
             network_bin_selected={},
             component_transmission_response_s={},
+            source_response_s={},
+            nominal_upper_s={},
         ),
     )
 
@@ -162,7 +181,7 @@ def _fix_worker(
 
 def _add_legacy_constraints(
     model: gp.Model,
-    problem: GurobiProblem,
+    problem: CompactFormulationData,
     assignment: AssignmentVariables,
     network: NetworkVariables,
     *,
@@ -264,26 +283,13 @@ def test_production_q_indices_are_sparse_binary_and_keep_self_transitions() -> N
             ),
         ),
     )
-    context = cast(
-        OptimizationContext,
-        SimpleNamespace(network_topology=topology, static_profiles_by_variant={}),
-    )
-    requests = cast(
-        OptimizationRequestsByFlow,
-        {
-            _FLOW_A: SimpleNamespace(
-                qos_requirements=SimpleNamespace(max_mean_response_time=1.0)
-            )
-        },
-    )
+    problem = replace(problem, network_topology=topology)
 
     with gp.Model() as model:
         model.Params.OutputFlag = 0
         network = _add_network_variables(
             model,
             problem,
-            context,
-            requests,
             max_components=3,
             network_utilization_limit=0.9,
         )

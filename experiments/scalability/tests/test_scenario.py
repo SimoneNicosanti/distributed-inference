@@ -18,8 +18,8 @@ from scalability_benchmark.network import select_network
 from scalability_benchmark.profiling.static import StaticModel
 from scalability_benchmark.randomness import fingerprint
 
-from controller.adapters.outbound.optimization.gurobi_problem_builder import (
-    DefaultGurobiProblemBuilder,
+from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
+    CompactFormulationDataBuilder,
 )
 from controller.domain.optimization.request.flow_endpoint_placement import (
     FixedPlacement,
@@ -27,7 +27,9 @@ from controller.domain.optimization.request.flow_endpoint_placement import (
 from controller.domain.optimization.request.local_worker_config import (
     ValidLocalWorkerConfig,
 )
-from controller.domain.optimization.solving.solver_config import ProblemConfig
+from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
+    CompactFormulationConfig,
+)
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
 
@@ -101,10 +103,12 @@ async def test_nested_entities_and_requests(scenario: Scenario) -> None:
         assert request.local_worker_config == ValidLocalWorkerConfig(device, True)
         lower, upper = scenario.config.flows.deadline_s
         assert lower <= request.qos_requirements.max_mean_response_time <= upper
-    problem = DefaultGurobiProblemBuilder().build(
+    problem = CompactFormulationDataBuilder().build_formulation_data(
         requests,
         large,
-        ProblemConfig(**scenario.config.optimization.model_dump(exclude={"objective"})),
+        CompactFormulationConfig(
+            **scenario.config.optimization.model_dump(exclude={"objective"})
+        ),
     )
     assert all(len(models) == 10 for models in problem.models_by_flow.values())
     assert device in problem.workers

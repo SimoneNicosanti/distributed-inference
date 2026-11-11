@@ -5,6 +5,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from controller.adapters.outbound.optimization.gurobi_solver import (
+    GurobiSolver,
+    OptimizationInfeasibleError,
+)
 from scalability_benchmark.catalog import (
     CatalogEntry,
     artifact_hashes,
@@ -20,19 +24,21 @@ from scalability_benchmark.profiling.static import (
     profile_entry,
 )
 
-from controller.adapters.outbound.optimization.gurobi_solver import (
-    GurobiSolver,
-    OptimizationInfeasibleError,
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_run_statistics import (
+    GurobiRunStatistics,
+)
+from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
+    CompactFormulationConfig,
+    FormulationKind,
+)
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
 )
 from controller.domain.optimization.solving.optimization_context import (
     OptimizationContext,
-)
-from controller.domain.optimization.solving.solver_config import (
-    FormulationKind,
-    ObjectiveKind,
-    ProblemConfig,
-    SolverConfig,
-    SolverRunStatistics,
 )
 from controller.domain.profile.model_variant_execution_profile import (
     WorkerExecutionProfiles,
@@ -113,18 +119,18 @@ async def test_real_solver_feasible_and_infeasible(
         },
     )
     flow = flow_pool(config, 42, 0.6, 1.0, device.id)[0]
-    observed: list[SolverRunStatistics] = []
+    observed: list[GurobiRunStatistics] = []
     solver = GurobiSolver(
-        SolverConfig(
-            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        GurobiSolverConfig(
+            CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=formulation,
             time_limit_s=300,
             mip_gap=0.01,
             observer=observed.append,
         )
     )
-    problem = ProblemConfig(7, 3, 0.8, 0.8, 0.1)
-    result = await solver.solve({flow.flow_id: flow}, context, problem)
+    problem = CompactFormulationConfig(7, 3, 0.8, 0.8, 0.1)
+    result = await solver.solve_model({flow.flow_id: flow}, context, problem)
     assert result.flow_solutions and observed[-1].solution_count > 0
     from dataclasses import replace
 
@@ -133,4 +139,4 @@ async def test_real_solver_feasible_and_infeasible(
         qos_requirements=replace(flow.qos_requirements, max_mean_response_time=1e-12),
     )
     with pytest.raises(OptimizationInfeasibleError):
-        await solver.solve({impossible.flow_id: impossible}, context, problem)
+        await solver.solve_model({impossible.flow_id: impossible}, context, problem)

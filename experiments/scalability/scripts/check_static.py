@@ -46,12 +46,12 @@ def main() -> None:
     production = (
         "packages/shared/src/shared/model/model_variant.py",
         "services/controller/src/controller/domain/optimization/solving/solver_config.py",
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi_problem_builder.py",
+        "services/controller/src/controller/application/optimization/formulation/compact/compact_formulation_data_builder.py",
         "services/controller/src/controller/adapters/outbound/optimization/gurobi_solver.py",
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi_objective.py",
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi_qos_constraints.py",
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi_variables.py",
-        "services/controller/src/controller/adapters/outbound/optimization/compact_bounds.py",
+        "services/controller/src/controller/adapters/outbound/optimization/gurobi/model_builder/formulations/compact/collaborators/objective_builder.py",
+        "services/controller/src/controller/adapters/outbound/optimization/gurobi/model_builder/formulations/compact/collaborators/response_time/constraints.py",
+        "services/controller/src/controller/adapters/outbound/optimization/gurobi/model_builder/formulations/compact_variables.py",
+        "services/controller/src/controller/application/optimization/formulation/compact/bounds.py",
         "services/controller/src/controller/adapters/outbound/optimization/gurobi_incumbent.py",
     )
     sources = sorted(
@@ -200,7 +200,12 @@ def main() -> None:
         )
         for node in ast.walk(analysis)
     )
-    objective = ast.parse((optimizer / "gurobi_objective.py").read_text())
+    objective = ast.parse(
+        (
+            optimizer
+            / "gurobi/model_builder/formulations/compact/collaborators/objective_builder.py"
+        ).read_text()
+    )
     calls = [
         node.func.attr
         for node in ast.walk(objective)
@@ -226,7 +231,12 @@ def main() -> None:
         "DEADLINE_VIOLATIONS",
         "ARRIVAL_WEIGHTED_NORMALIZED_DELAY",
     }
-    qos = ast.parse((optimizer / "gurobi_qos_constraints.py").read_text())
+    qos = ast.parse(
+        (
+            optimizer
+            / "gurobi/model_builder/formulations/compact/collaborators/response_time/constraints.py"
+        ).read_text()
+    )
     guards = [
         node
         for node in ast.walk(qos)
@@ -240,12 +250,16 @@ def main() -> None:
         "ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME",
         "ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY",
     }
-    for name in ("compact_bounds.py", "gurobi_variables.py"):
-        tree = ast.parse((optimizer / name).read_text())
+    for path in (
+        root
+        / "services/controller/src/controller/application/optimization/formulation/compact/bounds.py",
+        optimizer / "gurobi/model_builder/formulations/compact_variables.py",
+    ):
+        tree = ast.parse(path.read_text())
         assert not any(
             isinstance(node, ast.Attribute) and node.attr == "max_mean_response_time"
             for node in ast.walk(tree)
-        ), name
+        ), path.name
     print(
         f"Static inspection: {len(sources)} Python syntax trees; YAML/TOML valid; base grids 770/198; 10 models; 7 flows; 11 infrastructures; four alternative objectives; conditional deadlines; no implicit deadline bounds; solver call order, incumbent callback and offline plotting wiring valid"
     )

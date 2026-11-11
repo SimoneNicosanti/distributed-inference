@@ -7,7 +7,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
-from controller.domain.optimization.solving.solver_config import ObjectiveKind
+from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
+    CompactObjectiveKind,
+)
 from scalability_benchmark.campaigns import CampaignName, campaign_specs
 from scalability_benchmark.configuration import ExperimentConfig, load_configuration
 from scalability_benchmark.instances import build_scenario, request_record
@@ -25,7 +27,7 @@ async def run_campaign(
     resume: bool,
     retry_errors: bool,
     limit: int | None,
-    objectives: tuple[ObjectiveKind, ...] | None = None,
+    objectives: tuple[CompactObjectiveKind, ...] | None = None,
 ) -> None:
     provenance = software_provenance()
     provenance_hash = fingerprint(provenance)
@@ -115,7 +117,7 @@ def main() -> None:
     parser.add_argument(
         "--objectives",
         nargs="+",
-        choices=(*ObjectiveKind, "all"),
+        choices=(*CompactObjectiveKind, "all"),
         help="Run each selected objective independently; all selects all four (default: YAML objective)",
     )
     parser.add_argument("--resume", action="store_true")
@@ -140,10 +142,10 @@ def main() -> None:
                 parser.error(
                     "--objectives all cannot be combined with individual objectives"
                 )
-            objectives = tuple(ObjectiveKind)
+            objectives = tuple(CompactObjectiveKind)
         else:
             objectives = tuple(
-                dict.fromkeys(ObjectiveKind(value) for value in args.objectives)
+                dict.fromkeys(CompactObjectiveKind(value) for value in args.objectives)
             )
     config = load_configuration(args.config)
     if args.seed:
