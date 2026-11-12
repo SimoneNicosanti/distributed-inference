@@ -52,18 +52,19 @@ def test_liveness_releases_consumed_activations(model: StaticModel) -> None:
     assert partition.peak_live_activations_bytes < partition.summed_activations_bytes
 
 
+@pytest.mark.parametrize("tier", ["device", "edge", "cloud"])
 def test_roofline_uses_operator_efficiency_and_stable_jitter(
-    model: StaticModel, config: ExperimentConfig
+    model: StaticModel, config: ExperimentConfig, tier: str
 ) -> None:
     settings = config.execution.model_copy(update={"jitter_fraction": 0.0})
-    hardware = config.hardware["device"]
-    result = execution_profile(model.profile, hardware, settings, 42, "device")
+    hardware = config.hardware[tier]
+    result = execution_profile(model.profile, hardware, settings, 42, tier)
     assert (
         result.profile.shape_execution_profiles[0].input_shapes
         == model.profile.shape_profiles[0].input_shapes
     )
     backend = result.profile.shape_execution_profiles[0].backend_profiles[0]
-    assert backend.backend == Backend.CPU
+    assert backend.backend == Backend(hardware.backend)
     convolution = settings.groups["convolution"]
     expected = hardware.overhead_s + max(
         1024 / (hardware.compute_flops_s * convolution.compute),
@@ -72,9 +73,9 @@ def test_roofline_uses_operator_efficiency_and_stable_jitter(
     assert backend.layer_profiles["conv"].execution_time_s == expected
     assert backend.layer_profiles["input"].execution_time_s == 0
     assert result.fallback_operators == ()
-    first = execution_profile(model.profile, hardware, config.execution, 42, "device")
+    first = execution_profile(model.profile, hardware, config.execution, 42, tier)
     assert first == execution_profile(
-        model.profile, hardware, config.execution, 42, "device"
+        model.profile, hardware, config.execution, 42, tier
     )
     for layer in ("conv", "relu", "pool"):
         value = (

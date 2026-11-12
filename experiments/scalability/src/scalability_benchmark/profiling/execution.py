@@ -1,4 +1,4 @@
-"""Operator roofline estimates projected into the solver's CPU backend slot."""
+"""Operator roofline estimates grouped by the simulated hardware backend."""
 
 from dataclasses import dataclass
 
@@ -6,8 +6,8 @@ from controller.application.optimization.formulation.compact.profile_data import
     layer_weight_size_bytes,
     tensor_size_bytes,
 )
+from controller.domain.backend import Backend
 from controller.domain.profile.model_variant_execution_profile import (
-    Backend,
     BackendExecutionProfile,
     LayerExecutionProfile,
     ModelVariantExecutionProfile,
@@ -72,7 +72,7 @@ def execution_profile(
             (
                 ShapeExecutionProfile(
                     shaped.input_shapes,
-                    (BackendExecutionProfile(Backend.CPU, profiles),),
+                    (BackendExecutionProfile(Backend(hardware.backend), profiles),),
                 ),
             )
         ),

@@ -32,8 +32,8 @@ class TimeDistribution:
 def summarize_times(records: list[dict[str, Any]], metric: str) -> TimeDistribution:
     if metric not in TIME_METRICS:
         raise ValueError(f"Unknown time metric: {metric}")
-    non_timeouts = []
-    timeouts = []
+    non_timeouts: list[float] = []
+    timeouts: list[float] = []
     for record in records:
         if metric == "solver_runtime_s" and record["termination"] == "solver_error":
             continue

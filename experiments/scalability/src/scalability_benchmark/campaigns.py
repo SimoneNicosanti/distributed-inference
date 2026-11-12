@@ -7,7 +7,7 @@ from typing import Literal
 from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
     CompactObjectiveKind,
 )
-from scalability_benchmark.configuration import ExperimentConfig
+from scalability_benchmark.configuration import BENCHMARK_OBJECTIVES, ExperimentConfig
 
 type CampaignName = Literal["pilot", "main", "sensitivity"]
 
@@ -52,6 +52,8 @@ def campaign_specs(
     )
     if not selected:
         raise ValueError("Select at least one objective")
+    if any(objective not in BENCHMARK_OBJECTIVES for objective in selected):
+        raise ValueError("Select one of the four benchmark objectives")
     for spec in _instance_specs(config, name):
         for objective in selected:
             yield replace(spec, objective=objective)

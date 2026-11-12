@@ -7,6 +7,8 @@ the simulated infrastructure. Real Gurobi execution needs an adequate license.
 
 The solver uses only the compact formulation. `solver.formulation` defaults to
 `compact`; the explicit value `compact` remains accepted and `legacy` is rejected.
+The benchmark exposes four optimization objectives. The controller's `CONSTANT`
+feasibility objective is excluded from configuration and `--objectives all`.
 Profiles must contain `max_cut_size_mib`. Historical result files remain readable.
 
 ## Setup
@@ -80,7 +82,7 @@ The existing profiler currently requires input `images`; it is not modified.
 # Six representative runs, native solver timeout 60 seconds, then offline analysis.
 uv run --project experiments/scalability --locked scalability pilot --output experiments/scalability/results/pilot --analyze
 
-# Main: seed 42, load 0.75, 7 flow counts x 10 model counts x 11 infrastructures.
+# Main: seed 42, load 0.7, 7 flow counts x 10 model counts x 11 infrastructures.
 uv run --project experiments/scalability --locked scalability main --output experiments/scalability/results/main
 
 # Resume: completed timeouts and proven infeasibility are completed outcomes.
@@ -173,16 +175,16 @@ repair. Report pilot findings before changing assumptions.
 * One full scenario is generated per seed: ten models, seven flows, eleven workers
   and 110 directed links. Instances select prefixes/subsets without resampling.
   Worker IDs remain stable, and identical tiers share execution profiles.
-* Infrastructure: device alone, one through five edges, then one through five
-  clouds while retaining all five edges. Never an edge/cloud Cartesian product.
+* Infrastructure: device alone, then one through ten edges. The current campaign
+  does not select cloud workers; cloud hardware and link profiles remain available.
 * Device: four CPU cores, 8 GiB RAM. Edge: 8 GiB VRAM, 16 GiB physical RAM.
   Cloud: 24 GiB VRAM, 64 GiB physical RAM. Edge/cloud host core counts are explicit
   synthetic assumptions (8/16), not parallel service multipliers.
-* **Authorized solver projection:** GPU roofline times occupy `Backend.CPU`,
-  because the current formulation selects this slot only. GPU VRAM occupies the
-  solver's `ram_profile` capacity (8/24 GiB). Device uses its actual 8 GiB RAM.
-  Physical RAM, simulated backend and projected capacity remain separate metadata.
-  This is a benchmark adapter convention, not production GPU-backend support.
+* **Backend-aware profiles:** device estimates use `Backend.CPU`; edge/cloud
+  estimates use `Backend.GPU`, matching the worker resource profiles. Inference
+  capacity is device RAM or GPU VRAM (8/24 GiB); host RAM remains separately
+  represented as physical RAM. Workers and execution metadata record the effective
+  backend. These are synthetic estimates; no GPU hardware is needed to run them.
 * Operator time: `overhead + max(FLOPs / effective_compute, traffic / effective_bandwidth)`.
   Traffic estimates input/output tensors and weights once per operator. FLOPs
   come from the existing static profiler. YAML defines operator-group efficiencies,
@@ -209,9 +211,7 @@ repair. Report pilot findings before changing assumptions.
 
   `lambda_i = L * weight_i / (reference_service_time * sum(all_seven_weights))`.
 
-  Main and pilot use `L = 0.75`, increasing each flow's arrival rate by 25%
-  compared with `L = 0.6` for the same seven-flow pool. Sensitivity retains
-  loads 0.3 and 0.8.
+  Main and pilot use `L = 0.7`. Sensitivity retains loads 0.3 and 0.8.
 
   Thus all seven reference flows together offer utilization `L`. Smaller prefixes
   do not rescale rates. Sensitivity scales arrivals only: IDs, deadlines, models,
@@ -229,9 +229,17 @@ repair. Report pilot findings before changing assumptions.
 
 ## Solver evidence and reproducibility
 
-The optional `SolverConfig.observer` receives immutable `SolverRunStatistics`
-before the native model closes, including error exits from `optimize()`.
-Existing callers without an observer keep the same solution interface.
+The benchmark composes the production `FullSolverStrategy`: compact data builder,
+Gurobi model builder/compiler, solver-config builder, native solver and compact
+translator. Formulation configuration, including the objective, is bound to the
+strategy constructor; `solve` receives only requests and context.
+
+A recording solver retains `SolverOutput` before translation and model closure.
+Normalized termination, optional solved model, objective, bound and runtime come
+from this output; `GurobiRunStatistics` contains native diagnostics and incumbent
+history. A missing incumbent raises `SolveError` in the full strategy, while the
+recorded output still distinguishes timeout and proven infeasibility. Native
+exceptions remain solver errors; no unavailable measurements are invented.
 Explicit benchmark settings: TimeLimit 300 (pilot 60), MIPGap 0.01, Seed 0.
 Threads remains unset by default, preserving project behavior; effective
 `Threads=0` means Gurobi automatic selection. Host CPU count/affinity and package
@@ -247,8 +255,9 @@ versions are recorded. Record native status alongside the benchmark label:
 The positive-gap label describes observed evidence; it does not infer an
 unreported internal stopping cause. Missing objectives/gaps are null, not zero.
 Infinite bounds/gaps are unavailable. Wall time, native runtime and construction
-time are distinct. Construction includes preparation and environment startup.
-The benchmark enables `SolverConfig.record_incumbent_history` (default false for
+time are distinct. Construction measures native environment/model construction;
+compact data preparation is included in wall time. The benchmark enables
+`GurobiSolverConfig.record_incumbent_history` (default false for
 other callers). `time_to_first_incumbent_s` records the first finite MIPSOL
 candidate using native solver runtime, excluding construction. It appears in
 JSONL and `summary.csv`. Strict improvements are filtered for minimization or
@@ -319,6 +328,9 @@ observations are present:
   include observed timeout runtimes and pool the other scaling factors and seeds,
   as stated in the title. Missing/error runtimes are excluded and missing median
   points break the curve. The title reports observed/total completed attempts.
+* `analysis/<campaign>-<objective>-load-<load>-time-to-first-incumbent.{pdf,png}`:
+  observed first-incumbent times against workers, flows and candidate models,
+  with timeout markers and observed medians. Missing discovery times are excluded.
 * `analysis/<campaign>-<objective>-load-<load>-time-boxplots.{pdf,png}`:
   distributions for both time to first incumbent and native solver runtime,
   grouped by worker, flow and model counts. Boxes show median and quartiles;
@@ -345,8 +357,8 @@ include observed timeout runtimes. Historical runs without first-incumbent
 measurements still contribute to runtime distributions and coverage counts.
 `aggregated.csv` retains `first_incumbent_observed_count` and
 `first_incumbent_median_s`. Analysis reads the latest attempt per run and does not
-invoke the solver. Time-to-first-incumbent progression and per-run incumbent
-curves are not generated by `analyze`; their helper functions remain available.
+invoke the solver. Per-run incumbent curves are not generated by `analyze`;
+the helper function remains available.
 Previously generated files are not deleted when analysis is rerun.
 
 ## Tests and static verification

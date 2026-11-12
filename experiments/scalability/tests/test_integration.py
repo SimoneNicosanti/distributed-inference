@@ -5,10 +5,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from controller.adapters.outbound.optimization.gurobi_solver import (
-    GurobiSolver,
-    OptimizationInfeasibleError,
-)
 from scalability_benchmark.catalog import (
     CatalogEntry,
     artifact_hashes,
@@ -23,6 +19,7 @@ from scalability_benchmark.profiling.static import (
     StaticModel,
     profile_entry,
 )
+from scalability_benchmark.solver import build_solver_strategy
 
 from controller.adapters.outbound.optimization.gurobi.entities.gurobi_run_statistics import (
     GurobiRunStatistics,
@@ -30,9 +27,9 @@ from controller.adapters.outbound.optimization.gurobi.entities.gurobi_run_statis
 from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
     GurobiSolverConfig,
 )
+from controller.application.optimization.abc.solver_strategy import SolveError
 from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
     CompactFormulationConfig,
-    FormulationKind,
 )
 from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
     CompactObjectiveKind,
@@ -40,6 +37,7 @@ from controller.domain.optimization.solving.formulation.compact.compact_objectiv
 from controller.domain.optimization.solving.optimization_context import (
     OptimizationContext,
 )
+from controller.domain.optimization.solving.solver_result import SolverTerminationKind
 from controller.domain.profile.model_variant_execution_profile import (
     WorkerExecutionProfiles,
 )
@@ -90,12 +88,10 @@ async def test_real_onnx_static_profiler(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("formulation", list(FormulationKind))
 async def test_real_solver_feasible_and_infeasible(
     config: ExperimentConfig,
     make_model: Callable[[CatalogEntry], StaticModel],
     tmp_path: Path,
-    formulation: FormulationKind,
 ) -> None:
     specification = config.catalog.models[0]
     entry = CatalogEntry(
@@ -120,17 +116,23 @@ async def test_real_solver_feasible_and_infeasible(
     )
     flow = flow_pool(config, 42, 0.6, 1.0, device.id)[0]
     observed: list[GurobiRunStatistics] = []
-    solver = GurobiSolver(
+    formulation_config = CompactFormulationConfig(
+        max_components=7,
+        priority_count=3,
+        compute_utilization_limit=0.8,
+        network_utilization_limit=0.8,
+        relative_error=0.1,
+        objective=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+    )
+    strategy, recorder = build_solver_strategy(
+        formulation_config,
         GurobiSolverConfig(
-            CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
-            formulation=formulation,
             time_limit_s=300,
             mip_gap=0.01,
             observer=observed.append,
-        )
+        ),
     )
-    problem = CompactFormulationConfig(7, 3, 0.8, 0.8, 0.1)
-    result = await solver.solve_model({flow.flow_id: flow}, context, problem)
+    result = await strategy.solve({flow.flow_id: flow}, context)
     assert result.flow_solutions and observed[-1].solution_count > 0
     from dataclasses import replace
 
@@ -138,5 +140,7 @@ async def test_real_solver_feasible_and_infeasible(
         flow,
         qos_requirements=replace(flow.qos_requirements, max_mean_response_time=1e-12),
     )
-    with pytest.raises(OptimizationInfeasibleError):
-        await solver.solve_model({impossible.flow_id: impossible}, context, problem)
+    with pytest.raises(SolveError):
+        await strategy.solve({impossible.flow_id: impossible}, context)
+    assert recorder.output is not None
+    assert recorder.output.termination is SolverTerminationKind.INFEASIBLE

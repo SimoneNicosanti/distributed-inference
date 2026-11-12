@@ -4,7 +4,7 @@ from dataclasses import replace
 import pytest
 from scalability_benchmark import cli
 from scalability_benchmark.campaigns import campaign_specs
-from scalability_benchmark.configuration import ExperimentConfig
+from scalability_benchmark.configuration import BENCHMARK_OBJECTIVES, ExperimentConfig
 from scalability_benchmark.randomness import fingerprint
 
 from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
@@ -16,13 +16,11 @@ def test_each_instance_has_independent_runs_for_all_objectives(
     config: ExperimentConfig,
 ) -> None:
     baseline = list(campaign_specs(config, "pilot"))
-    expanded = list(
-        campaign_specs(config, "pilot", objectives=tuple(CompactObjectiveKind))
-    )
+    expanded = list(campaign_specs(config, "pilot", objectives=BENCHMARK_OBJECTIVES))
     assert len(expanded) == 4 * len(baseline)
     for index, original in enumerate(baseline):
         group = expanded[4 * index : 4 * index + 4]
-        assert tuple(spec.objective for spec in group) == tuple(CompactObjectiveKind)
+        assert tuple(spec.objective for spec in group) == BENCHMARK_OBJECTIVES
         assert all(
             replace(spec, objective=original.objective) == original for spec in group
         )

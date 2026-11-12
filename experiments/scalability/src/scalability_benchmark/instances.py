@@ -83,6 +83,9 @@ class Scenario:
                 {
                     "model": name,
                     "tier": tier,
+                    "backend": estimate.profile.shape_execution_profiles[0]
+                    .backend_profiles[0]
+                    .backend.value,
                     "fallback_operators": estimate.fallback_operators,
                     "layers": {
                         layer: {
@@ -105,7 +108,7 @@ class Scenario:
             },
             "device_worker_id": str(self.workers[0].id.id),
             "endpoint_policy": "fixed_device_ingress_and_sink; is_inference_runner=true",
-            "projection": "GPU times in CPU slot; GPU VRAM in solver RAM slot; physical hardware retained separately",
+            "projection": "CPU/GPU profiles match simulated hardware; inference memory uses CPU RAM or GPU VRAM",
             "memory_constraint": "production weights plus profiled maximum-cut activations; peak liveness is diagnostic only",
         }
 

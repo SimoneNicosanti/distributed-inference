@@ -71,7 +71,8 @@ async def scenario(
 async def test_nested_entities_and_requests(scenario: Scenario) -> None:
     load = scenario.config.main.loads[0]
     small_spec = RunSpec("main", 42, load, 1, 1, 0, 0, 300)
-    large_spec = RunSpec("main", 42, load, 7, 10, 5, 5, 300)
+    edge_count, cloud_count = scenario.config.infrastructure[-1]
+    large_spec = RunSpec("main", 42, load, 7, 10, edge_count, cloud_count, 300)
     small_requests, small = make_instance(scenario, small_spec)
     requests, large = make_instance(scenario, large_spec)
     assert len(requests) == 7 and len(large.static_profiles_by_variant) == 10
@@ -107,11 +108,20 @@ async def test_nested_entities_and_requests(scenario: Scenario) -> None:
         requests,
         large,
         CompactFormulationConfig(
-            **scenario.config.optimization.model_dump(exclude={"objective"})
+            objective=scenario.config.optimization.objective,
+            **scenario.config.optimization.model_dump(exclude={"objective"}),
         ),
     )
     assert all(len(models) == 10 for models in problem.models_by_flow.values())
     assert device in problem.workers
+    for (
+        variant,
+        worker,
+    ), profiles in problem.layer_execution_profiles_by_model_worker.items():
+        assert profiles is not None, (variant, worker)
+        assert set(large.static_profiles_by_variant[variant].topology.layers()) <= set(
+            profiles
+        )
 
 
 @pytest.mark.asyncio
@@ -127,12 +137,30 @@ async def test_subset_bounds_follow_actual_scenario(scenario: Scenario) -> None:
 
 
 @pytest.mark.asyncio
-async def test_homogeneity_projection_and_calibration(scenario: Scenario) -> None:
+async def test_homogeneity_backend_and_calibration(scenario: Scenario) -> None:
     for tier, capacity in (("device", 8), ("edge", 8), ("cloud", 24)):
         workers = [worker for worker in scenario.workers if worker.tier == tier]
-        assert len(workers) == (1 if tier == "device" else 5)
+        expected_count = (
+            1
+            if tier == "device"
+            else max(
+                pair[0 if tier == "edge" else 1]
+                for pair in scenario.config.infrastructure
+            )
+        )
+        assert len(workers) == expected_count
         assert all(
-            worker.resource.ram_profile.available_bytes == capacity * 2**30
+            worker.resource.available_inference_memory_bytes == capacity * 2**30
+            for worker in workers
+        )
+        assert all(
+            worker.resource.ram_profile.available_bytes
+            == scenario.config.hardware[tier].ram_gib * 2**30
+            for worker in workers
+        )
+        assert all(
+            worker.resource.execution_backend.value == worker.hardware.backend
+            and worker.as_record()["solver_backend_slot"] == worker.hardware.backend
             for worker in workers
         )
         assert all(worker.hardware == workers[0].hardware for worker in workers)

@@ -1,5 +1,59 @@
 # Static-only validation
 
+## Synthetic backend correction (2026-11-11)
+
+The previous CPU-slot projection was incompatible with the backend-aware compact
+profile selector: GPU edge resources had only CPU execution profiles, leaving
+them eligible solely for input/output boundary layers. Synthetic execution
+profiles now use the configured hardware backend. Worker metadata uses
+`execution_backend` and `available_inference_memory_bytes`; GPU VRAM and physical
+host RAM are separate. Execution entries in scenario manifests expose their
+backend. Roofline estimates, jitter, arrival calibration and optimization settings
+are unchanged.
+
+Existing profile test definitions now cover device, edge and cloud. The scenario
+test checks that compact data retains all executable layer profiles for every
+selected model/worker pair. Verification remains static only: no test execution,
+profiling or native solve. Earlier campaign results affected by the mismatch must
+be rerun after this correction; the new code and scenario metadata change IDs.
+
+## Optimization contract migration (2026-11-11)
+
+The benchmark now composes the production full strategy with its configuration
+bound at construction. A recording solver captures the standardized
+`SolverOutput` before translation. Runtime, objective and bound come from that
+output; native status, gap and incumbent history remain in `GurobiRunStatistics`.
+No-incumbent `SolveError` retains the native evidence for timeout/infeasibility;
+unexpected solver or translation errors remain errors. Legacy solver imports,
+exceptions and formulation selectors were removed. The four benchmark objectives
+are explicit, excluding the controller's internal `CONSTANT` objective.
+
+Current YAML settings are unchanged: load 0.7 for main/pilot and infrastructure
+from device-only through ten edges. Static checker and fixture expectations now
+follow those settings and the current offline plotting entry points.
+
+Verification: the AST/grid checker passes on 44 syntax trees; Ruff lint/format
+passes on all 34 Python files; strict mypy passes on 32 source/test/script files.
+Mypy uses the root configuration with the experiment source root in `MYPYPATH`,
+silent diagnostics in imported production modules, and missing-import overrides
+for matplotlib/torchvision. Their runtime APIs are not proved by this check.
+Existing tests were migrated; additional cases describe missing-incumbent,
+translation-failure and unknown/local-status evidence. No pytest collection or
+execution, benchmark import, profiling, plotting or native solve was performed.
+Dependencies and lockfiles were not changed or resolved for this migration.
+
+Current checks, from the repository root:
+
+```bash
+python -B experiments/scalability/scripts/check_static.py
+ruff check --no-cache experiments
+ruff format --check --no-cache experiments
+git diff --check -- experiments
+```
+
+The validation notes below describe earlier snapshots; paths, infrastructure,
+load and plotting defaults mentioned there may differ from the current checkout.
+
 Implementation verification deliberately did **not** execute pytest (including
 collection), benchmark modules, torchvision export, ONNX profiling, Gurobi solves,
 pilot/campaign execution, plots, Docker or microservices. No environment sync or

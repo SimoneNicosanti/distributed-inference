@@ -11,7 +11,11 @@ from controller.domain.optimization.solving.formulation.compact.compact_objectiv
     CompactObjectiveKind,
 )
 from scalability_benchmark.campaigns import CampaignName, campaign_specs
-from scalability_benchmark.configuration import ExperimentConfig, load_configuration
+from scalability_benchmark.configuration import (
+    BENCHMARK_OBJECTIVES,
+    ExperimentConfig,
+    load_configuration,
+)
 from scalability_benchmark.instances import build_scenario, request_record
 from scalability_benchmark.persistence import ResultStore, atomic_json
 from scalability_benchmark.provenance import software_provenance
@@ -117,7 +121,7 @@ def main() -> None:
     parser.add_argument(
         "--objectives",
         nargs="+",
-        choices=(*CompactObjectiveKind, "all"),
+        choices=(*BENCHMARK_OBJECTIVES, "all"),
         help="Run each selected objective independently; all selects all four (default: YAML objective)",
     )
     parser.add_argument("--resume", action="store_true")
@@ -135,14 +139,14 @@ def main() -> None:
         parser.error("--limit must be positive")
     if args.retry_errors and not args.resume:
         parser.error("--retry-errors requires --resume")
-    objectives = None
+    objectives: tuple[CompactObjectiveKind, ...] | None = None
     if args.objectives:
         if "all" in args.objectives:
             if len(args.objectives) != 1:
                 parser.error(
                     "--objectives all cannot be combined with individual objectives"
                 )
-            objectives = tuple(CompactObjectiveKind)
+            objectives = BENCHMARK_OBJECTIVES
         else:
             objectives = tuple(
                 dict.fromkeys(CompactObjectiveKind(value) for value in args.objectives)

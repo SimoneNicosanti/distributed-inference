@@ -4,10 +4,17 @@ from pathlib import Path
 from typing import Literal, Self
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
     CompactObjectiveKind,
+)
+
+BENCHMARK_OBJECTIVES = (
+    CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+    CompactObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
+    CompactObjectiveKind.DEADLINE_VIOLATIONS,
+    CompactObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY,
 )
 
 
@@ -139,6 +146,13 @@ class OptimizationSettings(Settings):
     network_utilization_limit: float = Field(gt=0, lt=1)
     relative_error: float = Field(gt=0)
     objective: CompactObjectiveKind
+
+    @field_validator("objective")
+    @classmethod
+    def benchmark_objective(cls, value: CompactObjectiveKind) -> CompactObjectiveKind:
+        if value not in BENCHMARK_OBJECTIVES:
+            raise ValueError("Select one of the four benchmark objectives")
+        return value
 
 
 class SolverSettings(Settings):

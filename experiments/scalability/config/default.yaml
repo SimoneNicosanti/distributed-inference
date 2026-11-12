@@ -55,7 +55,7 @@ flows:
   max_energy_consumption: 1000000
 optimization:
   max_components: 7
-  priority_count: 3
+  priority_count: 1
   compute_utilization_limit: 0.8
   network_utilization_limit: 0.8
   relative_error: 0.1
@@ -70,7 +70,7 @@ solver:
 main:
   enabled: true
   loads: [0.7]
-  flows: [1, 2, 3, 4, 5, 6, 7]
+  flows: [4, 5, 6, 7]
   models: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 sensitivity:
   enabled: false

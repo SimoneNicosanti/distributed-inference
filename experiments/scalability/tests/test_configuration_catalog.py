@@ -9,7 +9,7 @@ from scalability_benchmark.catalog import (
     selection_order,
     synthetic_accuracies,
 )
-from scalability_benchmark.configuration import ExperimentConfig
+from scalability_benchmark.configuration import BENCHMARK_OBJECTIVES, ExperimentConfig
 from scalability_benchmark.randomness import fingerprint, stream
 
 from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
@@ -25,8 +25,8 @@ def test_default_campaign_contract(config: ExperimentConfig) -> None:
     assert len(config.catalog.models) == 10 and config.flows.pool_size == 7
     assert config.main.flows == tuple(range(1, 8))
     assert config.main.models == tuple(range(1, 11))
-    assert config.main.loads == (0.75,)
-    assert config.pilot.load == 0.75
+    assert config.main.loads == (0.7,)
+    assert config.pilot.load == 0.7
     assert config.flows.deadline_s == (0.2, 3.0)
     assert config.sensitivity.loads == (0.3, 0.8)
     assert config.sensitivity.flows == (1, 4, 7)
@@ -48,9 +48,7 @@ def test_default_campaign_contract(config: ExperimentConfig) -> None:
     )
     assert len({fingerprint(spec.as_record()) for spec in main + sensitivity}) == 968
     assert (
-        len(
-            list(campaign_specs(config, "main", objectives=tuple(CompactObjectiveKind)))
-        )
+        len(list(campaign_specs(config, "main", objectives=BENCHMARK_OBJECTIVES)))
         == 3080
     )
     assert {spec.timeout_s for spec in campaign_specs(config, "pilot")} == {60}
@@ -122,7 +120,7 @@ def test_compact_is_default_and_legacy_is_rejected(config: ExperimentConfig) -> 
         ExperimentConfig.model_validate(raw)
 
 
-@pytest.mark.parametrize("objective", list(CompactObjectiveKind))
+@pytest.mark.parametrize("objective", BENCHMARK_OBJECTIVES)
 def test_all_four_objectives_are_accepted(
     config: ExperimentConfig, objective: CompactObjectiveKind
 ) -> None:

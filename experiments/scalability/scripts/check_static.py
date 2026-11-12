@@ -7,37 +7,23 @@ from pathlib import Path
 import yaml
 
 
-def native_calls(source: str) -> list[str]:
+def native_calls(source: str, method_name: str) -> list[str]:
     tree = ast.parse(source)
     method = next(
         node
         for node in ast.walk(tree)
-        if isinstance(node, ast.FunctionDef) and node.name == "_solve"
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == method_name
     )
-    calls = [
-        node
-        for node in ast.walk(method)
-        if isinstance(node, ast.Call)
-        and (
-            (
-                isinstance(node.func, ast.Name)
-                and node.func.id in {"set_objective", "extract_solution"}
-            )
-            or (
-                isinstance(node.func, ast.Attribute)
-                and isinstance(node.func.value, ast.Attribute)
-                and node.func.value.attr == "_formulation"
-            )
-        )
-    ]
-    names = []
-    for node in sorted(calls, key=lambda node: node.lineno):
-        if isinstance(node.func, ast.Name):
-            names.append(node.func.id)
-        else:
-            assert isinstance(node.func, ast.Attribute)
-            names.append(node.func.attr)
-    return names
+    calls = sorted(
+        (
+            node
+            for node in ast.walk(method)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        ),
+        key=lambda node: (node.lineno, node.col_offset),
+    )
+    return [ast.unparse(node.func) for node in calls]
 
 
 def main() -> None:
@@ -45,14 +31,14 @@ def main() -> None:
     experiment = root / "experiments/scalability"
     production = (
         "packages/shared/src/shared/model/model_variant.py",
-        "services/controller/src/controller/domain/optimization/solving/solver_config.py",
+        "services/controller/src/controller/domain/optimization/solving/formulation/compact/compact_objective_kind.py",
         "services/controller/src/controller/application/optimization/formulation/compact/compact_formulation_data_builder.py",
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi_solver.py",
+        "services/controller/src/controller/adapters/outbound/optimization/gurobi/solver/gurobi_solver.py",
         "services/controller/src/controller/adapters/outbound/optimization/gurobi/model_builder/formulations/compact/collaborators/objective_builder.py",
         "services/controller/src/controller/adapters/outbound/optimization/gurobi/model_builder/formulations/compact/collaborators/response_time/constraints.py",
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi/model_builder/formulations/compact_variables.py",
+        "services/controller/src/controller/adapters/outbound/optimization/gurobi/model_builder/formulations/compact/compact_variables.py",
         "services/controller/src/controller/application/optimization/formulation/compact/bounds.py",
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi_incumbent.py",
+        "services/controller/src/controller/adapters/outbound/optimization/gurobi/trackers/gurobi_incumbent_tracker.py",
     )
     sources = sorted(
         path
@@ -66,9 +52,7 @@ def main() -> None:
     with (experiment / "uv.lock").open("rb") as handle:
         tomllib.load(handle)
     raw = yaml.safe_load((experiment / "config/default.yaml").read_text())
-    progression = [[index, 0] for index in range(6)] + [
-        [5, index] for index in range(1, 6)
-    ]
+    progression = [[index, 0] for index in range(11)]
     assert raw["infrastructure"] == progression
     assert raw["seeds"] == [42]
     for name, count in (("main", 770), ("sensitivity", 198)):
@@ -81,8 +65,8 @@ def main() -> None:
             * len(progression)
             == count
         )
-    assert raw["main"]["loads"] == [0.75] and not raw["sensitivity"]["enabled"]
-    assert raw["pilot"]["load"] == 0.75
+    assert raw["main"]["loads"] == [0.7] and not raw["sensitivity"]["enabled"]
+    assert raw["pilot"]["load"] == 0.7
     assert raw["flows"]["deadline_s"] == [0.2, 3.0]
     assert raw["sensitivity"]["loads"] == [0.3, 0.8]
     assert raw["solver"]["timeout_s"] == 300 and raw["solver"]["relative_gap"] == 0.01
@@ -103,22 +87,58 @@ def main() -> None:
         for case in raw["pilot"]["cases"]
     )
     adapter = Path(
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi_solver.py"
+        "services/controller/src/controller/adapters/outbound/optimization/gurobi/solver/gurobi_solver.py"
     )
-    assert native_calls((root / adapter).read_text()) == [
-        "prepare_problem",
-        "add_variables",
-        "add_assignment_constraints",
-        "add_execution_constraints",
-        "add_transmission_constraints",
-        "add_execution_queue_constraints",
-        "add_network_queue_constraints",
-        "add_memory_constraints",
-        "add_response_time_constraints",
-        "set_objective",
-        "extract_solution",
+    optimizer = (
+        root / "services/controller/src/controller/adapters/outbound/optimization"
+    )
+    full_strategy = (
+        root
+        / "services/controller/src/controller/application/optimization/strategies/full_solver_strategy.py"
+    )
+    assert native_calls(full_strategy.read_text(), "solve") == [
+        "self._formulation_data_builder.build_formulation_data",
+        "self._formulation_model_builder.build_formulation_model",
+        "self._solver_config_builder.build_solver_config",
+        "self._solver.solve_formulation_model",
+        "self._solved_model_translator.translate_solved_formulation_model",
     ]
-    optimizer = root / adapter.parent
+    full_tree = ast.parse(full_strategy.read_text())
+    solve = next(
+        node
+        for node in ast.walk(full_tree)
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "solve"
+    )
+    assert [arg.arg for arg in solve.args.args] == [
+        "self",
+        "requests_by_flow",
+        "context",
+    ]
+    scope = next(node for node in solve.body if isinstance(node, ast.AsyncWith))
+    assert any(
+        isinstance(node, ast.Await)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Attribute)
+        and node.value.func.attr == "translate_solved_formulation_model"
+        for node in ast.walk(scope)
+    )
+    compiler = (
+        optimizer
+        / "gurobi/model_builder/formulations/compact/gurobi_compact_formulation_compiler.py"
+    )
+    assert native_calls(compiler.read_text(), "compile_formulation") == [
+        "self._create_variables",
+        "self._assignment.add_constraints",
+        "self._execution.add_constraints",
+        "self._compute_queue.add_constraints",
+        "self._network.add_constraints",
+        "self._memory.add_constraints",
+        "self._response_time.add_constraints",
+        "self._objective.set_objective",
+    ]
+    builder = optimizer / "gurobi/model_builder/gurobi_formulation_model_builder.py"
+    for path in (full_strategy, compiler, builder):
+        compile(path.read_text(), str(path), "exec")
     solver_tree = ast.parse((root / adapter).read_text())
     optimize_calls = [
         node
@@ -127,13 +147,12 @@ def main() -> None:
         and isinstance(node.func, ast.Attribute)
         and node.func.attr == "optimize"
     ]
-    assert sorted(len(node.args) for node in optimize_calls) == [0, 1]
-    assert any(
-        isinstance(node.args[0], ast.Name) and node.args[0].id == "incumbent_tracker"
-        for node in optimize_calls
-        if node.args
+    assert len(optimize_calls) == 1 and len(optimize_calls[0].args) == 1
+    assert isinstance(optimize_calls[0].args[0], ast.Name)
+    assert optimize_calls[0].args[0].id == "callback"
+    tracker = ast.parse(
+        (optimizer / "gurobi/trackers/gurobi_incumbent_tracker.py").read_text()
     )
-    tracker = ast.parse((optimizer / "gurobi_incumbent.py").read_text())
     callback = next(
         node
         for node in ast.walk(tracker)
@@ -160,6 +179,88 @@ def main() -> None:
         and node.value.value is True
         for node in ast.walk(runner)
     )
+    strategy_builder = next(
+        node
+        for node in runner.body
+        if isinstance(node, ast.FunctionDef) and node.name == "build_solver_strategy"
+    )
+    configured_strategy = next(
+        node
+        for node in ast.walk(strategy_builder)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "FullSolverStrategy"
+    )
+    assert {keyword.arg for keyword in configured_strategy.keywords} == {
+        "formulation_data_builder",
+        "formulation_model_builder",
+        "solver_config_builder",
+        "solver",
+        "solved_model_translator",
+        "formulation_config",
+    }
+    recorder = next(
+        node
+        for node in runner.body
+        if isinstance(node, ast.ClassDef) and node.name == "_RecordingSolver"
+    )
+    assert any(
+        isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Await)
+        and isinstance(node.value.value, ast.Call)
+        and isinstance(node.value.value.func, ast.Attribute)
+        and node.value.value.func.attr == "solve_formulation_model"
+        for node in ast.walk(recorder)
+    )
+    configuration_tree = ast.parse(
+        (experiment / "src/scalability_benchmark/configuration.py").read_text()
+    )
+    objectives = next(
+        node.value
+        for node in configuration_tree.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "BENCHMARK_OBJECTIVES"
+            for target in node.targets
+        )
+    )
+    assert isinstance(objectives, ast.Tuple) and len(objectives.elts) == 4
+    assert all(
+        isinstance(item, ast.Attribute) and item.attr != "CONSTANT"
+        for item in objectives.elts
+    )
+    execution_profiles = ast.parse(
+        (experiment / "src/scalability_benchmark/profiling/execution.py").read_text()
+    )
+    backend_profile = next(
+        node
+        for node in ast.walk(execution_profiles)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "BackendExecutionProfile"
+    )
+    assert ast.unparse(backend_profile.args[0]) == "Backend(hardware.backend)"
+    hardware = ast.parse(
+        (experiment / "src/scalability_benchmark/hardware.py").read_text()
+    )
+    worker_record = next(
+        node.value
+        for node in ast.walk(hardware)
+        if isinstance(node, ast.Return) and isinstance(node.value, ast.Dict)
+    )
+    worker_metadata = {
+        key.value: ast.unparse(value)
+        for key, value in zip(worker_record.keys, worker_record.values, strict=True)
+        if isinstance(key, ast.Constant)
+    }
+    assert (
+        worker_metadata["solver_backend_slot"]
+        == "self.resource.execution_backend.value"
+    )
+    assert (
+        worker_metadata["solver_memory_capacity_bytes"]
+        == "self.resource.available_inference_memory_bytes"
+    )
     analysis = ast.parse(
         (experiment / "src/scalability_benchmark/analysis.py").read_text()
     )
@@ -177,9 +278,10 @@ def main() -> None:
         "read_journal",
         "plot_runtime_progression",
         "plot_aggregate_times",
+        "plot_first_incumbent",
     } <= analysis_calls
     assert not {"execute_solver", "GurobiSolver"} & analysis_calls
-    assert not {"plot_first_incumbent", "plot_incumbent_history"} & analysis_calls
+    assert "plot_incumbent_history" not in analysis_calls
     aggregate_plots = ast.parse(
         (experiment / "src/scalability_benchmark/aggregate_time_plots.py").read_text()
     )
@@ -217,7 +319,7 @@ def main() -> None:
     kinds = next(
         node
         for node in configuration.body
-        if isinstance(node, ast.ClassDef) and node.name == "ObjectiveKind"
+        if isinstance(node, ast.ClassDef) and node.name == "CompactObjectiveKind"
     )
     assert {
         target.id
@@ -230,6 +332,7 @@ def main() -> None:
         "ARRIVAL_WEIGHTED_ACCURACY",
         "DEADLINE_VIOLATIONS",
         "ARRIVAL_WEIGHTED_NORMALIZED_DELAY",
+        "CONSTANT",
     }
     qos = ast.parse(
         (
@@ -247,13 +350,13 @@ def main() -> None:
     assert isinstance(test, ast.Compare) and isinstance(test.ops[0], ast.In)
     assert isinstance(test.comparators[0], ast.Set)
     assert {ast.unparse(item) for item in test.comparators[0].elts} == {
-        "ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME",
-        "ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY",
+        "CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME",
+        "CompactObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY",
     }
     for path in (
         root
         / "services/controller/src/controller/application/optimization/formulation/compact/bounds.py",
-        optimizer / "gurobi/model_builder/formulations/compact_variables.py",
+        optimizer / "gurobi/model_builder/formulations/compact/compact_variables.py",
     ):
         tree = ast.parse(path.read_text())
         assert not any(
@@ -261,7 +364,7 @@ def main() -> None:
             for node in ast.walk(tree)
         ), path.name
     print(
-        f"Static inspection: {len(sources)} Python syntax trees; YAML/TOML valid; base grids 770/198; 10 models; 7 flows; 11 infrastructures; four alternative objectives; conditional deadlines; no implicit deadline bounds; solver call order, incumbent callback and offline plotting wiring valid"
+        f"Static inspection: {len(sources) + 3} Python syntax trees; YAML/TOML valid; base grids 770/198; 10 models; 7 flows; 11 infrastructures; four alternative objectives; conditional deadlines; no implicit deadline bounds; solver call order, incumbent callback and offline plotting wiring valid"
     )
     print(
         "No benchmark imports, tests, profiling, export, plotting or solver execution"

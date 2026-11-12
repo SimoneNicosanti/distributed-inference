@@ -1,4 +1,4 @@
-"""Stable homogeneous worker pools and the explicit VRAM-to-RAM projection."""
+"""Stable homogeneous CPU/GPU worker pools with separate RAM and VRAM."""
 
 from dataclasses import dataclass
 
@@ -30,8 +30,8 @@ class SyntheticWorker:
             "tier": self.tier,
             "index": self.index,
             "physical_hardware": self.hardware.model_dump(mode="json"),
-            "solver_memory_capacity_bytes": self.resource.ram_profile.available_bytes,
-            "solver_backend_slot": "cpu",
+            "solver_memory_capacity_bytes": self.resource.available_inference_memory_bytes,
+            "solver_backend_slot": self.resource.execution_backend.value,
             "simulated_backend": self.hardware.backend,
         }
 
@@ -44,6 +44,7 @@ def worker_pool(config: ExperimentConfig, seed: int) -> tuple[SyntheticWorker, .
             (hardware.vram_gib if hardware.backend == "gpu" else hardware.ram_gib)
             * 2**30
         )
+        ram = int(hardware.ram_gib * 2**30)
         for index in range(count):
             identity = stable_uuid(seed, "worker", f"{tier}-{index}")
             gpu = (
@@ -64,7 +65,7 @@ def worker_pool(config: ExperimentConfig, seed: int) -> tuple[SyntheticWorker, .
                         ServiceId(identity),
                         gpu,
                         CpuProfile(hardware.cpu_cores, float(hardware.cpu_cores)),
-                        RamProfile(memory, 0, memory, 0),
+                        RamProfile(ram, 0, ram, 0),
                     ),
                 )
             )

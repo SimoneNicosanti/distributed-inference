@@ -201,7 +201,7 @@ def test_offline_incumbent_plot_generation(tmp_path: Path) -> None:
         assert (
             destination
             / f"main-deadline_violations-load-0.6-time-to-first-incumbent.{extension}"
-        ).exists() is False
+        ).is_file()
         for objective in ("deadline_violations", "unspecified"):
             for kind in ("time-boxplots", "time-cdf", "time-heatmaps"):
                 assert (
