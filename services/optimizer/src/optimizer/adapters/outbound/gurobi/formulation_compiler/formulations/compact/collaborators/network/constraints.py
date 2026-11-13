@@ -59,7 +59,7 @@ def add_transmission_constraints(
     assignment: AssignmentVariables,
     network: NetworkVariables,
 ) -> None:
-    """Enforce exact nominal transmission times, including zeros for unused cuts."""
+    """Bound transmission epigraphs and zero unused sources or empty cuts."""
     problem = data
     max_components = data.problem.policy.max_components
     p = problem
@@ -161,14 +161,6 @@ def add_transmission_constraints(
                             ),
                             name=f"compact_transmission[{p.flow_index[flow]},{p.configuration_index[flow, variant]},{cut},{p.worker_index[source]},{p.worker_index[target]}]",
                         )
-                        # model.addConstr(
-                        #     time
-                        #     <= inverse_bandwidth * delta
-                        #     + upper
-                        #     * (maximum_inverse_bandwidth - inverse_bandwidth)
-                        #     * (1 - assignment.component_worker[flow, cut + 1, target]),
-                        #     name=f"compact_transmission_destination_upper[{p.flow_index[flow]},{p.configuration_index[flow, variant]},{cut},{p.worker_index[source]},{p.worker_index[target]}]",
-                        # )
 
 
 def add_network_queue_constraints(

@@ -66,7 +66,7 @@ solver:
   relative_gap: 0.01
   threads: null
   seed: 0
-  output_flag: false
+  output_flag: true
 main:
   enabled: true
   loads: [0.7]

@@ -126,7 +126,6 @@ class GurobiMisocpCompactSolvedCompiledFormulationTranslator(
     ) -> FlowOptimizationSolution:
         assignment = variables.assignment
         network = variables.network
-        qos = variables.qos
         selected_models = tuple(
             model_variant
             for model_variant in data.configurations_by_flow[flow]
@@ -174,7 +173,16 @@ class GurobiMisocpCompactSolvedCompiledFormulationTranslator(
             components=tuple(components),
             cuts=cuts,
             mean_batch_fill_time_s=data.batch_fill_time_s[flow, selected_model],
-            mean_response_time_s=_nonnegative(qos.response_time_s[flow].X),
+            # Execution epigraphs can have slack. Report a total consistent with
+            # the recomputed execution and the retained queue/network estimates.
+            mean_response_time_s=data.batch_fill_time_s[flow, selected_model]
+            + sum(
+                component.mean_execution_time_s
+                + component.mean_execution_queue_time_s
+                + component.mean_transmission_time_s
+                + component.transmission_latency_s
+                for component in components
+            ),
         )
 
     @staticmethod
@@ -185,7 +193,6 @@ class GurobiMisocpCompactSolvedCompiledFormulationTranslator(
         selected_model: ModelConfigurationKey,
     ) -> list[ComponentSolution]:
         assignment = variables.assignment
-        execution = variables.execution
         compute_queue = variables.compute_queue
         network = variables.network
         topology = data.problem.variants[selected_model.model_variant_id]
@@ -288,10 +295,9 @@ class GurobiMisocpCompactSolvedCompiledFormulationTranslator(
                         ),
                     ),
                     priority=selected_priorities[0],
-                    mean_execution_time_s=_nonnegative(
-                        execution.execution_time_s[
-                            flow, selected_model, component, worker
-                        ].X
+                    mean_execution_time_s=sum(
+                        data.problem.execution_times_s[selected_model, worker][layer]
+                        for layer in layers
                     ),
                     mean_execution_queue_time_s=_nonnegative(
                         compute_queue.component_queue_wait_s[flow, component].X

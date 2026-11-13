@@ -1,20 +1,11 @@
 from typing import override
 
-from controller.domain.optimization.context.optimization_context import (
-    OptimizationContext,
-)
-from controller.domain.optimization.request.optimization_request import (
-    OptimizationRequest,
-)
 from optimizer.application.abc.formulation_builder import (
     FormulationBuilder,
 )
 from optimizer.application.abc.solver_strategy import (
     SolveError,
     SolverStrategy,
-)
-from optimizer.application.abc.warm_start_alternated_formulation_config_builder import (
-    WarmStartFormulationConfigBuilder,
 )
 from optimizer.application.ports.outbound.formulation_compiler import (
     FormulationCompiler,
@@ -36,47 +27,53 @@ from optimizer.application.strategies.alternated.abc.phase_generator import (
 from optimizer.application.strategies.alternated.abc.warm_start_applier import (
     WarmStartApplier,
 )
+from optimizer.application.strategies.alternated.abc.warm_start_searcher import (
+    WarmStartSearcher,
+)
 from optimizer.application.strategies.alternated.alternated_strategy_config import (
     AlternatedStrategyConfig,
 )
+from optimizer.domain.formulation.formulation import Formulation
+from optimizer.domain.formulation.formulation_config import FormulationConfig
+from optimizer.domain.problem.optimization_problem import OptimizationProblem
 from optimizer.domain.solution.optimization_solution import (
     OptimizationSolution,
 )
-from shared.flow.flow import FlowId
 
 
 class AlternatedOptimizationSolverStrategy[
-    FormulationConfigT,
-    FormulationDataT,
-    FormulationModelT,
+    OptimizationProblemT: OptimizationProblem,
+    FormulationT: Formulation,
+    FormulationConfigT: FormulationConfig,
+    CompiledFormulationT,
     SolverConfigT,
-    SolvedFormulationModelT,
+    SolvedCompiledFormulationT,
     SolverStatisticsT,
-](SolverStrategy):
+](SolverStrategy[OptimizationProblemT]):
     def __init__(
         self,
         formulation_data_builder: FormulationBuilder[
-            FormulationDataT, FormulationConfigT
+            OptimizationProblemT, FormulationT, FormulationConfigT
         ],
         formulation_model_builder: FormulationCompiler[
-            FormulationDataT, FormulationModelT
+            FormulationT, CompiledFormulationT
         ],
         solver_config_builder: SolverConfigBuilder[SolverConfigT],
         solver: Solver[
-            FormulationModelT, SolverConfigT, SolvedFormulationModelT, SolverStatisticsT
+            CompiledFormulationT,
+            SolverConfigT,
+            SolvedCompiledFormulationT,
+            SolverStatisticsT,
         ],
         solved_model_translator: SolvedCompiledFormulationTranslator[
-            SolvedFormulationModelT
+            SolvedCompiledFormulationT
         ],
-        warm_start_formulation_config_builder: WarmStartFormulationConfigBuilder[
-            FormulationConfigT
-        ],
-        warm_start_solver_config_builder: SolverConfigBuilder[SolverConfigT],
-        warm_start_applier: WarmStartApplier[FormulationModelT],
         formulation_config: FormulationConfigT,
+        warm_start_searcher: WarmStartSearcher[OptimizationProblemT],
+        warm_start_applier: WarmStartApplier[CompiledFormulationT],
         alternated_strategy_config: AlternatedStrategyConfig,
-        phase_generator: PhaseGenerator[FormulationModelT],
-        phase_constraints_applier: PhaseConstraintsApplier[FormulationModelT],
+        phase_generator: PhaseGenerator[CompiledFormulationT],
+        phase_constraints_applier: PhaseConstraintsApplier[CompiledFormulationT],
     ) -> None:
         super().__init__()
         self._formulation_data_builder = formulation_data_builder
@@ -86,11 +83,8 @@ class AlternatedOptimizationSolverStrategy[
         self._solved_model_translator = solved_model_translator
         self._formulation_config = formulation_config
 
-        self._warm_start_formulation_config_builder = (
-            warm_start_formulation_config_builder
-        )
+        self._warm_start_searcher = warm_start_searcher
         self._warm_start_applier = warm_start_applier
-        self._warm_start_solver_config_builder = warm_start_solver_config_builder
 
         self._phase_generator = phase_generator
         self._phase_constraints_applier = phase_constraints_applier
@@ -98,17 +92,16 @@ class AlternatedOptimizationSolverStrategy[
     @override
     async def solve(
         self,
-        requests_by_flow: dict[FlowId, OptimizationRequest],
-        context: OptimizationContext,
+        problem: OptimizationProblemT,
     ) -> OptimizationSolution:
 
-        warm_start_solution = await self._warm_start_search(requests_by_flow, context)
+        warm_start_solution = await self._warm_start_searcher.search_warm_start(problem)
 
-        formulation_data = self._formulation_data_builder.build_formulation(
-            requests_by_flow, context, self._formulation_config
+        formulation = self._formulation_data_builder.build_formulation(
+            problem, self._formulation_config
         )
         async with self._formulation_model_builder.compile_formulation(
-            formulation_data
+            formulation
         ) as formulation_model:
             incumbent = warm_start_solution
             while True:
@@ -136,38 +129,3 @@ class AlternatedOptimizationSolverStrategy[
                         )
 
         raise SolveError()
-
-    async def _warm_start_search(
-        self,
-        requests_by_flow: dict[FlowId, OptimizationRequest],
-        context: OptimizationContext,
-    ) -> OptimizationSolution:
-
-        warm_start_solver_config = (
-            self._warm_start_solver_config_builder.build_solver_config()
-        )
-        for (
-            warm_start_formulation_config
-        ) in self._warm_start_formulation_config_builder.warm_start_formulation_configs(
-            self._formulation_config
-        ):
-            warm_start_formulation_data = (
-                self._formulation_data_builder.build_formulation(
-                    requests_by_flow, context, warm_start_formulation_config
-                )
-            )
-            async with self._formulation_model_builder.compile_formulation(
-                warm_start_formulation_data
-            ) as warm_start_formulation_model:
-                warm_start_solver_output = (
-                    await self._solver.solve_compiled_formulation(
-                        warm_start_formulation_model, warm_start_solver_config
-                    )
-                )
-
-                if warm_start_solver_output.solved_model is not None:
-                    return await self._solved_model_translator.translate_solved_formulation_model(
-                        warm_start_solver_output.solved_model
-                    )
-
-        raise SolveError("Could not find a valid warm start point")

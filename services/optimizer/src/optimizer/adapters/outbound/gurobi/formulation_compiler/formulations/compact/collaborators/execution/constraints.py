@@ -25,7 +25,7 @@ def add_execution_constraints(
     assignment: AssignmentVariables,
     execution: ExecutionVariables,
 ) -> None:
-    """Enforce placement times assigned layer cost, independently of the objective."""
+    """Bound execution epigraphs cumulatively and zero unselected candidates."""
     problem = data
     max_components = data.problem.policy.max_components
     p = problem
@@ -50,12 +50,16 @@ def add_execution_constraints(
                         or layer in topology.output_layers
                     }
             minimum = _minimum_execution_time_by_layer(layers, profiles)
+            upper_by_worker = {
+                worker: sum(float(available.get(layer, 0.0)) for layer in layers)
+                for worker, available in profiles.items()
+            }
             for component in range(1, max_components + 1):
                 for worker in p.problem.flows[flow].workers:
                     available = profiles[worker] or {}
                     placement = assignment.component_worker[flow, component, worker]
                     terms = []
-                    upper = 0.0
+                    upper = upper_by_worker[worker]
                     for layer in layers:
                         x = assignment.layer_component[flow, variant, layer, component]
                         if layer not in available:
@@ -65,21 +69,12 @@ def add_execution_constraints(
                             )
                         else:
                             time = float(available[layer])
-                            upper += time
                             terms.append(time * x)
                     execution_time = execution.execution_time_s[
                         flow, variant, component, worker
                     ]
                     expression = gp.quicksum(terms)
                     execution_time.UB = upper
-                    model.addConstr(
-                        execution_time <= upper * placement,
-                        name=f"compact_execution_placement_upper[{p.flow_index[flow]},{p.configuration_index[flow, variant]},{component},{p.worker_index[worker]}]",
-                    )
-                    model.addConstr(
-                        execution_time <= expression,
-                        name=f"compact_execution_expression_upper[{p.flow_index[flow]},{p.configuration_index[flow, variant]},{component},{p.worker_index[worker]}]",
-                    )
                     model.addConstr(
                         execution_time >= expression - upper * (1 - placement),
                         name=f"compact_execution[{p.flow_index[flow]},{p.configuration_index[flow, variant]},{component},{p.worker_index[worker]}]",
@@ -99,6 +94,18 @@ def add_execution_constraints(
                         )
                     ),
                     name=f"execution_minimum[{p.flow_index[flow]},{p.configuration_index[flow, variant]},{component}]",
+                )
+            for worker in p.problem.flows[flow].workers:
+                # Nonnegativity makes every term zero when this candidate is off.
+                # Selected candidates share one full-model budget on each worker.
+                model.addConstr(
+                    gp.quicksum(
+                        execution.execution_time_s[flow, variant, component, worker]
+                        for component in range(1, max_components + 1)
+                    )
+                    <= upper_by_worker[worker]
+                    * assignment.configuration_selected[flow, variant],
+                    name=f"compact_execution_cumulative_upper[{p.flow_index[flow]},{p.configuration_index[flow, variant]},{p.worker_index[worker]}]",
                 )
 
 

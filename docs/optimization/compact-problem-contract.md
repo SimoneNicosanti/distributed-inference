@@ -40,10 +40,12 @@ factory, DTO round trips, and HTTP rejection before optimizer invocation.
 `test/optimizer/test_single_configuration_runtime.py` runs the native full solver
 with one or two variants, always with exactly one configuration per variant.
 
-The single-variant cases have consistent aggregate and component timings for
-all objectives. Multiple eligible variants still expose positive auxiliary costs
-for an excluded variant under non-response-time objectives. The cardinality rule
-therefore does not replace the need to gate costs by candidate selection.
+Auxiliary costs are now gated by candidate selection through the
+[reduced time linearizations](compact-reduced-time-linearization.md). The
+execution bound is cumulative across components for each flow, candidate and
+worker. Selected-candidate variables may retain slack; translated execution
+times are recomputed from the selected layers and profiles. The cardinality rule
+alone does not enforce cost gating.
 
 Earlier tests using multiple configurations of the same variant are left
 unchanged and predate this contract; they must be migrated separately.
