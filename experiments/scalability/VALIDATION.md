@@ -1,4 +1,40 @@
-# Static-only validation
+# Validation
+
+## Direct optimizer contract migration (2026-11-12)
+
+`make_instance` now projects the selected synthetic profiles directly into the
+optimizer-owned `CompactOptimizationProblem`: variant graphs and weights, one
+named shape configuration per variant, tensor sizes, max-cut bytes, matching
+backend execution costs, eligible flow candidates, worker inference memory and
+directed links. Calibration, endpoints and synthetic roofline estimates remain
+unchanged. Missing computational profiles remain unsupported; boundary costs are
+zero. Controller optimization requests/context and the DTO round trip are gone.
+Raw profiling types still belong to the controller.
+
+The runner composes `MisocpCompactFormulationBuilder`,
+`GurobiFormulationCompiler`, `GurobiSolver` and
+`GurobiMisocpCompactSolvedCompiledFormulationTranslator` through
+`FullSolverStrategy`. The recording solver preserves native termination and
+statistics even when no solution can be translated. Optimizer source files are
+included in software provenance and therefore invalidate previous cache/run IDs.
+
+The optimizer manifest is currently empty. The README documents importing its
+source tree through `PYTHONPATH`; no production packaging, manifest, lockfile,
+environment or dependencies were changed. Current YAML defines 440 main and 198
+sensitivity runs per objective; static checks and README counts follow this grid.
+
+Verification: 35 focused tests passed, including five native Gurobi executions
+(four objectives and proven memory infeasibility), nested/deterministic projection,
+accuracy eligibility, shape cardinality, CPU/GPU profile selection and provenance.
+Ruff lint/format, strict mypy on 21 source/script files, the AST/grid checker and
+CLI `plan --objectives all` passed. The existing eleven experiment test files
+remain unchanged; stale scenario/solver/integration contracts and historical grid
+expectations are not claimed as passing. New coverage lives in
+`tests/test_optimizer_contract.py`. No real ONNX profiling, campaign, export,
+rendering or distributed runtime was executed for this migration.
+
+The sections below describe earlier snapshots.
+
 
 ## Synthetic backend correction (2026-11-11)
 

@@ -1,5 +1,9 @@
 # Compact MISOCP formulation
 
+The current normalized input contract requires exactly one configuration per
+variant; see [Compact problem contract](compact-problem-contract.md). This replaces
+the earlier policy of admitting all profiled shapes of each variant.
+
 `compact` is the only supported formulation and the default. It uses the v2 epigraphs, the existing
 preprocessing and operational constraints, and the existing solution interface.
 No dependency was added. Existing unrelated working-tree changes were preserved.

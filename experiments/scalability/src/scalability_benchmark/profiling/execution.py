@@ -2,10 +2,6 @@
 
 from dataclasses import dataclass
 
-from controller.application.optimization.formulation.compact.profile_data import (
-    layer_weight_size_bytes,
-    tensor_size_bytes,
-)
 from controller.domain.backend import Backend
 from controller.domain.profile.model_variant_execution_profile import (
     BackendExecutionProfile,
@@ -17,6 +13,10 @@ from controller.domain.profile.model_variant_static_profile import (
     ModelVariantStaticProfile,
 )
 from scalability_benchmark.configuration import ExecutionSettings, TierSettings
+from scalability_benchmark.profiling.static_costs import (
+    layer_weight_size_bytes,
+    tensor_size_bytes,
+)
 from scalability_benchmark.randomness import stream
 
 

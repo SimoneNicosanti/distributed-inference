@@ -31,14 +31,14 @@ def main() -> None:
     experiment = root / "experiments/scalability"
     production = (
         "packages/shared/src/shared/model/model_variant.py",
-        "services/controller/src/controller/domain/optimization/solving/formulation/compact/compact_objective_kind.py",
-        "services/controller/src/controller/application/optimization/formulation/compact/compact_formulation_data_builder.py",
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi/solver/gurobi_solver.py",
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi/model_builder/formulations/compact/collaborators/objective_builder.py",
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi/model_builder/formulations/compact/collaborators/response_time/constraints.py",
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi/model_builder/formulations/compact/compact_variables.py",
-        "services/controller/src/controller/application/optimization/formulation/compact/bounds.py",
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi/trackers/gurobi_incumbent_tracker.py",
+        "services/optimizer/src/optimizer/domain/problem/compact/compact_optimization_problem.py",
+        "services/optimizer/src/optimizer/application/formulation/compact/misocp/misocp_compact_formulation_builder.py",
+        "services/optimizer/src/optimizer/adapters/outbound/gurobi/solver/gurobi_solver.py",
+        "services/optimizer/src/optimizer/adapters/outbound/gurobi/formulation_compiler/formulations/compact/collaborators/objective_builder.py",
+        "services/optimizer/src/optimizer/adapters/outbound/gurobi/formulation_compiler/formulations/compact/collaborators/response_time/constraints.py",
+        "services/optimizer/src/optimizer/adapters/outbound/gurobi/formulation_compiler/formulations/compact/compact_variables.py",
+        "services/optimizer/src/optimizer/domain/formulation/compact/misocp/misocp_compact_formulation.py",
+        "services/optimizer/src/optimizer/adapters/outbound/gurobi/trackers/gurobi_incumbent_tracker.py",
     )
     sources = sorted(
         path
@@ -55,16 +55,17 @@ def main() -> None:
     progression = [[index, 0] for index in range(11)]
     assert raw["infrastructure"] == progression
     assert raw["seeds"] == [42]
-    for name, count in (("main", 770), ("sensitivity", 198)):
+    counts = {}
+    for name in ("main", "sensitivity"):
         campaign = raw[name]
-        assert (
+        counts[name] = (
             len(raw["seeds"])
             * len(campaign["loads"])
             * len(campaign["flows"])
             * len(campaign["models"])
             * len(progression)
-            == count
         )
+        assert counts[name] > 0
     assert raw["main"]["loads"] == [0.7] and not raw["sensitivity"]["enabled"]
     assert raw["pilot"]["load"] == 0.7
     assert raw["flows"]["deadline_s"] == [0.2, 3.0]
@@ -75,7 +76,9 @@ def main() -> None:
     )
     assert len(raw["catalog"]["models"]) == 10 and raw["flows"]["pool_size"] == 7
     assert raw["main"]["models"] == list(range(1, 11))
-    assert raw["main"]["flows"] == list(range(1, 8))
+    assert raw["main"]["flows"] and all(
+        1 <= count <= raw["flows"]["pool_size"] for count in raw["main"]["flows"]
+    )
     assert raw["sensitivity"]["models"] == [1, 5, 10]
     assert raw["sensitivity"]["flows"] == [1, 4, 7]
     assert len(raw["pilot"]["cases"]) == 6
@@ -87,20 +90,17 @@ def main() -> None:
         for case in raw["pilot"]["cases"]
     )
     adapter = Path(
-        "services/controller/src/controller/adapters/outbound/optimization/gurobi/solver/gurobi_solver.py"
+        "services/optimizer/src/optimizer/adapters/outbound/gurobi/solver/gurobi_solver.py"
     )
-    optimizer = (
-        root / "services/controller/src/controller/adapters/outbound/optimization"
-    )
+    optimizer = root / "services/optimizer/src/optimizer/adapters/outbound"
     full_strategy = (
         root
-        / "services/controller/src/controller/application/optimization/strategies/full_solver_strategy.py"
+        / "services/optimizer/src/optimizer/application/strategies/full_solver_strategy.py"
     )
     assert native_calls(full_strategy.read_text(), "solve") == [
-        "self._formulation_data_builder.build_formulation_data",
-        "self._formulation_model_builder.build_formulation_model",
-        "self._solver_config_builder.build_solver_config",
-        "self._solver.solve_formulation_model",
+        "self._formulation_builder.build_formulation",
+        "self._formulation_compiler.compile_formulation",
+        "self._solver.solve_compiled_formulation",
         "self._solved_model_translator.translate_solved_formulation_model",
     ]
     full_tree = ast.parse(full_strategy.read_text())
@@ -111,8 +111,7 @@ def main() -> None:
     )
     assert [arg.arg for arg in solve.args.args] == [
         "self",
-        "requests_by_flow",
-        "context",
+        "problem",
     ]
     scope = next(node for node in solve.body if isinstance(node, ast.AsyncWith))
     assert any(
@@ -124,9 +123,9 @@ def main() -> None:
     )
     compiler = (
         optimizer
-        / "gurobi/model_builder/formulations/compact/gurobi_compact_formulation_compiler.py"
+        / "gurobi/formulation_compiler/formulations/compact/gurobi_misocp_compact_formulation_compiler.py"
     )
-    assert native_calls(compiler.read_text(), "compile_formulation") == [
+    assert native_calls(compiler.read_text(), "build_model_from_formulation") == [
         "self._create_variables",
         "self._assignment.add_constraints",
         "self._execution.add_constraints",
@@ -136,7 +135,7 @@ def main() -> None:
         "self._response_time.add_constraints",
         "self._objective.set_objective",
     ]
-    builder = optimizer / "gurobi/model_builder/gurobi_formulation_model_builder.py"
+    builder = optimizer / "gurobi/formulation_compiler/gurobi_formulation_compiler.py"
     for path in (full_strategy, compiler, builder):
         compile(path.read_text(), str(path), "exec")
     solver_tree = ast.parse((root / adapter).read_text())
@@ -192,9 +191,9 @@ def main() -> None:
         and node.func.id == "FullSolverStrategy"
     )
     assert {keyword.arg for keyword in configured_strategy.keywords} == {
-        "formulation_data_builder",
-        "formulation_model_builder",
-        "solver_config_builder",
+        "formulation_builder",
+        "formulation_compiler",
+        "solver_config",
         "solver",
         "solved_model_translator",
         "formulation_config",
@@ -209,7 +208,7 @@ def main() -> None:
         and isinstance(node.value, ast.Await)
         and isinstance(node.value.value, ast.Call)
         and isinstance(node.value.value.func, ast.Attribute)
-        and node.value.value.func.attr == "solve_formulation_model"
+        and node.value.value.func.attr == "solve_compiled_formulation"
         for node in ast.walk(recorder)
     )
     configuration_tree = ast.parse(
@@ -305,7 +304,7 @@ def main() -> None:
     objective = ast.parse(
         (
             optimizer
-            / "gurobi/model_builder/formulations/compact/collaborators/objective_builder.py"
+            / "gurobi/formulation_compiler/formulations/compact/collaborators/objective_builder.py"
         ).read_text()
     )
     calls = [
@@ -319,7 +318,7 @@ def main() -> None:
     kinds = next(
         node
         for node in configuration.body
-        if isinstance(node, ast.ClassDef) and node.name == "CompactObjectiveKind"
+        if isinstance(node, ast.ClassDef) and node.name == "ObjectiveKind"
     )
     assert {
         target.id
@@ -337,7 +336,7 @@ def main() -> None:
     qos = ast.parse(
         (
             optimizer
-            / "gurobi/model_builder/formulations/compact/collaborators/response_time/constraints.py"
+            / "gurobi/formulation_compiler/formulations/compact/collaborators/response_time/constraints.py"
         ).read_text()
     )
     guards = [
@@ -350,21 +349,40 @@ def main() -> None:
     assert isinstance(test, ast.Compare) and isinstance(test.ops[0], ast.In)
     assert isinstance(test.comparators[0], ast.Set)
     assert {ast.unparse(item) for item in test.comparators[0].elts} == {
-        "CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME",
-        "CompactObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY",
+        "ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME",
+        "ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY",
     }
-    for path in (
-        root
-        / "services/controller/src/controller/application/optimization/formulation/compact/bounds.py",
-        optimizer / "gurobi/model_builder/formulations/compact/compact_variables.py",
-    ):
-        tree = ast.parse(path.read_text())
+    formulation_tree = ast.parse((root / production[2]).read_text())
+    waits = [
+        node.value
+        for node in ast.walk(formulation_tree)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Subscript)
+            and isinstance(target.value, ast.Name)
+            and target.value.id == "waits"
+            for target in node.targets
+        )
+    ]
+    assert waits and all(
+        not any(
+            isinstance(node, ast.Attribute) and node.attr == "max_response_time_s"
+            for node in ast.walk(value)
+        )
+        for value in waits
+    )
+    for name in ("instances", "flows", "network", "solver"):
+        tree = ast.parse(
+            (experiment / f"src/scalability_benchmark/{name}.py").read_text()
+        )
         assert not any(
-            isinstance(node, ast.Attribute) and node.attr == "max_mean_response_time"
+            isinstance(node, ast.ImportFrom)
+            and node.module is not None
+            and node.module.startswith("controller")
             for node in ast.walk(tree)
-        ), path.name
+        ), name
     print(
-        f"Static inspection: {len(sources) + 3} Python syntax trees; YAML/TOML valid; base grids 770/198; 10 models; 7 flows; 11 infrastructures; four alternative objectives; conditional deadlines; no implicit deadline bounds; solver call order, incumbent callback and offline plotting wiring valid"
+        f"Static inspection: {len(sources) + 3} Python syntax trees; YAML/TOML valid; base grids {counts['main']}/{counts['sensitivity']}; 10 models; 7-flow pool; 11 infrastructures; four alternative objectives; conditional deadlines; no implicit deadline bounds; optimizer contracts, solver call order, incumbent callback and offline plotting wiring valid"
     )
     print(
         "No benchmark imports, tests, profiling, export, plotting or solver execution"

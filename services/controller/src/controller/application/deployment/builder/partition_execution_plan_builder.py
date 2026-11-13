@@ -3,13 +3,13 @@ from collections.abc import Sequence
 from controller.application.deployment.builder.partition_replica_id_builder import (
     ReplicaIdsByFlow,
 )
-from controller.domain.optimization.solving.optimization_solution import (
-    ComponentSolution,
-    OptimizationSolution,
-)
 from controller.domain.plan.partition_execution_plan import (
     PartitionExecutionPlan,
     PartitionIOScheme,
+)
+from optimizer.domain.solution.optimization_solution import (
+    ComponentSolution,
+    OptimizationSolution,
 )
 from shared.model.model_partition import ModelPartitionId
 from shared.service.service import WorkerId

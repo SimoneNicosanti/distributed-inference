@@ -7,6 +7,13 @@ from unittest.mock import AsyncMock, Mock
 import gurobipy as gp
 import pytest
 from gurobipy import GRB
+from optimizer.application.formulation.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
+from optimizer.application.formulation.compact.compact_formulation_data_builder import (
+    CompactFormulationDataBuilder,
+    _is_metric_satisfied,
+)
 from scalability_benchmark import solver as benchmark_solver
 from scalability_benchmark.campaigns import RunSpec
 from scalability_benchmark.configuration import BENCHMARK_OBJECTIVES, ExperimentConfig
@@ -17,39 +24,32 @@ from scalability_benchmark.solver import (
     classify,
 )
 
-from controller.adapters.outbound.optimization.gurobi.entities.gurobi_formulation_model import (
-    GurobiFormulationModel,
+from optimizer.adapters.outbound.gurobi.entities.gurobi_compiled_formulation import (
+    GurobiCompiledFormulation,
 )
-from controller.adapters.outbound.optimization.gurobi.entities.gurobi_run_statistics import (
+from optimizer.adapters.outbound.gurobi.entities.gurobi_run_statistics import (
     GurobiRunStatistics,
 )
-from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
+from optimizer.adapters.outbound.gurobi.entities.gurobi_solver_config import (
     GurobiSolverConfig,
 )
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.compact_variables import (
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.compact_variables import (
     CompactVariables,
 )
-from controller.adapters.outbound.optimization.gurobi.model_builder.gurobi_formulation_model_builder import (
-    GurobiFormulationModelBuilder,
+from optimizer.adapters.outbound.gurobi.formulation_compiler.gurobi_formulation_compiler import (
+    GurobiModelBuilder,
 )
-from controller.adapters.outbound.optimization.gurobi.result_translation.formulations.compact.gurobi_compact_solved_formulation_model_translator import (
+from optimizer.adapters.outbound.gurobi.result_translation.formulations.compact.gurobi_misocp_compact_solved_compiled_formulation_translator import (
     GurobiCompactSolvedFormulationModelTranslator,
 )
-from controller.adapters.outbound.optimization.gurobi.solver.gurobi_solver import (
+from optimizer.adapters.outbound.gurobi.solver.gurobi_solver import (
     GurobiSolver,
 )
-from controller.application.optimization.abc.solver_strategy import SolveError
-from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
-    CompactFormulationDataBuilder,
-    _is_metric_satisfied,
+from optimizer.application.abc.solver_strategy import SolveError
+from optimizer.application.ports.outbound.solver_result import SolverOutput
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
 )
-from controller.domain.optimization.solving.formulation.compact.compact_formulation_data import (
-    CompactFormulationData,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
-)
-from controller.domain.optimization.solving.solver_result import SolverOutput
 from shared.model.model_variant import PerformanceMetric, PerformanceMetricType
 
 
@@ -97,7 +97,7 @@ def test_status_mapping(
     record = classify(
         output,
         SolveError() if not solutions else None,
-        objective=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        objective=ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
     )
     assert record["termination"] == termination
     assert record["infeasibility_proven"] == (status == GRB.INFEASIBLE)
@@ -110,7 +110,7 @@ def test_errors_have_no_invented_metrics() -> None:
     record = classify(
         None,
         RuntimeError("license unavailable"),
-        objective=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        objective=ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
     )
     assert record["termination"] == "solver_error"
     assert record["objective_value"] is None
@@ -121,7 +121,7 @@ def test_translation_failure_retains_native_evidence() -> None:
     record = classify(
         solver_output(GRB.TIME_LIMIT, 1, 0.1),
         ValueError("invalid extracted solution"),
-        objective=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        objective=ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
     )
     assert record["termination"] == "solver_error"
     assert record["timeout_reached"] is True
@@ -161,9 +161,9 @@ def test_output_guards_unavailable_attributes_and_captures_effective_parameters(
         "NumGenConstrs",
     ):
         setattr(model, attribute, 0)
-    wrapped = GurobiFormulationModel(
+    wrapped = GurobiCompiledFormulation(
         native_model=model,
-        data=cast(CompactFormulationData, object()),
+        formulation=cast(CompactFormulationData, object()),
         variables=cast(CompactVariables, object()),
         construction_time_s=0.2,
     )
@@ -199,7 +199,7 @@ async def test_runner_invokes_full_strategy_with_explicit_limits(
     config: ExperimentConfig,
     monkeypatch: pytest.MonkeyPatch,
     time_limit_s: int,
-    objective: CompactObjectiveKind,
+    objective: ObjectiveKind,
 ) -> None:
     output = solver_output(GRB.OPTIMAL, 1, 0)
     model = output.solved_model
@@ -222,7 +222,7 @@ async def test_runner_invokes_full_strategy_with_explicit_limits(
         data_builder,
     )
     monkeypatch.setattr(
-        GurobiFormulationModelBuilder,
+        GurobiModelBuilder,
         "build_formulation_model",
         build_model,
     )

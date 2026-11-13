@@ -1,8 +1,7 @@
 """Full directed topology; reciprocal links share sampled physical parameters."""
 
-from controller.domain.profile.network_topology import (
+from optimizer.domain.problem.other.network_connection import (
     NetworkConnection,
-    NetworkTopology,
 )
 from scalability_benchmark.configuration import ExperimentConfig
 from scalability_benchmark.hardware import SyntheticWorker
@@ -33,13 +32,10 @@ def network_pool(
 
 def select_network(
     workers: tuple[SyntheticWorker, ...], pool: tuple[NetworkConnection, ...]
-) -> NetworkTopology:
+) -> tuple[NetworkConnection, ...]:
     identities = {worker.id for worker in workers}
-    return NetworkTopology(
-        workers=identities,
-        connections=(
-            connection
-            for connection in pool
-            if connection.source in identities and connection.target in identities
-        ),
+    return tuple(
+        connection
+        for connection in pool
+        if connection.source in identities and connection.target in identities
     )

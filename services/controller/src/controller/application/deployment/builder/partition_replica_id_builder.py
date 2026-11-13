@@ -1,7 +1,7 @@
 from collections import defaultdict
 from collections.abc import Mapping
 
-from controller.domain.optimization.solving.optimization_solution import (
+from optimizer.domain.solution.optimization_solution import (
     OptimizationSolution,
 )
 from shared.flow.flow import FlowId

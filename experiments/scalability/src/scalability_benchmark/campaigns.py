@@ -4,8 +4,8 @@ from collections.abc import Iterator
 from dataclasses import asdict, dataclass, replace
 from typing import Literal
 
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
 )
 from scalability_benchmark.configuration import BENCHMARK_OBJECTIVES, ExperimentConfig
 
@@ -22,9 +22,7 @@ class RunSpec:
     edge_count: int
     cloud_count: int
     timeout_s: float
-    objective: CompactObjectiveKind = (
-        CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME
-    )
+    objective: ObjectiveKind = ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME
 
     @property
     def worker_count(self) -> int:
@@ -38,11 +36,11 @@ def campaign_specs(
     config: ExperimentConfig,
     name: CampaignName,
     *,
-    objectives: tuple[CompactObjectiveKind, ...] | None = None,
+    objectives: tuple[ObjectiveKind, ...] | None = None,
 ) -> Iterator[RunSpec]:
     selected = tuple(
         dict.fromkeys(
-            CompactObjectiveKind(value)
+            ObjectiveKind(value)
             for value in (
                 objectives
                 if objectives is not None

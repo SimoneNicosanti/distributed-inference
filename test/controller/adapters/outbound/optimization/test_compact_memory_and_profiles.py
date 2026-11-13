@@ -18,25 +18,10 @@ from test.model_manager.test_profile_contract import (
     profiled_variant as profiled_variant,
 )
 
-from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
-    GurobiSolverConfig,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.profile_bounds import (
-    cut_upper_mb,
-)
 from controller.adapters.outbound.profile.mappers.model_variant_static_profile_mapper import (
     ModelVariantStaticProfileMapper,
 )
-from controller.application.optimization.formulation.compact.profile_data import (
-    ProfileDataError,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
-    FormulationKind,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
-)
-from controller.domain.optimization.solving.optimization_context import (
+from controller.domain.optimization.context.optimization_context import (
     OptimizationContext,
 )
 from controller.domain.profile.model_variant_static_profile import (
@@ -47,6 +32,21 @@ from controller.domain.profile.model_variant_static_profile import (
 from integration.dto.model.model_dto import ModelDto
 from model_manager.adapters.outbound.model_metadata_store.mappers.profiled_model_variant_mapper import (
     ProfiledModelVariantMapper,
+)
+from optimizer.adapters.outbound.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.profile_bounds import (
+    cut_upper_mb,
+)
+from optimizer.application.formulation.compact.compact_formulation_config import (
+    FormulationKind,
+)
+from optimizer.application.formulation.compact.profile_data import (
+    ProfileDataError,
+)
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
 )
 from shared.model.model import CNNArchitectureInfo, ModelTask
 
@@ -141,7 +141,7 @@ def test_resident_weights_sum_across_flows_but_activation_is_maximum(capacity):
     }
     solver = GurobiSolver(
         GurobiSolverConfig(
-            CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=FormulationKind.COMPACT,
         )
     )
@@ -160,6 +160,6 @@ def test_profiled_cut_activation_fits_despite_larger_layer_activation_sum():
     )
 
     result = GurobiSolver(
-        GurobiSolverConfig(CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
+        GurobiSolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
     )._solve({request.flow_id: request}, context, _problem_config(1))
     assert result.is_optimal

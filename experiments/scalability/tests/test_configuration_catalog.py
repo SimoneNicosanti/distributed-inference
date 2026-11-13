@@ -12,8 +12,8 @@ from scalability_benchmark.catalog import (
 from scalability_benchmark.configuration import BENCHMARK_OBJECTIVES, ExperimentConfig
 from scalability_benchmark.randomness import fingerprint, stream
 
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
 )
 from shared.model.model_variant import PerformanceMetricType
 
@@ -122,7 +122,7 @@ def test_compact_is_default_and_legacy_is_rejected(config: ExperimentConfig) -> 
 
 @pytest.mark.parametrize("objective", BENCHMARK_OBJECTIVES)
 def test_all_four_objectives_are_accepted(
-    config: ExperimentConfig, objective: CompactObjectiveKind
+    config: ExperimentConfig, objective: ObjectiveKind
 ) -> None:
     raw = config.model_dump()
     raw["optimization"]["objective"] = objective.value

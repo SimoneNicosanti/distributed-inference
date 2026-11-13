@@ -4,34 +4,34 @@ from typing import cast, override
 
 import pytest
 
-from controller.application.optimization.abc.formulation_data_builder import (
-    FormulationDataBuilder,
-)
-from controller.application.optimization.strategies.full_solver_strategy import (
-    FullSolverStrategy,
-)
-from controller.application.ports.outbound.optimization.formulation_model_builder import (
-    FormulationModelBuilder,
-)
-from controller.application.ports.outbound.optimization.solved_formulation_model_translator import (
-    SolvedFormulationModelTranslator,
-)
-from controller.application.ports.outbound.optimization.solver import Solver
-from controller.application.ports.outbound.optimization.solver_config_builder import (
-    SolverConfigBuilder,
+from controller.domain.optimization.context.optimization_context import (
+    OptimizationContext,
 )
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
 )
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
+from optimizer.application.abc.formulation_builder import (
+    FormulationBuilder,
 )
-from controller.domain.optimization.solving.optimization_solution import (
-    OptimizationSolution,
+from optimizer.application.ports.outbound.formulation_compiler import (
+    FormulationCompiler,
 )
-from controller.domain.optimization.solving.solver_result import (
+from optimizer.application.ports.outbound.solved_compiled_formulation_translator import (
+    SolvedFormulationModelTranslator,
+)
+from optimizer.application.ports.outbound.solver import Solver
+from optimizer.application.ports.outbound.solver_config_builder import (
+    SolverConfigBuilder,
+)
+from optimizer.application.ports.outbound.solver_result import (
     SolverOutput,
     SolverTerminationKind,
+)
+from optimizer.application.strategies.full_solver_strategy import (
+    FullSolverStrategy,
+)
+from optimizer.domain.solution.optimization_solution import (
+    OptimizationSolution,
 )
 
 
@@ -54,9 +54,9 @@ async def test_prepares_data_and_keeps_model_alive_through_translation(
     formulation_config = object()
     solver_config = object()
 
-    class DataBuilder(FormulationDataBuilder[object, object]):
+    class DataBuilder(FormulationBuilder[object, object]):
         @override
-        def build_formulation_data(
+        def build_formulation(
             self,
             requests_by_flow: OptimizationRequestsByFlow,
             context: OptimizationContext,
@@ -68,10 +68,10 @@ async def test_prepares_data_and_keeps_model_alive_through_translation(
             events.append("prepare")
             return data
 
-    class ModelBuilder(FormulationModelBuilder[object, object]):
+    class ModelBuilder(FormulationCompiler[object, object]):
         @override
         @asynccontextmanager
-        async def build_formulation_model(self, data: object) -> AsyncIterator[object]:
+        async def compile_formulation(self, data: object) -> AsyncIterator[object]:
             assert data is expected_data
             events.append("open")
             try:
@@ -89,7 +89,7 @@ async def test_prepares_data_and_keeps_model_alive_through_translation(
 
     class ModelSolver(Solver[object, object, object, None]):
         @override
-        async def solve_formulation_model(
+        async def solve_compiled_formulation(
             self, model: object, config: object
         ) -> SolverOutput[object, None]:
             assert model is expected_model
@@ -124,8 +124,8 @@ async def test_prepares_data_and_keeps_model_alive_through_translation(
     expected_model = model
     expected_formulation_config = formulation_config
     strategy = FullSolverStrategy(
-        formulation_data_builder=DataBuilder(),
-        formulation_model_builder=ModelBuilder(),
+        formulation_builder=DataBuilder(),
+        formulation_compiler=ModelBuilder(),
         solver_config_builder=ConfigBuilder(),
         solver=ModelSolver(),
         solved_model_translator=Translator(),

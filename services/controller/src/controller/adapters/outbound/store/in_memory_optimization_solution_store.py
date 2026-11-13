@@ -5,7 +5,7 @@ from controller.application.deployment.abc.solution_observer import SolutionObse
 from controller.application.ports.outbound.store.optimization_solution_store import (
     OptimizationSolutionStore,
 )
-from controller.domain.optimization.solving.enriched_optimization_solution import (
+from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
 

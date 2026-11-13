@@ -3,6 +3,12 @@ from typing import override
 
 import gurobipy as gp
 import pytest
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.gurobi_model_builder import (
+    GurobiModelBuilder,
+)
+from optimizer.application.formulation.compact.compact_formulation_data_builder import (
+    CompactFormulationDataBuilder,
+)
 from test.controller.adapters.outbound.optimization.test_gurobi_solver import (
     _context,
     _flow,
@@ -11,20 +17,14 @@ from test.controller.adapters.outbound.optimization.test_gurobi_solver import (
     _worker,
 )
 
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.gurobi_compact_formulation_compiler import (
-    GurobiCompactFormulationCompiler,
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.gurobi_misocp_compact_formulation_compiler import (
+    GurobiMisocpCompactFormulationModelBuilder,
 )
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.gurobi_formulation_compiler import (
-    GurobiFormulationCompiler,
+from optimizer.adapters.outbound.gurobi.formulation_compiler.gurobi_formulation_compiler import (
+    GurobiModelBuilder,
 )
-from controller.adapters.outbound.optimization.gurobi.model_builder.gurobi_formulation_model_builder import (
-    GurobiFormulationModelBuilder,
-)
-from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
-    CompactFormulationDataBuilder,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
 )
 
 
@@ -37,15 +37,15 @@ def _inputs():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("objective", list(CompactObjectiveKind))
+@pytest.mark.parametrize("objective", list(ObjectiveKind))
 async def test_builds_unsolved_model_with_matching_deadline_policy(objective):
     requests, context, config = _inputs()
     data = CompactFormulationDataBuilder(objective).build_formulation_data(
         requests, context, config
     )
-    builder = GurobiFormulationModelBuilder(GurobiCompactFormulationCompiler())
+    builder = GurobiModelBuilder(GurobiMisocpCompactFormulationModelBuilder())
 
-    async with builder.build_formulation_model(data) as compiled:
+    async with builder.build_model_from_formulation(data) as compiled:
         model = compiled.native_model
         assert model.NumVars > 0
         assert model.NumConstrs > 0
@@ -57,20 +57,18 @@ async def test_builds_unsolved_model_with_matching_deadline_policy(objective):
         assert compiled.construction_time_s >= 0
         assert model.ModelSense == (
             gp.GRB.MAXIMIZE
-            if objective == CompactObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY
+            if objective == ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY
             else gp.GRB.MINIMIZE
         )
         hard_deadline = objective in {
-            CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
-            CompactObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+            ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
         }
         assert (model.getConstrByName("response_requirement[0]") is not None) == (
             hard_deadline
         )
         assert model.NumGenConstrs == (
-            len(requests)
-            if objective == CompactObjectiveKind.DEADLINE_VIOLATIONS
-            else 0
+            len(requests) if objective == ObjectiveKind.DEADLINE_VIOLATIONS else 0
         )
 
 
@@ -84,15 +82,15 @@ class _ClientError(Exception):
 
 @pytest.mark.asyncio
 async def test_accepts_another_formulation_data_and_variable_container():
-    class ScalarFormulation(GurobiFormulationCompiler[float, dict[str, gp.Var]]):
+    class ScalarFormulation(GurobiModelBuilder[float, dict[str, gp.Var]]):
         @override
-        def compile_formulation(
+        def build_model_from_formulation(
             self, model: gp.Model, data: float
         ) -> dict[str, gp.Var]:
             return {"value": model.addVar(lb=data, name="value")}
 
-    builder = GurobiFormulationModelBuilder(ScalarFormulation())
-    async with builder.build_formulation_model(2.0) as compiled:
+    builder = GurobiModelBuilder(ScalarFormulation())
+    async with builder.build_model_from_formulation(2.0) as compiled:
         assert compiled.data == 2.0
         assert compiled.variables["value"].LB == 2.0
         assert compiled.native_model.Status == gp.GRB.LOADED
@@ -105,16 +103,16 @@ async def test_prepared_data_does_not_need_the_original_requests():
         requests, context, config
     )
     requests.clear()
-    async with GurobiFormulationModelBuilder(
-        GurobiCompactFormulationCompiler()
-    ).build_formulation_model(data) as compiled:
+    async with GurobiModelBuilder(
+        GurobiMisocpCompactFormulationModelBuilder()
+    ).build_model_from_formulation(data) as compiled:
         assert compiled.native_model.NumVars > 0
         assert set(compiled.variables.qos.response_time_s) == set(data.flows)
 
 
-class _FailingFormulation(GurobiCompactFormulationCompiler):
+class _FailingFormulation(GurobiMisocpCompactFormulationModelBuilder):
     @override
-    def compile_formulation(self, *args, **kwargs):
+    def build_model_from_formulation(self, *args, **kwargs):
         raise _BuildError
 
 
@@ -148,13 +146,13 @@ async def test_releases_model_before_environment_on_success_and_failure(
     formulation = (
         _FailingFormulation()
         if failure == "build"
-        else GurobiCompactFormulationCompiler()
+        else GurobiMisocpCompactFormulationModelBuilder()
     )
-    builder = GurobiFormulationModelBuilder(formulation)
+    builder = GurobiModelBuilder(formulation)
     data = CompactFormulationDataBuilder().build_formulation_data(*_inputs())
 
     async def use_model():
-        async with builder.build_formulation_model(data) as compiled:
+        async with builder.build_model_from_formulation(data) as compiled:
             assert not closed
             assert compiled.native_model.NumVars > 0
             if failure == "client":

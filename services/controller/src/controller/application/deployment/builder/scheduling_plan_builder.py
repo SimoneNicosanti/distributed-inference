@@ -3,10 +3,10 @@ from collections.abc import Sequence
 from controller.application.deployment.builder.partition_replica_id_builder import (
     ReplicaIdsByFlow,
 )
-from controller.domain.optimization.solving.optimization_solution import (
+from controller.domain.plan.scheduling_plan import PriorityKey, SchedulingPlan
+from optimizer.domain.solution.optimization_solution import (
     OptimizationSolution,
 )
-from controller.domain.plan.scheduling_plan import PriorityKey, SchedulingPlan
 from shared.service.service import WorkerId
 
 

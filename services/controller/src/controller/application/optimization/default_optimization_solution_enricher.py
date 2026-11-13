@@ -4,10 +4,10 @@ from typing import override
 from controller.application.optimization.abc.optimization_solution_enricher import (
     OptimizationSolutionEnricher,
 )
-from controller.domain.optimization.solving.enriched_optimization_solution import (
+from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
-from controller.domain.optimization.solving.optimization_solution import (
+from controller.domain.optimization.solution.optimization_solution import (
     OptimizationSolution,
 )
 from controller.domain.profile.model_variant_static_profile import (

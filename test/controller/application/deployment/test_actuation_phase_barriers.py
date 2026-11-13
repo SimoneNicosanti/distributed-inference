@@ -23,13 +23,13 @@ from controller.application.ports.outbound.plan_version.plan_version_factory imp
 from controller.application.ports.outbound.store.flow_plan_publisher import (
     FlowPlanPublisher,
 )
-from controller.domain.optimization.solving.enriched_optimization_solution import (
+from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
-from controller.domain.optimization.solving.optimization_solution import (
+from controller.domain.plan.worker_plan import WorkerPlan
+from optimizer.domain.solution.optimization_solution import (
     OptimizationSolution,
 )
-from controller.domain.plan.worker_plan import WorkerPlan
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId, WorkerId
 

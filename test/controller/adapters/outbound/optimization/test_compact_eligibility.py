@@ -6,19 +6,9 @@ from uuid import UUID
 import gurobipy as gp
 from gurobipy import GRB
 
-import controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.execution.constraints as structure_constraints
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.assignment_builder import (
-    _add_assignment_variables,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.assignment_variables import (
-    AssignmentVariables,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.execution.execution_builder import (
-    CompactExecutionBuilder,
-    _add_execution_variables,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.execution.execution_variables import (
-    ExecutionVariables,
+import optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.execution.constraints as structure_constraints
+from controller.domain.optimization.context.optimization_context import (
+    OptimizationContext,
 )
 from controller.domain.optimization.request.local_worker_config import (
     NoLocalWorkerConfig,
@@ -26,15 +16,6 @@ from controller.domain.optimization.request.local_worker_config import (
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
     OptimizationRequestsByFlow,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_formulation_data import (
-    CompactFormulationData,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
-)
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
 )
 from controller.domain.profile.model_variant_execution_profile import (
     LayerExecutionProfile,
@@ -47,6 +28,25 @@ from controller.domain.profile.model_variant_topology import (
     ModelVariantTopology,
 )
 from controller.domain.profile.network_topology import NetworkTopology
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.assignment.assignment_builder import (
+    _add_assignment_variables,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.assignment.assignment_variables import (
+    AssignmentVariables,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.execution.execution_builder import (
+    CompactExecutionBuilder,
+    _add_execution_variables,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.execution.execution_variables import (
+    ExecutionVariables,
+)
+from optimizer.application.formulation.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
+)
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -102,7 +102,7 @@ def _problem() -> CompactFormulationData:
         priority_count=1,
         compute_utilization_limit=0.9,
         network_utilization_limit=0.9,
-        objective_kind=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        objective_kind=ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
         static_profiles_by_variant={model: _profile() for model in _MODELS},
         resource_profiles_by_worker={},
         network_topology=NetworkTopology(workers=_WORKERS, connections=()),

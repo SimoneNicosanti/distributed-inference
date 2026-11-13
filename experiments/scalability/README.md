@@ -1,19 +1,35 @@
 # Scalability benchmark
 
-Synthetic, nested optimization instances. Reuses the controller's `GurobiSolver`
-and the model manager's complete `DefaultModelProfiler`. No microservices,
-Redis, HTTP endpoints, worker processes or GPU hardware are needed to construct
-the simulated infrastructure. Real Gurobi execution needs an adequate license.
+Synthetic, nested optimization instances. Builds the optimizer's normalized
+`CompactOptimizationProblem` directly and uses its `FullSolverStrategy`, MISOCP
+formulation, Gurobi compiler, solver and translator. Static profiling still uses
+the model manager's complete `DefaultModelProfiler` and controller profile types.
+No microservices, Redis, HTTP endpoints, worker processes or GPU hardware are
+needed to construct the simulated infrastructure. Real Gurobi execution needs an
+adequate license.
 
 The solver uses only the compact formulation. `solver.formulation` defaults to
 `compact`; the explicit value `compact` remains accepted and `legacy` is rejected.
-The benchmark exposes four optimization objectives. The controller's `CONSTANT`
+The benchmark exposes four optimization objectives. The optimizer's `CONSTANT`
 feasibility objective is excluded from configuration and `--objectives all`.
 Profiles must contain `max_cut_size_mib`. Historical result files remain readable.
 
 ## Setup
 
 Run commands from the repository root. Python 3.14 or later is required.
+
+The optimizer currently has an empty `pyproject.toml`, so it is consumed from its
+source tree. Set this once before the commands below (from the repository root):
+
+```bash
+export PYTHONPATH="$PWD/services/optimizer/src${PYTHONPATH:+:$PYTHONPATH}"
+```
+
+The benchmark retains the controller dependency for raw profile types and their
+DTO mapper; it does not use controller optimization requests, context, factory or
+optimizer transport mappers. Each variant has exactly one named input-shape
+configuration. CPU/GPU execution profiles and RAM/VRAM capacities retain their
+existing meanings. Optimizer source changes participate in provenance hashes.
 
 ```bash
 uv sync --project experiments/scalability --locked
@@ -22,9 +38,8 @@ uv run --project experiments/scalability --locked scalability plan
 
 The project has its own manifest and lockfile. Production manifests and lockfiles
 are unchanged. Plotting uses matplotlib; exporting additionally needs the export
-dependency group. These commands are provided for subsequent execution: no
-dependencies, exports, profiling, plots, tests or solves were run during the
-static-only implementation verification.
+dependency group. Current validation is recorded in `VALIDATION.md`; no environment
+sync or dependency installation was performed for the optimizer migration.
 
 The export group resolves `torch` and `torchvision` exclusively from the explicit
 PyTorch CPU index. It does not install CUDA, NVIDIA runtime packages or Triton.
@@ -82,7 +97,7 @@ The existing profiler currently requires input `images`; it is not modified.
 # Six representative runs, native solver timeout 60 seconds, then offline analysis.
 uv run --project experiments/scalability --locked scalability pilot --output experiments/scalability/results/pilot --analyze
 
-# Main: seed 42, load 0.7, 7 flow counts x 10 model counts x 11 infrastructures.
+# Main: seed 42, load 0.7, 4 flow counts x 10 model counts x 11 infrastructures.
 uv run --project experiments/scalability --locked scalability main --output experiments/scalability/results/main
 
 # Resume: completed timeouts and proven infeasibility are completed outcomes.
@@ -106,12 +121,12 @@ Campaign `enabled` flags describe default inclusion; explicitly selecting a name
 campaign opts into it, including sensitivity even with its default `enabled: false`.
 There is no command that implicitly executes both campaigns.
 
-Main: **770** configurations, 300-second timeout and relative gap **0.01**.
+Main: **440** configurations (4–7 flows), 300-second timeout and relative gap **0.01**.
 Sensitivity: **198** additional configurations, loads 0.3/0.8, flow counts 1/4/7,
-model counts 1/5/10, all 11 infrastructures. Solver time budgets: 64 hours
-10 minutes and 16 hours 30 minutes, 80 hours 40 minutes combined.
-Main plus sensitivity contains **968** runs; the six-case pilot brings this to
-**974** per objective. Model construction, profiling, persistence and solver
+model counts 1/5/10, all 11 infrastructures. Solver time budgets: 36 hours
+40 minutes and 16 hours 30 minutes, 53 hours 10 minutes combined.
+Main plus sensitivity contains **638** runs; the six-case pilot brings this to
+**644** per objective. Model construction, profiling, persistence and solver
 shutdown add time; these figures are not strict wall-clock bounds.
 
 ## Objective selection
@@ -141,7 +156,7 @@ deduplicated while preserving order; `all` must be used alone. There is no
 hierarchical optimization or response-time tie-break. The former response-slack
 objective names are replaced by the four values above.
 
-The counts/budgets above are **per objective**. Selecting all four gives 3,080
+The counts/budgets above are **per objective**. Selecting all four gives 1,760
 main runs, 792 sensitivity runs and 24 pilot runs with the default configuration;
 solver time budgets scale by the number selected. `--limit N` limits total runs
 after objective expansion. Run IDs include the objective, so `--resume` skips

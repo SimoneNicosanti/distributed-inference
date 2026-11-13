@@ -15,11 +15,8 @@ from test.controller.adapters.outbound.optimization.test_gurobi_solver import (
     _worker,
 )
 
-from controller.adapters.outbound.optimization.gurobi.entities.gurobi_run_statistics import (
-    GurobiRunStatistics,
-)
-from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
-    GurobiSolverConfig,
+from controller.domain.optimization.context.optimization_context import (
+    OptimizationContext,
 )
 from controller.domain.optimization.request.local_worker_config import (
     ValidLocalWorkerConfig,
@@ -27,18 +24,21 @@ from controller.domain.optimization.request.local_worker_config import (
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequestsByFlow,
 )
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
+from optimizer.adapters.outbound.gurobi.entities.gurobi_run_statistics import (
+    GurobiRunStatistics,
 )
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
+from optimizer.adapters.outbound.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
+)
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
 )
 from shared.model.model_variant import PerformanceMetric, PerformanceMetricType
 
 
-@pytest.mark.parametrize("objective", list(CompactObjectiveKind))
+@pytest.mark.parametrize("objective", list(ObjectiveKind))
 def test_response_time_and_accuracy_objectives_require_deadline(
-    objective: CompactObjectiveKind,
+    objective: ObjectiveKind,
 ) -> None:
     worker = _worker(1)
     context = _context({worker: 0.2})
@@ -52,8 +52,8 @@ def test_response_time_and_accuracy_objectives_require_deadline(
         )
     )
     if objective in {
-        CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
-        CompactObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
+        ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
     }:
         with pytest.raises(OptimizationInfeasibleError):
             solver._solve({request.flow_id: request}, context, _problem_config(1))
@@ -62,27 +62,25 @@ def test_response_time_and_accuracy_objectives_require_deadline(
     assert result.flow_solutions[0].mean_response_time_s > 0.001
     expected_response = 0.2 + 0.1 * 0.2**2 / (2 * (1 - 0.1 * 0.2))
     expected = {
-        CompactObjectiveKind.DEADLINE_VIOLATIONS: 1,
-        CompactObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY: expected_response
-        / 0.001
-        - 1,
+        ObjectiveKind.DEADLINE_VIOLATIONS: 1,
+        ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY: expected_response / 0.001 - 1,
     }
     assert result.objective_value == pytest.approx(expected[objective], abs=1e-5)
     assert observed[-1].objective == objective.value
     assert observed[-1].general_constraints == (
-        1 if objective == CompactObjectiveKind.DEADLINE_VIOLATIONS else 0
+        1 if objective == ObjectiveKind.DEADLINE_VIOLATIONS else 0
     )
 
 
 @pytest.mark.parametrize(
     "objective",
     [
-        CompactObjectiveKind.DEADLINE_VIOLATIONS,
-        CompactObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY,
+        ObjectiveKind.DEADLINE_VIOLATIONS,
+        ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY,
     ],
 )
 def test_satisfied_deadline_has_zero_violation_or_delay_cost(
-    objective: CompactObjectiveKind,
+    objective: ObjectiveKind,
 ) -> None:
     worker = _worker(1)
     request = _request(
@@ -136,7 +134,7 @@ def test_accuracy_uses_request_dataset_and_flow_arrival_weights() -> None:
         )
         requests[request.flow_id] = request
     result = GurobiSolver(
-        GurobiSolverConfig(CompactObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY)
+        GurobiSolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY)
     )._solve(requests, context, _problem_config(1))
     assert result.objective_value == pytest.approx(0.25 * 0.7 + 0.75 * 0.9)
 
@@ -145,16 +143,16 @@ def test_accuracy_uses_request_dataset_and_flow_arrival_weights() -> None:
     "objective",
     [
         kind
-        for kind in CompactObjectiveKind
+        for kind in ObjectiveKind
         if kind
         in {
-            CompactObjectiveKind.DEADLINE_VIOLATIONS,
-            CompactObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY,
+            ObjectiveKind.DEADLINE_VIOLATIONS,
+            ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY,
         }
     ],
 )
 def test_soft_objectives_allow_network_response_above_deadline(
-    objective: CompactObjectiveKind,
+    objective: ObjectiveKind,
 ) -> None:
     worker, edge = _worker(1), _worker(2)
     context = _context({worker: 2, edge: 0.1}, throughput_bytes_per_s=4)

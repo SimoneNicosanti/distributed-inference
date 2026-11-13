@@ -7,8 +7,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
 )
 from scalability_benchmark.campaigns import CampaignName, campaign_specs
 from scalability_benchmark.configuration import (
@@ -31,7 +31,7 @@ async def run_campaign(
     resume: bool,
     retry_errors: bool,
     limit: int | None,
-    objectives: tuple[CompactObjectiveKind, ...] | None = None,
+    objectives: tuple[ObjectiveKind, ...] | None = None,
 ) -> None:
     provenance = software_provenance()
     provenance_hash = fingerprint(provenance)
@@ -139,7 +139,7 @@ def main() -> None:
         parser.error("--limit must be positive")
     if args.retry_errors and not args.resume:
         parser.error("--retry-errors requires --resume")
-    objectives: tuple[CompactObjectiveKind, ...] | None = None
+    objectives: tuple[ObjectiveKind, ...] | None = None
     if args.objectives:
         if "all" in args.objectives:
             if len(args.objectives) != 1:
@@ -149,7 +149,7 @@ def main() -> None:
             objectives = BENCHMARK_OBJECTIVES
         else:
             objectives = tuple(
-                dict.fromkeys(CompactObjectiveKind(value) for value in args.objectives)
+                dict.fromkeys(ObjectiveKind(value) for value in args.objectives)
             )
     config = load_configuration(args.config)
     if args.seed:

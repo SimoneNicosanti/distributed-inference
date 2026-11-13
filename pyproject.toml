@@ -210,6 +210,7 @@ mypy_path = [
   "$MYPY_CONFIG_FILE_DIR/services/worker/src",
   "$MYPY_CONFIG_FILE_DIR/services/ingress/src",
   "$MYPY_CONFIG_FILE_DIR/services/front_end/src",
+  "$MYPY_CONFIG_FILE_DIR/services/optimizer/src",
   "$MYPY_CONFIG_FILE_DIR/services",
 ]
 
@@ -274,6 +275,7 @@ extraPaths = [
   "services/worker/src",
   "services/ingress/src",
   "services/front_end/src",
+  "services/optimizer/src",
 
   "packages/catalog/src",
   "packages/integration/src",

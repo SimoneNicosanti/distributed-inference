@@ -7,10 +7,10 @@ from controller.application.optimization.default_optimization_solution_enricher 
     DefaultOptimizationSolutionEnricher,
 )
 from controller.domain.backend import Backend
-from controller.domain.optimization.solving.enriched_optimization_solution import (
+from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
-from controller.domain.optimization.solving.optimization_solution import (
+from controller.domain.optimization.solution.optimization_solution import (
     ComponentSolution,
     ComponentTensorContract,
     FlowOptimizationSolution,

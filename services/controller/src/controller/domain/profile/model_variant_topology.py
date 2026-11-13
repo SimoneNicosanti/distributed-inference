@@ -4,7 +4,7 @@ from typing import Any, TypedDict, cast
 
 import networkx as nx
 
-from controller.domain.optimization.solving.optimization_solution import (
+from controller.domain.optimization.solution.optimization_solution import (
     ComponentTensorContract,
 )
 from shared.model.keys import EdgeKey, LayerKey, TensorKey

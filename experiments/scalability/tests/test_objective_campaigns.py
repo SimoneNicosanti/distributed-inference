@@ -7,8 +7,8 @@ from scalability_benchmark.campaigns import campaign_specs
 from scalability_benchmark.configuration import BENCHMARK_OBJECTIVES, ExperimentConfig
 from scalability_benchmark.randomness import fingerprint
 
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
 )
 
 
@@ -41,8 +41,8 @@ def test_subset_selection_is_deduplicated_and_preserves_order(
     config: ExperimentConfig,
 ) -> None:
     selected = (
-        CompactObjectiveKind.DEADLINE_VIOLATIONS,
-        CompactObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
+        ObjectiveKind.DEADLINE_VIOLATIONS,
+        ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
     )
     specs = list(campaign_specs(config, "pilot", objectives=selected + selected))
     assert tuple(spec.objective for spec in specs[:2]) == selected

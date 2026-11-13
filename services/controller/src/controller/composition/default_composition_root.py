@@ -3,6 +3,27 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from typing import override
 
 import httpx
+from optimizer.src.optimizer.application.abc.optimization_context_builder import (
+    OptimizationContextBuilder,
+)
+from optimizer.src.optimizer.application.default_optimization_context_builder import (
+    DefaultOptimizationContextBuilder,
+)
+from optimizer.src.optimizer.application.default_optimization_solution_enricher import (
+    DefaultOptimizationSolutionEnricher,
+)
+from optimizer.src.optimizer.application.formulation.compact.compact_formulation_data_builder import (
+    CompactFormulationDataBuilder,
+)
+from optimizer.src.optimizer.domain.compact.compact_formulation_config import (
+    CompactFormulationConfig,
+)
+from optimizer.src.optimizer.domain.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
+from optimizer.src.optimizer.domain.compact.compact_objective_kind import (
+    CompactObjectiveKind,
+)
 from redis import asyncio as redis_asyncio
 
 from advertisement.advertising_manager import AdvertisingManager
@@ -15,27 +36,6 @@ from catalog.redis.service.redis_service_registrar import RedisServiceRegistrar
 from catalog.view.worker.default_worker_directory import DefaultWorkerDirectory
 from controller.adapters.outbound.directory.default_worker_directory_gateway import (
     DefaultWorkerDirectoryGateway,
-)
-from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
-    GurobiSolverConfig,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.compact_variables import (
-    CompactVariables,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.gurobi_compact_formulation_compiler import (
-    GurobiCompactFormulationCompiler,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.gurobi_formulation_model_builder import (
-    GurobiFormulationModelBuilder,
-)
-from controller.adapters.outbound.optimization.gurobi.result_translation.formulations.compact.gurobi_compact_solved_formulation_model_translator import (
-    GurobiCompactSolvedFormulationModelTranslator,
-)
-from controller.adapters.outbound.optimization.gurobi.solver.gurobi_solver import (
-    GurobiSolver,
-)
-from controller.adapters.outbound.optimization.gurobi.solver_config_builder.gurobi_solver_config_builder import (
-    GurobiSolverConfigBuilder,
 )
 from controller.adapters.outbound.partition_builder.http_partition_builder_gateway import (
     HttpPartitionBuilderGateway,
@@ -81,24 +81,8 @@ from controller.application.deployment.default_plan_three_phase_dispatcher impor
 from controller.application.deployment.default_solution_to_plan_converter import (
     DefaultSolutionToPlanConverter,
 )
-from controller.application.optimization.abc.optimization_context_builder import (
-    OptimizationContextBuilder,
-)
-from controller.application.optimization.abc.solver_strategy import SolverStrategy
-from controller.application.optimization.default_optimization_context_builder import (
-    DefaultOptimizationContextBuilder,
-)
 from controller.application.optimization.default_optimization_manager import (
     DefaultOptimizationManager,
-)
-from controller.application.optimization.default_optimization_solution_enricher import (
-    DefaultOptimizationSolutionEnricher,
-)
-from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
-    CompactFormulationDataBuilder,
-)
-from controller.application.optimization.strategies.full_solver_strategy import (
-    FullSolverStrategy,
 )
 from controller.application.ports.inbound.optimization.optimization_manager import (
     OptimizationManager,
@@ -110,15 +94,6 @@ from controller.application.ports.outbound.store.optimization_solution_store imp
     OptimizationSolutionStore,
 )
 from controller.composition.composition_root import CompositionRoot
-from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
-    CompactFormulationConfig,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_formulation_data import (
-    CompactFormulationData,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
-)
 from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
 from integration.redis.model.keys_factory import StringModelKeyFactory
 from integration.redis.profiled_model_variant.keys_factory import (
@@ -134,6 +109,31 @@ from integration.redis.worker_profiles.resource_profile_keys import (
     StringResourceProfileKeyFactory,
 )
 from integration.service_instance.service_instance import ServiceInstance
+from optimizer.adapters.outbound.gurobi.formulation_compiler.gurobi_formulation_compiler import (
+    GurobiModelBuilder,
+)
+from optimizer.src.optimizer.adapters.outbound.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
+)
+from optimizer.src.optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.compact_variables import (
+    CompactVariables,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.gurobi_misocp_compact_formulation_compiler import (
+    GurobiMisocpCompactFormulationModelBuilder,
+)
+from optimizer.adapters.outbound.gurobi.result_translation.formulations.compact.gurobi_misocp_compact_solved_compiled_formulation_translator import (
+    GurobiCompactSolvedFormulationModelTranslator,
+)
+from optimizer.src.optimizer.adapters.outbound.gurobi.solver.gurobi_solver import (
+    GurobiSolver,
+)
+from optimizer.src.optimizer.adapters.outbound.gurobi.solver_config_builder.gurobi_solver_config_builder import (
+    GurobiSolverConfigBuilder,
+)
+from optimizer.src.optimizer.application.abc.solver_strategy import SolverStrategy
+from optimizer.src.optimizer.application.strategies.full_solver_strategy import (
+    FullSolverStrategy,
+)
 
 
 class DefaultCompositionRoot(CompositionRoot):
@@ -199,9 +199,9 @@ class DefaultCompositionRoot(CompositionRoot):
         )
 
         solver_strategy: SolverStrategy = FullSolverStrategy(
-            formulation_data_builder=CompactFormulationDataBuilder(),
-            formulation_model_builder=GurobiFormulationModelBuilder(
-                GurobiCompactFormulationCompiler(),
+            formulation_builder=CompactFormulationDataBuilder(),
+            formulation_compiler=GurobiModelBuilder(
+                GurobiMisocpCompactFormulationModelBuilder(),
                 non_convex=0,
                 output_flag=solver_config.output_flag,
             ),

@@ -3,10 +3,10 @@ from collections.abc import Sequence
 from controller.application.deployment.builder.endpoint_replica_id_builder import (
     EndpointIdsByFlow,
 )
-from controller.domain.optimization.solving.optimization_solution import (
+from controller.domain.plan.failure_plan import FailurePlan
+from optimizer.domain.solution.optimization_solution import (
     OptimizationSolution,
 )
-from controller.domain.plan.failure_plan import FailurePlan
 from shared.flow.flow import FlowId
 from shared.plan.hop_logical_id import PlannedSinkReplicaId
 from shared.service.service import WorkerId

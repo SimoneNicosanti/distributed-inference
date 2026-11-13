@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from controller.domain.optimization.solving.enriched_optimization_solution import (
+from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
 

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import TypeAlias
 
-from controller.domain.optimization.solving.enriched_optimization_solution import (
+from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
 from controller.domain.plan.flow_plan import FlowPlan

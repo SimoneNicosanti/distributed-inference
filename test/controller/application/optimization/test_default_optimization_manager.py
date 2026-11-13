@@ -9,24 +9,24 @@ from controller.application.optimization.abc.optimization_context_builder import
 from controller.application.optimization.abc.optimization_solution_enricher import (
     OptimizationSolutionEnricher,
 )
-from controller.application.optimization.abc.solver_strategy import SolverStrategy
 from controller.application.optimization.default_optimization_manager import (
     DefaultOptimizationManager,
 )
 from controller.application.ports.outbound.store.optimization_solution_store import (
     OptimizationSolutionStore,
 )
+from controller.domain.optimization.context.optimization_context import (
+    OptimizationContext,
+)
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
     OptimizationRequestsByFlow,
 )
-from controller.domain.optimization.solving.enriched_optimization_solution import (
+from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
-)
-from controller.domain.optimization.solving.optimization_solution import (
+from optimizer.application.abc.solver_strategy import SolverStrategy
+from optimizer.domain.solution.optimization_solution import (
     OptimizationSolution,
 )
 from shared.flow.flow import FlowId

@@ -8,16 +8,16 @@ from controller.application.deployment.builder.partition_replica_id_builder impo
     ReplicaIdsByFlow,
 )
 from controller.domain.hop.hop import ExternalHop, InvocableHop, SourceHop
-from controller.domain.optimization.solving.optimization_solution import (
-    FlowOptimizationSolution,
-    OptimizationSolution,
-)
 from controller.domain.plan.hop_routing_plan import (
     HopAddress,
     HopInputRouting,
     HopOutputRouting,
     HopRoutingPlan,
     HopRoutings,
+)
+from optimizer.domain.solution.optimization_solution import (
+    FlowOptimizationSolution,
+    OptimizationSolution,
 )
 from shared.plan.hop_logical_id import PlannedPartitionReplicaId
 from shared.service.service import WorkerId

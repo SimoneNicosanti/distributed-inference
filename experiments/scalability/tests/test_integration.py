@@ -21,25 +21,25 @@ from scalability_benchmark.profiling.static import (
 )
 from scalability_benchmark.solver import build_solver_strategy
 
-from controller.adapters.outbound.optimization.gurobi.entities.gurobi_run_statistics import (
-    GurobiRunStatistics,
-)
-from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
-    GurobiSolverConfig,
-)
-from controller.application.optimization.abc.solver_strategy import SolveError
-from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
-    CompactFormulationConfig,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
-)
-from controller.domain.optimization.solving.optimization_context import (
+from controller.domain.optimization.context.optimization_context import (
     OptimizationContext,
 )
-from controller.domain.optimization.solving.solver_result import SolverTerminationKind
 from controller.domain.profile.model_variant_execution_profile import (
     WorkerExecutionProfiles,
+)
+from optimizer.adapters.outbound.gurobi.entities.gurobi_run_statistics import (
+    GurobiRunStatistics,
+)
+from optimizer.adapters.outbound.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
+)
+from optimizer.application.abc.solver_strategy import SolveError
+from optimizer.application.formulation.compact.compact_formulation_config import (
+    CompactFormulationConfig,
+)
+from optimizer.application.ports.outbound.solver_result import SolverTerminationKind
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
 )
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -122,7 +122,7 @@ async def test_real_solver_feasible_and_infeasible(
         compute_utilization_limit=0.8,
         network_utilization_limit=0.8,
         relative_error=0.1,
-        objective=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        objective=ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
     )
     strategy, recorder = build_solver_strategy(
         formulation_config,

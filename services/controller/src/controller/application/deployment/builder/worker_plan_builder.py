@@ -19,10 +19,10 @@ from controller.application.deployment.builder.partition_replica_id_builder impo
 from controller.application.deployment.builder.scheduling_plan_builder import (
     SchedulingPlanBuilder,
 )
-from controller.domain.optimization.solving.optimization_solution import (
+from controller.domain.plan.worker_plan import WorkerPlan
+from optimizer.domain.solution.optimization_solution import (
     OptimizationSolution,
 )
-from controller.domain.plan.worker_plan import WorkerPlan
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import WorkerId
 

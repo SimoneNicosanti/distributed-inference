@@ -7,10 +7,10 @@ from controller.application.deployment.builder.partition_replica_id_builder impo
     ReplicaIdsByFlow,
 )
 from controller.domain.backend import Backend
-from controller.domain.optimization.solving.optimization_solution import (
+from controller.domain.plan.deployment_plan import DeploymentPlan, ResourceAllocation
+from optimizer.domain.solution.optimization_solution import (
     OptimizationSolution,
 )
-from controller.domain.plan.deployment_plan import DeploymentPlan, ResourceAllocation
 from shared.plan.hop_logical_id import (
     PlannedIngressReplicaId,
     PlannedPartitionReplicaId,

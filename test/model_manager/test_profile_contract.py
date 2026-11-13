@@ -14,13 +14,7 @@ from controller.adapters.outbound.profile.mappers.model_variant_execution_profil
 from controller.adapters.outbound.profile.mappers.model_variant_static_profile_mapper import (
     ModelVariantStaticProfileMapper,
 )
-from controller.application.optimization.formulation.compact.profile_data import (
-    batch_size,
-    layer_execution_profiles,
-    layer_weight_size_bytes,
-    tensor_size_bytes,
-)
-from controller.domain.optimization.solving.optimization_context import (
+from controller.domain.optimization.context.optimization_context import (
     OptimizationContext,
 )
 from controller.domain.profile.model_variant_execution_profile import (
@@ -59,6 +53,12 @@ from model_manager.domain.model_variant import (
     ModelVariantInfo,
 )
 from model_manager.domain.profiled_model_variant import ProfiledModelVariant
+from optimizer.application.formulation.compact.profile_data import (
+    batch_size,
+    layer_execution_profiles,
+    layer_weight_size_bytes,
+    tensor_size_bytes,
+)
 from shared.artifact.artifact_ref import ArtifactRef
 from shared.model.model import CNNArchitectureInfo, ModelId, ModelTask
 from shared.model.model_variant import (

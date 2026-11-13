@@ -8,27 +8,27 @@ import gurobipy as gp
 import pytest
 from gurobipy import GRB
 
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.assignment_variables import (
-    AssignmentVariables,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.constraints import (
-    _add_transition_marginal_constraints,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.network_builder import (
-    _add_network_variables,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.network_variables import (
-    NetworkVariables,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_formulation_data import (
-    CompactFormulationData,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
-)
 from controller.domain.profile.network_topology import (
     NetworkConnection,
     NetworkTopology,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.assignment.assignment_variables import (
+    AssignmentVariables,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.network.constraints import (
+    _add_transition_marginal_constraints,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.network.network_builder import (
+    _add_network_variables,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.network.network_variables import (
+    NetworkVariables,
+)
+from optimizer.application.formulation.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
 )
 from shared.flow.flow import FlowId
 from shared.service.service import ServiceId, WorkerId
@@ -61,7 +61,7 @@ def _problem(
         priority_count=1,
         compute_utilization_limit=0.9,
         network_utilization_limit=0.9,
-        objective_kind=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        objective_kind=ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
         static_profiles_by_variant={},
         resource_profiles_by_worker={},
         network_topology=NetworkTopology(workers=workers, connections=()),

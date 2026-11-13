@@ -1,6 +1,6 @@
 import pytest
 
-from controller.adapters.outbound.optimization.gurobi.gurobi_units import (
+from optimizer.adapters.outbound.gurobi.gurobi_units import (
     bytes_per_second_to_megabytes_per_second,
     bytes_to_megabytes,
 )

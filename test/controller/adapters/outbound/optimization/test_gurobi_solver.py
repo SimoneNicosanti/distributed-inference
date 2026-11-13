@@ -7,11 +7,8 @@ from controller.adapters.outbound.optimization.gurobi_solver import (
     OptimizationInfeasibleError,
 )
 
-from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
-    GurobiSolverConfig,
-)
-from controller.application.optimization.formulation.compact.profile_data import (
-    layer_execution_profiles,
+from controller.domain.optimization.context.optimization_context import (
+    OptimizationContext,
 )
 from controller.domain.optimization.request.flow_endpoint_placement import (
     FixedPlacement,
@@ -25,18 +22,6 @@ from controller.domain.optimization.request.optimization_request import (
 )
 from controller.domain.optimization.request.qos_constraints import QoSRequirements
 from controller.domain.optimization.request.stream_info import StreamInfo
-from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
-    CompactFormulationConfig,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
-)
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
-)
-from controller.domain.optimization.solving.optimization_solution import (
-    OptimizationSolution,
-)
 from controller.domain.profile.model_variant_execution_profile import (
     Backend,
     BackendExecutionProfile,
@@ -68,6 +53,21 @@ from controller.domain.profile.resource_profile import (
     CpuProfile,
     RamProfile,
     WorkerResourceProfile,
+)
+from optimizer.adapters.outbound.gurobi.entities.gurobi_solver_config import (
+    GurobiSolverConfig,
+)
+from optimizer.application.formulation.compact.compact_formulation_config import (
+    CompactFormulationConfig,
+)
+from optimizer.application.formulation.compact.profile_data import (
+    layer_execution_profiles,
+)
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
+)
+from optimizer.domain.solution.optimization_solution import (
+    OptimizationSolution,
 )
 from shared.flow.flow import FlowId
 from shared.model.keys import LayerKey
@@ -507,7 +507,7 @@ def _problem_config(
 def _solver() -> GurobiSolver:
     return GurobiSolver(
         GurobiSolverConfig(
-            objective=(CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME),
+            objective=(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME),
         )
     )
 

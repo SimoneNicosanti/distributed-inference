@@ -6,15 +6,15 @@ from typing import Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
 )
 
 BENCHMARK_OBJECTIVES = (
-    CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
-    CompactObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
-    CompactObjectiveKind.DEADLINE_VIOLATIONS,
-    CompactObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY,
+    ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+    ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
+    ObjectiveKind.DEADLINE_VIOLATIONS,
+    ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY,
 )
 
 
@@ -145,11 +145,11 @@ class OptimizationSettings(Settings):
     compute_utilization_limit: float = Field(gt=0, lt=1)
     network_utilization_limit: float = Field(gt=0, lt=1)
     relative_error: float = Field(gt=0)
-    objective: CompactObjectiveKind
+    objective: ObjectiveKind
 
     @field_validator("objective")
     @classmethod
-    def benchmark_objective(cls, value: CompactObjectiveKind) -> CompactObjectiveKind:
+    def benchmark_objective(cls, value: ObjectiveKind) -> ObjectiveKind:
         if value not in BENCHMARK_OBJECTIVES:
             raise ValueError("Select one of the four benchmark objectives")
         return value

@@ -24,19 +24,19 @@ from controller.application.ports.outbound.store.flow_plan_publisher import (
     FlowPlanPublisher,
 )
 from controller.domain.backend import Backend
-from controller.domain.optimization.solving.enriched_optimization_solution import (
+from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
-from controller.domain.optimization.solving.optimization_solution import (
+from controller.domain.plan.flow_plan import FlowPlan
+from controller.domain.plan.worker_plan import WorkerPlan
+from controller.domain.profile.model_variant_static_profile import TensorProperty
+from optimizer.domain.solution.optimization_solution import (
     ComponentSolution,
     ComponentTensorContract,
     CutSolution,
     FlowOptimizationSolution,
     OptimizationSolution,
 )
-from controller.domain.plan.flow_plan import FlowPlan
-from controller.domain.plan.worker_plan import WorkerPlan
-from controller.domain.profile.model_variant_static_profile import TensorProperty
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_partition import ModelPartitionId

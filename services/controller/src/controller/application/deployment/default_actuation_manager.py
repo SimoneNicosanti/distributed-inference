@@ -14,7 +14,7 @@ from controller.application.deployment.abc.solution_observer import SolutionObse
 from controller.application.deployment.abc.worker_plan_three_phase_dispatcher import (
     PlanThreePhaseDispatcher,
 )
-from controller.domain.optimization.solving.enriched_optimization_solution import (
+from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
 from lifecycle.async_lifecycle import AsyncLifecycle

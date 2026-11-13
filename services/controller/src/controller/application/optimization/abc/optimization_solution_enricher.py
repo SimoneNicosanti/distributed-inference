@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 
-from controller.domain.optimization.solving.enriched_optimization_solution import (
+from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
-from controller.domain.optimization.solving.optimization_solution import (
+from controller.domain.optimization.solution.optimization_solution import (
     OptimizationSolution,
 )
 from controller.domain.profile.model_variant_static_profile import (

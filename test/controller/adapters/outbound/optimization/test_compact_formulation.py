@@ -5,6 +5,9 @@ from dataclasses import replace
 import gurobipy as gp
 import pytest
 from controller.adapters.outbound.optimization.gurobi_solver import GurobiSolver
+from optimizer.application.formulation.compact.compact_formulation_config import (
+    FormulationKind,
+)
 from test.controller.adapters.outbound.optimization.test_gurobi_solver import (
     _context,
     _flow,
@@ -13,14 +16,11 @@ from test.controller.adapters.outbound.optimization.test_gurobi_solver import (
     _worker,
 )
 
-from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
+from optimizer.adapters.outbound.gurobi.entities.gurobi_solver_config import (
     GurobiSolverConfig,
 )
-from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
-    FormulationKind,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
 )
 
 
@@ -30,7 +30,7 @@ def solve(formulation=FormulationKind.COMPACT, *, components=1, priorities=1):
     request = _request(worker, arrival_rate=1, max_response_time_s=10, flow_id=_flow(1))
     solution = GurobiSolver(
         GurobiSolverConfig(
-            CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=formulation,
             observer=observations.append,
             threads=1,
@@ -45,7 +45,7 @@ def solve(formulation=FormulationKind.COMPACT, *, components=1, priorities=1):
 
 
 def test_formulation_configuration():
-    config = GurobiSolverConfig(CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
+    config = GurobiSolverConfig(ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME)
     assert config.formulation is FormulationKind.COMPACT
     assert list(FormulationKind) == [FormulationKind.COMPACT]
     assert replace(config, formulation="compact").formulation is FormulationKind.COMPACT
@@ -88,15 +88,16 @@ def test_implicit_integrality_from_binary_layer_and_priority_assignments(monkeyp
 
 @pytest.mark.parametrize("selected", [False, True])
 def test_execution_epigraph_cannot_underestimate_physical_time(selected):
-    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.assignment_builder import (
+    from optimizer.application.formulation.compact.compact_formulation_data_builder import (
+        CompactFormulationDataBuilder,
+    )
+
+    from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.assignment.assignment_builder import (
         _add_assignment_variables,
     )
-    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.execution.execution_builder import (
+    from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.execution.execution_builder import (
         CompactExecutionBuilder,
         _add_execution_variables,
-    )
-    from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
-        CompactFormulationDataBuilder,
     )
 
     workers = (_worker(1), _worker(2))
@@ -131,16 +132,17 @@ def test_execution_epigraph_cannot_underestimate_physical_time(selected):
 
 @pytest.mark.parametrize("missing_link", [False, True])
 def test_transmission_link_latency_and_sparse_topology(missing_link):
-    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.constraints import (
-        add_transmission_constraints,
-    )
-    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.gurobi_compact_formulation_compiler import (
-        GurobiCompactFormulationCompiler,
-    )
-    from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
+    from optimizer.application.formulation.compact.compact_formulation_data_builder import (
         CompactFormulationDataBuilder,
     )
+
     from controller.domain.profile.network_topology import NetworkTopology
+    from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.network.constraints import (
+        add_transmission_constraints,
+    )
+    from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.gurobi_misocp_compact_formulation_compiler import (
+        GurobiMisocpCompactFormulationModelBuilder,
+    )
 
     workers = (_worker(1), _worker(2))
     request = _request(
@@ -149,7 +151,7 @@ def test_transmission_link_latency_and_sparse_topology(missing_link):
     requests = {request.flow_id: request}
     context = _context(dict.fromkeys(workers, 0.1), throughput_bytes_per_s=4)
     if missing_link:
-        from controller.domain.optimization.solving.optimization_context import (
+        from controller.domain.optimization.context.optimization_context import (
             OptimizationContext,
         )
 
@@ -166,7 +168,9 @@ def test_transmission_link_latency_and_sparse_topology(missing_link):
     variant = problem.models_by_flow[request.flow_id][0]
     with gp.Model() as model:
         model.Params.OutputFlag = 0
-        variables = GurobiCompactFormulationCompiler()._create_variables(model, problem)
+        variables = GurobiMisocpCompactFormulationModelBuilder()._create_variables(
+            model, problem
+        )
         for (
             _flow_id,
             component,
@@ -200,15 +204,16 @@ def test_transmission_link_latency_and_sparse_topology(missing_link):
 
 @pytest.mark.parametrize("selected", [False, True])
 def test_memory_uses_profiled_maximum_cut_and_one_server_activation(selected):
-    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.assignment_builder import (
+    from optimizer.application.formulation.compact.compact_formulation_data_builder import (
+        CompactFormulationDataBuilder,
+    )
+
+    from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.assignment.assignment_builder import (
         _add_assignment_variables,
     )
-    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.memory.memory_builder import (
+    from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.memory.memory_builder import (
         CompactMemoryBuilder,
         _add_compact_memory_variables,
-    )
-    from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
-        CompactFormulationDataBuilder,
     )
 
     worker = _worker(1)
@@ -257,10 +262,10 @@ def test_compact_priority_queue_matches_physical_first_priority(priorities):
 
 
 def test_queue_bounds_use_full_profile_and_stability_without_deadline_clipping():
-    from controller.application.optimization.formulation.compact.bounds import (
+    from optimizer.application.formulation.compact.bounds import (
         prepare_compact_problem,
     )
-    from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
+    from optimizer.application.formulation.compact.compact_formulation_data_builder import (
         CompactFormulationDataBuilder,
     )
 
@@ -284,10 +289,10 @@ def test_queue_bounds_use_full_profile_and_stability_without_deadline_clipping()
 
 
 def test_queue_bound_keeps_models_even_when_batch_fill_exceeds_deadline():
-    from controller.application.optimization.formulation.compact.bounds import (
+    from optimizer.application.formulation.compact.bounds import (
         prepare_compact_problem,
     )
-    from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
+    from optimizer.application.formulation.compact.compact_formulation_data_builder import (
         CompactFormulationDataBuilder,
     )
 
@@ -309,17 +314,18 @@ def test_queue_bound_keeps_models_even_when_batch_fill_exceeds_deadline():
 
 
 def test_two_priority_queue_uses_upper_bin_endpoint_and_unscaled_wait():
-    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.compute_queue.compute_queue_builder import (
-        CompactComputeQueueBuilder,
-    )
-    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.gurobi_compact_formulation_compiler import (
-        GurobiCompactFormulationCompiler,
-    )
-    from controller.application.optimization.formulation.compact.bounds import (
+    from optimizer.application.formulation.compact.bounds import (
         prepare_compact_problem,
     )
-    from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
+    from optimizer.application.formulation.compact.compact_formulation_data_builder import (
         CompactFormulationDataBuilder,
+    )
+
+    from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.compute_queue.compute_queue_builder import (
+        CompactComputeQueueBuilder,
+    )
+    from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.gurobi_misocp_compact_formulation_compiler import (
+        GurobiMisocpCompactFormulationModelBuilder,
     )
 
     worker = _worker(1)
@@ -340,7 +346,9 @@ def test_two_priority_queue_uses_upper_bin_endpoint_and_unscaled_wait():
     with gp.Model() as model:
         model.Params.OutputFlag = 0
         model.Params.NonConvex = 0
-        variables = GurobiCompactFormulationCompiler()._create_variables(model, problem)
+        variables = GurobiMisocpCompactFormulationModelBuilder()._create_variables(
+            model, problem
+        )
         for e in variables.assignment.component_worker.values():
             e.LB = e.UB = 1
         for active in variables.assignment.component_active.values():
@@ -381,7 +389,7 @@ def test_two_priority_queue_uses_upper_bin_endpoint_and_unscaled_wait():
 )
 @pytest.mark.parametrize("nominal", [0, 0.2, 0.7, 1])
 def test_projected_ps_matches_independent_disaggregated_lp(selected, nominal):
-    from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.constraints import (
+    from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.network.constraints import (
         add_projected_ps_epigraph,
     )
 

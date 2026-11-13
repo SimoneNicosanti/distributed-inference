@@ -19,7 +19,7 @@ from controller.application.deployment.builder.partition_replica_id_builder impo
 from controller.application.deployment.builder.worker_plan_builder import (
     WorkerPlanBuilder,
 )
-from controller.domain.optimization.solving.enriched_optimization_solution import (
+from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
 from shared.plan.plan_version import PlanVersion

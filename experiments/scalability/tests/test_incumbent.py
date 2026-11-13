@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 from gurobipy import GRB
 
-from controller.adapters.outbound.optimization.gurobi.trackers.gurobi_incumbent_tracker import (
+from optimizer.adapters.outbound.gurobi.trackers.gurobi_incumbent_tracker import (
     GurobiIncumbentTracker,
 )
 

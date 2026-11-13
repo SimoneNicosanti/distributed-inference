@@ -6,7 +6,7 @@ from controller.application.deployment.abc.model_partition_build_manager import 
 from controller.application.ports.outbound.partition.partition_builder_gateway import (
     PartitionBuilderGateway,
 )
-from controller.domain.optimization.solving.optimization_solution import (
+from optimizer.domain.solution.optimization_solution import (
     OptimizationSolution,
 )
 from shared.model.model_partition import ModelPartitionId

@@ -4,11 +4,11 @@ import math
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 
-from controller.application.optimization.formulation.compact.profile_data import (
-    tensor_size_bytes,
-)
 from controller.domain.profile.model_variant_static_profile import (
     ModelVariantStaticProfile,
+)
+from scalability_benchmark.profiling.static_costs import (
+    tensor_size_bytes,
 )
 from shared.model.keys import LayerKey
 

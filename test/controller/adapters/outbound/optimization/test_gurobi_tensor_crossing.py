@@ -5,35 +5,6 @@ import gurobipy as gp
 import pytest
 from gurobipy import GRB
 
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.assignment.assignment_variables import (
-    AssignmentVariables,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.constraints import (
-    _tensor_crossing_cut,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.expressions import (
-    GurobiAffineTerm,
-    tensor_crossing_term,
-    transmitted_data_size_mb_expression,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.network_builder import (
-    _add_network_variables,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.collaborators.network.network_variables import (
-    NetworkVariables,
-)
-from controller.adapters.outbound.optimization.gurobi.gurobi_units import (
-    bytes_to_megabytes,
-)
-from controller.application.optimization.formulation.compact.profile_data import (
-    tensor_size_bytes,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_formulation_data import (
-    CompactFormulationData,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
-)
 from controller.domain.profile.model_variant_static_profile import (
     ModelVariantStaticProfile,
 )
@@ -44,6 +15,35 @@ from controller.domain.profile.model_variant_topology import (
     TensorRoute,
 )
 from controller.domain.profile.network_topology import NetworkTopology
+from optimizer.adapters.outbound.gurobi.gurobi_units import (
+    bytes_to_megabytes,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.assignment.assignment_variables import (
+    AssignmentVariables,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.network.constraints import (
+    _tensor_crossing_cut,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.network.expressions import (
+    GurobiAffineTerm,
+    tensor_crossing_term,
+    transmitted_data_size_mb_expression,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.network.network_builder import (
+    _add_network_variables,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.network.network_variables import (
+    NetworkVariables,
+)
+from optimizer.application.formulation.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
+from optimizer.application.formulation.compact.profile_data import (
+    tensor_size_bytes,
+)
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
+)
 from shared.flow.flow import FlowId
 from shared.model.keys import LayerKey, TensorKey
 from shared.model.model_variant import ModelVariantId
@@ -103,7 +103,7 @@ def _problem(profile: ModelVariantStaticProfile) -> CompactFormulationData:
         priority_count=1,
         compute_utilization_limit=0.9,
         network_utilization_limit=0.9,
-        objective_kind=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        objective_kind=ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
         static_profiles_by_variant={_MODEL: profile},
         resource_profiles_by_worker={},
         network_topology=NetworkTopology(workers=(), connections=()),

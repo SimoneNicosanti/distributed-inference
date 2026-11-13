@@ -18,17 +18,17 @@ from scalability_benchmark.network import select_network
 from scalability_benchmark.profiling.static import StaticModel
 from scalability_benchmark.randomness import fingerprint
 
-from controller.application.optimization.formulation.compact.compact_formulation_data_builder import (
-    CompactFormulationDataBuilder,
-)
 from controller.domain.optimization.request.flow_endpoint_placement import (
     FixedPlacement,
 )
 from controller.domain.optimization.request.local_worker_config import (
     ValidLocalWorkerConfig,
 )
-from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
+from optimizer.application.formulation.compact.compact_formulation_config import (
     CompactFormulationConfig,
+)
+from optimizer.application.formulation.compact.compact_formulation_data_builder import (
+    CompactFormulationDataBuilder,
 )
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId

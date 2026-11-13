@@ -5,21 +5,21 @@ from unittest import IsolatedAsyncioTestCase
 
 import gurobipy as gp
 from gurobipy import GRB
-
-from controller.adapters.outbound.optimization.gurobi.entities.gurobi_formulation_model import (
-    GurobiFormulationModel,
-)
-from controller.adapters.outbound.optimization.gurobi.model_builder.formulations.compact.compact_variables import (
-    CompactVariables,
-)
-from controller.adapters.outbound.optimization.gurobi.warm_start.compact_gurobi_warm_start_applier import (
-    CompactGurobiWarmStartApplier,
-)
-from controller.domain.backend import Backend
-from controller.domain.optimization.solving.formulation.compact.compact_formulation_data import (
+from optimizer.application.formulation.compact.compact_formulation_data import (
     CompactFormulationData,
 )
-from controller.domain.optimization.solving.optimization_solution import (
+
+from controller.domain.backend import Backend
+from optimizer.adapters.outbound.gurobi.entities.gurobi_compiled_formulation import (
+    GurobiCompiledFormulation,
+)
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.compact_variables import (
+    CompactVariables,
+)
+from optimizer.adapters.outbound.gurobi.warm_start.compact_gurobi_warm_start_applier import (
+    CompactGurobiWarmStartApplier,
+)
+from optimizer.domain.solution.optimization_solution import (
     ComponentSolution,
     ComponentTensorContract,
     FlowOptimizationSolution,
@@ -121,11 +121,10 @@ class CompactGurobiWarmStartApplierTests(IsolatedAsyncioTestCase):
             flows=flows,
             max_components=3,
             static_profiles_by_variant={
-                variant: SimpleNamespace(topology=topology)
-                for variant in self.variants
+                variant: SimpleNamespace(topology=topology) for variant in self.variants
             },
         )
-        self.model = GurobiFormulationModel(
+        self.model = GurobiCompiledFormulation(
             native_model=cast(gp.Model, self.native),
             variables=cast(
                 CompactVariables,
@@ -134,7 +133,7 @@ class CompactGurobiWarmStartApplierTests(IsolatedAsyncioTestCase):
                     compute_queue=SimpleNamespace(component_priority=self.priorities),
                 ),
             ),
-            data=cast(CompactFormulationData, data),
+            formulation=cast(CompactFormulationData, data),
             construction_time_s=0.0,
         )
 

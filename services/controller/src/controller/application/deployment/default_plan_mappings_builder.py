@@ -11,7 +11,7 @@ from controller.application.deployment.abc.solution_to_plan_converter import (
 from controller.application.ports.outbound.plan_version.plan_version_factory import (
     PlanVersionFactory,
 )
-from controller.domain.optimization.solving.enriched_optimization_solution import (
+from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
 

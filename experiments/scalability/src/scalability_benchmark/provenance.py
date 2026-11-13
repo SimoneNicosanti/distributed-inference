@@ -20,7 +20,7 @@ def software_provenance() -> dict[str, object]:
     ]
     roots.extend(
         repository / "services" / name / "src"
-        for name in ("controller", "model_manager")
+        for name in ("optimizer", "controller", "model_manager")
     )
     roots.extend(
         repository / "packages" / name / "src"

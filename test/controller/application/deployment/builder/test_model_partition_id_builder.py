@@ -1,10 +1,10 @@
 import pytest
-
 from controller.application.deployment.builder.model_partition_id_builder import (
     ModelPartitionIdBuilder,
 )
+
 from controller.domain.backend import Backend
-from controller.domain.optimization.solving.optimization_solution import (
+from optimizer.domain.solution.optimization_solution import (
     ComponentSolution,
     ComponentTensorContract,
     FlowOptimizationSolution,

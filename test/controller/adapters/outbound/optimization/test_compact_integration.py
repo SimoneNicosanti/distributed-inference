@@ -10,21 +10,21 @@ from test.controller.adapters.outbound.optimization import (
     test_gurobi_solver as fixtures,
 )
 
-from controller.adapters.outbound.optimization.gurobi.entities.gurobi_solver_config import (
+from controller.domain.optimization.context.optimization_context import (
+    OptimizationContext,
+)
+from optimizer.adapters.outbound.gurobi.entities.gurobi_solver_config import (
     GurobiSolverConfig,
 )
-from controller.application.optimization.formulation.compact.profile_data import (
+from optimizer.application.formulation.compact.compact_formulation_config import (
+    FormulationKind,
+)
+from optimizer.application.formulation.compact.profile_data import (
     layer_execution_profiles,
     tensor_size_bytes,
 )
-from controller.domain.optimization.solving.formulation.compact.compact_formulation_config import (
-    FormulationKind,
-)
-from controller.domain.optimization.solving.formulation.compact.compact_objective_kind import (
-    CompactObjectiveKind,
-)
-from controller.domain.optimization.solving.optimization_context import (
-    OptimizationContext,
+from optimizer.domain.problem.compact.compact_optimization_problem import (
+    ObjectiveKind,
 )
 
 
@@ -104,7 +104,7 @@ async def test_existing_operational_cases_with_compact(monkeypatch, case):
         "_solver",
         lambda: GurobiSolver(
             GurobiSolverConfig(
-                CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+                ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
                 formulation=FormulationKind.COMPACT,
                 threads=1,
                 seed=0,
@@ -132,7 +132,7 @@ def test_compact_physical_times_and_response_aggregation(priorities):
     )
     result = GurobiSolver(
         GurobiSolverConfig(
-            CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=FormulationKind.COMPACT,
             threads=1,
             seed=0,
@@ -213,7 +213,7 @@ def test_physical_network_queue_and_objective_at_well_scaled_tensor_sizes():
     )
     expected_wait = 0.05 * 0.04**2 / (2 * (1 - 0.05 * 0.04))
     expected = 0.04 + expected_wait + 2 * 0.01 / (1 - 0.5) + 0.002
-    objective = CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME
+    objective = ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME
     result = GurobiSolver(
         GurobiSolverConfig(
             objective, formulation=FormulationKind.COMPACT, threads=1, seed=0, mip_gap=0
@@ -249,7 +249,7 @@ def test_relay_only_worker_keeps_endpoints_and_excludes_computation(inference_ru
     )
     result = GurobiSolver(
         GurobiSolverConfig(
-            CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+            ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
             formulation=FormulationKind.COMPACT,
             threads=1,
             seed=0,
