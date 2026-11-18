@@ -127,7 +127,7 @@ def main() -> None:
     )
     assert native_calls(compiler.read_text(), "build_model_from_formulation") == [
         "self._create_variables",
-        "self._assignment.add_constraints",
+        "assignment_builder.add_constraints",
         "self._execution.add_constraints",
         "self._compute_queue.add_constraints",
         "self._network.add_constraints",
@@ -188,15 +188,17 @@ def main() -> None:
         for node in ast.walk(strategy_builder)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
-        and node.func.id == "FullSolverStrategy"
+        and node.func.id == "build_compact_gurobi_solver_strategy"
     )
     assert {keyword.arg for keyword in configured_strategy.keywords} == {
-        "formulation_builder",
-        "formulation_compiler",
-        "solver_config",
+        "strategy_config",
         "solver",
-        "solved_model_translator",
-        "formulation_config",
+    }
+    factory = ast.parse((optimizer / "gurobi/strategy_factory.py").read_text())
+    assert {"FullSolverStrategy", "IncrementalFlowSolverStrategy"} <= {
+        node.func.id
+        for node in ast.walk(factory)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     recorder = next(
         node
@@ -273,14 +275,24 @@ def main() -> None:
         for node in ast.walk(analyze)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
+    assert {"read_journal", "_plot_records"} <= analysis_calls
+    plotting = next(
+        node
+        for node in analysis.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_plot_records"
+    )
+    plotting_calls = {
+        node.func.id
+        for node in ast.walk(plotting)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
     assert {
-        "read_journal",
         "plot_runtime_progression",
         "plot_aggregate_times",
         "plot_first_incumbent",
-    } <= analysis_calls
-    assert not {"execute_solver", "GurobiSolver"} & analysis_calls
-    assert "plot_incumbent_history" not in analysis_calls
+    } <= plotting_calls
+    assert not {"execute_solver", "GurobiSolver"} & (analysis_calls | plotting_calls)
+    assert "plot_incumbent_history" not in plotting_calls
     aggregate_plots = ast.parse(
         (experiment / "src/scalability_benchmark/aggregate_time_plots.py").read_text()
     )

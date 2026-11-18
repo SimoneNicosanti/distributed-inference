@@ -4,6 +4,9 @@ from collections.abc import Iterator
 from dataclasses import asdict, dataclass, replace
 from typing import Literal
 
+from optimizer.domain.formulation.compact.misocp.compact_formulation_kind import (
+    CompactFormulationKind,
+)
 from optimizer.domain.problem.compact.compact_optimization_problem import (
     ObjectiveKind,
 )
@@ -23,10 +26,25 @@ class RunSpec:
     cloud_count: int
     timeout_s: float
     objective: ObjectiveKind = ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME
+    formulation: CompactFormulationKind = CompactFormulationKind.ASSIGNMENT
+    strategy: Literal["full", "incremental"] = "full"
+    insertion_time_limit_s: float | None = None
+    repair_time_limit_s: float | None = None
+    final_time_limit_s: float | None = None
 
     @property
     def worker_count(self) -> int:
         return 1 + self.edge_count + self.cloud_count
+
+    @property
+    def solver_budget_upper_bound_s(self) -> float:
+        if self.strategy == "full":
+            return self.timeout_s
+        return (
+            self.flow_count * (self.insertion_time_limit_s or self.timeout_s)
+            + (self.flow_count - 1) * (self.repair_time_limit_s or self.timeout_s)
+            + (self.final_time_limit_s or self.timeout_s)
+        )
 
     def as_record(self) -> dict[str, object]:
         return {**asdict(self), "worker_count": self.worker_count}
@@ -54,7 +72,15 @@ def campaign_specs(
         raise ValueError("Select one of the four benchmark objectives")
     for spec in _instance_specs(config, name):
         for objective in selected:
-            yield replace(spec, objective=objective)
+            yield replace(
+                spec,
+                objective=objective,
+                formulation=config.solver.formulation,
+                strategy=config.solver.strategy,
+                insertion_time_limit_s=config.solver.insertion_time_limit_s,
+                repair_time_limit_s=config.solver.repair_time_limit_s,
+                final_time_limit_s=config.solver.final_time_limit_s,
+            )
 
 
 def _instance_specs(config: ExperimentConfig, name: CampaignName) -> Iterator[RunSpec]:

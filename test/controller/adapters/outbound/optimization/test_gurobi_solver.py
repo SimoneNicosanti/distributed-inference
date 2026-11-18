@@ -20,7 +20,7 @@ from controller.domain.optimization.request.local_worker_config import (
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
 )
-from controller.domain.optimization.request.qos_constraints import QoSRequirements
+from controller.domain.optimization.request.qos_requirements import QoSRequirements
 from controller.domain.optimization.request.stream_info import StreamInfo
 from controller.domain.profile.model_variant_execution_profile import (
     Backend,

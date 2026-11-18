@@ -1,0 +1,373 @@
+"""State-machine tests using real prefix formulation and controlled solver outputs."""
+
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, replace
+from types import SimpleNamespace
+
+import pytest
+from test.optimizer.test_cumulative_formulation import LAYERS, dag_problem
+
+from optimizer.application.formulation.compact.misocp.misocp_compact_formulation_builder import (
+    MisocpCompactFormulationBuilder,
+)
+from optimizer.application.ports.outbound.formulation_compiler import (
+    FormulationCompiler,
+)
+from optimizer.application.ports.outbound.solved_compiled_formulation_translator import (
+    SolvedCompiledFormulationTranslator,
+)
+from optimizer.application.ports.outbound.solver import Solver
+from optimizer.application.ports.outbound.solver_result import SolverOutput
+from optimizer.application.ports.outbound.solver_result import (
+    SolverTerminationKind as Termination,
+)
+from optimizer.application.strategies.incremental.compact_problem_prefix import (
+    compact_problem_prefix,
+)
+from optimizer.application.strategies.incremental.incremental_flow_diagnostics import (
+    IncrementalStage,
+)
+from optimizer.application.strategies.incremental.incremental_flow_solver_strategy import (
+    IncrementalFlowSolveError,
+    IncrementalFlowSolverStrategy,
+    IncrementalFlowStrategyConfig,
+)
+from optimizer.application.strategies.incremental.incremental_model_adapter import (
+    IncrementalModelAdapter,
+)
+from optimizer.domain.formulation.compact.misocp.misocp_compact_formulation_config import (
+    MisocpCompactFormulationConfig,
+)
+from optimizer.domain.problem.compact.compact_optimization_problem import ObjectiveKind
+from optimizer.domain.solution.optimization_solution import (
+    ComponentSolution,
+    ComponentTensorContract,
+    FlowOptimizationSolution,
+    OptimizationSolution,
+)
+
+
+def solution_for(problem, objective=1.0):
+    flows = []
+    for flow, request in problem.flows.items():
+        key = request.configurations[0]
+        worker = request.workers[0]
+        component = ComponentSolution(
+            1,
+            worker,
+            problem.workers[worker].backend,
+            LAYERS,
+            ("input",),
+            ("output", "output2"),
+            ComponentTensorContract((), ()),
+            1,
+            0.01,
+            0,
+            0,
+            0,
+        )
+        flows.append(
+            FlowOptimizationSolution(
+                flow,
+                worker,
+                worker,
+                key.model_variant_id,
+                (component,),
+                (),
+                0,
+                0.01,
+                key.input_shapes.input_shapes,
+            )
+        )
+    return OptimizationSolution(tuple(flows), objective, True)
+
+
+@dataclass
+class Outcome:
+    termination: Termination = Termination.SOLUTION_LIMIT
+    incumbent: bool = True
+    objective: float = 1.0
+    valid: bool = True
+    error: Exception | None = None
+
+
+class FakeCompiler(FormulationCompiler):
+    def __init__(self):
+        self.models = []
+
+    @asynccontextmanager
+    async def compile_formulation(self, formulation) -> AsyncGenerator:
+        model = SimpleNamespace(
+            formulation=formulation, alive=True, seed=None, fixed=False
+        )
+        self.models.append(model)
+        try:
+            yield model
+        finally:
+            model.alive = False
+
+
+class FakeSolver(Solver):
+    def __init__(self, outcomes):
+        self.outcomes = iter(outcomes)
+        self.calls = []
+
+    async def solve_compiled_formulation(self, model, config):
+        assert model.alive
+        self.calls.append((model, config))
+        outcome = next(self.outcomes)
+        if outcome.error:
+            raise outcome.error
+        model.valid = outcome.valid
+        model.solution = solution_for(model.formulation.problem, outcome.objective)
+        return SolverOutput(
+            outcome.termination,
+            model if outcome.incumbent else None,
+            outcome.objective if outcome.incumbent else None,
+            None,
+            0.2,
+            SimpleNamespace(
+                time_to_first_incumbent_s=0.03 if outcome.incumbent else None
+            ),
+        )
+
+
+class FakeAdapter(IncrementalModelAdapter):
+    async def initialize_model(self, model, solution, *, fix_decisions):
+        assert model.alive
+        model.seed, model.fixed = solution, fix_decisions
+
+    def is_valid_solution(self, model):
+        assert model.alive
+        return model.valid
+
+
+class FakeTranslator(SolvedCompiledFormulationTranslator):
+    async def translate_solved_formulation_model(self, model):
+        assert model.alive
+        return model.solution
+
+
+def strategy(outcomes):
+    compiler = FakeCompiler()
+    solver = FakeSolver(outcomes)
+    observer = []
+    result = IncrementalFlowSolverStrategy(
+        formulation_builder=MisocpCompactFormulationBuilder(),
+        formulation_config=MisocpCompactFormulationConfig(0.5),
+        formulation_compiler=compiler,
+        config=IncrementalFlowStrategyConfig("insertion", "repair", "final"),
+        solver=solver,
+        solved_model_translator=FakeTranslator(),
+        model_adapter=FakeAdapter(),
+        observer=observer.append,
+    )
+    return result, compiler, solver, observer
+
+
+@pytest.mark.asyncio
+async def test_successful_insertions_then_exactly_one_free_final_solve():
+    problem = dag_problem(variants=1, flows=3)
+    runner, compiler, solver, observed = strategy([Outcome() for _ in range(4)])
+    result = await runner.solve(problem)
+    assert len(result.flow_solutions) == 3
+    assert [len(m.formulation.problem.flows) for m in compiler.models] == [1, 2, 3, 3]
+    assert [m.fixed for m in compiler.models] == [False, True, True, False]
+    assert [c for _, c in solver.calls] == ["insertion"] * 3 + ["final"]
+    assert [len(m.seed.flow_solutions) if m.seed else 0 for m in compiler.models] == [
+        0,
+        1,
+        2,
+        3,
+    ]
+    assert all(not m.alive for m in compiler.models)
+    diagnostics = runner.diagnostics
+    assert diagnostics.successful_restricted_insertions == 2
+    assert diagnostics.global_repair_count == 0
+    assert diagnostics.as_record()["native_solve_count"] == 4
+    assert observed == [diagnostics]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "termination, reason",
+    [
+        (Termination.INFEASIBLE, "restricted_infeasible"),
+        (Termination.TIME_LIMIT, "restricted_timeout_without_incumbent"),
+    ],
+)
+async def test_failed_insertion_recovers_with_partial_hint_and_free_decisions(
+    termination, reason
+):
+    runner, compiler, _, _ = strategy(
+        [Outcome(), Outcome(termination, False), Outcome(), Outcome()]
+    )
+    await runner.solve(dag_problem(variants=1, flows=2))
+    insertion, repair, final = compiler.models[1:]
+    assert insertion.fixed and not repair.fixed and not final.fixed
+    assert repair is not insertion
+    assert repair.seed is insertion.seed
+    assert len(repair.seed.flow_solutions) == 1
+    diagnostics = runner.diagnostics
+    assert diagnostics.global_repair_count == 1
+    assert diagnostics.attempts[2].reason == reason
+    assert diagnostics.attempts[2].stage == IncrementalStage.REPAIR
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "termination",
+    [Termination.INFEASIBLE, Termination.TIME_LIMIT, Termination.NUMERICAL_FAILURE],
+)
+async def test_unsuccessful_repair_preserves_status_and_never_returns_smaller_solution(
+    termination,
+):
+    runner, compiler, _, _ = strategy(
+        [Outcome(), Outcome(Termination.INFEASIBLE, False), Outcome(termination, False)]
+    )
+    with pytest.raises(IncrementalFlowSolveError) as failure:
+        await runner.solve(dag_problem(variants=1, flows=2))
+    assert failure.value.termination == termination
+    assert failure.value.attempt.stage == IncrementalStage.REPAIR
+    assert runner.diagnostics.completed_flow_count == 1
+    assert runner.diagnostics.returned_source is None
+    assert len(compiler.models) == 3
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "final",
+    [
+        Outcome(Termination.TIME_LIMIT, False),
+        Outcome(Termination.TIME_LIMIT, True, 2),
+        Outcome(Termination.NUMERICAL_FAILURE, True, 0),
+        Outcome(Termination.OPTIMAL, True, 0, False),
+        Outcome(error=RuntimeError("native failure")),
+    ],
+)
+async def test_final_failure_or_worse_incumbent_retains_complete_valid_fallback(final):
+    runner, _, _, _ = strategy([Outcome(), Outcome(), final])
+    result = await runner.solve(dag_problem(variants=1, flows=2))
+    assert len(result.flow_solutions) == 2
+    assert result.objective_value == 1
+    assert not result.is_optimal
+    assert runner.diagnostics.returned_source == "incremental"
+    assert runner.diagnostics.completed_flow_count == 2
+    assert len(runner.diagnostics.attempts) == 3
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "objective,before,after",
+    [
+        (ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME, 2, 1),
+        (ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY, 1, 2),
+    ],
+)
+async def test_final_candidate_comparison_respects_objective_sense(
+    objective, before, after
+):
+    problem = dag_problem(variants=1, flows=1)
+    problem = replace(problem, policy=replace(problem.policy, objective=objective))
+    runner, compiler, _, _ = strategy(
+        [Outcome(objective=before), Outcome(Termination.TIME_LIMIT, True, after)]
+    )
+    result = await runner.solve(problem)
+    assert result.objective_value == after
+    assert runner.diagnostics.returned_source == "final"
+    assert len(compiler.models) == 2
+    assert not any(m.fixed for m in compiler.models)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "termination",
+    [Termination.TIME_LIMIT, Termination.INFEASIBLE, Termination.NUMERICAL_FAILURE],
+)
+async def test_first_flow_without_incumbent_is_explicit_failure(termination):
+    runner, compiler, _, _ = strategy([Outcome(termination, False)])
+    with pytest.raises(IncrementalFlowSolveError) as failure:
+        await runner.solve(dag_problem(variants=1))
+    assert failure.value.termination == termination
+    assert len(compiler.models) == 1
+    assert runner.diagnostics.completed_flow_count == 0
+
+
+@pytest.mark.asyncio
+async def test_invalid_insertion_incumbent_is_not_accepted():
+    runner, _, _, _ = strategy(
+        [Outcome(), Outcome(Termination.SOLUTION_LIMIT, True, valid=False)]
+    )
+    with pytest.raises(IncrementalFlowSolveError):
+        await runner.solve(dag_problem(variants=1, flows=2))
+    assert runner.diagnostics.attempts[-1].error_type == "ValueError"
+    assert runner.diagnostics.global_repair_count == 0
+
+
+@pytest.mark.asyncio
+async def test_cancellation_propagates_and_closes_model():
+    import asyncio
+
+    runner, compiler, _, _ = strategy([Outcome(error=asyncio.CancelledError())])
+    with pytest.raises(asyncio.CancelledError):
+        await runner.solve(dag_problem(variants=1))
+    assert not compiler.models[0].alive
+    assert runner.diagnostics.attempts[0].error_type == "CancelledError"
+
+
+@pytest.mark.asyncio
+async def test_empty_problem_rejected_before_any_solve():
+    runner, compiler, _, _ = strategy([])
+    with pytest.raises(ValueError, match="at least one flow"):
+        await runner.solve(replace(dag_problem(variants=1), flows={}))
+    assert not compiler.models
+
+
+def test_prefix_preserves_identity_of_profiles_and_original_flow_parameters():
+    problem = dag_problem(variants=1, flows=3)
+    for count in (1, 2, 3):
+        prefix = compact_problem_prefix(problem, count)
+        assert tuple(prefix.flows) == tuple(problem.flows)[:count]
+        assert all(prefix.flows[f] is problem.flows[f] for f in prefix.flows)
+        for name in (
+            "variants",
+            "configurations",
+            "execution_times_s",
+            "workers",
+            "connections",
+            "policy",
+        ):
+            assert getattr(prefix, name) is getattr(problem, name)
+    assert compact_problem_prefix(problem, 3) is problem
+    for count in (0, 4, True):
+        with pytest.raises(ValueError):
+            compact_problem_prefix(problem, count)
+
+
+@pytest.mark.asyncio
+async def test_timeout_with_valid_incumbent_continues_without_repair():
+    runner, _, _, _ = strategy(
+        [
+            Outcome(Termination.TIME_LIMIT, True),
+            Outcome(Termination.TIME_LIMIT, True),
+            Outcome(Termination.OPTIMAL, True),
+        ]
+    )
+    result = await runner.solve(dag_problem(variants=1, flows=2))
+    assert len(result.flow_solutions) == 2
+    assert runner.diagnostics.global_repair_count == 0
+    assert runner.diagnostics.successful_restricted_insertions == 1
+
+
+@pytest.mark.asyncio
+async def test_invalid_flow_reports_formulation_error_before_solver_call():
+    problem = dag_problem(variants=1)
+    flow, request = next(iter(problem.flows.items()))
+    problem = replace(problem, flows={flow: replace(request, workers=())})
+    runner, _, solver, _ = strategy([])
+    with pytest.raises(IncrementalFlowSolveError) as failure:
+        await runner.solve(problem)
+    assert failure.value.attempt.error_type == "MisocpCompactFormulationBuildError"
+    assert not solver.calls
+    assert runner.diagnostics.as_record()["native_solve_count"] == 0

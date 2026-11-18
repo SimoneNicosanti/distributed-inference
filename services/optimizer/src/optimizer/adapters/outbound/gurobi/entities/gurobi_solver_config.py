@@ -18,8 +18,16 @@ class GurobiSolverConfig:
         default=None, repr=False, compare=False
     )
     record_incumbent_history: bool = False
+    solution_limit: int | None = None
 
     def __post_init__(self) -> None:
+        if self.solution_limit is not None and (
+            type(self.solution_limit) is not int
+            or not 1 <= self.solution_limit <= 2_000_000_000
+        ):
+            raise ValueError(
+                "solution_limit must be a positive integer at most 2000000000"
+            )
         if self.time_limit_s is not None and (
             not math.isfinite(self.time_limit_s) or self.time_limit_s <= 0
         ):

@@ -1,7 +1,9 @@
 import gurobipy as gp
 
 from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.assignment.assignment_variables import (
+    AssignmentTerm,
     AssignmentVariables,
+    CumulativeAssignmentVariables,
 )
 from optimizer.domain.formulation.compact.misocp.misocp_compact_formulation import (
     MisocpCompactFormulation,
@@ -169,7 +171,7 @@ def _component_is_active_if_has_at_least_one_layer(
     flow_index: int,
     component: int,
 ) -> None:
-    layer_assignments: list[gp.Var] = []
+    layer_assignments: list[AssignmentTerm] = []
     for model_variant in p.configurations_by_flow[flow]:
         model_index = p.configuration_index[flow, model_variant]
         static_profile = p.problem.variants[model_variant.model_variant_id]
@@ -296,16 +298,15 @@ def _layer_assignments_respect_precedence(
         source, target = edge.source, edge.target
         source_index = p.layer_index[model_variant.model_variant_id, source]
         target_index = p.layer_index[model_variant.model_variant_id, target]
-        for component in components:
+        cuts = (
+            range(1, p.problem.policy.max_components)
+            if isinstance(assignment, CumulativeAssignmentVariables)
+            else components
+        )
+        for component in cuts:
             model.addConstr(
-                gp.quicksum(
-                    assignment.layer_component[flow, model_variant, target, previous]
-                    for previous in range(1, component + 1)
-                )
-                <= gp.quicksum(
-                    assignment.layer_component[flow, model_variant, source, previous]
-                    for previous in range(1, component + 1)
-                ),
+                assignment.layer_prefix_at(flow, model_variant, target, component)
+                <= assignment.layer_prefix_at(flow, model_variant, source, component),
                 name=f"precedence[{flow_index},{model_index},{source_index},{target_index},{component}]",
             )
 
@@ -364,6 +365,14 @@ def _layer_assigned_to_component_if_configuration_selected(
 ) -> None:
     for layer in static_profile.layers:
         layer_index = p.layer_index[model_variant.model_variant_id, layer]
+        if isinstance(assignment, CumulativeAssignmentVariables):
+            for cut in range(1, p.problem.policy.max_components):
+                model.addConstr(
+                    assignment.layer_prefix_at(flow, model_variant, layer, cut)
+                    <= assignment.layer_prefix_at(flow, model_variant, layer, cut + 1),
+                    name=f"cumulative_monotone[{flow_index},{model_index},{layer_index},{cut}]",
+                )
+            continue
         model.addConstr(
             gp.quicksum(
                 assignment.layer_component[flow, model_variant, layer, component]

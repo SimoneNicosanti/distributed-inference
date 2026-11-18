@@ -27,6 +27,19 @@ def finite_number(value: object) -> float | None:
     return float(value)
 
 
+def record_formulation(record: dict[str, Any]) -> str:
+    requested = record.get("requested_solver_configuration") or {}
+    value = str(
+        record.get("formulation") or requested.get("formulation") or "unspecified"
+    )
+    return "assignment" if value == "compact" else value
+
+
+def record_strategy(record: dict[str, Any]) -> str:
+    requested = record.get("requested_solver_configuration") or {}
+    return str(record.get("strategy") or requested.get("strategy") or "full")
+
+
 def record_objective(record: dict[str, Any]) -> str:
     requested = record.get("requested_solver_configuration") or {}
     return str(record.get("objective") or requested.get("objective") or "unspecified")
@@ -56,8 +69,8 @@ def incumbent_points(record: dict[str, Any]) -> list[tuple[float, float | None]]
 
 
 def aggregate(records: list[dict[str, Any]]) -> list[dict[str, object]]:
-    grouped: dict[tuple[str, float, str, str, int], list[dict[str, Any]]] = defaultdict(
-        list
+    grouped: dict[tuple[str, float, str, str, str, str, int], list[dict[str, Any]]] = (
+        defaultdict(list)
     )
     for record in records:
         for dimension in DIMENSIONS:
@@ -65,11 +78,21 @@ def aggregate(records: list[dict[str, Any]]) -> list[dict[str, object]]:
                 record["campaign"],
                 record["load"],
                 record_objective(record),
+                record_formulation(record),
+                record_strategy(record),
                 dimension,
                 record[dimension],
             ].append(record)
     rows: list[dict[str, object]] = []
-    for (campaign, load, objective, dimension, size), group in sorted(grouped.items()):
+    for (
+        campaign,
+        load,
+        objective,
+        formulation,
+        strategy,
+        dimension,
+        size,
+    ), group in sorted(grouped.items()):
         runtimes = [
             value
             for record in group
@@ -92,6 +115,8 @@ def aggregate(records: list[dict[str, Any]]) -> list[dict[str, object]]:
             {
                 "campaign": campaign,
                 "objective": objective,
+                "formulation": formulation,
+                "strategy": strategy,
                 "load": load,
                 "dimension": dimension,
                 "size": size,
@@ -145,6 +170,29 @@ def analyze(directory: Path) -> None:
         writer.writeheader()
         writer.writerows(rows)
     # Import only for analysis: scenario construction and solves do not need plotting.
+    for strategy, formulation in sorted(
+        {(record_strategy(r), record_formulation(r)) for r in records}
+    ):
+        selected = [
+            r
+            for r in records
+            if record_strategy(r) == strategy and record_formulation(r) == formulation
+        ]
+        selected_rows = [
+            row
+            for row in rows
+            if row["strategy"] == strategy and row["formulation"] == formulation
+        ]
+        base = destination if strategy == "full" else destination / strategy
+        target = base if formulation == "unspecified" else base / formulation
+        target.mkdir(parents=True, exist_ok=True)
+        _plot_records(selected, selected_rows, target)
+
+
+def _plot_records(
+    records: list[dict[str, Any]], rows: list[dict[str, object]], destination: Path
+) -> None:
+
     import matplotlib
 
     matplotlib.use("Agg")

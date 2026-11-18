@@ -1,18 +1,56 @@
 # Scalability benchmark
 
 Synthetic, nested optimization instances. Builds the optimizer's normalized
-`CompactOptimizationProblem` directly and uses its `FullSolverStrategy`, MISOCP
+`CompactOptimizationProblem` directly and uses its full (default) or incremental strategy, MISOCP
 formulation, Gurobi compiler, solver and translator. Static profiling still uses
 the model manager's complete `DefaultModelProfiler` and controller profile types.
 No microservices, Redis, HTTP endpoints, worker processes or GPU hardware are
 needed to construct the simulated infrastructure. Real Gurobi execution needs an
 adequate license.
 
-The solver uses only the compact formulation. `solver.formulation` defaults to
-`compact`; the explicit value `compact` remains accepted and `legacy` is rejected.
+The compact MISOCP supports two layer representations: `assignment` (default)
+and `cumulative`. The old `compact` name remains an alias for `assignment`.
+Select with `solver.formulation` in YAML or `--formulation` on the CLI; `legacy`
+is rejected.
 The benchmark exposes four optimization objectives. The optimizer's `CONSTANT`
 feasibility objective is excluded from configuration and `--objectives all`.
 Profiles must contain `max_cut_size_mib`. Historical result files remain readable.
+
+## Assignment versus cumulative
+
+```bash
+# After setting PYTHONPATH as described below:
+uv run --python 3.14 --project experiments/scalability --locked scalability main --formulation assignment --output experiments/scalability/results/main-assignment
+uv run --python 3.14 --project experiments/scalability --locked scalability main --formulation cumulative --output experiments/scalability/results/main-cumulative
+
+# Repeated paired runs: one generated scenario, identical settings, alternating order.
+uv run --python 3.14 --project experiments/scalability --locked python experiments/scalability/scripts/compare_formulations.py --limit 1 --repetitions 3 --output experiments/scalability/results/paired-formulations
+```
+
+Each paired case uses a single generated instance for both representations.
+`--limit` counts base instances, so the command above performs six native solves.
+Run IDs, CSV columns and metadata include the formulation. Analysis separates
+plots into `analysis/assignment/` and `analysis/cumulative/`; aggregates never
+pool the two. Solver metrics include original variables/binaries/constraints,
+linear and quadratic-constraint nonzeros, presolve removals, node count,
+first-incumbent time, a sampled bound trace and zero-tardiness discovery time
+where applicable. Full presolved matrix sizes/nonzeros and root-relaxation time
+are not synthesized from these observations; enable solver logging for those.
+See [mathematics, validation and measured comparison](../../docs/optimization/cumulative-formulation.md).
+
+## Incremental strategy
+
+Select `--strategy incremental` or `solver.strategy: incremental` in YAML.
+The optimizer inserts flows with previous decisions fixed, repairs failed
+insertions with all decisions free, then always performs a final unrestricted
+solve. Both `assignment` and `cumulative` are supported. The default remains
+`full`.
+
+Optional YAML solver fields `insertion_time_limit_s`, `repair_time_limit_s`, and
+`final_time_limit_s` override the ordinary per-solve timeout for those stages.
+They do not impose a whole-strategy timeout. JSONL includes stage diagnostics;
+CSV includes repair/solve counts and strategy timing. Analysis separates the
+strategies. See [algorithm, configuration and validation](../../docs/optimization/incremental-flow-strategy.md).
 
 ## Setup
 

@@ -14,8 +14,14 @@ from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compac
     CompactObjectiveBuilder,
     CompactResponseTimeBuilder,
 )
+from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.assignment.cumulative_assignment_builder import (
+    CumulativeAssignmentBuilder,
+)
 from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.compact_variables import (
     CompactVariables,
+)
+from optimizer.domain.formulation.compact.misocp.compact_formulation_kind import (
+    CompactFormulationKind,
 )
 from optimizer.domain.formulation.compact.misocp.misocp_compact_formulation import (
     MisocpCompactFormulation,
@@ -43,6 +49,7 @@ class GurobiMisocpCompactFormulationModelBuilder(
             if assignment_builder is not None
             else CompactAssignmentBuilder()
         )
+        self._cumulative_assignment = CumulativeAssignmentBuilder()
         self._execution = (
             execution_builder
             if execution_builder is not None
@@ -74,7 +81,11 @@ class GurobiMisocpCompactFormulationModelBuilder(
         self, model: gp.Model, data: MisocpCompactFormulation
     ) -> CompactVariables:
         return CompactVariables(
-            assignment=self._assignment.create_variables(model, data),
+            assignment=(
+                self._cumulative_assignment
+                if data.representation is CompactFormulationKind.CUMULATIVE
+                else self._assignment
+            ).create_variables(model, data),
             execution=self._execution.create_variables(model, data),
             compute_queue=self._compute_queue.create_variables(model, data),
             network=self._network.create_variables(model, data),
@@ -87,7 +98,12 @@ class GurobiMisocpCompactFormulationModelBuilder(
         self, model: gp.Model, data: MisocpCompactFormulation
     ) -> CompactVariables:
         variables = self._create_variables(model, data)
-        self._assignment.add_constraints(model, data, assignment=variables.assignment)
+        assignment_builder = (
+            self._cumulative_assignment
+            if data.representation is CompactFormulationKind.CUMULATIVE
+            else self._assignment
+        )
+        assignment_builder.add_constraints(model, data, assignment=variables.assignment)
         self._execution.add_constraints(
             model, data, assignment=variables.assignment, execution=variables.execution
         )

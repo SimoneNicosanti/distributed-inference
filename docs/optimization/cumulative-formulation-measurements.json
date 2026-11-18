@@ -1,0 +1,709 @@
+{
+  "gurobi_version": [
+    13,
+    0,
+    3
+  ],
+  "fixture": "one flow, one 8-layer branching/skip DAG, two outputs, two CPU/GPU workers, K=3, P=1",
+  "repetitions": 5,
+  "gurobi_settings": {
+    "threads": 1,
+    "seed": 0,
+    "mip_gap": 0,
+    "time_limit_s": 10
+  },
+  "summaries": [
+    {
+      "formulation": "assignment",
+      "original_variables": 105,
+      "binary_variables": 36,
+      "linear_constraints": 236,
+      "linear_nonzeros": 865,
+      "objective": 0.00709688523708667,
+      "median_construction_time_s": 0.0037750970004708506,
+      "median_solver_runtime_s": 0.007447957992553711
+    },
+    {
+      "formulation": "cumulative",
+      "original_variables": 97,
+      "binary_variables": 29,
+      "linear_constraints": 234,
+      "linear_nonzeros": 801,
+      "objective": 0.007097527761809044,
+      "median_construction_time_s": 0.003516753000440076,
+      "median_solver_runtime_s": 0.0034821033477783203
+    }
+  ],
+  "runs": [
+    {
+      "formulation": "assignment",
+      "repetition": 0,
+      "objective": 0.00709688523708667,
+      "runtime_s": 0.01038503646850586,
+      "effective_parameters": {
+        "Threads": 1,
+        "Seed": 0,
+        "MIPGap": 0.0,
+        "MIPGapAbs": 1e-10,
+        "TimeLimit": 10.0,
+        "NonConvex": 0,
+        "DegenMoves": 0,
+        "PreMIQCPForm": 1,
+        "Presolve": -1,
+        "Method": -1,
+        "MIQCPMethod": -1,
+        "FeasibilityTol": 1e-06,
+        "OptimalityTol": 1e-06,
+        "BarQCPConvTol": 1e-06,
+        "NumericFocus": 0
+      },
+      "native_status": 2,
+      "solution_count": 2,
+      "relative_gap": 0.0,
+      "construction_time_s": 0.004825034000532469,
+      "time_limit_s": 10.0,
+      "mip_gap_target": 0.0,
+      "threads": 1,
+      "seed": 0,
+      "continuous_variables": 69,
+      "binary_variables": 36,
+      "integer_variables": 0,
+      "linear_constraints": 236,
+      "quadratic_constraints": 2,
+      "general_constraints": 0,
+      "node_count": 3.0,
+      "time_to_first_incumbent_s": 0.006356000900268555,
+      "incumbent_history": [
+        {
+          "runtime_s": 0.0,
+          "objective_value": null
+        },
+        {
+          "runtime_s": 0.01038503646850586,
+          "objective_value": 0.00709688523708667
+        }
+      ],
+      "original_variables": 105,
+      "linear_nonzeros": 865,
+      "quadratic_constraint_nonzeros": 8,
+      "presolve_columns_removed": 77,
+      "presolve_rows_removed": 194,
+      "time_to_zero_objective_s": null,
+      "bound_history": [
+        {
+          "runtime_s": 0.0049588680267333984,
+          "objective_bound": -0.00014400000000000003,
+          "node_count": 0.0
+        },
+        {
+          "runtime_s": 0.01038503646850586,
+          "objective_bound": 0.00709688523708667,
+          "node_count": 3.0
+        }
+      ]
+    },
+    {
+      "formulation": "cumulative",
+      "repetition": 0,
+      "objective": 0.007097527761809044,
+      "runtime_s": 0.003660917282104492,
+      "effective_parameters": {
+        "Threads": 1,
+        "Seed": 0,
+        "MIPGap": 0.0,
+        "MIPGapAbs": 1e-10,
+        "TimeLimit": 10.0,
+        "NonConvex": 0,
+        "DegenMoves": 0,
+        "PreMIQCPForm": 1,
+        "Presolve": -1,
+        "Method": -1,
+        "MIQCPMethod": -1,
+        "FeasibilityTol": 1e-06,
+        "OptimalityTol": 1e-06,
+        "BarQCPConvTol": 1e-06,
+        "NumericFocus": 0
+      },
+      "native_status": 2,
+      "solution_count": 1,
+      "relative_gap": 0.0,
+      "construction_time_s": 0.003880962001858279,
+      "time_limit_s": 10.0,
+      "mip_gap_target": 0.0,
+      "threads": 1,
+      "seed": 0,
+      "continuous_variables": 68,
+      "binary_variables": 29,
+      "integer_variables": 0,
+      "linear_constraints": 234,
+      "quadratic_constraints": 2,
+      "general_constraints": 0,
+      "node_count": 1.0,
+      "time_to_first_incumbent_s": 0.0035979747772216797,
+      "incumbent_history": [
+        {
+          "runtime_s": 0.0,
+          "objective_value": null
+        },
+        {
+          "runtime_s": 0.003660917282104492,
+          "objective_value": 0.007097527761809044
+        }
+      ],
+      "original_variables": 97,
+      "linear_nonzeros": 801,
+      "quadratic_constraint_nonzeros": 8,
+      "presolve_columns_removed": 74,
+      "presolve_rows_removed": 197,
+      "time_to_zero_objective_s": null,
+      "bound_history": [
+        {
+          "runtime_s": 0.002786874771118164,
+          "objective_bound": -0.00014400000000000003,
+          "node_count": 0.0
+        },
+        {
+          "runtime_s": 0.003660917282104492,
+          "objective_bound": 0.007097527761809044,
+          "node_count": 1.0
+        }
+      ]
+    },
+    {
+      "formulation": "cumulative",
+      "repetition": 1,
+      "objective": 0.007097527761809044,
+      "runtime_s": 0.0034821033477783203,
+      "effective_parameters": {
+        "Threads": 1,
+        "Seed": 0,
+        "MIPGap": 0.0,
+        "MIPGapAbs": 1e-10,
+        "TimeLimit": 10.0,
+        "NonConvex": 0,
+        "DegenMoves": 0,
+        "PreMIQCPForm": 1,
+        "Presolve": -1,
+        "Method": -1,
+        "MIQCPMethod": -1,
+        "FeasibilityTol": 1e-06,
+        "OptimalityTol": 1e-06,
+        "BarQCPConvTol": 1e-06,
+        "NumericFocus": 0
+      },
+      "native_status": 2,
+      "solution_count": 1,
+      "relative_gap": 0.0,
+      "construction_time_s": 0.003516753000440076,
+      "time_limit_s": 10.0,
+      "mip_gap_target": 0.0,
+      "threads": 1,
+      "seed": 0,
+      "continuous_variables": 68,
+      "binary_variables": 29,
+      "integer_variables": 0,
+      "linear_constraints": 234,
+      "quadratic_constraints": 2,
+      "general_constraints": 0,
+      "node_count": 1.0,
+      "time_to_first_incumbent_s": 0.003414154052734375,
+      "incumbent_history": [
+        {
+          "runtime_s": 0.0,
+          "objective_value": null
+        },
+        {
+          "runtime_s": 0.0034821033477783203,
+          "objective_value": 0.007097527761809044
+        }
+      ],
+      "original_variables": 97,
+      "linear_nonzeros": 801,
+      "quadratic_constraint_nonzeros": 8,
+      "presolve_columns_removed": 74,
+      "presolve_rows_removed": 197,
+      "time_to_zero_objective_s": null,
+      "bound_history": [
+        {
+          "runtime_s": 0.0026590824127197266,
+          "objective_bound": -0.00014400000000000003,
+          "node_count": 0.0
+        },
+        {
+          "runtime_s": 0.0034821033477783203,
+          "objective_bound": 0.007097527761809044,
+          "node_count": 1.0
+        }
+      ]
+    },
+    {
+      "formulation": "assignment",
+      "repetition": 1,
+      "objective": 0.00709688523708667,
+      "runtime_s": 0.0072879791259765625,
+      "effective_parameters": {
+        "Threads": 1,
+        "Seed": 0,
+        "MIPGap": 0.0,
+        "MIPGapAbs": 1e-10,
+        "TimeLimit": 10.0,
+        "NonConvex": 0,
+        "DegenMoves": 0,
+        "PreMIQCPForm": 1,
+        "Presolve": -1,
+        "Method": -1,
+        "MIQCPMethod": -1,
+        "FeasibilityTol": 1e-06,
+        "OptimalityTol": 1e-06,
+        "BarQCPConvTol": 1e-06,
+        "NumericFocus": 0
+      },
+      "native_status": 2,
+      "solution_count": 2,
+      "relative_gap": 0.0,
+      "construction_time_s": 0.003506458000629209,
+      "time_limit_s": 10.0,
+      "mip_gap_target": 0.0,
+      "threads": 1,
+      "seed": 0,
+      "continuous_variables": 69,
+      "binary_variables": 36,
+      "integer_variables": 0,
+      "linear_constraints": 236,
+      "quadratic_constraints": 2,
+      "general_constraints": 0,
+      "node_count": 3.0,
+      "time_to_first_incumbent_s": 0.003818035125732422,
+      "incumbent_history": [
+        {
+          "runtime_s": 0.0,
+          "objective_value": null
+        },
+        {
+          "runtime_s": 0.0072879791259765625,
+          "objective_value": 0.00709688523708667
+        }
+      ],
+      "original_variables": 105,
+      "linear_nonzeros": 865,
+      "quadratic_constraint_nonzeros": 8,
+      "presolve_columns_removed": 77,
+      "presolve_rows_removed": 194,
+      "time_to_zero_objective_s": null,
+      "bound_history": [
+        {
+          "runtime_s": 0.0029518604278564453,
+          "objective_bound": -0.00014400000000000003,
+          "node_count": 0.0
+        },
+        {
+          "runtime_s": 0.0072879791259765625,
+          "objective_bound": 0.00709688523708667,
+          "node_count": 3.0
+        }
+      ]
+    },
+    {
+      "formulation": "assignment",
+      "repetition": 2,
+      "objective": 0.00709688523708667,
+      "runtime_s": 0.007071971893310547,
+      "effective_parameters": {
+        "Threads": 1,
+        "Seed": 0,
+        "MIPGap": 0.0,
+        "MIPGapAbs": 1e-10,
+        "TimeLimit": 10.0,
+        "NonConvex": 0,
+        "DegenMoves": 0,
+        "PreMIQCPForm": 1,
+        "Presolve": -1,
+        "Method": -1,
+        "MIQCPMethod": -1,
+        "FeasibilityTol": 1e-06,
+        "OptimalityTol": 1e-06,
+        "BarQCPConvTol": 1e-06,
+        "NumericFocus": 0
+      },
+      "native_status": 2,
+      "solution_count": 2,
+      "relative_gap": 0.0,
+      "construction_time_s": 0.0035151240008417517,
+      "time_limit_s": 10.0,
+      "mip_gap_target": 0.0,
+      "threads": 1,
+      "seed": 0,
+      "continuous_variables": 69,
+      "binary_variables": 36,
+      "integer_variables": 0,
+      "linear_constraints": 236,
+      "quadratic_constraints": 2,
+      "general_constraints": 0,
+      "node_count": 3.0,
+      "time_to_first_incumbent_s": 0.003688812255859375,
+      "incumbent_history": [
+        {
+          "runtime_s": 0.0,
+          "objective_value": null
+        },
+        {
+          "runtime_s": 0.007071971893310547,
+          "objective_value": 0.00709688523708667
+        }
+      ],
+      "original_variables": 105,
+      "linear_nonzeros": 865,
+      "quadratic_constraint_nonzeros": 8,
+      "presolve_columns_removed": 77,
+      "presolve_rows_removed": 194,
+      "time_to_zero_objective_s": null,
+      "bound_history": [
+        {
+          "runtime_s": 0.00290679931640625,
+          "objective_bound": -0.00014400000000000003,
+          "node_count": 0.0
+        },
+        {
+          "runtime_s": 0.007071971893310547,
+          "objective_bound": 0.00709688523708667,
+          "node_count": 3.0
+        }
+      ]
+    },
+    {
+      "formulation": "cumulative",
+      "repetition": 2,
+      "objective": 0.007097527761809044,
+      "runtime_s": 0.003331899642944336,
+      "effective_parameters": {
+        "Threads": 1,
+        "Seed": 0,
+        "MIPGap": 0.0,
+        "MIPGapAbs": 1e-10,
+        "TimeLimit": 10.0,
+        "NonConvex": 0,
+        "DegenMoves": 0,
+        "PreMIQCPForm": 1,
+        "Presolve": -1,
+        "Method": -1,
+        "MIQCPMethod": -1,
+        "FeasibilityTol": 1e-06,
+        "OptimalityTol": 1e-06,
+        "BarQCPConvTol": 1e-06,
+        "NumericFocus": 0
+      },
+      "native_status": 2,
+      "solution_count": 1,
+      "relative_gap": 0.0,
+      "construction_time_s": 0.003441455999563914,
+      "time_limit_s": 10.0,
+      "mip_gap_target": 0.0,
+      "threads": 1,
+      "seed": 0,
+      "continuous_variables": 68,
+      "binary_variables": 29,
+      "integer_variables": 0,
+      "linear_constraints": 234,
+      "quadratic_constraints": 2,
+      "general_constraints": 0,
+      "node_count": 1.0,
+      "time_to_first_incumbent_s": 0.0032799243927001953,
+      "incumbent_history": [
+        {
+          "runtime_s": 0.0,
+          "objective_value": null
+        },
+        {
+          "runtime_s": 0.003331899642944336,
+          "objective_value": 0.007097527761809044
+        }
+      ],
+      "original_variables": 97,
+      "linear_nonzeros": 801,
+      "quadratic_constraint_nonzeros": 8,
+      "presolve_columns_removed": 74,
+      "presolve_rows_removed": 197,
+      "time_to_zero_objective_s": null,
+      "bound_history": [
+        {
+          "runtime_s": 0.002552032470703125,
+          "objective_bound": -0.00014400000000000003,
+          "node_count": 0.0
+        },
+        {
+          "runtime_s": 0.003331899642944336,
+          "objective_bound": 0.007097527761809044,
+          "node_count": 1.0
+        }
+      ]
+    },
+    {
+      "formulation": "cumulative",
+      "repetition": 3,
+      "objective": 0.007097527761809044,
+      "runtime_s": 0.003325939178466797,
+      "effective_parameters": {
+        "Threads": 1,
+        "Seed": 0,
+        "MIPGap": 0.0,
+        "MIPGapAbs": 1e-10,
+        "TimeLimit": 10.0,
+        "NonConvex": 0,
+        "DegenMoves": 0,
+        "PreMIQCPForm": 1,
+        "Presolve": -1,
+        "Method": -1,
+        "MIQCPMethod": -1,
+        "FeasibilityTol": 1e-06,
+        "OptimalityTol": 1e-06,
+        "BarQCPConvTol": 1e-06,
+        "NumericFocus": 0
+      },
+      "native_status": 2,
+      "solution_count": 1,
+      "relative_gap": 0.0,
+      "construction_time_s": 0.0034102259996871,
+      "time_limit_s": 10.0,
+      "mip_gap_target": 0.0,
+      "threads": 1,
+      "seed": 0,
+      "continuous_variables": 68,
+      "binary_variables": 29,
+      "integer_variables": 0,
+      "linear_constraints": 234,
+      "quadratic_constraints": 2,
+      "general_constraints": 0,
+      "node_count": 1.0,
+      "time_to_first_incumbent_s": 0.0032739639282226562,
+      "incumbent_history": [
+        {
+          "runtime_s": 0.0,
+          "objective_value": null
+        },
+        {
+          "runtime_s": 0.003325939178466797,
+          "objective_value": 0.007097527761809044
+        }
+      ],
+      "original_variables": 97,
+      "linear_nonzeros": 801,
+      "quadratic_constraint_nonzeros": 8,
+      "presolve_columns_removed": 74,
+      "presolve_rows_removed": 197,
+      "time_to_zero_objective_s": null,
+      "bound_history": [
+        {
+          "runtime_s": 0.0025730133056640625,
+          "objective_bound": -0.00014400000000000003,
+          "node_count": 0.0
+        },
+        {
+          "runtime_s": 0.003325939178466797,
+          "objective_bound": 0.007097527761809044,
+          "node_count": 1.0
+        }
+      ]
+    },
+    {
+      "formulation": "assignment",
+      "repetition": 3,
+      "objective": 0.00709688523708667,
+      "runtime_s": 0.008162975311279297,
+      "effective_parameters": {
+        "Threads": 1,
+        "Seed": 0,
+        "MIPGap": 0.0,
+        "MIPGapAbs": 1e-10,
+        "TimeLimit": 10.0,
+        "NonConvex": 0,
+        "DegenMoves": 0,
+        "PreMIQCPForm": 1,
+        "Presolve": -1,
+        "Method": -1,
+        "MIQCPMethod": -1,
+        "FeasibilityTol": 1e-06,
+        "OptimalityTol": 1e-06,
+        "BarQCPConvTol": 1e-06,
+        "NumericFocus": 0
+      },
+      "native_status": 2,
+      "solution_count": 2,
+      "relative_gap": 0.0,
+      "construction_time_s": 0.0037750970004708506,
+      "time_limit_s": 10.0,
+      "mip_gap_target": 0.0,
+      "threads": 1,
+      "seed": 0,
+      "continuous_variables": 69,
+      "binary_variables": 36,
+      "integer_variables": 0,
+      "linear_constraints": 236,
+      "quadratic_constraints": 2,
+      "general_constraints": 0,
+      "node_count": 3.0,
+      "time_to_first_incumbent_s": 0.004055023193359375,
+      "incumbent_history": [
+        {
+          "runtime_s": 0.0,
+          "objective_value": null
+        },
+        {
+          "runtime_s": 0.008162975311279297,
+          "objective_value": 0.00709688523708667
+        }
+      ],
+      "original_variables": 105,
+      "linear_nonzeros": 865,
+      "quadratic_constraint_nonzeros": 8,
+      "presolve_columns_removed": 77,
+      "presolve_rows_removed": 194,
+      "time_to_zero_objective_s": null,
+      "bound_history": [
+        {
+          "runtime_s": 0.0031571388244628906,
+          "objective_bound": -0.00014400000000000003,
+          "node_count": 0.0
+        },
+        {
+          "runtime_s": 0.008162975311279297,
+          "objective_bound": 0.00709688523708667,
+          "node_count": 3.0
+        }
+      ]
+    },
+    {
+      "formulation": "assignment",
+      "repetition": 4,
+      "objective": 0.00709688523708667,
+      "runtime_s": 0.007447957992553711,
+      "effective_parameters": {
+        "Threads": 1,
+        "Seed": 0,
+        "MIPGap": 0.0,
+        "MIPGapAbs": 1e-10,
+        "TimeLimit": 10.0,
+        "NonConvex": 0,
+        "DegenMoves": 0,
+        "PreMIQCPForm": 1,
+        "Presolve": -1,
+        "Method": -1,
+        "MIQCPMethod": -1,
+        "FeasibilityTol": 1e-06,
+        "OptimalityTol": 1e-06,
+        "BarQCPConvTol": 1e-06,
+        "NumericFocus": 0
+      },
+      "native_status": 2,
+      "solution_count": 2,
+      "relative_gap": 0.0,
+      "construction_time_s": 0.0039341060000879224,
+      "time_limit_s": 10.0,
+      "mip_gap_target": 0.0,
+      "threads": 1,
+      "seed": 0,
+      "continuous_variables": 69,
+      "binary_variables": 36,
+      "integer_variables": 0,
+      "linear_constraints": 236,
+      "quadratic_constraints": 2,
+      "general_constraints": 0,
+      "node_count": 3.0,
+      "time_to_first_incumbent_s": 0.003936052322387695,
+      "incumbent_history": [
+        {
+          "runtime_s": 0.0,
+          "objective_value": null
+        },
+        {
+          "runtime_s": 0.007447957992553711,
+          "objective_value": 0.00709688523708667
+        }
+      ],
+      "original_variables": 105,
+      "linear_nonzeros": 865,
+      "quadratic_constraint_nonzeros": 8,
+      "presolve_columns_removed": 77,
+      "presolve_rows_removed": 194,
+      "time_to_zero_objective_s": null,
+      "bound_history": [
+        {
+          "runtime_s": 0.003062009811401367,
+          "objective_bound": -0.00014400000000000003,
+          "node_count": 0.0
+        },
+        {
+          "runtime_s": 0.007447957992553711,
+          "objective_bound": 0.00709688523708667,
+          "node_count": 3.0
+        }
+      ]
+    },
+    {
+      "formulation": "cumulative",
+      "repetition": 4,
+      "objective": 0.007097527761809044,
+      "runtime_s": 0.003638029098510742,
+      "effective_parameters": {
+        "Threads": 1,
+        "Seed": 0,
+        "MIPGap": 0.0,
+        "MIPGapAbs": 1e-10,
+        "TimeLimit": 10.0,
+        "NonConvex": 0,
+        "DegenMoves": 0,
+        "PreMIQCPForm": 1,
+        "Presolve": -1,
+        "Method": -1,
+        "MIQCPMethod": -1,
+        "FeasibilityTol": 1e-06,
+        "OptimalityTol": 1e-06,
+        "BarQCPConvTol": 1e-06,
+        "NumericFocus": 0
+      },
+      "native_status": 2,
+      "solution_count": 1,
+      "relative_gap": 0.0,
+      "construction_time_s": 0.003878043997247005,
+      "time_limit_s": 10.0,
+      "mip_gap_target": 0.0,
+      "threads": 1,
+      "seed": 0,
+      "continuous_variables": 68,
+      "binary_variables": 29,
+      "integer_variables": 0,
+      "linear_constraints": 234,
+      "quadratic_constraints": 2,
+      "general_constraints": 0,
+      "node_count": 1.0,
+      "time_to_first_incumbent_s": 0.003559112548828125,
+      "incumbent_history": [
+        {
+          "runtime_s": 0.0,
+          "objective_value": null
+        },
+        {
+          "runtime_s": 0.003638029098510742,
+          "objective_value": 0.007097527761809044
+        }
+      ],
+      "original_variables": 97,
+      "linear_nonzeros": 801,
+      "quadratic_constraint_nonzeros": 8,
+      "presolve_columns_removed": 74,
+      "presolve_rows_removed": 197,
+      "time_to_zero_objective_s": null,
+      "bound_history": [
+        {
+          "runtime_s": 0.002732992172241211,
+          "objective_bound": -0.00014400000000000003,
+          "node_count": 0.0
+        },
+        {
+          "runtime_s": 0.003638029098510742,
+          "objective_bound": 0.007097527761809044,
+          "node_count": 1.0
+        }
+      ]
+    }
+  ]
+}

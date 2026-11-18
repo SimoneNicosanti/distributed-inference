@@ -24,7 +24,7 @@ from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
     OptimizationRequestsByFlow,
 )
-from controller.domain.optimization.request.qos_constraints import QoSRequirements
+from controller.domain.optimization.request.qos_requirements import QoSRequirements
 from controller.domain.optimization.request.stream_info import StreamInfo
 from integration.controller.http.optimization_http_paths import (
     OPTIMIZE_INFERENCE_DISTRIBUTION_PATH,

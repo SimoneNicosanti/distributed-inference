@@ -211,6 +211,7 @@ class MisocpCompactFormulationBuilder(
             )
         return MisocpCompactFormulation(
             problem=problem,
+            representation=formulation_config.representation,
             flows=flows,
             workers=workers,
             configurations_by_flow=candidates,

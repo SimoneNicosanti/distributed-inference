@@ -14,7 +14,7 @@ from controller.domain.optimization.request.local_worker_config import (
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
 )
-from controller.domain.optimization.request.qos_constraints import QoSRequirements
+from controller.domain.optimization.request.qos_requirements import QoSRequirements
 from controller.domain.optimization.request.stream_info import StreamInfo
 from integration.dto.optimization.optimization_dto import (
     AnyPlacementDto,

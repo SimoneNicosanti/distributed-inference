@@ -2,6 +2,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
+from optimizer.domain.formulation.compact.misocp.compact_formulation_kind import (
+    CompactFormulationKind,
+)
 from optimizer.domain.formulation.formulation import Formulation
 from optimizer.domain.problem.compact.compact_optimization_problem import (
     CompactOptimizationProblem,
@@ -48,8 +51,12 @@ class MisocpCompactFormulation(Formulation):
     connections_by_pair: Mapping[tuple[WorkerId, WorkerId], NetworkConnection]
     successors_by_worker: Mapping[WorkerId, tuple[WorkerId, ...]]
     predecessors_by_worker: Mapping[WorkerId, tuple[WorkerId, ...]]
+    representation: CompactFormulationKind = CompactFormulationKind.ASSIGNMENT
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "representation", CompactFormulationKind(self.representation)
+        )
         for name in (
             "configurations_by_flow",
             "service_arrival_rate_per_s",

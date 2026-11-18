@@ -18,6 +18,9 @@ from optimizer.adapters.outbound.gurobi.entities.gurobi_solver_config import (
 from optimizer.adapters.outbound.gurobi.trackers.gurobi_incumbent_tracker import (
     GurobiIncumbentTracker,
 )
+from optimizer.adapters.outbound.gurobi.trackers.gurobi_progress_tracker import (
+    GurobiProgressTracker,
+)
 from optimizer.application.ports.outbound.solver import Solver
 from optimizer.application.ports.outbound.solver_result import (
     SolverOutput,
@@ -93,18 +96,25 @@ class GurobiSolver[FormulationT, VariablesT](
             if config.record_incumbent_history
             else None
         )
+        progress = (
+            GurobiProgressTracker(minimize=native_model.ModelSense == GRB.MINIMIZE)
+            if config.record_incumbent_history
+            else None
+        )
 
         def callback(native: gp.Model, where: int) -> None:
             if cancel_requested.is_set():
                 native.terminate()
             elif tracker is not None:
                 tracker(native, where)
+                if progress is not None:
+                    progress(native, where)
 
         # Covers cancellation before optimize, including queued worker execution.
         if cancel_requested.is_set():
             raise asyncio.CancelledError
         native_model.optimize(callback)
-        result = self._collect_result(model, tracker)
+        result = self._collect_result(model, tracker, progress)
         if config.observer is not None:
             config.observer(result.statistics)
         return result
@@ -116,6 +126,7 @@ class GurobiSolver[FormulationT, VariablesT](
             ("MIPGap", config.mip_gap),
             ("Threads", config.threads),
             ("Seed", config.seed),
+            ("SolutionLimit", config.solution_limit),
         ):
             if value is not None:
                 model.setParam(name, value)
@@ -157,6 +168,7 @@ class GurobiSolver[FormulationT, VariablesT](
         self,
         model: GurobiCompiledFormulation[FormulationT, VariablesT],
         tracker: GurobiIncumbentTracker | None,
+        progress: GurobiProgressTracker | None = None,
     ) -> SolverOutput[
         GurobiCompiledFormulation[FormulationT, VariablesT], GurobiRunStatistics
     ]:
@@ -169,6 +181,15 @@ class GurobiSolver[FormulationT, VariablesT](
             if solution_count > 0
             else None
         )
+        bound = self._finite_attribute(native_model, GRB.Attr.ObjBound)
+        nodes = self._finite_attribute(native_model, GRB.Attr.NodeCount)
+        if (
+            progress is not None
+            and runtime_s is not None
+            and bound is not None
+            and nodes is not None
+        ):
+            progress.record_bound(runtime_s, bound, nodes)
         statistics = GurobiRunStatistics(
             native_status=status,
             solution_count=solution_count,
@@ -182,6 +203,25 @@ class GurobiSolver[FormulationT, VariablesT](
             mip_gap_target=float(native_model.Params.MIPGap),
             threads=int(native_model.Params.Threads),
             seed=int(native_model.Params.Seed),
+            original_variables=int(native_model.NumVars),
+            linear_nonzeros=int(value)
+            if (value := self._finite_attribute(native_model, GRB.Attr.NumNZs))
+            is not None
+            else None,
+            quadratic_constraint_nonzeros=int(value)
+            if (value := self._finite_attribute(native_model, GRB.Attr.NumQCNZs))
+            is not None
+            else None,
+            presolve_columns_removed=progress.presolve_columns_removed
+            if progress is not None
+            else None,
+            presolve_rows_removed=progress.presolve_rows_removed
+            if progress is not None
+            else None,
+            time_to_zero_objective_s=progress.time_to_zero_objective_s
+            if progress is not None
+            else None,
+            bound_history=tuple(progress.bound_history) if progress is not None else (),
             continuous_variables=(
                 int(native_model.NumVars) - int(native_model.NumIntVars)
             ),

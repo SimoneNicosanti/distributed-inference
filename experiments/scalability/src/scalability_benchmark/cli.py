@@ -7,6 +7,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
+from optimizer.domain.formulation.compact.misocp.compact_formulation_kind import (
+    CompactFormulationKind,
+)
 from optimizer.domain.problem.compact.compact_optimization_problem import (
     ObjectiveKind,
 )
@@ -118,6 +121,12 @@ def main() -> None:
         "--seed", type=int, action="append", help="Repeat to override the seed list"
     )
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--strategy", choices=("full", "incremental"))
+    parser.add_argument(
+        "--formulation",
+        choices=tuple(CompactFormulationKind),
+        help="Layer assignment representation (default: YAML, assignment)",
+    )
     parser.add_argument(
         "--objectives",
         nargs="+",
@@ -152,6 +161,21 @@ def main() -> None:
                 dict.fromkeys(ObjectiveKind(value) for value in args.objectives)
             )
     config = load_configuration(args.config)
+    if args.strategy is not None:
+        config = ExperimentConfig.model_validate(
+            {
+                **config.model_dump(),
+                "solver": {**config.solver.model_dump(), "strategy": args.strategy},
+            }
+        )
+    if args.formulation is not None:
+        config = config.model_copy(
+            update={
+                "solver": config.solver.model_copy(
+                    update={"formulation": CompactFormulationKind(args.formulation)}
+                )
+            }
+        )
     if args.seed:
         config = ExperimentConfig.model_validate(
             {**config.model_dump(), "seeds": tuple(args.seed)}
@@ -164,9 +188,13 @@ def main() -> None:
     elif args.command == "plan":
         for name in ("pilot", "main", "sensitivity"):
             specs = list(campaign_specs(config, name, objectives=objectives))
-            print(
-                f"{name}: {len(specs)} runs; solver budget={sum(spec.timeout_s for spec in specs) / 3600:g} h"
+            budget = sum(spec.solver_budget_upper_bound_s for spec in specs) / 3600
+            label = (
+                "solver budget upper bound"
+                if config.solver.strategy == "incremental"
+                else "solver budget"
             )
+            print(f"{name}: {len(specs)} runs; {label}={budget:g} h")
     else:
         try:
             asyncio.run(

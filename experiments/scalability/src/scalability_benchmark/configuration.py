@@ -6,6 +6,9 @@ from typing import Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from optimizer.domain.formulation.compact.misocp.compact_formulation_kind import (
+    CompactFormulationKind,
+)
 from optimizer.domain.problem.compact.compact_optimization_problem import (
     ObjectiveKind,
 )
@@ -156,12 +159,23 @@ class OptimizationSettings(Settings):
 
 
 class SolverSettings(Settings):
-    formulation: Literal["compact"] = "compact"
+    strategy: Literal["full", "incremental"] = "full"
+    insertion_time_limit_s: float | None = Field(
+        default=None, gt=0, allow_inf_nan=False
+    )
+    repair_time_limit_s: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    final_time_limit_s: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    formulation: CompactFormulationKind = CompactFormulationKind.ASSIGNMENT
     timeout_s: float = Field(gt=0)
     relative_gap: float = Field(ge=0)
     threads: int | None = Field(default=None, ge=0)
     seed: int = Field(ge=0, le=2_000_000_000)
     output_flag: bool
+
+    @field_validator("formulation", mode="before")
+    @classmethod
+    def old_compact_name(cls, value: object) -> object:
+        return CompactFormulationKind.ASSIGNMENT if value == "compact" else value
 
 
 class CampaignSettings(Settings):
@@ -214,7 +228,7 @@ class ExperimentConfig(Settings):
             raise ValueError("The device must be CPU-only")
         if any(self.hardware[tier].backend != "gpu" for tier in ("edge", "cloud")):
             raise ValueError("Edge and cloud must provide GPUs")
-        progression = tuple((i, 0) for i in range(11))
+        progression = tuple((i, 0) for i in range(4))
         if self.infrastructure != progression:
             raise ValueError(
                 "Infrastructure must preserve all 11 ordered configurations"

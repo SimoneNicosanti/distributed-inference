@@ -4,7 +4,7 @@ from controller.domain.optimization.request.flow_endpoint_placement import (
     FlowEndpointPlacement,
 )
 from controller.domain.optimization.request.local_worker_config import LocalWorkerConfig
-from controller.domain.optimization.request.qos_constraints import QoSRequirements
+from controller.domain.optimization.request.qos_requirements import QoSRequirements
 from controller.domain.optimization.request.stream_info import StreamInfo
 from shared.flow.flow import FlowId
 from shared.model.model import ModelTask

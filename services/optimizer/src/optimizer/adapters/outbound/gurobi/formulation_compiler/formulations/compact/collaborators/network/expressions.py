@@ -31,11 +31,9 @@ def destination_crossing_expression(
     destination: LayerKey,
     cut: int,
 ) -> gp.LinExpr:
-    return gp.quicksum(
-        assignment.layer_component[flow, model_variant, source, component]
-        - assignment.layer_component[flow, model_variant, destination, component]
-        for component in range(1, cut + 1)
-    )
+    return assignment.layer_prefix_at(
+        flow, model_variant, source, cut
+    ) - assignment.layer_prefix_at(flow, model_variant, destination, cut)
 
 
 def tensor_crossing_term(

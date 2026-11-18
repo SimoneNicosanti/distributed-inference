@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 
+from optimizer.adapters.outbound.gurobi.entities.gurobi_bound_sample import (
+    GurobiBoundSample,
+)
 from optimizer.adapters.outbound.gurobi.entities.gurobi_incumbent_sample import (
     GurobiIncumbentSample,
 )
@@ -26,3 +29,10 @@ class GurobiRunStatistics:
     node_count: float | None = None
     time_to_first_incumbent_s: float | None = None
     incumbent_history: tuple[GurobiIncumbentSample, ...] = ()
+    original_variables: int = 0
+    linear_nonzeros: int | None = None
+    quadratic_constraint_nonzeros: int | None = None
+    presolve_columns_removed: int | None = None
+    presolve_rows_removed: int | None = None
+    time_to_zero_objective_s: float | None = None
+    bound_history: tuple[GurobiBoundSample, ...] = ()

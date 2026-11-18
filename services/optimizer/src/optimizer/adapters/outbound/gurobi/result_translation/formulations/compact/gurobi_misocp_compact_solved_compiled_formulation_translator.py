@@ -231,7 +231,9 @@ class GurobiMisocpCompactSolvedCompiledFormulationTranslator(
             layers = tuple(
                 layer
                 for layer in topology.layers
-                if assignment.layer_component[flow, selected_model, layer, component].X
+                if _solution_value(
+                    assignment.layer_component[flow, selected_model, layer, component]
+                )
                 > 0.5
             )
             transmission_response = (

@@ -15,35 +15,33 @@ from optimizer.adapters.outbound.gurobi.entities.gurobi_run_statistics import (
 from optimizer.adapters.outbound.gurobi.entities.gurobi_solver_config import (
     GurobiSolverConfig,
 )
+from optimizer.adapters.outbound.gurobi.entities.gurobi_strategy_config import (
+    GurobiStrategyConfig,
+)
 from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.compact_variables import (
     CompactVariables,
-)
-from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.gurobi_misocp_compact_formulation_compiler import (
-    GurobiMisocpCompactFormulationModelBuilder,
-)
-from optimizer.adapters.outbound.gurobi.formulation_compiler.gurobi_formulation_compiler import (
-    GurobiFormulationCompiler,
-)
-from optimizer.adapters.outbound.gurobi.result_translation.formulations.compact.gurobi_misocp_compact_solved_compiled_formulation_translator import (
-    GurobiMisocpCompactSolvedCompiledFormulationTranslator,
 )
 from optimizer.adapters.outbound.gurobi.solver.gurobi_solver import (
     GurobiSolver,
 )
+from optimizer.adapters.outbound.gurobi.strategy_factory import (
+    build_compact_gurobi_solver_strategy,
+)
 from optimizer.application.abc.solver_strategy import (
     SolveError,
     SolverStrategy,
-)
-from optimizer.application.formulation.compact.misocp.misocp_compact_formulation_builder import (
-    MisocpCompactFormulationBuilder,
 )
 from optimizer.application.ports.outbound.solver import Solver
 from optimizer.application.ports.outbound.solver_result import (
     SolverOutput,
     SolverTerminationKind,
 )
-from optimizer.application.strategies.full_solver_strategy import (
-    FullSolverStrategy,
+from optimizer.application.strategies.incremental.incremental_flow_solver_strategy import (
+    IncrementalFlowSolverStrategy,
+)
+from optimizer.application.strategies.solver_strategy_kind import SolverStrategyKind
+from optimizer.domain.formulation.compact.misocp.compact_formulation_kind import (
+    CompactFormulationKind,
 )
 from optimizer.domain.formulation.compact.misocp.misocp_compact_formulation import (
     MisocpCompactFormulation,
@@ -97,21 +95,17 @@ class _RecordingSolver(
 def build_solver_strategy(
     formulation_config: MisocpCompactFormulationConfig,
     solver_config: GurobiSolverConfig,
+    *,
+    strategy_config: GurobiStrategyConfig | None = None,
 ) -> tuple[SolverStrategy[CompactOptimizationProblem], _RecordingSolver]:
     recorder = _RecordingSolver(
         GurobiSolver[MisocpCompactFormulation, CompactVariables]()
     )
-    strategy = FullSolverStrategy(
-        formulation_builder=MisocpCompactFormulationBuilder(),
-        formulation_compiler=GurobiFormulationCompiler(
-            GurobiMisocpCompactFormulationModelBuilder(),
-            non_convex=0,
-            output_flag=solver_config.output_flag,
-        ),
-        solver_config=solver_config,
+    strategy = build_compact_gurobi_solver_strategy(
+        formulation_config,
+        solver_config,
+        strategy_config=strategy_config,
         solver=recorder,
-        solved_model_translator=GurobiMisocpCompactSolvedCompiledFormulationTranslator(),
-        formulation_config=formulation_config,
     )
     return strategy, recorder
 
@@ -121,6 +115,7 @@ def classify(
     error: Exception | None,
     *,
     objective: ObjectiveKind,
+    formulation: CompactFormulationKind = CompactFormulationKind.ASSIGNMENT,
 ) -> dict[str, object]:
     statistics = output.statistics if output is not None else None
     status = statistics.native_status if statistics is not None else None
@@ -197,8 +192,36 @@ def classify(
         "time_to_first_incumbent_s": (
             statistics.time_to_first_incumbent_s if statistics else None
         ),
+        "time_to_zero_tardiness_s": statistics.time_to_zero_objective_s
+        if statistics
+        and objective
+        in {
+            ObjectiveKind.DEADLINE_VIOLATIONS,
+            ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY,
+        }
+        else None,
+        "original_variables": statistics.original_variables if statistics else None,
+        "original_binary_variables": statistics.binary_variables
+        if statistics
+        else None,
+        "original_constraints": statistics.linear_constraints
+        + statistics.quadratic_constraints
+        + statistics.general_constraints
+        if statistics
+        else None,
+        "original_linear_nonzeros": statistics.linear_nonzeros if statistics else None,
+        "original_quadratic_constraint_nonzeros": statistics.quadratic_constraint_nonzeros
+        if statistics
+        else None,
+        "presolve_columns_removed": statistics.presolve_columns_removed
+        if statistics
+        else None,
+        "presolve_rows_removed": statistics.presolve_rows_removed
+        if statistics
+        else None,
+        "node_count": statistics.node_count if statistics else None,
         "effective_solver_configuration": {
-            "formulation": "compact",
+            "formulation": formulation.value,
             "objective": objective.value,
             "time_limit_s": statistics.time_limit_s,
             "mip_gap": statistics.mip_gap_target,
@@ -219,11 +242,13 @@ async def execute_solver(
     failure = None
     solution = None
     recorder = None
+    strategy = None
     try:
         problem = make_instance(scenario, spec, config=config)
         strategy, recorder = build_solver_strategy(
             MisocpCompactFormulationConfig(
                 relative_error=config.optimization.relative_error,
+                representation=spec.formulation,
             ),
             GurobiSolverConfig(
                 output_flag=config.solver.output_flag,
@@ -233,20 +258,98 @@ async def execute_solver(
                 seed=config.solver.seed,
                 record_incumbent_history=True,
             ),
+            strategy_config=GurobiStrategyConfig(
+                strategy=SolverStrategyKind(spec.strategy),
+                insertion_time_limit_s=spec.insertion_time_limit_s,
+                repair_time_limit_s=spec.repair_time_limit_s,
+                final_time_limit_s=spec.final_time_limit_s,
+            ),
         )
         solution = await strategy.solve(problem)
     except Exception as error:
         failure = error
     output = recorder.output if recorder is not None else None
+    diagnostics = (
+        strategy.diagnostics
+        if isinstance(strategy, IncrementalFlowSolverStrategy)
+        else None
+    )
+    if (
+        diagnostics
+        and diagnostics.attempts
+        and diagnostics.attempts[-1].termination is None
+    ):
+        output = None
+    result = classify(
+        output, failure, objective=spec.objective, formulation=spec.formulation
+    )
+    extra: dict[str, object] = {}
+    if diagnostics is not None:
+        record = diagnostics.as_record()
+        extra = {
+            "strategy_diagnostics": record,
+            **{
+                key: value
+                for key, value in record.items()
+                if key not in {"attempts", "wall_time_s"}
+            },
+        }
+        result.update(
+            {
+                "feasible_incumbent": solution is not None,
+                "objective_value": solution.objective_value
+                if solution is not None
+                else None,
+                "solver_runtime_s": sum(
+                    attempt.solver_runtime_s or 0 for attempt in diagnostics.attempts
+                ),
+                "construction_time_s": sum(
+                    attempt.construction_time_s for attempt in diagnostics.attempts
+                ),
+                # Native history/bounds belong to the last attempt, not the strategy.
+                "time_to_first_incumbent_s": None,
+                "time_to_zero_tardiness_s": None,
+                "final_gap": None,
+                "objective_bound": None,
+                "infeasibility_proven": False,
+            }
+        )
+        last = diagnostics.attempts[-1] if diagnostics.attempts else None
+        full_infeasible = (
+            failure is not None
+            and last is not None
+            and last.stage != "insertion"
+            and last.flow_count == spec.flow_count
+            and last.termination == SolverTerminationKind.INFEASIBLE
+        )
+        result["infeasibility_proven"] = full_infeasible
+        if solution is not None:
+            result["termination"] = (
+                "feasible_fallback"
+                if diagnostics.returned_source == "incremental"
+                else result["termination"]
+            )
+        elif not full_infeasible and result["termination"] == "proven_infeasible":
+            result["termination"] = "incremental_failure"
     return {
-        **classify(output, failure, objective=spec.objective),
+        **result,
+        **extra,
+        "strategy": spec.strategy,
+        "formulation": spec.formulation.value,
         "wall_time_s": perf_counter() - started,
         "raw_solver_statistics": asdict(output.statistics)
-        if output is not None
+        if output is not None and diagnostics is None
+        else None,
+        "last_attempt_solver_statistics": asdict(output.statistics)
+        if output is not None and diagnostics is not None
         else None,
         "solution_extracted": solution is not None,
         "requested_solver_configuration": {
-            "formulation": config.solver.formulation,
+            "strategy": spec.strategy,
+            "insertion_time_limit_s": spec.insertion_time_limit_s,
+            "repair_time_limit_s": spec.repair_time_limit_s,
+            "final_time_limit_s": spec.final_time_limit_s,
+            "formulation": spec.formulation.value,
             "time_limit_s": spec.timeout_s,
             "mip_gap": config.solver.relative_gap,
             "threads": config.solver.threads,
