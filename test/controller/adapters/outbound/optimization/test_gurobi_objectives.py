@@ -125,10 +125,13 @@ def test_accuracy_uses_request_dataset_and_flow_arrival_weights() -> None:
         )
         request = replace(
             request,
-            qos_requirements=replace(
-                request.qos_requirements,
-                min_model_performance=PerformanceMetric(
-                    PerformanceMetricType.MAP_AT_50, dataset, 0.6
+            model_selection_requirements=replace(
+                request.model_selection_requirements,
+                selection_strategy=replace(
+                    request.model_selection_requirements.selection_strategy,
+                    min_model_performance=PerformanceMetric(
+                        PerformanceMetricType.MAP_AT_50, dataset, 0.6
+                    ),
                 ),
             ),
         )

@@ -70,8 +70,8 @@ solver:
 main:
   enabled: true
   loads: [0.7]
-  flows: [7]
-  models: [1] #, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  flows: [5, 7]
+  models: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 sensitivity:
   enabled: false
   loads: [0.3, 0.8]

@@ -6,6 +6,7 @@ from shared.model.model_variant import ModelVariantId, PerformanceMetric
 
 @dataclass(frozen=True, slots=True)
 class PerformanceSelectionStrategy:
+    task: ModelTask
     min_model_performance: PerformanceMetric
 
 
@@ -19,6 +20,4 @@ type SelectionStrategy = PerformanceSelectionStrategy | ModelVariantSelectionStr
 
 @dataclass(frozen=True, slots=True)
 class ModelSelectionRequirements:
-    task: ModelTask
-
     selection_strategy: SelectionStrategy

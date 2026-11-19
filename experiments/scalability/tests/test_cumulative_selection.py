@@ -160,7 +160,10 @@ def test_analysis_never_pools_representations(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_paired_comparison_reuses_one_scenario(scenario, tmp_path, monkeypatch):
+@pytest.mark.parametrize("model_selection", ["performance", "model_variant"])
+async def test_paired_comparison_reuses_one_scenario(
+    scenario, tmp_path, monkeypatch, model_selection
+):
     loader_spec = importlib.util.spec_from_file_location(
         "paired_comparison", COMPARISON_SCRIPT
     )
@@ -173,7 +176,9 @@ async def test_paired_comparison_reuses_one_scenario(scenario, tmp_path, monkeyp
             )
         }
     )
-    spec = RunSpec("main", 42, config.main.loads[0], 1, 1, 0, 0, 5)
+    spec = RunSpec(
+        "main", 42, config.main.loads[0], 1, 1, 0, 0, 5, model_selection=model_selection
+    )
     calls = []
 
     async def build(config, seed, cache, software):
@@ -182,11 +187,25 @@ async def test_paired_comparison_reuses_one_scenario(scenario, tmp_path, monkeyp
 
     monkeypatch.setattr(module, "load_configuration", lambda path: config)
     monkeypatch.setattr(module, "build_scenario", build)
-    monkeypatch.setattr(module, "campaign_specs", lambda config, name: iter([spec]))
-    await module.compare(tmp_path / "config.yaml", tmp_path / "paired", 1, 2)
+    monkeypatch.setattr(
+        module, "campaign_specs", lambda config, name, **kwargs: iter([spec])
+    )
+    await module.compare(
+        tmp_path / "config.yaml",
+        tmp_path / "paired",
+        1,
+        2,
+        model_selection=model_selection,
+    )
     records = list(read_journal(tmp_path / "paired/runs.jsonl").values())
     assert calls == [42]
     assert len(records) == 4
     assert len({row["scenario_id"] for row in records}) == 1
     assert {row["formulation"] for row in records} == {"assignment", "cumulative"}
     assert all(row["solver_status_name"] == "OPTIMAL" for row in records)
+    assert {row["model_selection"] for row in records} == {model_selection}
+    assert all(
+        (row["flows"][0]["model_variant_id"] is not None)
+        == (model_selection == "model_variant")
+        for row in records
+    )

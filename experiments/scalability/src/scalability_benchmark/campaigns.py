@@ -13,6 +13,9 @@ from optimizer.domain.problem.compact.compact_optimization_problem import (
 from scalability_benchmark.configuration import BENCHMARK_OBJECTIVES, ExperimentConfig
 
 type CampaignName = Literal["pilot", "main", "sensitivity"]
+type ModelSelection = Literal["performance", "model_variant"]
+
+MODEL_SELECTIONS: tuple[ModelSelection, ...] = ("performance", "model_variant")
 
 
 @dataclass(frozen=True)
@@ -31,6 +34,7 @@ class RunSpec:
     insertion_time_limit_s: float | None = None
     repair_time_limit_s: float | None = None
     final_time_limit_s: float | None = None
+    model_selection: ModelSelection = "performance"
 
     @property
     def worker_count(self) -> int:
@@ -55,7 +59,11 @@ def campaign_specs(
     name: CampaignName,
     *,
     objectives: tuple[ObjectiveKind, ...] | None = None,
+    model_selections: tuple[ModelSelection, ...] = ("performance",),
 ) -> Iterator[RunSpec]:
+    selections = tuple(dict.fromkeys(model_selections))
+    if not selections or any(value not in MODEL_SELECTIONS for value in selections):
+        raise ValueError("Select performance or model_variant model selection")
     selected = tuple(
         dict.fromkeys(
             ObjectiveKind(value)
@@ -72,15 +80,17 @@ def campaign_specs(
         raise ValueError("Select one of the four benchmark objectives")
     for spec in _instance_specs(config, name):
         for objective in selected:
-            yield replace(
-                spec,
-                objective=objective,
-                formulation=config.solver.formulation,
-                strategy=config.solver.strategy,
-                insertion_time_limit_s=config.solver.insertion_time_limit_s,
-                repair_time_limit_s=config.solver.repair_time_limit_s,
-                final_time_limit_s=config.solver.final_time_limit_s,
-            )
+            for selection in selections:
+                yield replace(
+                    spec,
+                    objective=objective,
+                    formulation=config.solver.formulation,
+                    strategy=config.solver.strategy,
+                    insertion_time_limit_s=config.solver.insertion_time_limit_s,
+                    repair_time_limit_s=config.solver.repair_time_limit_s,
+                    final_time_limit_s=config.solver.final_time_limit_s,
+                    model_selection=selection,
+                )
 
 
 def _instance_specs(config: ExperimentConfig, name: CampaignName) -> Iterator[RunSpec]:

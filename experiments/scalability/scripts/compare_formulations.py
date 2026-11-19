@@ -5,10 +5,19 @@ import asyncio
 import itertools
 from dataclasses import replace
 from pathlib import Path
+from typing import cast
 
-from scalability_benchmark.campaigns import campaign_specs
+from scalability_benchmark.campaigns import (
+    MODEL_SELECTIONS,
+    ModelSelection,
+    campaign_specs,
+)
 from scalability_benchmark.configuration import load_configuration
-from scalability_benchmark.instances import build_scenario
+from scalability_benchmark.instances import (
+    build_scenario,
+    instance_flows,
+    request_record,
+)
 from scalability_benchmark.persistence import ResultStore, atomic_json
 from scalability_benchmark.provenance import software_provenance
 from scalability_benchmark.randomness import fingerprint
@@ -20,12 +29,18 @@ from optimizer.domain.formulation.compact.misocp.compact_formulation_kind import
 
 
 async def compare(
-    config_path: Path, output: Path, limit: int, repetitions: int
+    config_path: Path,
+    output: Path,
+    limit: int,
+    repetitions: int,
+    model_selection: ModelSelection = "performance",
 ) -> None:
     config = load_configuration(config_path)
     software = software_provenance()
     with ResultStore(output, resume=False) as store:
-        specs = itertools.islice(campaign_specs(config, "main"), limit)
+        specs = itertools.islice(
+            campaign_specs(config, "main", model_selections=(model_selection,)), limit
+        )
         for seed, group in itertools.groupby(specs, key=lambda spec: spec.seed):
             source_hash = str(software["source_hash"])
             scenario = await build_scenario(
@@ -51,7 +66,14 @@ async def compare(
                             "repetition": repetition,
                         }
                         run_id = fingerprint(identity)
-                        base = {"run_id": run_id, **identity}
+                        base = {
+                            "run_id": run_id,
+                            **identity,
+                            "flows": [
+                                request_record(flow)
+                                for flow in instance_flows(scenario, selected)
+                            ],
+                        }
                         store.append({**base, "state": "started"})
                         result = await execute_solver(scenario, selected, config)
                         store.append({**base, **result, "state": "finished"})
@@ -71,10 +93,21 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--limit", type=int, default=1)
     parser.add_argument("--repetitions", type=int, default=3)
+    parser.add_argument(
+        "--model-selection", choices=MODEL_SELECTIONS, default="performance"
+    )
     args = parser.parse_args()
     if args.limit < 1 or args.repetitions < 1:
         parser.error("--limit and --repetitions must be positive")
-    asyncio.run(compare(args.config, args.output, args.limit, args.repetitions))
+    asyncio.run(
+        compare(
+            args.config,
+            args.output,
+            args.limit,
+            args.repetitions,
+            cast(ModelSelection, args.model_selection),
+        )
+    )
 
 
 if __name__ == "__main__":

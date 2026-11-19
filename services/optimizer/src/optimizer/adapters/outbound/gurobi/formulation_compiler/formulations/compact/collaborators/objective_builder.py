@@ -46,6 +46,9 @@ class CompactObjectiveBuilder:
             coefficients = {}
             for flow in p.flows:
                 requirement = problem.problem.flows[flow].performance_requirement
+                if requirement is None:
+                    # Explicit variants have no quality choice or comparison metric.
+                    continue
                 if requirement.type not in {
                     PerformanceMetricType.ACCURACY,
                     PerformanceMetricType.MAP_AT_50,
@@ -72,8 +75,7 @@ class CompactObjectiveBuilder:
                 / total_arrival_rate
                 * coefficients[flow, variant]
                 * assignment.configuration_selected[flow, variant]
-                for flow in p.flows
-                for variant in p.configurations_by_flow[flow]
+                for (flow, variant) in coefficients
             )
             sense = GRB.MAXIMIZE
         elif objective_kind == ObjectiveKind.DEADLINE_VIOLATIONS:

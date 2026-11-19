@@ -16,6 +16,35 @@ The benchmark exposes four optimization objectives. The optimizer's `CONSTANT`
 feasibility objective is excluded from configuration and `--objectives all`.
 Profiles must contain `max_cut_size_mib`. Historical result files remain readable.
 
+## Explicit model per flow
+
+`--model-selection model_variant` assigns each flow one model variant, sampled
+uniformly with replacement from that run's available model prefix. The seed and
+flow identity determine the assignment, so it stays identical across worker
+configurations, objectives and formulations for the same model pool. Growing the
+model pool can change assignments. Arrivals, deadlines and endpoint placements
+remain shared with the default `performance` mode.
+
+```bash
+# After setting PYTHONPATH as described below:
+uv run --python 3.14 --project experiments/scalability --locked scalability main --model-selection model_variant --output experiments/scalability/results/fixed-models
+# Compare both modes on each base instance (twice as many runs):
+uv run --python 3.14 --project experiments/scalability --locked scalability main --model-selection performance model_variant --output experiments/scalability/results/model-selection
+```
+
+`model_count` counts available models; explicit selection can use fewer distinct
+models because assignments may repeat. Each flow admits only its assigned variant
+and has no performance threshold. With `arrival_weighted_accuracy`, all choices
+are fixed and the objective is zero. The `performance` mode remains the default.
+The paired `scripts/compare_formulations.py` command also accepts
+`--model-selection model_variant`.
+
+Run identities, JSONL, CSV and aggregates include `model_selection`; JSONL flow
+records contain the assigned `model_variant_id`. Explicit-mode figures are under
+`analysis/model_variant/` (then strategy/formulation subdirectories). Historical
+records without a selection mode are interpreted as `performance`.
+
+
 ## Assignment versus cumulative
 
 ```bash

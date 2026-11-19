@@ -68,10 +68,14 @@ def incumbent_points(record: dict[str, Any]) -> list[tuple[float, float | None]]
     return points
 
 
+def record_model_selection(record: dict[str, Any]) -> str:
+    return str(record.get("model_selection") or "performance")
+
+
 def aggregate(records: list[dict[str, Any]]) -> list[dict[str, object]]:
-    grouped: dict[tuple[str, float, str, str, str, str, int], list[dict[str, Any]]] = (
-        defaultdict(list)
-    )
+    grouped: dict[
+        tuple[str, float, str, str, str, str, str, int], list[dict[str, Any]]
+    ] = defaultdict(list)
     for record in records:
         for dimension in DIMENSIONS:
             grouped[
@@ -80,6 +84,7 @@ def aggregate(records: list[dict[str, Any]]) -> list[dict[str, object]]:
                 record_objective(record),
                 record_formulation(record),
                 record_strategy(record),
+                record_model_selection(record),
                 dimension,
                 record[dimension],
             ].append(record)
@@ -90,6 +95,7 @@ def aggregate(records: list[dict[str, Any]]) -> list[dict[str, object]]:
         objective,
         formulation,
         strategy,
+        model_selection,
         dimension,
         size,
     ), group in sorted(grouped.items()):
@@ -117,6 +123,7 @@ def aggregate(records: list[dict[str, Any]]) -> list[dict[str, object]]:
                 "objective": objective,
                 "formulation": formulation,
                 "strategy": strategy,
+                "model_selection": model_selection,
                 "load": load,
                 "dimension": dimension,
                 "size": size,
@@ -170,20 +177,30 @@ def analyze(directory: Path) -> None:
         writer.writeheader()
         writer.writerows(rows)
     # Import only for analysis: scenario construction and solves do not need plotting.
-    for strategy, formulation in sorted(
-        {(record_strategy(r), record_formulation(r)) for r in records}
+    for selection, strategy, formulation in sorted(
+        {
+            (record_model_selection(r), record_strategy(r), record_formulation(r))
+            for r in records
+        }
     ):
         selected = [
             r
             for r in records
-            if record_strategy(r) == strategy and record_formulation(r) == formulation
+            if record_model_selection(r) == selection
+            and record_strategy(r) == strategy
+            and record_formulation(r) == formulation
         ]
         selected_rows = [
             row
             for row in rows
-            if row["strategy"] == strategy and row["formulation"] == formulation
+            if row["model_selection"] == selection
+            and row["strategy"] == strategy
+            and row["formulation"] == formulation
         ]
-        base = destination if strategy == "full" else destination / strategy
+        selection_base = (
+            destination if selection == "performance" else destination / selection
+        )
+        base = selection_base if strategy == "full" else selection_base / strategy
         target = base if formulation == "unspecified" else base / formulation
         target.mkdir(parents=True, exist_ok=True)
         _plot_records(selected, selected_rows, target)

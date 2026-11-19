@@ -11,6 +11,12 @@ from controller.domain.optimization.request.local_worker_config import (
     NoLocalWorkerConfig,
     ValidLocalWorkerConfig,
 )
+from controller.domain.optimization.request.model_selection_requirements import (
+    ModelSelectionRequirements,
+    ModelVariantSelectionStrategy,
+    PerformanceSelectionStrategy,
+    SelectionStrategy,
+)
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
 )
@@ -20,9 +26,12 @@ from integration.dto.optimization.optimization_dto import (
     AnyPlacementDto,
     FixedPlacementDto,
     LocalWorkerConfigDto,
+    ModelVariantSelectionStrategyDto,
     NoLocalWorkerConfigDto,
     OptimizationRequestDto,
+    PerformanceSelectionStrategyDto,
     PlacementDto,
+    SelectionStrategyDto,
     ValidLocalWorkerConfigDto,
 )
 
@@ -34,11 +43,14 @@ class OptimizationRequestMapper:
     ) -> OptimizationRequest:
         return OptimizationRequest(
             flow_id=dto.flow_id,
-            task=dto.task,
+            model_selection_requirements=ModelSelectionRequirements(
+                selection_strategy=OptimizationRequestMapper._to_selection_strategy(
+                    dto.model_selection_requirements.selection_strategy
+                )
+            ),
             stream_info=StreamInfo(arrival_rate=dto.stream_info.arrival_rate),
             qos_requirements=QoSRequirements(
                 max_mean_response_time=(dto.qos_requirements.max_mean_response_time),
-                min_model_performance=(dto.qos_requirements.min_model_performance),
                 max_energy_consumption=(dto.qos_requirements.max_energy_consumption),
             ),
             flow_endpoint_placement=FlowEndpointPlacement(
@@ -53,6 +65,21 @@ class OptimizationRequestMapper:
                 dto.local_worker_config
             ),
         )
+
+    @staticmethod
+    def _to_selection_strategy(dto: SelectionStrategyDto) -> SelectionStrategy:
+        match dto:
+            case PerformanceSelectionStrategyDto():
+                return PerformanceSelectionStrategy(
+                    task=dto.task,
+                    min_model_performance=dto.min_model_performance,
+                )
+            case ModelVariantSelectionStrategyDto():
+                return ModelVariantSelectionStrategy(
+                    model_variant_id=dto.model_variant_id
+                )
+            case _:
+                assert_never(dto)
 
     @staticmethod
     def _to_placement(dto: PlacementDto) -> Placement:

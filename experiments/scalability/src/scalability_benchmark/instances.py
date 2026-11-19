@@ -1,7 +1,7 @@
 """One full scenario per seed; optimizer inputs are immutable subset views."""
 
 import math
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from optimizer.domain.problem.compact.compact_optimization_problem import (
@@ -40,19 +40,46 @@ from scalability_benchmark.profiling.static_costs import (
     layer_weight_size_bytes,
     tensor_size_bytes,
 )
+from scalability_benchmark.randomness import stream
 from shared.model.keys import LayerKey
 
 
 def request_record(request: SyntheticFlow) -> dict[str, object]:
+    requirement = request.performance_requirement
     return {
         "flow_id": str(request.flow_id.flow_id),
         "user_id": str(request.flow_id.user_id.id),
         "arrival_rate_per_s": request.arrival_rate_per_s,
         "deadline_s": request.max_response_time_s,
-        "minimum_accuracy": request.performance_requirement.value,
-        "dataset": request.performance_requirement.dataset,
+        "minimum_accuracy": requirement.value if requirement is not None else None,
+        "dataset": requirement.dataset if requirement is not None else None,
+        "model_variant_id": asdict(request.model_variant_id)
+        if request.model_variant_id is not None
+        else None,
         "max_energy_consumption": request.max_energy_consumption,
     }
+
+
+def instance_flows(scenario: Scenario, spec: RunSpec) -> tuple[SyntheticFlow, ...]:
+    """Pin each flow within the available model prefix using its own seeded stream."""
+    flows = scenario.flows[spec.load][: spec.flow_count]
+    if spec.model_selection == "performance":
+        return flows
+    if spec.model_selection != "model_variant":
+        raise ValueError("Unknown model selection")
+    models = scenario.models[: spec.model_count]
+    return tuple(
+        replace(
+            flow,
+            performance_requirement=None,
+            model_variant_id=stream(
+                spec.seed, "model-selection", str(flow.flow_id.flow_id)
+            )
+            .choice(models)
+            .entry.variant_id,
+        )
+        for flow in flows
+    )
 
 
 @dataclass(frozen=True)
@@ -180,6 +207,12 @@ def make_instance(
     if (spec.edge_count, spec.cloud_count) not in scenario.config.infrastructure:
         raise ValueError("Unknown infrastructure configuration")
     models = scenario.models[: spec.model_count]
+    requests = instance_flows(scenario, spec)
+    if spec.model_selection == "model_variant":
+        requested_variants = {request.model_variant_id for request in requests}
+        models = tuple(
+            model for model in models if model.entry.variant_id in requested_variants
+        )
     workers = select_workers(scenario.workers, spec.edge_count, spec.cloud_count)
     variants = {}
     configurations = {}
@@ -262,16 +295,21 @@ def make_instance(
                 **dict.fromkeys((*inputs, *outputs), 0.0),
             }
     flows = {}
-    for request in scenario.flows[spec.load][: spec.flow_count]:
+    for request in requests:
         requirement = request.performance_requirement
         eligible = tuple(
             key
             for key in configurations
-            if any(
-                metric.type == requirement.type
-                and metric.dataset == requirement.dataset
-                and metric.value >= requirement.value
-                for metric in variants[key.model_variant_id].accuracies
+            if (
+                key.model_variant_id == request.model_variant_id
+                if request.model_variant_id is not None
+                else requirement is not None
+                and any(
+                    metric.type == requirement.type
+                    and metric.dataset == requirement.dataset
+                    and metric.value >= requirement.value
+                    for metric in variants[key.model_variant_id].accuracies
+                )
             )
         )
         if not eligible:

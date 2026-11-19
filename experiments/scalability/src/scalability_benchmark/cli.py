@@ -13,13 +13,22 @@ from optimizer.domain.formulation.compact.misocp.compact_formulation_kind import
 from optimizer.domain.problem.compact.compact_optimization_problem import (
     ObjectiveKind,
 )
-from scalability_benchmark.campaigns import CampaignName, campaign_specs
+from scalability_benchmark.campaigns import (
+    MODEL_SELECTIONS,
+    CampaignName,
+    ModelSelection,
+    campaign_specs,
+)
 from scalability_benchmark.configuration import (
     BENCHMARK_OBJECTIVES,
     ExperimentConfig,
     load_configuration,
 )
-from scalability_benchmark.instances import build_scenario, request_record
+from scalability_benchmark.instances import (
+    build_scenario,
+    instance_flows,
+    request_record,
+)
 from scalability_benchmark.persistence import ResultStore, atomic_json
 from scalability_benchmark.provenance import software_provenance
 from scalability_benchmark.randomness import fingerprint
@@ -35,10 +44,13 @@ async def run_campaign(
     retry_errors: bool,
     limit: int | None,
     objectives: tuple[ObjectiveKind, ...] | None = None,
+    model_selections: tuple[ModelSelection, ...] = ("performance",),
 ) -> None:
     provenance = software_provenance()
     provenance_hash = fingerprint(provenance)
-    specs = campaign_specs(config, campaign, objectives=objectives)
+    specs = campaign_specs(
+        config, campaign, objectives=objectives, model_selections=model_selections
+    )
     if limit is not None:
         specs = iter(itertools.islice(specs, limit))
     with ResultStore(output, resume=resume, retry_errors=retry_errors) as store:
@@ -78,7 +90,7 @@ async def run_campaign(
                     ],
                     "flows": [
                         request_record(request)
-                        for request in scenario.flows[spec.load][: spec.flow_count]
+                        for request in instance_flows(scenario, spec)
                     ],
                     "solver_gap_target": config.solver.relative_gap,
                     "scenario_manifest": f"scenarios/{scenario_id}.json",
@@ -102,7 +114,7 @@ async def run_campaign(
                     }
                 )
                 print(
-                    f"{run_id[:12]} {spec.objective.value} {result['termination']} runtime={result['solver_runtime_s']}",
+                    f"{run_id[:12]} {spec.model_selection} {spec.objective.value} {result['termination']} runtime={result['solver_runtime_s']}",
                     flush=True,
                 )
 
@@ -122,6 +134,13 @@ def main() -> None:
     )
     parser.add_argument("--output", type=Path)
     parser.add_argument("--strategy", choices=("full", "incremental"))
+    parser.add_argument(
+        "--model-selection",
+        nargs="+",
+        choices=MODEL_SELECTIONS,
+        default=["performance"],
+        help="Run performance-based selection, explicit per-flow variants, or both",
+    )
     parser.add_argument(
         "--formulation",
         choices=tuple(CompactFormulationKind),
@@ -161,6 +180,7 @@ def main() -> None:
                 dict.fromkeys(ObjectiveKind(value) for value in args.objectives)
             )
     config = load_configuration(args.config)
+    model_selections = cast(tuple[ModelSelection, ...], tuple(args.model_selection))
     if args.strategy is not None:
         config = ExperimentConfig.model_validate(
             {
@@ -187,7 +207,14 @@ def main() -> None:
         analyze(output)
     elif args.command == "plan":
         for name in ("pilot", "main", "sensitivity"):
-            specs = list(campaign_specs(config, name, objectives=objectives))
+            specs = list(
+                campaign_specs(
+                    config,
+                    name,
+                    objectives=objectives,
+                    model_selections=model_selections,
+                )
+            )
             budget = sum(spec.solver_budget_upper_bound_s for spec in specs) / 3600
             label = (
                 "solver budget upper bound"
@@ -206,6 +233,7 @@ def main() -> None:
                     retry_errors=args.retry_errors,
                     limit=args.limit,
                     objectives=objectives,
+                    model_selections=model_selections,
                 )
             )
         except KeyboardInterrupt:

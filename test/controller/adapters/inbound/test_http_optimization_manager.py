@@ -20,6 +20,10 @@ from controller.domain.optimization.request.local_worker_config import (
     NoLocalWorkerConfig,
     ValidLocalWorkerConfig,
 )
+from controller.domain.optimization.request.model_selection_requirements import (
+    ModelSelectionRequirements,
+    PerformanceSelectionStrategy,
+)
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
     OptimizationRequestsByFlow,
@@ -36,8 +40,10 @@ from integration.dto.optimization.optimization_dto import (
     AnyPlacementDto,
     FixedPlacementDto,
     FlowEndpointPlacementDto,
+    ModelSelectionRequirementsDto,
     NoLocalWorkerConfigDto,
     OptimizationRequestDto,
+    PerformanceSelectionStrategyDto,
     QoSRequirementsDto,
     StreamInfoDto,
     ValidLocalWorkerConfigDto,
@@ -64,15 +70,19 @@ class RecordingOptimizationManager(OptimizationManager):
 def _request_dto(flow_id: FlowId) -> OptimizationRequestDto:
     return OptimizationRequestDto(
         flow_id=flow_id,
-        task=ModelTask.CLASSIFICATION,
+        model_selection_requirements=ModelSelectionRequirementsDto(
+            selection_strategy=PerformanceSelectionStrategyDto(
+                task=ModelTask.CLASSIFICATION,
+                min_model_performance=PerformanceMetric(
+                    type=PerformanceMetricType.MAP_AT_50,
+                    dataset="validation",
+                    value=0.8,
+                ),
+            )
+        ),
         stream_info=StreamInfoDto(arrival_rate=2.5),
         qos_requirements=QoSRequirementsDto(
             max_mean_response_time=0.5,
-            min_model_performance=PerformanceMetric(
-                type=PerformanceMetricType.MAP_AT_50,
-                dataset="validation",
-                value=0.8,
-            ),
             max_energy_consumption=10,
         ),
         flow_endpoint_placement=FlowEndpointPlacementDto(
@@ -109,16 +119,20 @@ def test_maps_request_to_domain_and_delegates_to_manager() -> None:
         {
             flow_id: OptimizationRequest(
                 flow_id=flow_id,
-                task=request_dto.task,
+                model_selection_requirements=ModelSelectionRequirements(
+                    selection_strategy=PerformanceSelectionStrategy(
+                        task=ModelTask.CLASSIFICATION,
+                        min_model_performance=PerformanceMetric(
+                            PerformanceMetricType.MAP_AT_50, "validation", 0.8
+                        ),
+                    )
+                ),
                 stream_info=StreamInfo(
                     arrival_rate=request_dto.stream_info.arrival_rate
                 ),
                 qos_requirements=QoSRequirements(
                     max_mean_response_time=(
                         request_dto.qos_requirements.max_mean_response_time
-                    ),
-                    min_model_performance=(
-                        request_dto.qos_requirements.min_model_performance
                     ),
                     max_energy_consumption=(
                         request_dto.qos_requirements.max_energy_consumption

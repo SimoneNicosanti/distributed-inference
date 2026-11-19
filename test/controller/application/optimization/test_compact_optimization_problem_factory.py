@@ -28,6 +28,10 @@ from controller.domain.optimization.request.flow_endpoint_placement import (
 from controller.domain.optimization.request.local_worker_config import (
     ValidLocalWorkerConfig,
 )
+from controller.domain.optimization.request.model_selection_requirements import (
+    ModelSelectionRequirements,
+    PerformanceSelectionStrategy,
+)
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
 )
@@ -206,9 +210,13 @@ def _context(
 def _request() -> OptimizationRequest:
     return OptimizationRequest(
         flow_id=FlowId(UserId()),
-        task=ModelTask.CLASSIFICATION,
+        model_selection_requirements=ModelSelectionRequirements(
+            selection_strategy=PerformanceSelectionStrategy(
+                task=ModelTask.CLASSIFICATION, min_model_performance=_metric(0.8)
+            )
+        ),
         stream_info=StreamInfo(2),
-        qos_requirements=QoSRequirements(10, _metric(0.8), 50),
+        qos_requirements=QoSRequirements(10, 50),
         flow_endpoint_placement=FlowEndpointPlacement(
             FixedPlacement(_worker(1)), AnyPlacement()
         ),
@@ -292,7 +300,10 @@ async def test_each_flow_gets_all_shapes_only_of_quality_eligible_variants() -> 
     )
     relaxed = _request()
     strict = replace(
-        _request(), qos_requirements=QoSRequirements(10, _metric(0.88), 50)
+        _request(),
+        model_selection_requirements=ModelSelectionRequirements(
+            PerformanceSelectionStrategy(ModelTask.CLASSIFICATION, _metric(0.88))
+        ),
     )
     problem = await _factory().build_optimization_problem(
         {relaxed.flow_id: relaxed, strict.flow_id: strict}, context
@@ -322,8 +333,10 @@ async def test_error_metrics_use_the_lower_is_better_direction(
     )
     request = replace(
         _request(),
-        qos_requirements=QoSRequirements(
-            10, PerformanceMetric(kind, "dataset", 0.2), 50
+        model_selection_requirements=ModelSelectionRequirements(
+            PerformanceSelectionStrategy(
+                ModelTask.CLASSIFICATION, PerformanceMetric(kind, "dataset", 0.2)
+            )
         ),
     )
     problem = await _factory().build_optimization_problem(
@@ -484,7 +497,12 @@ async def test_rejects_invalid_requests_or_unavailable_candidates(failure: str) 
             if failure == "quality"
             else replace(_metric(), dataset="other")
         )
-        request = replace(request, qos_requirements=QoSRequirements(10, metric, 50))
+        request = replace(
+            request,
+            model_selection_requirements=ModelSelectionRequirements(
+                PerformanceSelectionStrategy(ModelTask.CLASSIFICATION, metric)
+            ),
+        )
     elif failure == "endpoint":
         request = replace(
             request,

@@ -335,6 +335,7 @@ async def execute_solver(
         **result,
         **extra,
         "strategy": spec.strategy,
+        "model_selection": spec.model_selection,
         "formulation": spec.formulation.value,
         "wall_time_s": perf_counter() - started,
         "raw_solver_statistics": asdict(output.statistics)

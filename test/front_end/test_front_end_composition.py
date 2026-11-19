@@ -14,22 +14,22 @@ from front_end.adapters.outbound.inference.arrow_worker_ingress_gateway import (
 from front_end.adapters.outbound.inference.arrow_worker_sink_gateway import (
     ArrowWorkerSinkGateway,
 )
-from front_end.adapters.outbound.optimization.http_optimization_gateway import (
-    HttpOptimizationGateway,
-)
 from front_end.adapters.outbound.inference.redis_flow_plan_reader import (
     RedisFlowPlanReader,
+)
+from front_end.adapters.outbound.optimization.http_optimization_gateway import (
+    HttpOptimizationGateway,
 )
 from front_end.application.inference.default_inference_runner import (
     DefaultInferenceRunner,
 )
 from front_end.application.ports.inbound.inference_runner import InferenceCoordinator
 from front_end.application.ports.inbound.model_loader import ModelLoader
-from front_end.application.ports.outbound.optimization.optimization_gateway import (
-    OptimizationGateway,
-)
 from front_end.application.ports.outbound.inference.local_worker_identity_gateway import (
     LocalWorkerIdentityGateway,
+)
+from front_end.application.ports.outbound.optimization.optimization_gateway import (
+    OptimizationGateway,
 )
 from front_end.composition.composition_root import FrontEndComposition
 from front_end.composition.default_composition_root import DefaultCompositionRoot
@@ -110,7 +110,7 @@ async def test_http_inference_builds_versioned_request_and_keeps_local_identity_
         {"result": np.ones(1, dtype=np.float32)}
     )
     identity = AsyncMock(spec=LocalWorkerIdentityGateway)
-    identity.get_worker_identity.return_value = worker_id
+    identity.get_local_worker_identity.return_value = worker_id
     composition = FrontEndComposition(
         inference_runner=runner,
         worker_identity_gateway=identity,
@@ -144,4 +144,4 @@ async def test_http_inference_builds_versioned_request_and_keeps_local_identity_
         forwarded.bundle["input"], np.ones(2, dtype=np.float32)
     )
     assert identity_response.json() == {"service_id": str(worker_id.id)}
-    identity.get_worker_identity.assert_awaited_once()
+    identity.get_local_worker_identity.assert_awaited_once()

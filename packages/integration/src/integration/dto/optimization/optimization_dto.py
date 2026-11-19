@@ -5,7 +5,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PositiveFloa
 
 from shared.flow.flow import FlowId
 from shared.model.model import ModelTask
-from shared.model.model_variant import PerformanceMetric
+from shared.model.model_variant import ModelVariantId, PerformanceMetric
 from shared.service.service import WorkerId
 
 
@@ -22,11 +22,37 @@ class StreamInfoDto(BaseModel):
 
 
 class QoSRequirementsDto(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     max_mean_response_time: PositiveFloat
-    min_model_performance: PerformanceMetric
     max_energy_consumption: PositiveFloat
+
+
+class PerformanceSelectionStrategyDto(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    kind: Literal["performance"] = "performance"
+    task: ModelTask
+    min_model_performance: PerformanceMetric
+
+
+class ModelVariantSelectionStrategyDto(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    kind: Literal["model_variant"] = "model_variant"
+    model_variant_id: ModelVariantId
+
+
+type SelectionStrategyDto = Annotated[
+    PerformanceSelectionStrategyDto | ModelVariantSelectionStrategyDto,
+    Field(discriminator="kind"),
+]
+
+
+class ModelSelectionRequirementsDto(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    selection_strategy: SelectionStrategyDto
 
 
 class FixedPlacementDto(BaseModel):
@@ -76,10 +102,10 @@ type LocalWorkerConfigDto = Annotated[
 
 
 class OptimizationRequestDto(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     flow_id: FlowId
-    task: ModelTask
+    model_selection_requirements: ModelSelectionRequirementsDto
     stream_info: StreamInfoDto
     qos_requirements: QoSRequirementsDto
     flow_endpoint_placement: FlowEndpointPlacementDto

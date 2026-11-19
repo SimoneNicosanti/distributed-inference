@@ -1,6 +1,6 @@
 import math
 from collections.abc import Mapping
-from typing import override
+from typing import assert_never, override
 
 from controller.application.optimization.abc.optimization_problem_factory import (
     OptimizationProblemFactory,
@@ -20,6 +20,10 @@ from controller.domain.optimization.problem.compact_optimization_problem import 
 )
 from controller.domain.optimization.request.flow_endpoint_placement import (
     FixedPlacement,
+)
+from controller.domain.optimization.request.model_selection_requirements import (
+    ModelVariantSelectionStrategy,
+    PerformanceSelectionStrategy,
 )
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
@@ -59,10 +63,28 @@ def _satisfies(metric: PerformanceMetric, requirement: PerformanceMetric) -> boo
 
 
 def _eligible(request: OptimizationRequest, profile: ModelVariantStaticProfile) -> bool:
-    return profile.info.task == request.task and any(
-        _satisfies(metric, request.qos_requirements.min_model_performance)
-        for metric in profile.info.accuracies
-    )
+    strategy = request.model_selection_requirements.selection_strategy
+    match strategy:
+        case PerformanceSelectionStrategy():
+            return profile.info.task == strategy.task and any(
+                _satisfies(metric, strategy.min_model_performance)
+                for metric in profile.info.accuracies
+            )
+        case ModelVariantSelectionStrategy():
+            return profile.model_variant_id == strategy.model_variant_id
+        case _:
+            assert_never(strategy)
+
+
+def _performance_requirement(request: OptimizationRequest) -> PerformanceMetric | None:
+    strategy = request.model_selection_requirements.selection_strategy
+    match strategy:
+        case PerformanceSelectionStrategy():
+            return strategy.min_model_performance
+        case ModelVariantSelectionStrategy():
+            return None
+        case _:
+            assert_never(strategy)
 
 
 def _variant_data(profile: ModelVariantStaticProfile) -> VariantData:
@@ -320,9 +342,9 @@ class CompactOptimizationProblemFactory(OptimizationProblemFactory):
                 max_response_time_s=float(
                     requests_by_flow[flow].qos_requirements.max_mean_response_time
                 ),
-                performance_requirement=requests_by_flow[
-                    flow
-                ].qos_requirements.min_model_performance,
+                performance_requirement=_performance_requirement(
+                    requests_by_flow[flow]
+                ),
                 max_energy_consumption=requests_by_flow[
                     flow
                 ].qos_requirements.max_energy_consumption,

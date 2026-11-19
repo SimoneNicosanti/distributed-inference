@@ -102,12 +102,18 @@ class WorkerData:
 class FlowData:
     arrival_rate_per_s: float
     max_response_time_s: float
-    performance_requirement: PerformanceMetric
+    performance_requirement: PerformanceMetric | None
     max_energy_consumption: float
     configurations: tuple[ModelConfigurationKey, ...]
     workers: tuple[WorkerId, ...]
     endpoint_placement: FlowEndpointPlacement
     local_worker_config: LocalWorkerConfig
+
+    def __post_init__(self) -> None:
+        if self.performance_requirement is None and len(self.configurations) != 1:
+            raise ValueError(
+                "Flows without a performance requirement need exactly one configuration"
+            )
 
 
 type ConfigurationWorker = tuple[ModelConfigurationKey, WorkerId]

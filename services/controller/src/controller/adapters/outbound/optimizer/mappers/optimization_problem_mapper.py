@@ -126,7 +126,11 @@ class OptimizationProblemMapper:
                     flow_id=flow_id,
                     arrival_rate_per_s=data.arrival_rate_per_s,
                     max_response_time_s=data.max_response_time_s,
-                    performance_requirement=_metric(data.performance_requirement),
+                    performance_requirement=(
+                        _metric(data.performance_requirement)
+                        if data.performance_requirement is not None
+                        else None
+                    ),
                     max_energy_consumption=data.max_energy_consumption,
                     configurations=tuple(_key(key) for key in data.configurations),
                     workers=data.workers,

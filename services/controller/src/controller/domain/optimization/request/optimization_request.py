@@ -4,16 +4,19 @@ from controller.domain.optimization.request.flow_endpoint_placement import (
     FlowEndpointPlacement,
 )
 from controller.domain.optimization.request.local_worker_config import LocalWorkerConfig
+from controller.domain.optimization.request.model_selection_requirements import (
+    ModelSelectionRequirements,
+)
 from controller.domain.optimization.request.qos_requirements import QoSRequirements
 from controller.domain.optimization.request.stream_info import StreamInfo
 from shared.flow.flow import FlowId
-from shared.model.model import ModelTask
 
 
 @dataclass(frozen=True, slots=True)
 class OptimizationRequest:
     flow_id: FlowId
-    task: ModelTask
+
+    model_selection_requirements: ModelSelectionRequirements
 
     stream_info: StreamInfo
     qos_requirements: QoSRequirements

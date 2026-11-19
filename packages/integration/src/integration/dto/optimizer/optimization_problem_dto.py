@@ -129,12 +129,20 @@ class FlowDataDto(OptimizerDto):
     flow_id: FlowReference
     arrival_rate_per_s: PositiveFloat
     max_response_time_s: PositiveFloat
-    performance_requirement: PerformanceMetricDto
+    performance_requirement: PerformanceMetricDto | None
     max_energy_consumption: PositiveFloat
     configurations: Annotated[tuple[ModelConfigurationKeyDto, ...], Field(min_length=1)]
     workers: Annotated[tuple[WorkerReference, ...], Field(min_length=1)]
     endpoint_placement: FlowEndpointPlacementDto
     local_worker_config: LocalWorkerConfigDto
+
+    @model_validator(mode="after")
+    def validate_selection(self) -> Self:
+        if self.performance_requirement is None and len(self.configurations) != 1:
+            raise ValueError(
+                "Flows without a performance requirement need exactly one configuration"
+            )
+        return self
 
 
 class CompactOptimizationProblemDto(OptimizerDto):

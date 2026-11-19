@@ -30,7 +30,9 @@ from integration.dto.model.model_variant_dto import (
 from integration.dto.optimization.optimization_dto import (
     FixedPlacementDto,
     FlowEndpointPlacementDto,
+    ModelSelectionRequirementsDto,
     OptimizationRequestDto,
+    PerformanceSelectionStrategyDto,
     QoSRequirementsDto,
     StreamInfoDto,
     ValidLocalWorkerConfigDto,
@@ -180,15 +182,19 @@ def prepare_optimization_scenario(tmp_path: Path) -> OptimizationScenario:
     requests = tuple(
         OptimizationRequestDto(
             flow_id=flow_id,
-            task=ModelTask.CLASSIFICATION,
+            model_selection_requirements=ModelSelectionRequirementsDto(
+                selection_strategy=PerformanceSelectionStrategyDto(
+                    task=ModelTask.CLASSIFICATION,
+                    min_model_performance=PerformanceMetric(
+                        type=PerformanceMetricType.MAP_AT_50,
+                        dataset=metric_dataset,
+                        value=0.70,
+                    ),
+                )
+            ),
             stream_info=StreamInfoDto(arrival_rate=arrival_rate),
             qos_requirements=QoSRequirementsDto(
                 max_mean_response_time=max_response_time,
-                min_model_performance=PerformanceMetric(
-                    type=PerformanceMetricType.MAP_AT_50,
-                    dataset=metric_dataset,
-                    value=0.70,
-                ),
                 max_energy_consumption=1_000_000.0,
             ),
             flow_endpoint_placement=FlowEndpointPlacementDto(

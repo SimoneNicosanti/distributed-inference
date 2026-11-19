@@ -12,7 +12,11 @@ from optimizer.domain.problem.other.local_worker_config import (
 from scalability_benchmark.configuration import ExperimentConfig
 from scalability_benchmark.randomness import stable_uuid, stream
 from shared.flow.flow import FlowId
-from shared.model.model_variant import PerformanceMetric, PerformanceMetricType
+from shared.model.model_variant import (
+    ModelVariantId,
+    PerformanceMetric,
+    PerformanceMetricType,
+)
 from shared.service.service import WorkerId
 from shared.user.user import UserId
 
@@ -22,10 +26,11 @@ class SyntheticFlow:
     flow_id: FlowId
     arrival_rate_per_s: float
     max_response_time_s: float
-    performance_requirement: PerformanceMetric
+    performance_requirement: PerformanceMetric | None
     max_energy_consumption: float
     endpoint_placement: FlowEndpointPlacement
     local_worker_config: ValidLocalWorkerConfig
+    model_variant_id: ModelVariantId | None = None
 
 
 def flow_pool(

@@ -6,6 +6,12 @@ from controller.adapters.outbound.optimization.gurobi_solver import (
     GurobiSolver,
     OptimizationInfeasibleError,
 )
+from optimizer.application.formulation.compact.compact_formulation_config import (
+    CompactFormulationConfig,
+)
+from optimizer.application.formulation.compact.profile_data import (
+    layer_execution_profiles,
+)
 
 from controller.domain.optimization.context.optimization_context import (
     OptimizationContext,
@@ -16,6 +22,10 @@ from controller.domain.optimization.request.flow_endpoint_placement import (
 )
 from controller.domain.optimization.request.local_worker_config import (
     ValidLocalWorkerConfig,
+)
+from controller.domain.optimization.request.model_selection_requirements import (
+    ModelSelectionRequirements,
+    PerformanceSelectionStrategy,
 )
 from controller.domain.optimization.request.optimization_request import (
     OptimizationRequest,
@@ -56,12 +66,6 @@ from controller.domain.profile.resource_profile import (
 )
 from optimizer.adapters.outbound.gurobi.entities.gurobi_solver_config import (
     GurobiSolverConfig,
-)
-from optimizer.application.formulation.compact.compact_formulation_config import (
-    CompactFormulationConfig,
-)
-from optimizer.application.formulation.compact.profile_data import (
-    layer_execution_profiles,
 )
 from optimizer.domain.problem.compact.compact_optimization_problem import (
     ObjectiveKind,
@@ -468,15 +472,19 @@ def _request(
 ) -> OptimizationRequest:
     return OptimizationRequest(
         flow_id=flow_id or FlowId(user_id=_USER_ID),
-        task=ModelTask.CLASSIFICATION,
+        model_selection_requirements=ModelSelectionRequirements(
+            selection_strategy=PerformanceSelectionStrategy(
+                task=ModelTask.CLASSIFICATION,
+                min_model_performance=PerformanceMetric(
+                    type=PerformanceMetricType.MAP_AT_50,
+                    dataset="test",
+                    value=0.8,
+                ),
+            )
+        ),
         stream_info=StreamInfo(arrival_rate=arrival_rate),
         qos_requirements=QoSRequirements(
             max_mean_response_time=max_response_time_s,
-            min_model_performance=PerformanceMetric(
-                type=PerformanceMetricType.MAP_AT_50,
-                dataset="test",
-                value=0.8,
-            ),
             max_energy_consumption=1,
         ),
         flow_endpoint_placement=FlowEndpointPlacement(

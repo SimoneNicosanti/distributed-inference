@@ -6,15 +6,14 @@ import httpx
 import numpy as np
 import pyarrow as pa
 import pytest
-from front_end.adapters.outbound.redis_hop_deployment_directory import (
-    RedisHopDeploymentDirectory,
-)
+from pydantic import HttpUrl
 from redis import asyncio as redis_asyncio
-from shared.plan.hop_deployment_id import HopDeploymentId
 
 from catalog.redis.hop.keys_factory import StringHopDeploymentKeyFactory
+from catalog.redis.hop.redis_hop_deployment_catalog import RedisHopDeploymentCatalog
 from catalog.redis.service.keys_factory import build_catalog_key, build_service_hset_key
 from catalog.redis.service.redis_service_directory import RedisServiceDirectory
+from catalog.view.worker.default_worker_directory import DefaultWorkerDirectory
 from front_end.adapters.outbound.inference.arrow_worker_ingress_gateway import (
     ArrowWorkerIngressGateway,
 )
@@ -59,11 +58,11 @@ from integration.service_instance.service_instance import (
     CapabilityInterface,
     CapabilityProtocol,
     CapabilityType,
-    ServiceInstance,
 )
+from integration.service_instance.worker_instance import WorkerInstance
 from integration.shared.id_json import (
-    hop_deployment_id_to_json,
     planned_invocable_hop_id_to_json,
+    service_id_to_json,
 )
 from integration.sink.arrow.model_pass_result.arrow_model_pass_result_schema import (
     build_result_payload_schema,
@@ -81,7 +80,10 @@ from shared.user.user import UserId
 
 
 @pytest.mark.asyncio
-async def test_http_to_ingress_and_sink_using_versioned_redis_contracts() -> None:
+@pytest.mark.parametrize("worker_id_kind", ["named", "uuid"])
+async def test_http_to_ingress_and_sink_using_versioned_redis_contracts(
+    worker_id_kind: str,
+) -> None:
     flow_id = FlowId(user_id=UserId())
     version = PlanVersion(version_number=5)
     variant = ModelVariantId(ModelId(model_name="model"), "fp32")
@@ -89,7 +91,11 @@ async def test_http_to_ingress_and_sink_using_versioned_redis_contracts() -> Non
         PlannedIngressReplicaId(variant, 2),
         PlannedSinkReplicaId(variant, 3),
     )
-    ingress_worker, sink_worker = ServiceId(), ServiceId()
+    ingress_worker, sink_worker = (
+        (ServiceId(id="ingress-worker"), ServiceId(id="sink-worker"))
+        if worker_id_kind == "named"
+        else (ServiceId(), ServiceId())
+    )
     plan = FlowPlanDto(
         plan_version=version,
         model_specs=ModelSpecsDto(
@@ -107,41 +113,53 @@ async def test_http_to_ingress_and_sink_using_versioned_redis_contracts() -> Non
         (
             await StringHopDeploymentKeyFactory.build_hop_deployments_key(version),
             planned_invocable_hop_id_to_json(ingress),
-        ): hop_deployment_id_to_json(HopDeploymentId(ingress, ingress_worker)),
+        ): service_id_to_json(ingress_worker),
         (
             await StringHopDeploymentKeyFactory.build_hop_deployments_key(version),
             planned_invocable_hop_id_to_json(sink),
-        ): hop_deployment_id_to_json(HopDeploymentId(sink, sink_worker)),
+        ): service_id_to_json(sink_worker),
     }
-    for worker, capability, location in (
-        (ingress_worker, CapabilityType.HOP_INVOCATION, "grpc+tcp://ingress:8811"),
-        (sink_worker, CapabilityType.RESULT_RETRIEVE, "grpc+tcp://sink:8820"),
+    http_capabilities = {CapabilityType.PLAN_ACTUATION, CapabilityType.FAILURE_RECEIVE}
+    for worker, location in (
+        (ingress_worker, "grpc+tcp://ingress:8811"),
+        (sink_worker, "grpc+tcp://sink:8820"),
     ):
-        values[build_catalog_key(), build_service_hset_key(worker)] = ServiceInstance(
+        values[build_catalog_key(), build_service_hset_key(worker)] = WorkerInstance(
             service_id=worker,
             capabilities=[
                 Capability(
                     type=capability,
                     interfaces=[
                         CapabilityInterface(
-                            protocol=CapabilityProtocol.ARROW,
-                            endpoint=ArrowUrl(location),
+                            protocol=CapabilityProtocol.HTTP
+                            if capability in http_capabilities
+                            else CapabilityProtocol.ARROW,
+                            endpoint=HttpUrl("http://worker:9000")
+                            if capability in http_capabilities
+                            else ArrowUrl(location),
                         )
                     ],
+                )
+                for capability in (
+                    CapabilityType.HOP_INVOCATION,
+                    CapabilityType.RESULT_RETRIEVE,
+                    CapabilityType.PLAN_ACTUATION,
+                    CapabilityType.IN_NETWORK_PROFILING,
+                    CapabilityType.FAILURE_RECEIVE,
                 )
             ],
         ).model_dump_json()
     redis = AsyncMock(spec=redis_asyncio.Redis)
-    redis.get.return_value = str(version.version_number)
+    redis.get = AsyncMock(return_value=str(version.version_number))
 
     async def hget(key: str, field: str) -> str | None:
         return values.get((key, field))
 
-    redis.hget.side_effect = hget
-    directory = RedisServiceDirectory(redis)
+    redis.hget = AsyncMock(side_effect=hget)
+    directory = DefaultWorkerDirectory(RedisServiceDirectory(redis))
     runner = DefaultInferenceRunner(
         flow_plan_reader=RedisFlowPlanReader(redis, StringFlowPlanKeyFactory()),
-        hop_deployment_directory=RedisHopDeploymentDirectory(
+        hop_deployment_directory=RedisHopDeploymentCatalog(
             redis, StringHopDeploymentKeyFactory
         ),
         ingress_gateway=ArrowWorkerIngressGateway(directory),
@@ -210,7 +228,7 @@ async def test_http_to_ingress_and_sink_using_versioned_redis_contracts() -> Non
         bundle=TensorBundleDto.from_ndarrays({"input": np.ones(2, dtype=np.float32)}),
     )
     with patch(
-        "front_end.adapters.outbound.arrow_worker_ingress_gateway.flight.connect",
+        "front_end.adapters.outbound.inference.arrow_worker_ingress_gateway.flight.connect",
         side_effect=connect,
     ):
         async with httpx.AsyncClient(

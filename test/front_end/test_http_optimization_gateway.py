@@ -11,8 +11,10 @@ from integration.dto.optimization.optimization_dto import (
     AnyPlacementDto,
     FixedPlacementDto,
     FlowEndpointPlacementDto,
+    ModelSelectionRequirementsDto,
     NoLocalWorkerConfigDto,
     OptimizationRequestDto,
+    PerformanceSelectionStrategyDto,
     QoSRequirementsDto,
     StreamInfoDto,
     ValidLocalWorkerConfigDto,
@@ -30,13 +32,17 @@ def _request(
     worker_id = ServiceId()
     return OptimizationRequestDto(
         flow_id=FlowId(user_id=UserId()),
-        task=ModelTask.CLASSIFICATION,
+        model_selection_requirements=ModelSelectionRequirementsDto(
+            selection_strategy=PerformanceSelectionStrategyDto(
+                task=ModelTask.CLASSIFICATION,
+                min_model_performance=PerformanceMetric(
+                    PerformanceMetricType.MAP_AT_50, "test", 0.8
+                ),
+            )
+        ),
         stream_info=StreamInfoDto(arrival_rate=0.1),
         qos_requirements=QoSRequirementsDto(
             max_mean_response_time=10,
-            min_model_performance=PerformanceMetric(
-                PerformanceMetricType.MAP_AT_50, "test", 0.8
-            ),
             max_energy_consumption=100,
         ),
         flow_endpoint_placement=FlowEndpointPlacementDto(
@@ -71,7 +77,9 @@ async def test_sends_new_protocol_without_overriding_flow_constraints(
         decoded = OptimizeInferenceDistributionRequest.model_validate_json(
             request.content
         )
-        assert decoded.requests == requests
+        assert tuple(dto.model_dump(mode="json") for dto in decoded.requests) == tuple(
+            dto.model_dump(mode="json") for dto in requests
+        )
         assert request.extensions["timeout"]["read"] == 300
         return httpx.Response(204)
 

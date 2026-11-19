@@ -12,7 +12,6 @@ from integration.dto.optimizer.optimization_problem_dto import (
     OptimizationProblemDto,
 )
 from integration.shared.id_json import service_id_from_json, service_id_to_json
-from optimizer.domain.problem.other.backend import Backend
 from optimizer.domain.problem.compact.compact_optimization_problem import (
     CompactOptimizationProblem,
     ConfigurationData,
@@ -23,11 +22,8 @@ from optimizer.domain.problem.compact.compact_optimization_problem import (
     VariantData,
     WorkerData,
 )
+from optimizer.domain.problem.other.backend import Backend
 from optimizer.domain.problem.other.edge_description import EdgeDescription
-from optimizer.domain.problem.other.model_input_concrete_shapes import (
-    ModelInputConcreteShapes,
-)
-from optimizer.domain.problem.other.network_connection import NetworkConnection
 from optimizer.domain.problem.other.flow_endpoint_placement import (
     AnyPlacement,
     FixedPlacement,
@@ -39,6 +35,10 @@ from optimizer.domain.problem.other.local_worker_config import (
     NoLocalWorkerConfig,
     ValidLocalWorkerConfig,
 )
+from optimizer.domain.problem.other.model_input_concrete_shapes import (
+    ModelInputConcreteShapes,
+)
+from optimizer.domain.problem.other.network_connection import NetworkConnection
 from shared.model.model_variant import PerformanceMetric
 
 
@@ -109,7 +109,11 @@ class OptimizationProblemMapper:
                 flow.flow_id: FlowData(
                     arrival_rate_per_s=flow.arrival_rate_per_s,
                     max_response_time_s=flow.max_response_time_s,
-                    performance_requirement=_metric(flow.performance_requirement),
+                    performance_requirement=(
+                        _metric(flow.performance_requirement)
+                        if flow.performance_requirement is not None
+                        else None
+                    ),
                     max_energy_consumption=flow.max_energy_consumption,
                     configurations=tuple(_key(key) for key in flow.configurations),
                     workers=flow.workers,
