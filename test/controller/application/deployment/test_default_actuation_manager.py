@@ -43,7 +43,6 @@ from shared.model.model_partition import ModelPartitionId
 from shared.model.model_variant import ModelVariantId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 @pytest.mark.asyncio
@@ -80,7 +79,7 @@ async def test_prepares_all_workers_including_endpoints_before_applying(
     solution = OptimizationSolution(
         flow_solutions=(
             FlowOptimizationSolution(
-                flow_id=FlowId(user_id=UserId()),
+                flow_id=FlowId(),
                 ingress_worker_id=ingress,
                 sink_worker_id=sink,
                 model_variant_id=variant,

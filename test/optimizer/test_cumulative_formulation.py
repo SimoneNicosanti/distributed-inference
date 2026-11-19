@@ -129,7 +129,7 @@ def dag_problem(
         )
         for key, data in base.configurations.items()
     }
-    first_flow, request = next(iter(base.flows.items()))
+    request = next(iter(base.flows.values()))
     return replace(
         base,
         variants=dict.fromkeys(base.variants, graph),
@@ -152,7 +152,7 @@ def dag_problem(
             for worker in worker_ids
         },
         flows={
-            FlowId(first_flow.user_id, UUID(int=20 + index)): replace(
+            FlowId(flow_id=UUID(int=20 + index)): replace(
                 request,
                 arrival_rate_per_s=0.1,
                 workers=worker_ids,

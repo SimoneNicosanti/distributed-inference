@@ -39,11 +39,10 @@ from shared.model.model_variant import (
     PerformanceMetricType,
 )
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 def _problem() -> CompactOptimizationProblem:
-    flow = FlowId(UserId(UUID(int=1)), UUID(int=2))
+    flow = FlowId(flow_id=UUID(int=2))
     worker = ServiceId(UUID(int=3))
     variant = ModelVariantId(ModelId("model"), "fp32")
     configurations = tuple(

@@ -15,7 +15,6 @@ from shared.model.model import ModelId
 from shared.model.model_partition import ModelPartitionId
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 def _component(
@@ -46,7 +45,6 @@ def _component(
 
 
 def test_builds_partitions_only_from_executable_layers() -> None:
-    user_id = UserId()
     model_variant_id = ModelVariantId(
         model_id=ModelId(model_name="model"),
         variant_tag="variant",
@@ -65,7 +63,7 @@ def test_builds_partitions_only_from_executable_layers() -> None:
     solution = OptimizationSolution(
         flow_solutions=(
             FlowOptimizationSolution(
-                flow_id=FlowId(user_id=user_id),
+                flow_id=FlowId(),
                 ingress_worker_id=ingress_id,
                 sink_worker_id=components[-1].worker_id,
                 model_variant_id=model_variant_id,

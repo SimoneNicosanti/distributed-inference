@@ -18,7 +18,6 @@ from shared.model.model_variant import (
     PerformanceMetricType,
 )
 from shared.service.service import WorkerId
-from shared.user.user import UserId
 
 
 @dataclass(frozen=True)
@@ -48,10 +47,9 @@ def flow_pool(
         stream(seed, "arrival", str(index)).uniform(*config.flows.arrival_weight_range)
         for index in range(config.flows.pool_size)
     ]
-    user = UserId(stable_uuid(seed, "flow-owner", "benchmark"))
     return tuple(
         SyntheticFlow(
-            flow_id=FlowId(user, stable_uuid(seed, "flow", str(index))),
+            flow_id=FlowId(flow_id=stable_uuid(seed, "flow", str(index))),
             arrival_rate_per_s=load * weight / (reference_time_s * sum(weights)),
             max_response_time_s=stream(seed, "deadline", str(index)).uniform(
                 *config.flows.deadline_s

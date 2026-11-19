@@ -46,11 +46,11 @@ from optimizer.adapters.inbound.mappers.optimization_solution_mapper import (
     OptimizationSolutionMapper as OptimizerSolutionMapper,
 )
 from optimizer.application.ports.inbound.optimizer_controller import OptimizerController
-from optimizer.domain.problem.other.backend import Backend
 from optimizer.domain.problem.compact.compact_optimization_problem import (
     CompactOptimizationProblem,
 )
 from optimizer.domain.problem.optimization_problem import OptimizationProblem
+from optimizer.domain.problem.other.backend import Backend
 from optimizer.domain.solution.optimization_solution import (
     ComponentSolution,
     ComponentTensorContract,
@@ -248,11 +248,9 @@ def _invalid_payload(payload: dict[str, Any], failure: str) -> None:
     elif failure == "missing_worker_id":
         problem["workers"][0]["worker_id"] = {}
     elif failure == "missing_flow_id":
-        problem["flows"][0]["flow_id"] = {
-            "user_id": {"id": "00000000-0000-0000-0000-000000000001"}
-        }
-    elif failure == "missing_user_id":
-        problem["flows"][0]["flow_id"]["user_id"] = {}
+        problem["flows"][0]["flow_id"] = {}
+    elif failure == "invalid_flow_id":
+        problem["flows"][0]["flow_id"]["flow_id"] = "not-a-uuid"
     elif failure == "unsupported_kind":
         problem["kind"] = "unknown"
     elif failure == "raw_context":
@@ -281,7 +279,7 @@ def _invalid_payload(payload: dict[str, Any], failure: str) -> None:
         "boolean_memory",
         "missing_worker_id",
         "missing_flow_id",
-        "missing_user_id",
+        "invalid_flow_id",
         "unsupported_kind",
         "raw_context",
         "cyclic_graph",

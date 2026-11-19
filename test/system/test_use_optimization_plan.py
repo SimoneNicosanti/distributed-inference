@@ -7,7 +7,7 @@ import numpy as np
 import onnx
 import onnxruntime as ort
 import pytest
-from test.system.optimization_scenario import OptimizationScenario
+from test.system.existing_plan_scenario import ExistingPlanScenario
 
 from integration.dto.tensor.tensor_bundle_dto import TensorBundleDto
 from integration.front_end.http.front_end_http_paths import FRONT_END_RUN_INFERENCE_PATH
@@ -57,8 +57,8 @@ def _build_inference_bundle(model: onnx.ModelProto) -> TensorBundleDto:
 
 
 @pytest.mark.integration
-def test_use_optimization_plan(optimization_scenario: OptimizationScenario) -> None:
-    scenario = optimization_scenario
+def test_use_optimization_plan(existing_plan_scenario: ExistingPlanScenario) -> None:
+    scenario = existing_plan_scenario
     model = onnx.load(scenario.model_path, load_external_data=False)
     bundle = _build_inference_bundle(model)
     inputs = bundle.to_ndarrays()

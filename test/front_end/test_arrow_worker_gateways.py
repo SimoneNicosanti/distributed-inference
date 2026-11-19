@@ -55,14 +55,11 @@ from shared.model.model_variant import ModelVariantId
 from shared.plan.hop_logical_id import PlannedIngressReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 def _context() -> ModelPassContext:
     return ModelPassContext(
-        model_invocation_context=ModelInvocationContext(
-            flow_id=FlowId(user_id=UserId())
-        ),
+        model_invocation_context=ModelInvocationContext(flow_id=FlowId()),
         plan_version=PlanVersion(version_number=5),
         model_pass_type=ModelPassType.FORWARD,
     )

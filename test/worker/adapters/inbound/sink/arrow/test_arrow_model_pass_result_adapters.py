@@ -23,7 +23,6 @@ from shared.context.model_invocation_context import ModelInvocationContext
 from shared.context.model_pass_context import ModelPassContext, ModelPassType
 from shared.flow.flow import FlowId
 from shared.plan.plan_version import PlanVersion
-from shared.user.user import UserId
 from worker.adapters.context_mapper import model_pass_context_to_dto
 from worker.adapters.inbound.sink.arrow.arrow_model_pass_outcome_retrieve_server import (
     ArrowModelPassOutcomeRetrieveServer,
@@ -35,9 +34,7 @@ from worker.domain.tensor.tensor_bundle import TensorBundle
 
 def _context():
     return ModelPassContext(
-        model_invocation_context=ModelInvocationContext(
-            flow_id=FlowId(user_id=UserId())
-        ),
+        model_invocation_context=ModelInvocationContext(flow_id=FlowId()),
         plan_version=PlanVersion(1),
         model_pass_type=ModelPassType.FORWARD,
     )

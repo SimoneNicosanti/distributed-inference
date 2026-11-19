@@ -51,7 +51,6 @@ from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 @pytest.mark.asyncio
@@ -99,7 +98,7 @@ async def test_http_inference_builds_versioned_request_and_keeps_local_identity_
     None
 ):
     worker_id = ServiceId()
-    flow_id = FlowId(user_id=UserId())
+    flow_id = FlowId()
     variant = ModelVariantId(ModelId(model_name="model"), "fp32")
     runner = AsyncMock(spec=InferenceCoordinator)
     runner.get_current_contract_for_flow.return_value = ModelContract(

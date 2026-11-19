@@ -48,7 +48,6 @@ def request_record(request: SyntheticFlow) -> dict[str, object]:
     requirement = request.performance_requirement
     return {
         "flow_id": str(request.flow_id.flow_id),
-        "user_id": str(request.flow_id.user_id.id),
         "arrival_rate_per_s": request.arrival_rate_per_s,
         "deadline_s": request.max_response_time_s,
         "minimum_accuracy": requirement.value if requirement is not None else None,

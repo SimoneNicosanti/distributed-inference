@@ -52,7 +52,6 @@ from shared.flow.flow import FlowId
 from shared.model.model import ModelTask
 from shared.model.model_variant import PerformanceMetric, PerformanceMetricType
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 class RecordingOptimizationManager(OptimizationManager):
@@ -105,7 +104,7 @@ def _client(manager: OptimizationManager) -> TestClient:
 def test_maps_request_to_domain_and_delegates_to_manager() -> None:
     manager = RecordingOptimizationManager()
     client = _client(manager)
-    flow_id = FlowId(user_id=UserId())
+    flow_id = FlowId()
     request_dto = _request_dto(flow_id)
     request = OptimizeInferenceDistributionRequest(requests=(request_dto,))
 
@@ -160,7 +159,7 @@ def test_maps_all_placement_and_local_worker_variants(
     is_inference_runner: bool | None,
 ) -> None:
     manager = RecordingOptimizationManager()
-    flow_id = FlowId(user_id=UserId())
+    flow_id = FlowId()
     ingress_id = ServiceId(id="ingress")
     sink_id = ServiceId(id="sink")
     dto = _request_dto(flow_id).model_copy(
@@ -225,7 +224,7 @@ def test_maps_all_placement_and_local_worker_variants(
 def test_preserves_independent_configurations_in_a_multi_flow_batch() -> None:
     manager = RecordingOptimizationManager()
     local_worker_id = ServiceId(id="shared-local-worker")
-    first = _request_dto(FlowId(user_id=UserId())).model_copy(
+    first = _request_dto(FlowId()).model_copy(
         update={
             "local_worker_config": ValidLocalWorkerConfigDto(
                 worker_id=local_worker_id,
@@ -233,7 +232,7 @@ def test_preserves_independent_configurations_in_a_multi_flow_batch() -> None:
             ),
         }
     )
-    second = _request_dto(FlowId(user_id=UserId())).model_copy(
+    second = _request_dto(FlowId()).model_copy(
         update={
             "flow_endpoint_placement": FlowEndpointPlacementDto(
                 ingress_placement=AnyPlacementDto(),
@@ -281,7 +280,7 @@ def test_preserves_independent_configurations_in_a_multi_flow_batch() -> None:
 )
 def test_transmits_named_and_uuid_worker_ids(worker_id: ServiceId) -> None:
     manager = RecordingOptimizationManager()
-    flow_id = FlowId(user_id=UserId())
+    flow_id = FlowId()
     dto = _request_dto(flow_id).model_copy(
         update={
             "flow_endpoint_placement": FlowEndpointPlacementDto(
@@ -370,7 +369,7 @@ def test_rejects_invalid_request_configurations(
     field: str, invalid_value: object
 ) -> None:
     manager = RecordingOptimizationManager()
-    payload = _request_dto(FlowId(user_id=UserId())).model_dump(mode="json")
+    payload = _request_dto(FlowId()).model_dump(mode="json")
     payload[field] = invalid_value
 
     response = _client(manager).post(
@@ -402,7 +401,7 @@ def test_rejects_invalid_endpoint_placements(
     endpoint: str, invalid_placement: object
 ) -> None:
     manager = RecordingOptimizationManager()
-    payload = _request_dto(FlowId(user_id=UserId())).model_dump(mode="json")
+    payload = _request_dto(FlowId()).model_dump(mode="json")
     payload["flow_endpoint_placement"][endpoint] = invalid_placement
 
     response = _client(manager).post(
@@ -417,7 +416,7 @@ def test_rejects_invalid_endpoint_placements(
 @pytest.mark.parametrize("field", ["flow_endpoint_placement", "local_worker_config"])
 def test_requires_explicit_configuration_fields(field: str) -> None:
     manager = RecordingOptimizationManager()
-    payload = _request_dto(FlowId(user_id=UserId())).model_dump(mode="json")
+    payload = _request_dto(FlowId()).model_dump(mode="json")
     del payload[field]
 
     response = _client(manager).post(
@@ -431,7 +430,7 @@ def test_requires_explicit_configuration_fields(field: str) -> None:
 
 def test_rejects_legacy_ingress_only_requests_without_inventing_configuration() -> None:
     manager = RecordingOptimizationManager()
-    payload = _request_dto(FlowId(user_id=UserId())).model_dump(mode="json")
+    payload = _request_dto(FlowId()).model_dump(mode="json")
     del payload["flow_endpoint_placement"]
     del payload["local_worker_config"]
     payload["ingress_id"] = {"id": "ingress"}
@@ -459,7 +458,7 @@ def test_rejects_empty_request_batch() -> None:
 
 def test_rejects_duplicate_flow_ids() -> None:
     manager = RecordingOptimizationManager()
-    request = _request_dto(FlowId(user_id=UserId())).model_dump(mode="json")
+    request = _request_dto(FlowId()).model_dump(mode="json")
 
     response = _client(manager).post(
         OPTIMIZE_INFERENCE_DISTRIBUTION_PATH,

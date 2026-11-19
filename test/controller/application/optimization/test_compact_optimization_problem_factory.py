@@ -77,7 +77,6 @@ from shared.model.model_variant import (
     PerformanceMetricType,
 )
 from shared.service.service import ServiceId, WorkerId
-from shared.user.user import UserId
 
 
 def _worker(index: int) -> WorkerId:
@@ -209,7 +208,7 @@ def _context(
 
 def _request() -> OptimizationRequest:
     return OptimizationRequest(
-        flow_id=FlowId(UserId()),
+        flow_id=FlowId(),
         model_selection_requirements=ModelSelectionRequirements(
             selection_strategy=PerformanceSelectionStrategy(
                 task=ModelTask.CLASSIFICATION, min_model_performance=_metric(0.8)

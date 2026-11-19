@@ -76,7 +76,6 @@ from shared.model.model_variant import ModelVariantId
 from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 @pytest.mark.asyncio
@@ -84,7 +83,7 @@ from shared.user.user import UserId
 async def test_http_to_ingress_and_sink_using_versioned_redis_contracts(
     worker_id_kind: str,
 ) -> None:
-    flow_id = FlowId(user_id=UserId())
+    flow_id = FlowId()
     version = PlanVersion(version_number=5)
     variant = ModelVariantId(ModelId(model_name="model"), "fp32")
     ingress, sink = (

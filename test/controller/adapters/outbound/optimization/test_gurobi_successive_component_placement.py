@@ -4,6 +4,9 @@ from uuid import UUID
 import gurobipy as gp
 import pytest
 from gurobipy import GRB
+from optimizer.application.formulation.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
 
 from controller.domain.profile.network_topology import NetworkTopology
 from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.assignment.assignment_variables import (
@@ -12,17 +15,13 @@ from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compac
 from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.assignment.constraints import (
     _successive_components_use_different_workers,
 )
-from optimizer.application.formulation.compact.compact_formulation_data import (
-    CompactFormulationData,
-)
 from optimizer.domain.problem.compact.compact_optimization_problem import (
     ObjectiveKind,
 )
 from shared.flow.flow import FlowId
 from shared.service.service import ServiceId, WorkerId
-from shared.user.user import UserId
 
-_FLOW = FlowId(user_id=UserId(id=UUID(int=1)), flow_id=UUID(int=2))
+_FLOW = FlowId(flow_id=UUID(int=2))
 _WORKER_A = cast(WorkerId, ServiceId(id=UUID(int=3)))
 _WORKER_B = cast(WorkerId, ServiceId(id=UUID(int=4)))
 _WORKERS = (_WORKER_A, _WORKER_B)

@@ -7,6 +7,9 @@ from uuid import UUID
 import gurobipy as gp
 import pytest
 from gurobipy import GRB
+from optimizer.application.formulation.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
 
 from controller.domain.profile.network_topology import (
     NetworkConnection,
@@ -24,22 +27,17 @@ from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compac
 from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.network.network_variables import (
     NetworkVariables,
 )
-from optimizer.application.formulation.compact.compact_formulation_data import (
-    CompactFormulationData,
-)
 from optimizer.domain.problem.compact.compact_optimization_problem import (
     ObjectiveKind,
 )
 from shared.flow.flow import FlowId
 from shared.service.service import ServiceId, WorkerId
-from shared.user.user import UserId
 
 type Arc = tuple[WorkerId, WorkerId]
 type Formulation = Literal["legacy", "marginal"]
 
-_USER = UserId(id=UUID(int=1))
-_FLOW_A = FlowId(user_id=_USER, flow_id=UUID(int=2))
-_FLOW_B = FlowId(user_id=_USER, flow_id=UUID(int=3))
+_FLOW_A = FlowId(flow_id=UUID(int=2))
+_FLOW_B = FlowId(flow_id=UUID(int=3))
 _WORKER_A = ServiceId(id=UUID(int=4))
 _WORKER_B = ServiceId(id=UUID(int=5))
 _WORKER_C = ServiceId(id=UUID(int=6))

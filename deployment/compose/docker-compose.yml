@@ -48,14 +48,22 @@ services:
     build:
       context: ../../
       dockerfile: docker/controller.dockerfile
+    ports:
+      - "8001:8000"
+    depends_on:
+      - redis
+      - optimizer
+
+  optimizer:
+    build:
+      context: ../../
+      dockerfile: docker/optimizer.dockerfile
     environment:
       GRB_LICENSE_FILE: /run/secrets/gurobi_license
     secrets:
       - gurobi_license
     ports:
-      - "8001:8000"
-    depends_on:
-      - redis
+      - "8002:8000"
 
   first-worker:
     build:

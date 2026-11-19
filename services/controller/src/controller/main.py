@@ -28,7 +28,7 @@ async def readiness() -> Response:
 def build_service_instance() -> ServiceInstance:
 
     optimization_capability = Capability(
-        type=CapabilityType.DEPLOYMENT_OPTIMIZATION,
+        type=CapabilityType.FLOW_DEPLOYMENT,
         interfaces=[
             CapabilityInterface(
                 protocol=CapabilityProtocol.HTTP,

@@ -18,7 +18,6 @@ from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 def _solution() -> EnrichedOptimizationSolution:
@@ -39,7 +38,7 @@ def _solution() -> EnrichedOptimizationSolution:
         transmission_latency_s=0,
     )
     flow = FlowOptimizationSolution(
-        flow_id=FlowId(user_id=UserId()),
+        flow_id=FlowId(),
         ingress_worker_id=worker_id,
         sink_worker_id=worker_id,
         model_variant_id=variant,

@@ -4,6 +4,9 @@ from uuid import UUID
 import gurobipy as gp
 import pytest
 from gurobipy import GRB
+from optimizer.application.formulation.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
 
 from controller.domain.profile.network_topology import NetworkTopology
 from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.network.constraints import (
@@ -12,9 +15,6 @@ from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compac
 from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.network.network_variables import (
     NetworkVariables,
 )
-from optimizer.application.formulation.compact.compact_formulation_data import (
-    CompactFormulationData,
-)
 from optimizer.domain.problem.compact.compact_optimization_problem import (
     ObjectiveKind,
 )
@@ -22,9 +22,8 @@ from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import ServiceId, WorkerId
-from shared.user.user import UserId
 
-_FLOW = FlowId(user_id=UserId(id=UUID(int=1)), flow_id=UUID(int=2))
+_FLOW = FlowId(flow_id=UUID(int=2))
 _MODEL_A = ModelVariantId(ModelId("model"), "a")
 _MODEL_B = ModelVariantId(ModelId("model"), "b")
 _MODELS = (_MODEL_A, _MODEL_B)

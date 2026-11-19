@@ -63,14 +63,13 @@ from shared.model.model_variant import (
     PerformanceMetric,
     PerformanceMetricType,
 )
-from shared.user.user import UserId
 
 
 def test_http_batch_preserves_both_selection_strategies():
     manager = RecordingOptimizationManager()
-    performance = _request_dto(FlowId(UserId()))
+    performance = _request_dto(FlowId())
     variant = ModelVariantId(ModelId("chosen"), "fp32")
-    fixed = _request_dto(FlowId(UserId())).model_copy(
+    fixed = _request_dto(FlowId()).model_copy(
         update={
             "model_selection_requirements": ModelSelectionRequirementsDto(
                 selection_strategy=ModelVariantSelectionStrategyDto(
@@ -113,7 +112,7 @@ def test_http_batch_preserves_both_selection_strategies():
 )
 def test_http_rejects_ambiguous_or_incomplete_selection(failure):
     manager = RecordingOptimizationManager()
-    payload = _request_dto(FlowId(UserId())).model_dump(mode="json")
+    payload = _request_dto(FlowId()).model_dump(mode="json")
     strategy = payload["model_selection_requirements"]["selection_strategy"]
     if failure == "missing":
         del payload["model_selection_requirements"]
@@ -305,7 +304,7 @@ def test_accuracy_objective_skips_fixed_variants_without_inventing_a_metric(fixe
     problem = single_configuration_problem(2)
     flow, data = next(iter(problem.flows.items()))
     key = data.configurations[0]
-    fixed_flow = FlowId(UserId())
+    fixed_flow = FlowId()
     fixed = replace(data, performance_requirement=None, configurations=(key,))
     problem = replace(
         problem,

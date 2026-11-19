@@ -62,11 +62,10 @@ from shared.model.model_variant import (
     PerformanceMetricType,
 )
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 def single_configuration_problem(variant_count=1):
-    flow = FlowId(UserId(UUID(int=1)), UUID(int=2))
+    flow = FlowId(flow_id=UUID(int=2))
     worker = ServiceId(UUID(int=3))
     metric = PerformanceMetric(PerformanceMetricType.ACCURACY, "dataset", 0.9)
     graph = VariantData(

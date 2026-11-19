@@ -63,7 +63,6 @@ from shared.model.model_variant import (
     QuantizationType,
 )
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 ARRIVAL_RATES = (0.01, 0.02, 0.03, 0.04, 0.05)
 MAX_RESPONSE_TIMES_S = (100.0, 150.0, 200.0, 250.0, 300.0)
@@ -100,8 +99,7 @@ def prepare_optimization_scenario(tmp_path: Path) -> OptimizationScenario:
     if not model_path.is_file():
         pytest.fail(f"MODEL_PATH is not a file: {model_path}")
 
-    user_id = UserId(id=uuid4())
-    flow_ids = tuple(FlowId(user_id=user_id, flow_id=uuid4()) for _ in ARRIVAL_RATES)
+    flow_ids = tuple(FlowId(flow_id=uuid4()) for _ in ARRIVAL_RATES)
 
     onnx_model = onnx.load(model_path, load_external_data=False)
     onnx.checker.check_model(onnx_model)

@@ -8,13 +8,12 @@ from front_end.adapters.outbound.inference.redis_flow_plan_reader import (
 from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
 from shared.flow.flow import FlowId
 from shared.plan.plan_version import PlanVersion
-from shared.user.user import UserId
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("value", ["3", b"3"])
 async def test_reads_current_version_from_string_or_bytes(value: str | bytes) -> None:
-    flow_id = FlowId(user_id=UserId())
+    flow_id = FlowId()
     redis = AsyncMock()
     redis.get.return_value = value
     factory = StringFlowPlanKeyFactory()
@@ -33,7 +32,7 @@ async def test_missing_current_version_raises_key_error() -> None:
     reader = RedisFlowPlanReader(redis, StringFlowPlanKeyFactory())
 
     with pytest.raises(KeyError, match="No plan for flow id"):
-        await reader.get_current_plan_version_for_flow(FlowId(user_id=UserId()))
+        await reader.get_current_plan_version_for_flow(FlowId())
 
 
 @pytest.mark.asyncio
@@ -44,4 +43,4 @@ async def test_invalid_current_version_raises_value_error(value: str) -> None:
     reader = RedisFlowPlanReader(redis, StringFlowPlanKeyFactory())
 
     with pytest.raises(ValueError):
-        await reader.get_current_plan_version_for_flow(FlowId(user_id=UserId()))
+        await reader.get_current_plan_version_for_flow(FlowId())

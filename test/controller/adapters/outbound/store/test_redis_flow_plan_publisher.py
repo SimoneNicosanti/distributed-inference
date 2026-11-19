@@ -24,7 +24,6 @@ from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
 from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 from shared.plan.plan_version import PlanVersion
-from shared.user.user import UserId
 
 
 def _plan(version: int = 3, variant_tag: str = "variant") -> FlowPlan:
@@ -94,8 +93,8 @@ async def test_publishes_all_flows_in_one_transaction_using_integration_keys(
     redis, pipeline = redis_pipeline
     factory = StringFlowPlanKeyFactory()
     plans = {
-        FlowId(user_id=UserId()): _plan(),
-        FlowId(user_id=UserId()): _plan(variant_tag="other"),
+        FlowId(): _plan(),
+        FlowId(): _plan(variant_tag="other"),
     }
     publisher: FlowPlanPublisher = RedisFlowPlanPublisher(redis, factory)
 
@@ -124,8 +123,8 @@ async def test_published_payloads_can_be_read_by_the_existing_front_end_reader(
     redis, pipeline = redis_pipeline
     factory = StringFlowPlanKeyFactory()
     plans = {
-        FlowId(user_id=UserId()): _plan(),
-        FlowId(user_id=UserId()): _plan(4, "other"),
+        FlowId(): _plan(),
+        FlowId(): _plan(4, "other"),
     }
     await RedisFlowPlanPublisher(redis, factory).publish_flow_plans(plans)
     reader = _reader_from_writes(redis, pipeline, factory)
@@ -153,7 +152,7 @@ async def test_keeps_previous_versions_when_publishing_a_new_current_version(
     redis, pipeline = redis_pipeline
     factory = StringFlowPlanKeyFactory()
     publisher = RedisFlowPlanPublisher(redis, factory)
-    flow_id = FlowId(user_id=UserId())
+    flow_id = FlowId()
     previous, current = _plan(3), _plan(4)
 
     await publisher.publish_flow_plans({flow_id: previous})
@@ -191,8 +190,8 @@ async def test_prepares_every_payload_before_opening_a_transaction(
     redis, pipeline = redis_pipeline
     first = _plan()
     plans = {
-        FlowId(user_id=UserId()): first,
-        FlowId(user_id=UserId()): _plan(variant_tag="other"),
+        FlowId(): first,
+        FlowId(): _plan(variant_tag="other"),
     }
     with (
         patch.object(
@@ -227,6 +226,6 @@ async def test_propagates_transaction_errors(
     with pytest.raises(type(error)):
         await RedisFlowPlanPublisher(
             redis, StringFlowPlanKeyFactory()
-        ).publish_flow_plans({FlowId(user_id=UserId()): _plan()})
+        ).publish_flow_plans({FlowId(): _plan()})
 
     pipeline.execute.assert_awaited_once_with()

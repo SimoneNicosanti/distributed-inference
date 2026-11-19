@@ -26,12 +26,8 @@ def _canonical_worker(value: WorkerId) -> WorkerId:
 
 
 def _require_explicit_flow_id(value: object) -> object:
-    if isinstance(value, Mapping):
-        user = value.get("user_id")
-        if "flow_id" not in value or "user_id" not in value:
-            raise ValueError("flow_id must contain explicit flow_id and user_id fields")
-        if isinstance(user, Mapping) and "id" not in user:
-            raise ValueError("user_id must contain an explicit id")
+    if isinstance(value, Mapping) and "flow_id" not in value:
+        raise ValueError("flow_id must contain an explicit flow_id field")
     return value
 
 

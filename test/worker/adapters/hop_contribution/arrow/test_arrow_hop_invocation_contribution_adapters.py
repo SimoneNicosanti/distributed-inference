@@ -5,7 +5,6 @@ from typing import override
 import numpy as np
 import pytest
 
-from front_end.domain.context.model_invocation_context import ModelInvocationContext
 from integration.service_instance.service_instance import (
     ArrowUrl,
     Capability,
@@ -14,7 +13,8 @@ from integration.service_instance.service_instance import (
     CapabilityType,
 )
 from integration.service_instance.worker_instance import WorkerInstance
-from shared.context.model_pass_context import ModelPassContext
+from shared.context.model_invocation_context import ModelInvocationContext
+from shared.context.model_pass_context import ModelPassContext, ModelPassType
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -22,7 +22,6 @@ from shared.plan.hop import ExternalHopId
 from shared.plan.hop_logical_id import PlannedIngressReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 from worker.adapters.inbound.hop_contribution.arrow.arrow_hop_invocation_contribution_server import (
     ArrowHopInvocationContributionServer,
 )
@@ -33,7 +32,6 @@ from worker.application.ports.inbound.hop_contribution_rcv.hop_invocation_contri
     HopInvocationContributionReceiveCoordinator,
 )
 from worker.domain.context.hop_invocation_context import HopInvocationContext
-from worker.domain.context.model_pass_context import ModelPassType
 from worker.domain.hop.hop_invocation_contribution import (
     HopInvocationContribution,
     HopInvocationContributionAck,
@@ -56,9 +54,7 @@ def _contribution(destination_id: PlannedIngressReplicaId) -> HopInvocationContr
     return HopInvocationContribution(
         source_context=HopInvocationContext(
             model_pass_context=ModelPassContext(
-                model_invocation_context=ModelInvocationContext(
-                    flow_id=FlowId(user_id=UserId())
-                ),
+                model_invocation_context=ModelInvocationContext(flow_id=FlowId()),
                 plan_version=PlanVersion(version_number=1),
                 model_pass_type=ModelPassType.FORWARD,
             ),
@@ -108,7 +104,7 @@ class _Directory:
     def __init__(self, worker: WorkerInstance) -> None:
         self.worker = worker
 
-    async def get_worker_instance_by_id(self, worker_id):  [no-untyped-def]
+    async def get_worker_instance_by_id(self, worker_id: ServiceId) -> WorkerInstance:
         assert worker_id == self.worker.service_id
         return self.worker
 
@@ -140,11 +136,10 @@ async def test_sender_reaches_generic_hop_server() -> None:
             Capability(type=CapabilityType.PLAN_ACTUATION, interfaces=[]),
             Capability(type=CapabilityType.IN_NETWORK_PROFILING, interfaces=[]),
             Capability(type=CapabilityType.RESULT_RETRIEVE, interfaces=[]),
+            Capability(type=CapabilityType.FAILURE_RECEIVE, interfaces=[]),
         ],
     )
-    sender = ArrowHopInvocationContributionSender(
-        _Directory(worker),  [arg-type]
-    )
+    sender = ArrowHopInvocationContributionSender(_Directory(worker))
 
     try:
         await sender.send(contribution, worker_id)

@@ -24,7 +24,6 @@ from shared.model.model_variant import ModelVariantId
 from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 def _flow(variant: ModelVariantId) -> FlowOptimizationSolution:
@@ -44,7 +43,7 @@ def _flow(variant: ModelVariantId) -> FlowOptimizationSolution:
         transmission_latency_s=0,
     )
     return FlowOptimizationSolution(
-        flow_id=FlowId(user_id=UserId()),
+        flow_id=FlowId(),
         ingress_worker_id=worker_id,
         sink_worker_id=worker_id,
         model_variant_id=variant,
@@ -100,7 +99,7 @@ def test_rejects_endpoint_mapping_that_does_not_match_the_flows(
     solution = _solution()
     endpoints = dict(EndpointReplicaIdBuilder().build_all(solution.solution))
     if extra_endpoint:
-        endpoints[FlowId(user_id=UserId())] = next(iter(endpoints.values()))
+        endpoints[FlowId()] = next(iter(endpoints.values()))
     else:
         endpoints.pop(next(iter(endpoints)))
 

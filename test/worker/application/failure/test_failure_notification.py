@@ -24,7 +24,6 @@ from shared.model.model_variant import ModelVariantId
 from shared.plan.hop_logical_id import PlannedSinkReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 from worker.adapters.context_mapper import model_pass_context_to_dto
 from worker.adapters.inbound.failure.http.http_failure_receiver import (
     build_failure_receiver_router,
@@ -50,9 +49,7 @@ from worker.domain.plan.failure_plan import FailurePlan
 
 def _context():
     return ModelPassContext(
-        model_invocation_context=ModelInvocationContext(
-            flow_id=FlowId(user_id=UserId())
-        ),
+        model_invocation_context=ModelInvocationContext(flow_id=FlowId()),
         plan_version=PlanVersion(1),
         model_pass_type=ModelPassType.FORWARD,
     )
@@ -138,7 +135,7 @@ async def test_sender_preserves_http_failure():
 
 @pytest.mark.parametrize("duplicate", [False, True])
 def test_failure_plan_rejects_invalid_flow_mapping(duplicate):
-    flow = FlowId(user_id=UserId())
+    flow = FlowId()
     sink = PlannedSinkReplicaId(ModelVariantId(ModelId("model"), "variant"), 0)
     flows = (flow, flow) if duplicate else (flow,)
     sinks = (sink, sink) if duplicate else ()

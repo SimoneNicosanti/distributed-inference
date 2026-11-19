@@ -67,7 +67,7 @@ from worker.adapters.outbound.partition_execution.onnx.onnx_partition_executor_f
 from worker.adapters.outbound.plan_store.in_memory_worker_plan_store import (
     InMemoryWorkerPlanStore,
 )
-from worker.adapters.outbound.profiling.model_execution.ort_engine_model_execution_profiler import (
+from worker.adapters.outbound.profiling.model_execution.ort.ort_engine_model_execution_profiler import (
     OrtModelExecutionProfiler,
 )
 from worker.adapters.outbound.profiling.network.arrow.arrow_network_probe_client import (
@@ -282,7 +282,9 @@ class DefaultCompositionRoot(CompositionRoot):
             failure_propagator = DefaultFailurePropagator(
                 failure_plan_reader=worker_plan_store,
                 hop_directory=deployment_catalog,
-                failure_sender=HttpFailureSender(service_directory, failure_http_client),
+                failure_sender=HttpFailureSender(
+                    service_directory, failure_http_client
+                ),
             )
 
             invocation_coordinator = HopInvocationCoordinator(

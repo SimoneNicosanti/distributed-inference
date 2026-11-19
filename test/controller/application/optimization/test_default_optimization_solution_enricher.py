@@ -31,7 +31,6 @@ from shared.model.keys import TensorKey
 from shared.model.model import ModelId, ModelTask
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 def _variant(model_name: str = "model", tag: str = "selected") -> ModelVariantId:
@@ -57,7 +56,7 @@ def _solution(*variants: ModelVariantId) -> OptimizationSolution:
     return OptimizationSolution(
         flow_solutions=tuple(
             FlowOptimizationSolution(
-                flow_id=FlowId(user_id=UserId()),
+                flow_id=FlowId(),
                 ingress_worker_id=worker_id,
                 sink_worker_id=worker_id,
                 model_variant_id=variant,

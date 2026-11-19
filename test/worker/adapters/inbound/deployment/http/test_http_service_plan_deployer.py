@@ -32,7 +32,6 @@ from shared.model.model_variant import ModelVariantId
 from shared.plan.hop import ExternalHopId
 from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 from shared.plan.plan_version import PlanVersion
-from shared.user.user import UserId
 from worker.adapters.inbound.deployment.http.http_service_plan_deployer import (
     build_worker_plan_deployment_router,
 )
@@ -129,7 +128,7 @@ def test_maps_hop_routing_plan() -> None:
     deployer = RecordingPlanDeployer()
     client = _client(deployer)
     plan = _empty_worker_plan(version_number=1)
-    flow_id = FlowId(user_id=UserId())
+    flow_id = FlowId()
     model_variant_id = ModelVariantId(
         model_id=ModelId("test-model"),
         variant_tag="test-variant",

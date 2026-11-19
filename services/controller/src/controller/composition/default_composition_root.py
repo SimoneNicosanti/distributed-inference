@@ -1,29 +1,9 @@
+import os
 from collections.abc import AsyncGenerator
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import override
 
 import httpx
-from optimizer.src.optimizer.application.abc.optimization_context_builder import (
-    OptimizationContextBuilder,
-)
-from optimizer.src.optimizer.application.default_optimization_context_builder import (
-    DefaultOptimizationContextBuilder,
-)
-from optimizer.src.optimizer.application.default_optimization_solution_enricher import (
-    DefaultOptimizationSolutionEnricher,
-)
-from optimizer.src.optimizer.application.formulation.compact.compact_formulation_data_builder import (
-    CompactFormulationDataBuilder,
-)
-from optimizer.src.optimizer.domain.compact.compact_formulation_config import (
-    CompactFormulationConfig,
-)
-from optimizer.src.optimizer.domain.compact.compact_formulation_data import (
-    CompactFormulationData,
-)
-from optimizer.src.optimizer.domain.compact.compact_objective_kind import (
-    CompactObjectiveKind,
-)
 from redis import asyncio as redis_asyncio
 
 from advertisement.advertising_manager import AdvertisingManager
@@ -36,6 +16,9 @@ from catalog.redis.service.redis_service_registrar import RedisServiceRegistrar
 from catalog.view.worker.default_worker_directory import DefaultWorkerDirectory
 from controller.adapters.outbound.directory.default_worker_directory_gateway import (
     DefaultWorkerDirectoryGateway,
+)
+from controller.adapters.outbound.optimizer.http_optimizer_gateway import (
+    HttpOptimizerGateway,
 )
 from controller.adapters.outbound.partition_builder.http_partition_builder_gateway import (
     HttpPartitionBuilderGateway,
@@ -81,8 +64,20 @@ from controller.application.deployment.default_plan_three_phase_dispatcher impor
 from controller.application.deployment.default_solution_to_plan_converter import (
     DefaultSolutionToPlanConverter,
 )
+from controller.application.optimization.abc.optimization_context_builder import (
+    OptimizationContextBuilder,
+)
+from controller.application.optimization.default_optimization_context_builder import (
+    DefaultOptimizationContextBuilder,
+)
 from controller.application.optimization.default_optimization_manager import (
     DefaultOptimizationManager,
+)
+from controller.application.optimization.default_optimization_solution_enricher import (
+    DefaultOptimizationSolutionEnricher,
+)
+from controller.application.optimization.formulation.compact_optimization_problem_factory import (
+    CompactOptimizationProblemFactory,
 )
 from controller.application.ports.inbound.optimization.optimization_manager import (
     OptimizationManager,
@@ -94,6 +89,10 @@ from controller.application.ports.outbound.store.optimization_solution_store imp
     OptimizationSolutionStore,
 )
 from controller.composition.composition_root import CompositionRoot
+from controller.domain.optimization.problem.compact_optimization_problem import (
+    ObjectiveKind,
+    OptimizationPolicy,
+)
 from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
 from integration.redis.model.keys_factory import StringModelKeyFactory
 from integration.redis.profiled_model_variant.keys_factory import (
@@ -109,36 +108,19 @@ from integration.redis.worker_profiles.resource_profile_keys import (
     StringResourceProfileKeyFactory,
 )
 from integration.service_instance.service_instance import ServiceInstance
-from optimizer.adapters.outbound.gurobi.formulation_compiler.gurobi_formulation_compiler import (
-    GurobiModelBuilder,
-)
-from optimizer.src.optimizer.adapters.outbound.gurobi.entities.gurobi_solver_config import (
-    GurobiSolverConfig,
-)
-from optimizer.src.optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.compact_variables import (
-    CompactVariables,
-)
-from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.gurobi_misocp_compact_formulation_compiler import (
-    GurobiMisocpCompactFormulationModelBuilder,
-)
-from optimizer.adapters.outbound.gurobi.result_translation.formulations.compact.gurobi_misocp_compact_solved_compiled_formulation_translator import (
-    GurobiCompactSolvedFormulationModelTranslator,
-)
-from optimizer.src.optimizer.adapters.outbound.gurobi.solver.gurobi_solver import (
-    GurobiSolver,
-)
-from optimizer.src.optimizer.adapters.outbound.gurobi.solver_config_builder.gurobi_solver_config_builder import (
-    GurobiSolverConfigBuilder,
-)
-from optimizer.src.optimizer.application.abc.solver_strategy import SolverStrategy
-from optimizer.src.optimizer.application.strategies.full_solver_strategy import (
-    FullSolverStrategy,
-)
+
+DEFAULT_OPTIMIZER_HTTP_BASE_URL = "http://optimizer:8000"
 
 
 class DefaultCompositionRoot(CompositionRoot):
-    def __init__(self, solver_config: GurobiSolverConfig | None = None) -> None:
-        self._solver_config = solver_config
+    def __init__(self, optimization_policy: OptimizationPolicy | None = None) -> None:
+        self._optimization_policy = optimization_policy or OptimizationPolicy(
+            max_components=5,
+            priority_count=3,
+            compute_utilization_limit=0.8,
+            network_utilization_limit=0.8,
+            objective=ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        )
 
     @asynccontextmanager
     @override
@@ -162,8 +144,17 @@ class DefaultCompositionRoot(CompositionRoot):
             worker_directory = DefaultWorkerDirectory(directory)
             worker_directory_gateway = DefaultWorkerDirectoryGateway(worker_directory)
 
+            http_client = await stack.enter_async_context(
+                httpx.AsyncClient(
+                    timeout=httpx.Timeout(30.0, connect=5.0),
+                    limits=httpx.Limits(
+                        max_connections=100,
+                        max_keepalive_connections=20,
+                    ),
+                )
+            )
             optimization_manager = self.build_optimization_manager(
-                solution_store, redis, worker_directory_gateway
+                solution_store, redis, worker_directory_gateway, http_client
             )
 
             await stack.enter_async_context(
@@ -179,50 +170,26 @@ class DefaultCompositionRoot(CompositionRoot):
         solution_store: OptimizationSolutionStore,
         redis: redis_asyncio.Redis,
         worker_directory_gateway: WorkerDirectoryGateway,
+        http_client: httpx.AsyncClient,
     ) -> OptimizationManager:
 
         optimization_context_builder = self.build_optimization_context_builder(
             redis, worker_directory_gateway
         )
-        solver_config = self._solver_config or GurobiSolverConfig(
-            output_flag=True,
-            time_limit_s=180,
-        )
-
-        formulation_config = CompactFormulationConfig(
-            max_components=5,
-            priority_count=3,
-            compute_utilization_limit=0.8,
-            network_utilization_limit=0.8,
-            relative_error=0.1,
-            objective=CompactObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
-        )
-
-        solver_strategy: SolverStrategy = FullSolverStrategy(
-            formulation_builder=CompactFormulationDataBuilder(),
-            formulation_compiler=GurobiModelBuilder(
-                GurobiMisocpCompactFormulationModelBuilder(),
-                non_convex=0,
-                output_flag=solver_config.output_flag,
-            ),
-            solver_config_builder=GurobiSolverConfigBuilder(
-                output_flag=solver_config.output_flag,
-                time_limit_s=solver_config.time_limit_s,
-                mip_gap=solver_config.mip_gap,
-                threads=solver_config.threads,
-                seed=solver_config.seed,
-                observer=solver_config.observer,
-                record_incumbent_history=solver_config.record_incumbent_history,
-            ),
-            solver=GurobiSolver[CompactFormulationData, CompactVariables](),
-            solved_model_translator=GurobiCompactSolvedFormulationModelTranslator(),
-            formulation_config=formulation_config,
-        )
         optimization_manager = DefaultOptimizationManager(
-            optimization_context_builder,
-            solver_strategy,
-            DefaultOptimizationSolutionEnricher(),
-            solution_store,
+            optimization_context_builder=optimization_context_builder,
+            optimization_problem_factory=CompactOptimizationProblemFactory(
+                self._optimization_policy
+            ),
+            optimizer_gateway=HttpOptimizerGateway(
+                http_client,
+                os.environ.get(
+                    "OPTIMIZER_HTTP_BASE_URL", DEFAULT_OPTIMIZER_HTTP_BASE_URL
+                ),
+                timeout_s=float(os.environ.get("OPTIMIZER_TIMEOUT_S", "300")),
+            ),
+            solution_enricher=DefaultOptimizationSolutionEnricher(),
+            solution_store=solution_store,
         )
 
         return optimization_manager

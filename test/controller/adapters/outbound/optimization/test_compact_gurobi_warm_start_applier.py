@@ -29,7 +29,6 @@ from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import ServiceId, WorkerId
-from shared.user.user import UserId
 
 
 @dataclass
@@ -60,7 +59,7 @@ class _Model:
 
 class CompactGurobiWarmStartApplierTests(IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.flow = FlowId(UserId())
+        self.flow = FlowId()
         self.workers = ServiceId(), ServiceId()
         self.variants = (
             ModelVariantId(ModelId("model"), "a"),
@@ -236,7 +235,7 @@ class CompactGurobiWarmStartApplierTests(IsolatedAsyncioTestCase):
         self.assertEqual(self.native.update_count, 2)
 
     async def test_maps_multiple_flows_independently(self) -> None:
-        second_flow = FlowId(UserId())
+        second_flow = FlowId()
         self._build_target((self.flow, second_flow))
         first = self._solution()
         second = self._solution(flow=second_flow, variant=self.variants[1])
@@ -255,7 +254,7 @@ class CompactGurobiWarmStartApplierTests(IsolatedAsyncioTestCase):
         gap = replace(flow_solution.components[1], component_index=3)
         invalid = (
             replace(seed, flow_solutions=()),
-            self._solution(flow=FlowId(UserId())),
+            self._solution(flow=FlowId()),
             self._solution(variant=ModelVariantId(ModelId("unknown"), "a")),
             self._solution(workers=(ServiceId(), self.workers[1])),
             self._solution(priorities=(1, 3)),
@@ -284,7 +283,7 @@ class CompactGurobiWarmStartApplierTests(IsolatedAsyncioTestCase):
                 self.assertEqual(self.native.update_count, 0)
 
     async def test_invalid_later_flow_preserves_all_existing_starts(self) -> None:
-        second_flow = FlowId(UserId())
+        second_flow = FlowId()
         self._build_target((self.flow, second_flow))
         first = self._solution()
         second = self._solution(flow=second_flow, priorities=(1, 3))

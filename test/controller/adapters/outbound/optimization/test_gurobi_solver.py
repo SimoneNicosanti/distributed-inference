@@ -82,7 +82,6 @@ from shared.model.model_variant import (
     PerformanceMetricType,
 )
 from shared.service.service import ServiceId, WorkerId
-from shared.user.user import UserId
 
 _INPUT = "input"
 _COMPUTE = "compute"
@@ -119,7 +118,6 @@ _BRANCHED_EDGES = (
     (_HEAD, _BRANCHED_OUTPUT, "head_output"),
 )
 
-_USER_ID = UserId(id=UUID("00000000-0000-0000-0000-000000000001"))
 _MODEL_VARIANT_ID = ModelVariantId(
     model_id=ModelId(model_name="test-model"),
     variant_tag="batch-1",
@@ -145,7 +143,7 @@ def _worker(number: int) -> WorkerId:
 
 
 def _flow(number: int) -> FlowId:
-    return FlowId(user_id=_USER_ID, flow_id=UUID(int=number))
+    return FlowId(flow_id=UUID(int=number))
 
 
 def _static_profile(
@@ -471,7 +469,7 @@ def _request(
     flow_id: FlowId | None = None,
 ) -> OptimizationRequest:
     return OptimizationRequest(
-        flow_id=flow_id or FlowId(user_id=_USER_ID),
+        flow_id=flow_id or FlowId(),
         model_selection_requirements=ModelSelectionRequirements(
             selection_strategy=PerformanceSelectionStrategy(
                 task=ModelTask.CLASSIFICATION,

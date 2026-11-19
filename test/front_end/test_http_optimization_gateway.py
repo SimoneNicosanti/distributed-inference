@@ -23,7 +23,6 @@ from shared.flow.flow import FlowId
 from shared.model.model import ModelTask
 from shared.model.model_variant import PerformanceMetric, PerformanceMetricType
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 
 
 def _request(
@@ -31,7 +30,7 @@ def _request(
 ) -> OptimizationRequestDto:
     worker_id = ServiceId()
     return OptimizationRequestDto(
-        flow_id=FlowId(user_id=UserId()),
+        flow_id=FlowId(),
         model_selection_requirements=ModelSelectionRequirementsDto(
             selection_strategy=PerformanceSelectionStrategyDto(
                 task=ModelTask.CLASSIFICATION,

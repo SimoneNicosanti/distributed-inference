@@ -5,6 +5,9 @@ from uuid import UUID
 
 import gurobipy as gp
 from gurobipy import GRB
+from optimizer.application.formulation.compact.compact_formulation_data import (
+    CompactFormulationData,
+)
 
 import optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.execution.constraints as structure_constraints
 from controller.domain.optimization.context.optimization_context import (
@@ -41,9 +44,6 @@ from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compac
 from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compact.collaborators.execution.execution_variables import (
     ExecutionVariables,
 )
-from optimizer.application.formulation.compact.compact_formulation_data import (
-    CompactFormulationData,
-)
 from optimizer.domain.problem.compact.compact_optimization_problem import (
     ObjectiveKind,
 )
@@ -51,11 +51,9 @@ from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import ServiceId, WorkerId
-from shared.user.user import UserId
 
 _LAYERS = ("a", "b", "c")
-_USER = UserId(id=UUID(int=1))
-_FLOW = FlowId(user_id=_USER, flow_id=UUID(int=2))
+_FLOW = FlowId(flow_id=UUID(int=2))
 _MODEL_A = ModelVariantId(
     model_id=ModelId(model_name="model"),
     variant_tag="a",

@@ -55,7 +55,10 @@ class CapabilityType(StrEnum):
     MODEL_REGISTRATION = auto()
 
     ## Declared by deployment optimization
-    DEPLOYMENT_OPTIMIZATION = auto()
+    FLOW_DEPLOYMENT = auto()
+
+    ## Declared by optimizer
+    OPTIMIZATION = auto()
 
     ## Declared by artifact storage (e.g. S3)
     ARTIFACT_STORAGE = auto()

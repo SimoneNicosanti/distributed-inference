@@ -2,8 +2,6 @@ import math
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
-from shared.user.user import UserId
-
 
 @dataclass(frozen=True, slots=True)
 class FlowInfo:
@@ -29,5 +27,4 @@ class FlowInfo:
 
 @dataclass(frozen=True, slots=True)
 class FlowId:
-    user_id: UserId
     flow_id: UUID = field(default_factory=uuid4)

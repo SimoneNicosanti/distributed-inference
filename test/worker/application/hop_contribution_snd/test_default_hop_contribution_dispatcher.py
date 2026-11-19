@@ -16,7 +16,6 @@ from shared.plan.hop import ExternalHopId
 from shared.plan.hop_logical_id import PlannedIngressReplicaId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId, WorkerId
-from shared.user.user import UserId
 from worker.application.activity.default_activity_request_factory import (
     DefaultActivityRequestFactory,
 )
@@ -98,9 +97,7 @@ def _contribution(
     return HopInvocationContribution(
         source_context=HopInvocationContext(
             model_pass_context=ModelPassContext(
-                model_invocation_context=ModelInvocationContext(
-                    flow_id=FlowId(user_id=UserId())
-                ),
+                model_invocation_context=ModelInvocationContext(flow_id=FlowId()),
                 plan_version=plan_version,
                 model_pass_type=ModelPassType.FORWARD,
             ),

@@ -34,7 +34,6 @@ from shared.model.model_variant import ModelVariantId
 from shared.plan.hop import ExternalHopId as WorkerExternalHop
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
-from shared.user.user import UserId
 from worker.adapters.inbound.deployment.http.service_plan_mapper import (
     worker_plan_from_dto,
 )
@@ -73,7 +72,6 @@ def _component(
 
 @pytest.mark.asyncio
 async def test_maps_solution_to_all_involved_workers() -> None:
-    user_id = UserId()
     model_variant_id = ModelVariantId(
         model_id=ModelId(model_name="model"),
         variant_tag="variant",
@@ -83,8 +81,8 @@ async def test_maps_solution_to_all_involved_workers() -> None:
     sink_one = ServiceId()
     compute_one = ServiceId()
     compute_two = ServiceId()
-    first_flow_id = FlowId(user_id=user_id)
-    second_flow_id = FlowId(user_id=user_id)
+    first_flow_id = FlowId()
+    second_flow_id = FlowId()
 
     first_flow = FlowOptimizationSolution(
         flow_id=first_flow_id,
@@ -252,7 +250,6 @@ async def test_maps_solution_to_all_involved_workers() -> None:
 
 @pytest.mark.asyncio
 async def test_rejects_flow_without_executable_components() -> None:
-    user_id = UserId()
     ingress_id = ServiceId()
     model_variant_id = ModelVariantId(
         model_id=ModelId(model_name="model"),
@@ -261,7 +258,7 @@ async def test_rejects_flow_without_executable_components() -> None:
     solution = OptimizationSolution(
         flow_solutions=(
             FlowOptimizationSolution(
-                flow_id=FlowId(user_id=user_id),
+                flow_id=FlowId(),
                 ingress_worker_id=ingress_id,
                 sink_worker_id=ingress_id,
                 model_variant_id=model_variant_id,
@@ -313,7 +310,7 @@ def _placed_flow(
         for index, (worker, layers) in enumerate(groups, start=1)
     )
     return FlowOptimizationSolution(
-        flow_id=FlowId(user_id=UserId()),
+        flow_id=FlowId(),
         ingress_worker_id=placements[0],
         sink_worker_id=placements[-1],
         model_variant_id=model_variant_id,
