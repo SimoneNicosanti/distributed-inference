@@ -20,9 +20,6 @@ from integration.service_instance.service_instance import (
 from integration.service_instance.worker_instance import WorkerInstance
 from integration.worker.http_worker_constants import DEFAULT_LOCAL_WORKER_HTTP_PORT
 from shared.service.service import ServiceId
-from worker.adapters.inbound.deployment.http.http_service_plan_deployer import (
-    build_worker_plan_deployment_router,
-)
 from worker.adapters.inbound.failure.http.http_failure_receiver import (
     build_failure_receiver_router,
 )
@@ -111,15 +108,6 @@ def build_worker_instance() -> WorkerInstance:
             interfaces=[_arrow_interface(advertised_host, hop_invocation_port)],
         ),
         Capability(
-            type=CapabilityType.PLAN_ACTUATION,
-            interfaces=[
-                CapabilityInterface(
-                    protocol=CapabilityProtocol.HTTP,
-                    endpoint=HttpUrl(f"http://{advertised_host}:{http_port}"),
-                )
-            ],
-        ),
-        Capability(
             type=CapabilityType.IN_NETWORK_PROFILING,
             interfaces=[_arrow_interface(advertised_host, network_port)],
         ),
@@ -147,9 +135,6 @@ def build_http_app(composition: WorkerComposition) -> FastAPI:
         readiness,
         methods=["GET"],
         status_code=204,
-    )
-    app.include_router(
-        build_worker_plan_deployment_router(composition.worker_plan_deployer)
     )
     app.include_router(
         build_worker_identity_query_router(composition.worker_identity_query)

@@ -1,6 +1,5 @@
 from typing import override
 
-from catalog.api.hop.hop_deployment_directory import HopDeploymentDirectory
 from front_end.application.ports.inbound.inference_runner import (
     InferenceCoordinator,
 )
@@ -25,12 +24,10 @@ class DefaultInferenceRunner(InferenceCoordinator):
     def __init__(
         self,
         flow_plan_reader: FlowPlanReader,
-        hop_deployment_directory: HopDeploymentDirectory,
         ingress_gateway: IngressGateway,
         sink_gateway: SinkGateway,
     ) -> None:
         self._flow_plan_reader = flow_plan_reader
-        self._hop_deployment_directory = hop_deployment_directory
         self._ingress_gateway = ingress_gateway
         self._sink_gateway = sink_gateway
 
@@ -84,17 +81,9 @@ class DefaultInferenceRunner(InferenceCoordinator):
             model_pass_context,
         )
 
-        ingress_worker_id = (
-            await self._hop_deployment_directory.get_worker_for_planned_invocable_hop(
-                curr_plan_version, flow_plan.ingress_replica_id
-            )
-        )
+        ingress_worker_id = flow_plan.ingress_worker_id
 
-        sink_worker_id = (
-            await self._hop_deployment_directory.get_worker_for_planned_invocable_hop(
-                curr_plan_version, flow_plan.sink_replica_id
-            )
-        )
+        sink_worker_id = flow_plan.sink_worker_id
 
         await self._ingress_gateway.submit_model_pass(
             external_source_invocation_context,

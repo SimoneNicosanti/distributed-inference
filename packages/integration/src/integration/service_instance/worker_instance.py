@@ -19,7 +19,6 @@ class WorkerInstance(ServiceInstance):
 
         required_capabilities = {
             CapabilityType.HOP_INVOCATION,
-            CapabilityType.PLAN_ACTUATION,
             CapabilityType.IN_NETWORK_PROFILING,
             CapabilityType.RESULT_RETRIEVE,
             CapabilityType.FAILURE_RECEIVE,

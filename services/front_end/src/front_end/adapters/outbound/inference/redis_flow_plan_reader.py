@@ -23,9 +23,10 @@ class RedisFlowPlanReader(FlowPlanReader):
 
     @override
     async def get_current_plan_version_for_flow(self, flow_id: FlowId) -> PlanVersion:
-        key = await self._key_factory.build_current_plan_key(flow_id)
+        hash_key = await self._key_factory.build_hash_key(flow_id)
+        elem_key = await self._key_factory.build_current_plan_field_key()
 
-        value = await self._redis.get(key)
+        value = await self._redis.hget(hash_key, elem_key)
         if value is None:
             raise KeyError(f"No plan for flow id {flow_id.flow_id}")
 
@@ -35,10 +36,10 @@ class RedisFlowPlanReader(FlowPlanReader):
     async def get_flow_plan_by_plan_version(
         self, flow_id: FlowId, plan_version: PlanVersion
     ) -> FlowPlan:
-        dict_key = await self._key_factory.build_flow_plans_dict_key(flow_id)
-        dict_elem_key = await self._key_factory.build_flow_plan_elem_key(plan_version)
+        hash_key = await self._key_factory.build_hash_key(flow_id)
+        elem_key = await self._key_factory.build_plan_field_key(plan_version)
 
-        value = await self._redis.hget(dict_key, dict_elem_key)
+        value = await self._redis.hget(hash_key, elem_key)
         if value is None:
             raise KeyError(
                 f"No plan with version {plan_version.version_number} for flow id {flow_id}"

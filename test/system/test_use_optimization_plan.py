@@ -1,4 +1,4 @@
-"""Run every flow against the current published plan and a local reference."""
+"""Run initial and repeated inference against published plans and a local reference."""
 
 import os
 
@@ -8,52 +8,13 @@ import onnx
 import onnxruntime as ort
 import pytest
 from test.system.existing_plan_scenario import ExistingPlanScenario
+from test.system.inference_support import _build_inference_bundle
 
-from integration.dto.tensor.tensor_bundle_dto import TensorBundleDto
 from integration.front_end.http.front_end_http_paths import FRONT_END_RUN_INFERENCE_PATH
 from integration.front_end.http.front_end_http_schema import (
     RunInferenceRequest,
     RunInferenceResponse,
 )
-
-
-def _build_inference_bundle(model: onnx.ModelProto) -> TensorBundleDto:
-    initializer_names = {initializer.name for initializer in model.graph.initializer}
-    tensors: dict[str, np.ndarray] = {}
-    rng = np.random.default_rng(0)
-
-    for model_input in model.graph.input:
-        if model_input.name in initializer_names:
-            continue
-
-        tensor_type = model_input.type.tensor_type
-        if tensor_type.elem_type == onnx.TensorProto.UNDEFINED:
-            raise ValueError(f"Input {model_input.name!r} has an undefined data type")
-
-        data_type = np.dtype(
-            onnx.helper.tensor_dtype_to_np_dtype(tensor_type.elem_type)
-        )
-        if data_type.kind in {"b", "O", "S", "U", "V"}:
-            raise ValueError(
-                f"Input {model_input.name!r} uses unsupported dtype {data_type}"
-            )
-
-        shape = tuple(
-            dimension.dim_value
-            if dimension.HasField("dim_value") and dimension.dim_value > 0
-            else 1
-            for dimension in tensor_type.shape.dim
-        )
-        tensors[model_input.name] = (
-            rng.uniform(0.0, 1.0, size=shape).astype(data_type)
-            if data_type.kind == "f"
-            else np.zeros(shape, dtype=data_type)
-        )
-
-    if not tensors:
-        raise ValueError("ONNX model has no runtime inputs")
-
-    return TensorBundleDto.from_ndarrays(tensors)
 
 
 @pytest.mark.integration
@@ -86,25 +47,28 @@ def test_use_optimization_plan(existing_plan_scenario: ExistingPlanScenario) -> 
                     if isinstance(declared, int):
                         assert declared == actual
 
-            request = RunInferenceRequest(flow_id=flow_id, bundle=bundle)
-            response = client.post(
-                FRONT_END_RUN_INFERENCE_PATH, json=request.model_dump(mode="json")
-            )
-            assert response.status_code == 200, (
-                f"Flow {flow_id}, plan {plan.plan_version}: "
-                f"{response.status_code} {response.text}"
-            )
-            result = RunInferenceResponse.model_validate(response.json())
-            outputs = result.bundle.to_ndarrays()
-            assert set(outputs) == set(expected)
-            for name, expected_tensor in expected.items():
-                actual = outputs[name]
-                assert actual.shape == expected_tensor.shape
-                assert actual.dtype == expected_tensor.dtype
-                assert np.isfinite(actual).all(), name
-                if actual.dtype.kind in {"f", "c"}:
-                    np.testing.assert_allclose(
-                        actual, expected_tensor, rtol=rtol, atol=atol, err_msg=name
-                    )
-                else:
-                    np.testing.assert_array_equal(actual, expected_tensor, err_msg=name)
+            for attempt in (1, 2):
+                request = RunInferenceRequest(flow_id=flow_id, bundle=bundle)
+                response = client.post(
+                    FRONT_END_RUN_INFERENCE_PATH, json=request.model_dump(mode="json")
+                )
+                assert response.status_code == 200, (
+                    f"Flow {flow_id}, plan {plan.plan_version}, request {attempt}: "
+                    f"{response.status_code} {response.text}"
+                )
+                result = RunInferenceResponse.model_validate(response.json())
+                outputs = result.bundle.to_ndarrays()
+                assert set(outputs) == set(expected)
+                for name, expected_tensor in expected.items():
+                    actual = outputs[name]
+                    assert actual.shape == expected_tensor.shape
+                    assert actual.dtype == expected_tensor.dtype
+                    assert np.isfinite(actual).all(), name
+                    if actual.dtype.kind in {"f", "c"}:
+                        np.testing.assert_allclose(
+                            actual, expected_tensor, rtol=rtol, atol=atol, err_msg=name
+                        )
+                    else:
+                        np.testing.assert_array_equal(
+                            actual, expected_tensor, err_msg=name
+                        )

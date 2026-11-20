@@ -98,7 +98,7 @@ services:
     environment:
       WORKER_ADVERTISED_HOST: worker-2
       SERVICE_ID: worker-2
-    gpus: all
+    # gpus: all
 
   worker-3:
     build:

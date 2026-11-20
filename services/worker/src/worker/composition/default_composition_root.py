@@ -2,6 +2,7 @@ import asyncio
 import os
 from collections.abc import AsyncGenerator
 from contextlib import AsyncExitStack, asynccontextmanager
+from pathlib import Path
 from typing import cast, override
 
 import boto3
@@ -19,14 +20,10 @@ from advertisement.http.http_capability_life_checker import (
     build_http_capability_life_checkers,
 )
 from artifacts.storage.artifact_store import ArtifactStore
+from artifacts.storage.cached_artifact_store import CachedArtifactStore
+from artifacts.storage.local_artifact_store import LocalArtifactStore
 from artifacts.storage.s3.s3_artifact_store import S3ArtifactStore
 from artifacts.storage.s3.s3_client import S3Client
-from catalog.redis.hop.keys_factory import (
-    StringHopDeploymentKeyFactory,
-)
-from catalog.redis.hop.redis_hop_deployment_catalog import (
-    RedisHopDeploymentCatalog,
-)
 from catalog.redis.service.redis_service_directory import RedisServiceDirectory
 from catalog.redis.service.redis_service_registrar import RedisServiceRegistrar
 from catalog.view.worker.default_worker_directory import DefaultWorkerDirectory
@@ -36,6 +33,7 @@ from integration.redis.model_partition.keys_factory import (
 from integration.redis.profiled_model_variant.keys_factory import (
     StringProfiledModelVariantKeyFactory,
 )
+from integration.redis.worker_plan.keys_factory import StringWorkerPlanKeyFactory
 from integration.redis.worker_profiles.execution_profile_keys import (
     StringExecutionProfileKeyFactory,
 )
@@ -58,14 +56,17 @@ from worker.adapters.outbound.failure.http.http_failure_sender import HttpFailur
 from worker.adapters.outbound.hop_contribution.arrow.arrow_hop_invocation_contribution_sender import (
     ArrowHopInvocationContributionSender,
 )
+from worker.adapters.outbound.hop_execution.onnx.onnx_partition_executor_factory import (
+    OnnxPartitionExecutorFactory,
+)
 from worker.adapters.outbound.model_metadata.redis_model_partition_metadata_reader import (
     RedisModelPartitionMetadataReader,
 )
-from worker.adapters.outbound.partition_execution.onnx.onnx_partition_executor_factory import (
-    OnnxPartitionExecutorFactory,
+from worker.adapters.outbound.plan_reader.all_worker_plan_view_readers import (
+    AllWorkerPlanViewReader,
 )
-from worker.adapters.outbound.plan_store.in_memory_worker_plan_store import (
-    InMemoryWorkerPlanStore,
+from worker.adapters.outbound.plan_reader.redis_worker_plan_reader import (
+    RedisWorkerPlanReader,
 )
 from worker.adapters.outbound.profiling.model_execution.ort.ort_engine_model_execution_profiler import (
     OrtModelExecutionProfiler,
@@ -101,9 +102,6 @@ from worker.adapters.outbound.profiling.utils.nvidia_gpu_availability_checker im
 from worker.application.activity.default_activity_request_factory import (
     DefaultActivityRequestFactory,
 )
-from worker.application.deployment.default_worker_plan_deployer import (
-    DefaultWorkerPlanDeployer,
-)
 from worker.application.failure.default_failure_propagator import (
     DefaultFailurePropagator,
 )
@@ -133,8 +131,11 @@ from worker.application.hop_contribution_snd.default_hop_output_router import (
 from worker.application.hop_handler.default_ingress_hop_handler import (
     DefaultIngressHopHandler,
 )
-from worker.application.hop_handler.default_partition_executor_registry import (
-    DefaultPartitionExecutorRegistry,
+from worker.application.hop_handler.default_partition_executor_initializer import (
+    DefaultPartitionExecutorInitializer,
+)
+from worker.application.hop_handler.default_partition_executor_provider import (
+    DefaultPartitionExecutorProvider,
 )
 from worker.application.hop_handler.default_planned_partition_replica_hop_handler import (
     DefaultPlannedPartitionReplicaHopHandler,
@@ -210,11 +211,10 @@ class DefaultCompositionRoot(CompositionRoot):
 
             directory = RedisServiceDirectory(redis)
             service_directory = DefaultWorkerDirectory(directory)
-            deployment_catalog = RedisHopDeploymentCatalog(
-                redis,
-                StringHopDeploymentKeyFactory,
+            worker_plan_reader = RedisWorkerPlanReader(
+                worker_id, redis, StringWorkerPlanKeyFactory()
             )
-            worker_plan_store = InMemoryWorkerPlanStore()
+            worker_plan_view_reader = AllWorkerPlanViewReader(worker_plan_reader)
             activity_request_factory = DefaultActivityRequestFactory()
             activity_manager = LocalActivityManagerAdapter(
                 {
@@ -223,29 +223,31 @@ class DefaultCompositionRoot(CompositionRoot):
                 }
             )
 
-            partition_executor_registry = DefaultPartitionExecutorRegistry()
-            worker_plan_deployer = DefaultWorkerPlanDeployer(
+            partition_executor_initializer = DefaultPartitionExecutorInitializer(
                 worker_id=worker_id,
-                worker_plan_store=worker_plan_store,
-                artifact_store=artifact_store,
+                deployment_plan_reader=worker_plan_view_reader,
                 model_partition_metadata_reader=RedisModelPartitionMetadataReader(
                     redis, StringModelPartitionKeyFactory
                 ),
+                artifact_store=artifact_store,
                 partition_executor_factory=OnnxPartitionExecutorFactory(),
-                partition_executor_registry=partition_executor_registry,
-                hop_deployment_registrar=deployment_catalog,
+            )
+            partition_executor_registry = DefaultPartitionExecutorProvider(
+                partition_executor_initializer=partition_executor_initializer
             )
 
             contribution_dispatcher = DefaultHopContributionDispatcher(
                 activity_request_factory=activity_request_factory,
                 activity_manager=activity_manager,
-                hop_deployment_directory=deployment_catalog,
+                hop_placement_plan_reader=worker_plan_view_reader,
                 contribution_sender=ArrowHopInvocationContributionSender(
                     service_directory,
                 ),
             )
 
-            request_assembler = DefaultHopInvocationRequestAssembler(worker_plan_store)
+            request_assembler = DefaultHopInvocationRequestAssembler(
+                worker_plan_view_reader
+            )
 
             hop_contribution_collection_postbox = OrderedPostbox[
                 HopContributionCollectionKey,
@@ -254,7 +256,9 @@ class DefaultCompositionRoot(CompositionRoot):
                 key_compute_callable=lambda collection: collection.key,
             )
             contribution_pipeline = DefaultContributionPipeline(
-                gathering_policy=DefaultContributionGatheringPolicy(worker_plan_store),
+                gathering_policy=DefaultContributionGatheringPolicy(
+                    worker_plan_view_reader
+                ),
                 contribution_store=InMemoryContributionStore[
                     HopContributionCollectionKey,
                     HopInvocationContribution,
@@ -266,7 +270,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 activity_request_factory=activity_request_factory,
                 activity_manager=activity_manager,
                 hop_invocation_request_scheduler=PlanBasedPartitionInvocationRequestScheduler(
-                    worker_plan_store
+                    worker_plan_view_reader
                 ),
                 partition_executor_registry=partition_executor_registry,
             )
@@ -280,8 +284,8 @@ class DefaultCompositionRoot(CompositionRoot):
             failure_receiver = DefaultFailureReceiver(outcome_postbox)
             failure_http_client = await stack.enter_async_context(httpx.AsyncClient())
             failure_propagator = DefaultFailurePropagator(
-                failure_plan_reader=worker_plan_store,
-                hop_directory=deployment_catalog,
+                failure_plan_reader=worker_plan_view_reader,
+                hop_placement_plan_reader=worker_plan_view_reader,
                 failure_sender=HttpFailureSender(
                     service_directory, failure_http_client
                 ),
@@ -295,7 +299,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 partition_replica_hop_handler=partition_replica_handler,
                 sink_hop_handler=DefaultSinkHopHandler(outcome_postbox),
                 contribution_propagator=DefaultHopContributionPropagator(
-                    router=DefaultHopOutputRouter(worker_plan_store),
+                    router=DefaultHopOutputRouter(worker_plan_view_reader),
                     dispatcher=contribution_dispatcher,
                 ),
                 failure_propagator=failure_propagator,
@@ -314,7 +318,6 @@ class DefaultCompositionRoot(CompositionRoot):
             )
 
             yield WorkerComposition(
-                worker_plan_deployer=worker_plan_deployer,
                 hop_contribution_receiver=DefaultHopInvocationContributionReceiveCoordinator(
                     contribution_pipeline
                 ),
@@ -454,6 +457,16 @@ class DefaultCompositionRoot(CompositionRoot):
                     raise
                 await asyncio.to_thread(client.create_bucket, Bucket=bucket_name)
 
-            yield S3ArtifactStore(cast(S3Client, client), bucket_name)
+            cache_path = Path(
+                os.environ.get(
+                    "WORKER_ARTIFACT_CACHE_DIR", "/tmp/worker-artifact-cache"
+                )
+            )
+            yield CachedArtifactStore(
+                authoritative_store=S3ArtifactStore(
+                    cast(S3Client, client), bucket_name
+                ),
+                cache_store=LocalArtifactStore(cache_path),
+            )
         finally:
             client.close()

@@ -3,6 +3,7 @@ from pydantic import BaseModel, ConfigDict
 from shared.model.model_variant import ModelVariantId
 from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 from shared.plan.plan_version import PlanVersion
+from shared.service.service import WorkerId
 
 
 class InputSpecDto(BaseModel):
@@ -26,4 +27,6 @@ class FlowPlanDto(BaseModel):
     plan_version: PlanVersion
     model_specs: ModelSpecsDto
     ingress_replica_id: PlannedIngressReplicaId
+    ingress_worker_id: WorkerId
     sink_replica_id: PlannedSinkReplicaId
+    sink_worker_id: WorkerId

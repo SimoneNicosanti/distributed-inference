@@ -11,8 +11,8 @@ from controller.application.deployment.abc.plan_mappings_builder import (
     PlanMappingsBuilder,
 )
 from controller.application.deployment.abc.solution_observer import SolutionObserver
-from controller.application.deployment.abc.worker_plan_three_phase_dispatcher import (
-    PlanThreePhaseDispatcher,
+from controller.application.ports.outbound.plan_publishing.plan_publisher import (
+    PlanPublisher,
 )
 from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
@@ -28,14 +28,14 @@ class DefaultActuationManager(ActuationManager, AsyncLifecycle):
         solution_observer: SolutionObserver,
         model_partition_build_manager: ModelPartitionBuildManager,
         plan_mappings_builder: PlanMappingsBuilder,
-        plan_dispatcher: PlanThreePhaseDispatcher,
+        plan_publisher: PlanPublisher,
     ) -> None:
         self._solution_observer = solution_observer
 
         self._model_partition_build_manager = model_partition_build_manager
         self._plan_mappings_builder = plan_mappings_builder
 
-        self._plan_dispatcher = plan_dispatcher
+        self._plan_publisher = plan_publisher
 
         self._observer_task: asyncio.Task[None] | None = None
 
@@ -52,8 +52,8 @@ class DefaultActuationManager(ActuationManager, AsyncLifecycle):
             flow_plans_by_flow_id,
         ) = await self._plan_mappings_builder.build_plan_mappings(solution)
 
-        await self._plan_dispatcher.dispatch_plans(
-            flow_plans_by_flow_id, worker_plans_by_worker_id
+        await self._plan_publisher.publish_plans(
+            worker_plans_by_worker_id, flow_plans_by_flow_id
         )
 
     ## TODO: We should run the deploy in a different task and cancel it if a new solution arrives

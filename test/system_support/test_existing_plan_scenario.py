@@ -10,22 +10,40 @@ from test.system import existing_plan_scenario as scenario_module
 from test.system.existing_plan_scenario import (
     load_existing_plan_scenario,
 )
+from test.system.optimization_readiness import wait_for_flow_plans
 
-from catalog.redis.hop.keys_factory import StringHopDeploymentKeyFactory
+from integration.dto.context.context_dto import (
+    IngressHopDto,
+    PartitionReplicaHopDto,
+    SinkHopDto,
+)
 from integration.dto.flow_plan.flow_plan_dto import (
     FlowPlanDto,
     InputSpecDto,
     ModelSpecsDto,
 )
-from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
-from integration.shared.id_json import (
-    planned_invocable_hop_id_to_json,
-    service_id_to_json,
+from integration.dto.worker_plan.worker_plan_dto import (
+    DeploymentPlanDto,
+    FailurePlanDto,
+    HopPlacementPlanDto,
+    HopRoutingPlanDto,
+    PartitionExecutionPlanDto,
+    PartitionIOSchemeDto,
+    ResourceAllocationDto,
+    SchedulingPlanDto,
+    WorkerPlanDto,
 )
+from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
+from integration.redis.worker_plan.keys_factory import StringWorkerPlanKeyFactory
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
+from shared.model.model_partition import ModelPartitionId
 from shared.model.model_variant import ModelVariantId
-from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
+from shared.plan.hop_logical_id import (
+    PlannedIngressReplicaId,
+    PlannedPartitionReplicaId,
+    PlannedSinkReplicaId,
+)
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
 
@@ -84,25 +102,62 @@ def _publish_plan(
             inputs=(InputSpecDto(name="input", shape=(1,), dtype="float32"),),
         ),
         ingress_replica_id=PlannedIngressReplicaId(variant, replica_idx=1),
+        ingress_worker_id=ServiceId(id=endpoint_worker),
         sink_replica_id=PlannedSinkReplicaId(variant, replica_idx=2),
-    )
-    redis.set(
-        asyncio.run(StringFlowPlanKeyFactory.build_current_plan_key(flow)),
-        str(version_number),
+        sink_worker_id=ServiceId(id=endpoint_worker),
     )
     redis.hset(
-        asyncio.run(StringFlowPlanKeyFactory.build_flow_plans_dict_key(flow)),
-        asyncio.run(StringFlowPlanKeyFactory.build_flow_plan_elem_key(version)),
-        plan.model_dump_json(),
+        asyncio.run(StringFlowPlanKeyFactory.build_hash_key(flow)),
+        mapping={
+            asyncio.run(StringFlowPlanKeyFactory.build_current_plan_field_key()): str(
+                version_number
+            ),
+            asyncio.run(
+                StringFlowPlanKeyFactory.build_plan_field_key(version)
+            ): plan.model_dump_json(),
+        },
     )
-    deployments_key = asyncio.run(
-        StringHopDeploymentKeyFactory.build_hop_deployments_key(version)
+    partition = PlannedPartitionReplicaId(
+        ModelPartitionId(variant, layers=("layer",)), replica_idx=0
     )
-    for hop in (plan.ingress_replica_id, plan.sink_replica_id):
+    compute_worker = ServiceId(id="compute-worker")
+    placement = HopPlacementPlanDto(
+        hops=(
+            IngressHopDto(ingress_replica_id=plan.ingress_replica_id),
+            PartitionReplicaHopDto(partition_replica_id=partition),
+            SinkHopDto(sink_replica_id=plan.sink_replica_id),
+        ),
+        worker_ids=(plan.ingress_worker_id, compute_worker, plan.sink_worker_id),
+    )
+    for worker in (plan.ingress_worker_id, compute_worker):
+        is_compute = worker == compute_worker
+        worker_plan = WorkerPlanDto(
+            plan_version=version,
+            deployment_plan=DeploymentPlanDto(
+                executable_hops=(partition,) if is_compute else (),
+                allocations=(ResourceAllocationDto(use_gpu=False),)
+                if is_compute
+                else (),
+                ingress_hops=() if is_compute else (plan.ingress_replica_id,),
+                sink_hops=() if is_compute else (plan.sink_replica_id,),
+            ),
+            scheduling_plan=SchedulingPlanDto(priority_keys=(), priorities=()),
+            partition_execution_plan=PartitionExecutionPlanDto(
+                partition_ids=(partition.partition_id,) if is_compute else (),
+                schemes=(PartitionIOSchemeDto(inputs=("input",), outputs=("output",)),)
+                if is_compute
+                else (),
+            ),
+            hop_routing_plan=HopRoutingPlanDto(hop_addresses=(), routings=()),
+            failure_plan=FailurePlanDto(
+                flow_ids=(flow,), sink_replica_ids=(plan.sink_replica_id,)
+            ),
+            hop_placement_plan=placement,
+        )
         redis.hset(
-            deployments_key,
-            planned_invocable_hop_id_to_json(hop),
-            service_id_to_json(ServiceId(id=endpoint_worker)),
+            StringWorkerPlanKeyFactory.build_hash_key(version),
+            StringWorkerPlanKeyFactory.build_field_key(worker),
+            worker_plan.model_dump_json(),
         )
     return plan
 
@@ -122,8 +177,10 @@ def test_load_existing_plan_reads_latest_active_version_without_writes(
         update={"plan_version": PlanVersion(version_number=99)}
     )
     redis.hset(
-        asyncio.run(StringFlowPlanKeyFactory.build_flow_plans_dict_key(flows[0])),
-        "plan-version-99",
+        asyncio.run(StringFlowPlanKeyFactory.build_hash_key(flows[0])),
+        asyncio.run(
+            StringFlowPlanKeyFactory.build_plan_field_key(inactive_plan.plan_version)
+        ),
         inactive_plan.model_dump_json(),
     )
     commands = Mock(wraps=redis.execute_command)
@@ -135,9 +192,7 @@ def test_load_existing_plan_reads_latest_active_version_without_writes(
     assert tuple(scenario.flow_plans) == flows
     assert scenario.front_end_base_url == "http://front-end"
     assert len(existing_plan_environment) == 1
-    assert all(
-        call.args[0] in {"GET", "HGET", "SCAN"} for call in commands.call_args_list
-    )
+    assert all(call.args[0] in {"HGET", "SCAN"} for call in commands.call_args_list)
 
 
 def test_load_existing_plan_fails_without_active_plans(
@@ -150,8 +205,10 @@ def test_load_existing_plan_fails_without_active_plans(
 def test_load_existing_plan_does_not_reoptimize_missing_plans(
     redis: fakeredis.FakeRedis, existing_plan_environment: list[httpx.Request]
 ) -> None:
-    redis.set(
-        asyncio.run(StringFlowPlanKeyFactory.build_current_plan_key(_flow(1))), "7"
+    redis.hset(
+        asyncio.run(StringFlowPlanKeyFactory.build_hash_key(_flow(1))),
+        asyncio.run(StringFlowPlanKeyFactory.build_current_plan_field_key()),
+        "7",
     )
 
     with pytest.raises(AssertionError, match="Active version has no flow plan"):
@@ -168,16 +225,99 @@ def test_load_existing_plan_rejects_endpoints_on_another_worker(
         load_existing_plan_scenario()
 
 
-def test_load_existing_plan_rejects_missing_endpoint_deployment(
-    redis: fakeredis.FakeRedis, existing_plan_environment: list[httpx.Request]
+@pytest.mark.parametrize("worker", ["first-worker", "compute-worker"])
+def test_load_existing_plan_rejects_missing_worker_plan(
+    redis: fakeredis.FakeRedis,
+    existing_plan_environment: list[httpx.Request],
+    worker: str,
 ) -> None:
     plan = _publish_plan(redis, _flow(1), 7)
     redis.hdel(
-        asyncio.run(
-            StringHopDeploymentKeyFactory.build_hop_deployments_key(plan.plan_version)
-        ),
-        planned_invocable_hop_id_to_json(plan.ingress_replica_id),
+        StringWorkerPlanKeyFactory.build_hash_key(plan.plan_version),
+        StringWorkerPlanKeyFactory.build_field_key(ServiceId(id=worker)),
     )
 
-    with pytest.raises(AssertionError, match="Published endpoint is not deployed"):
+    with pytest.raises(AssertionError, match="Active flow has no worker plan"):
         load_existing_plan_scenario()
+
+
+def test_load_existing_plan_ignores_staged_flows_and_legacy_keys(
+    redis: fakeredis.FakeRedis, existing_plan_environment: list[httpx.Request]
+) -> None:
+    flow = _flow(1)
+    plan = _publish_plan(redis, flow, 7)
+    redis.hset(
+        asyncio.run(StringFlowPlanKeyFactory.build_hash_key(_flow(2))),
+        "version-99",
+        plan.model_dump_json(),
+    )
+    redis.set(f"flow-plans:{_flow(3).flow_id.hex}:active-version", "100")
+
+    assert load_existing_plan_scenario().flow_plans == {flow: plan}
+
+
+def test_publication_readiness_allows_different_active_versions(
+    redis: fakeredis.FakeRedis,
+) -> None:
+    flows = (_flow(1), _flow(2))
+    expected = {
+        flows[0]: _publish_plan(redis, flows[0], 3),
+        flows[1]: _publish_plan(redis, flows[1], 7),
+    }
+
+    assert (
+        wait_for_flow_plans(redis, flows, 0, ServiceId(id="first-worker")) == expected
+    )
+
+
+@pytest.mark.parametrize("worker", ["first-worker", "compute-worker"])
+def test_publication_readiness_rejects_worker_version_mismatch(
+    redis: fakeredis.FakeRedis, worker: str
+) -> None:
+    flow = _flow(1)
+    plan = _publish_plan(redis, flow, 7)
+    key = StringWorkerPlanKeyFactory.build_hash_key(plan.plan_version)
+    field = StringWorkerPlanKeyFactory.build_field_key(ServiceId(id=worker))
+    worker_plan = WorkerPlanDto.model_validate_json(redis.hget(key, field))
+    redis.hset(
+        key,
+        field,
+        worker_plan.model_copy(
+            update={"plan_version": PlanVersion(version_number=8)}
+        ).model_dump_json(),
+    )
+
+    with pytest.raises(AssertionError):
+        wait_for_flow_plans(redis, (flow,), 0, ServiceId(id="first-worker"))
+
+
+@pytest.mark.parametrize("worker", ["first-worker", "compute-worker"])
+def test_publication_readiness_rejects_inconsistent_placement(
+    redis: fakeredis.FakeRedis, worker: str
+) -> None:
+    flow = _flow(1)
+    plan = _publish_plan(redis, flow, 7)
+    key = StringWorkerPlanKeyFactory.build_hash_key(plan.plan_version)
+    field = StringWorkerPlanKeyFactory.build_field_key(ServiceId(id=worker))
+    worker_plan = WorkerPlanDto.model_validate_json(redis.hget(key, field))
+    placement = worker_plan.hop_placement_plan
+    redis.hset(
+        key,
+        field,
+        worker_plan.model_copy(
+            update={
+                "hop_placement_plan": HopPlacementPlanDto(
+                    hops=placement.hops,
+                    worker_ids=tuple(
+                        ServiceId(id="another-worker")
+                        if owner == ServiceId(id=worker)
+                        else owner
+                        for owner in placement.worker_ids
+                    ),
+                )
+            }
+        ).model_dump_json(),
+    )
+
+    with pytest.raises(AssertionError, match="placement disagrees"):
+        wait_for_flow_plans(redis, (flow,), 0, ServiceId(id="first-worker"))

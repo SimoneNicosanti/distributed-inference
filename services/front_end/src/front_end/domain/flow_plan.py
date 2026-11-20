@@ -7,6 +7,7 @@ from shared.plan.hop_logical_id import (
     PlannedSinkReplicaId,
 )
 from shared.plan.plan_version import PlanVersion
+from shared.service.service import WorkerId
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,7 +17,10 @@ class FlowPlan:
     model_specs: ModelSpecs
 
     ingress_replica_id: PlannedIngressReplicaId
+    ingress_worker_id: WorkerId
+
     sink_replica_id: PlannedSinkReplicaId
+    sink_worker_id: WorkerId
 
     def __post_init__(self) -> None:
         if (

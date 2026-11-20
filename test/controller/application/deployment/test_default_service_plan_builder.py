@@ -3,7 +3,7 @@ from itertools import pairwise
 
 import pytest
 
-from controller.adapters.outbound.plan_share.mappers.worker_plan_mapper import (
+from controller.adapters.outbound.plan_publishing.mappers.worker_plan_mapper import (
     WorkerPlanMapper,
 )
 from controller.application.deployment.default_solution_to_plan_converter import (
@@ -34,7 +34,7 @@ from shared.model.model_variant import ModelVariantId
 from shared.plan.hop import ExternalHopId as WorkerExternalHop
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
-from worker.adapters.inbound.deployment.http.service_plan_mapper import (
+from worker.adapters.outbound.plan_reader.worker_plan_mapper import (
     worker_plan_from_dto,
 )
 
@@ -255,35 +255,25 @@ async def test_rejects_flow_without_executable_components() -> None:
         model_id=ModelId(model_name="model"),
         variant_tag="variant",
     )
-    solution = OptimizationSolution(
-        flow_solutions=(
-            FlowOptimizationSolution(
-                flow_id=FlowId(),
-                ingress_worker_id=ingress_id,
-                sink_worker_id=ingress_id,
-                model_variant_id=model_variant_id,
-                components=(
-                    _component(
-                        1,
-                        ingress_id,
-                        ("input",),
-                        ("x",),
-                        ("x",),
-                        input_layers=("input",),
-                    ),
-                ),
-                cuts=(),
-                mean_batch_fill_time_s=0,
-                mean_response_time_s=0,
-            ),
-        ),
-        objective_value=0,
-        is_optimal=True,
-    )
-
     with pytest.raises(ValueError, match="has no executable components"):
-        await DefaultSolutionToPlanConverter().convert_solution_to_plans(
-            PlanVersion(version_number=1), _enriched(solution)
+        FlowOptimizationSolution(
+            flow_id=FlowId(),
+            ingress_worker_id=ingress_id,
+            sink_worker_id=ingress_id,
+            model_variant_id=model_variant_id,
+            components=(
+                _component(
+                    1,
+                    ingress_id,
+                    ("input",),
+                    ("x",),
+                    ("x",),
+                    input_layers=("input",),
+                ),
+            ),
+            cuts=(),
+            mean_batch_fill_time_s=0,
+            mean_response_time_s=0,
         )
 
 
@@ -545,13 +535,16 @@ def _assert_worker_round_trip(plan: WorkerPlan) -> None:
     received = PrepareWorkerPlanRequest.model_validate_json(request.model_dump_json())
     worker_plan = worker_plan_from_dto(received.worker_plan)
     assert worker_plan.plan_version == plan.plan_version
+    assert worker_plan.hop_placement_plan.mapping == plan.hop_placement_plan.mapping
     assert worker_plan.failure_plan.flow_ids == plan.failure_plan.flow_ids
     assert (
         worker_plan.failure_plan.sink_replica_ids == plan.failure_plan.sink_replica_ids
     )
     assert (
-        worker_plan.deployment_plan.planned_hops == plan.deployment_plan.deployed_hops
-    )
+        *worker_plan.deployment_plan.executable_hops,
+        *worker_plan.deployment_plan.ingress_hops,
+        *worker_plan.deployment_plan.sink_hops,
+    ) == plan.deployment_plan.deployed_hops
     assert tuple(
         allocation.use_gpu for allocation in worker_plan.deployment_plan.allocations
     ) == tuple(allocation.use_gpu for allocation in plan.deployment_plan.allocations)

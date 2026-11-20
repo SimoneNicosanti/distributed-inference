@@ -14,8 +14,6 @@ from redis import asyncio as redis_asyncio
 from artifacts.storage.artifact_store import ArtifactStore
 from artifacts.storage.s3.s3_artifact_store import S3ArtifactStore
 from artifacts.storage.s3.s3_client import S3Client
-from catalog.redis.hop.keys_factory import StringHopDeploymentKeyFactory
-from catalog.redis.hop.redis_hop_deployment_catalog import RedisHopDeploymentCatalog
 from catalog.redis.service.redis_service_directory import RedisServiceDirectory
 from catalog.view.worker.default_worker_directory import DefaultWorkerDirectory
 from front_end.adapters.outbound.inference.arrow_worker_ingress_gateway import (
@@ -76,9 +74,6 @@ class DefaultCompositionRoot(CompositionRoot):
 
             inference = DefaultInferenceRunner(
                 flow_plan_reader=RedisFlowPlanReader(redis, StringFlowPlanKeyFactory()),
-                hop_deployment_directory=RedisHopDeploymentCatalog(
-                    redis, StringHopDeploymentKeyFactory
-                ),
                 ingress_gateway=ArrowWorkerIngressGateway(
                     directory,
                     timeout_s=float(

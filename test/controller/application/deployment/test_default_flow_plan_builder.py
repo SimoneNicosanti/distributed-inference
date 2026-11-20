@@ -84,7 +84,9 @@ def test_uses_selected_variant_metadata_and_shared_endpoint_ids_for_each_flow() 
         assert plan.plan_version == version
         assert plan.model_variant_id == flow.model_variant_id
         assert plan.ingress_replica_id is endpoints[flow.flow_id].ingress
+        assert plan.ingress_worker_id == flow.ingress_worker_id
         assert plan.sink_replica_id is endpoints[flow.flow_id].sink
+        assert plan.sink_worker_id == flow.sink_worker_id
         assert (
             plan.input_tensor_properties
             == (solution.input_tensor_properties_by_variant[flow.model_variant_id])
@@ -128,22 +130,26 @@ def test_flow_plan_requires_consistent_variant_identity(invalid_endpoint: str) -
             ingress_replica_id=PlannedIngressReplicaId(
                 other if invalid_endpoint == "ingress" else variant, 0
             ),
+            ingress_worker_id=ServiceId(),
             sink_replica_id=PlannedSinkReplicaId(
                 other if invalid_endpoint == "sink" else variant, 0
             ),
+            sink_worker_id=ServiceId(),
         )
 
 
 def test_flow_plan_keeps_an_independent_input_mapping_and_endpoint_indexes() -> None:
     variant = ModelVariantId(ModelId("model"), "variant")
-    property_ = TensorProperty("float32", 4, ("batch", 0, 3))
+    property_ = TensorProperty("float32", 4, ("batch", 2, 3))
     inputs = {"x": property_}
     plan = FlowPlan(
         plan_version=PlanVersion(version_number=1),
         model_variant_id=variant,
         input_tensor_properties=inputs,
         ingress_replica_id=PlannedIngressReplicaId(variant, 2),
+        ingress_worker_id=ServiceId(),
         sink_replica_id=PlannedSinkReplicaId(variant, 5),
+        sink_worker_id=ServiceId(),
     )
 
     inputs.clear()
@@ -162,5 +168,7 @@ def test_flow_plan_rejects_missing_input_properties() -> None:
             model_variant_id=variant,
             input_tensor_properties={},
             ingress_replica_id=PlannedIngressReplicaId(variant, 0),
+            ingress_worker_id=ServiceId(),
             sink_replica_id=PlannedSinkReplicaId(variant, 0),
+            sink_worker_id=ServiceId(),
         )

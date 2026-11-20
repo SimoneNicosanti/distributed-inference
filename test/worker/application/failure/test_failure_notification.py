@@ -45,6 +45,10 @@ from worker.application.sink.default_model_pass_outcome_retriever import (
 )
 from worker.domain.model.model_pass import ModelPassError
 from worker.domain.plan.failure_plan import FailurePlan
+from worker.domain.plan.hop_placement_plan import (
+    HopPlacementPlan,
+    NoPlacementForHopError,
+)
 
 
 def _context():
@@ -63,8 +67,10 @@ async def test_failure_reaches_sink_through_http():
     plan = FailurePlan((context.flow_id,), (sink,))
     plans = SimpleNamespace(get_failure_plan_by_version=AsyncMock(return_value=plan))
     worker_id = ServiceId()
-    hops = SimpleNamespace(
-        get_worker_for_planned_invocable_hop=AsyncMock(return_value=worker_id)
+    placements = SimpleNamespace(
+        get_hop_placement_plan=AsyncMock(
+            return_value=HopPlacementPlan(mapping={sink: worker_id})
+        )
     )
     interfaces = [
         CapabilityInterface(protocol=CapabilityProtocol.HTTP, endpoint="http://sink")
@@ -79,7 +85,7 @@ async def test_failure_reaches_sink_through_http():
     app.include_router(build_failure_receiver_router(DefaultFailureReceiver(postbox)))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app)) as client:
         propagator = DefaultFailurePropagator(
-            plans, hops, HttpFailureSender(workers, client)
+            plans, placements, HttpFailureSender(workers, client)
         )
         await propagator.propagate_failure(outcome)
     received = await DefaultModelPassResultRetriever(postbox).retrieve_outcome(
@@ -87,10 +93,31 @@ async def test_failure_reaches_sink_through_http():
     )
     assert received == outcome
     plans.get_failure_plan_by_version.assert_awaited_once_with(context.plan_version)
-    hops.get_worker_for_planned_invocable_hop.assert_awaited_once_with(
-        context.plan_version, sink
-    )
+    placements.get_hop_placement_plan.assert_awaited_once_with(context.plan_version)
     workers.get_worker_instance_by_id.assert_awaited_once_with(worker_id)
+
+
+@pytest.mark.asyncio
+async def test_failure_with_missing_sink_placement_does_not_send():
+    context = _context()
+    outcome = ModelPassError(context=context, message="execution failed")
+    sink = PlannedSinkReplicaId(ModelVariantId(ModelId("model"), "variant"), 0)
+    plans = SimpleNamespace(
+        get_failure_plan_by_version=AsyncMock(
+            return_value=FailurePlan((context.flow_id,), (sink,))
+        )
+    )
+    placements = SimpleNamespace(
+        get_hop_placement_plan=AsyncMock(return_value=HopPlacementPlan(mapping={}))
+    )
+    sender = SimpleNamespace(send_failure=AsyncMock())
+    propagator = DefaultFailurePropagator(plans, placements, sender)
+
+    with pytest.raises(NoPlacementForHopError):
+        await propagator.propagate_failure(outcome)
+
+    placements.get_hop_placement_plan.assert_awaited_once_with(context.plan_version)
+    sender.send_failure.assert_not_awaited()
 
 
 @pytest.mark.asyncio

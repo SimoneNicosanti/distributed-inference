@@ -7,11 +7,11 @@ from shared.plan.hop_logical_id import PlannedPartitionReplicaId
 from worker.application.activity.abc.activity_request_factory import (
     ActivityRequestFactory,
 )
+from worker.application.hop_handler.abc.hop_executor_provider import (
+    HopExecutorProvider,
+)
 from worker.application.hop_handler.abc.hop_handler import (
     HopHandler,
-)
-from worker.application.hop_handler.abc.partition_executor_registry import (
-    PartitionExecutorRegistry,
 )
 from worker.application.ports.outbound.activity_manager.activity_manager import (
     ActivityManager,
@@ -41,7 +41,7 @@ class DefaultPlannedPartitionReplicaHopHandler(
         activity_request_factory: ActivityRequestFactory,
         activity_manager: ActivityManager,
         hop_invocation_request_scheduler: HopInvocationRequestScheduler,
-        partition_executor_registry: PartitionExecutorRegistry,
+        partition_executor_registry: HopExecutorProvider,
     ) -> None:
         self._activity_request_factory = activity_request_factory
         self._activity_manager = activity_manager
@@ -131,7 +131,7 @@ class DefaultPlannedPartitionReplicaHopHandler(
             hop_invocation_request
         )
 
-        async with self._partition_executor_registry.acquire_partition_executor(
+        async with self._partition_executor_registry.acquire_hop_executor(
             hop_invocation_request.plan_version, replica_id
         ) as partition_executor:
             partition_execution_output = await partition_executor.execute(

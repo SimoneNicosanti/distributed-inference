@@ -5,7 +5,7 @@ from shared.plan.hop_logical_id import PlannedSinkReplicaId
 from worker.application.hop_contribution_snd.abc.hop_output_router import (
     HopOutputRouter,
 )
-from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import (
+from worker.application.ports.outbound.plan_reader.worker_plan_view_readers import (
     HopRoutingPlanReader,
 )
 from worker.domain.context.hop_invocation_context import HopInvocationContext

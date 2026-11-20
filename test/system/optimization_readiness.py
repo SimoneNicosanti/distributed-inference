@@ -11,16 +11,18 @@ from redis import asyncio as redis_asyncio
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
-from catalog.redis.hop.keys_factory import StringHopDeploymentKeyFactory
 from catalog.redis.service.redis_service_directory import RedisServiceDirectory
 from catalog.view.worker.default_worker_directory import DefaultWorkerDirectory
+from integration.dto.context.context_dto import IngressHopDto, SinkHopDto
 from integration.dto.flow_plan.flow_plan_dto import FlowPlanDto
+from integration.dto.worker_plan.worker_plan_dto import WorkerPlanDto
 from integration.dto.worker_profiles.execution_profile_dto import (
     ModelExecutionProfileDto,
 )
 from integration.dto.worker_profiles.network_profile_dto import NetworkProfileDto
 from integration.dto.worker_profiles.resource_profile_dto import ResourceProfileDto
 from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
+from integration.redis.worker_plan.keys_factory import StringWorkerPlanKeyFactory
 from integration.redis.worker_profiles.execution_profile_keys import (
     StringExecutionProfileKeyFactory,
 )
@@ -29,10 +31,6 @@ from integration.redis.worker_profiles.network_profile_keys import (
 )
 from integration.redis.worker_profiles.resource_profile_keys import (
     StringResourceProfileKeyFactory,
-)
-from integration.shared.id_json import (
-    planned_invocable_hop_id_to_json,
-    service_id_from_json,
 )
 from shared.flow.flow import FlowId
 from shared.model.model_variant import ModelVariantId
@@ -145,31 +143,22 @@ def wait_for_flow_plans(
     while True:
         plans: dict[FlowId, FlowPlanDto] = {}
         pending: list[str] = []
-        for flow_id, (active_key, versions_key) in keys.items():
-            active = redis.get(active_key)
+        for flow_id, (hash_key, active_field) in keys.items():
+            active = redis.hget(hash_key, active_field)
             if active is None:
                 pending.append(f"No active version: {flow_id}")
                 continue
             version = PlanVersion(version_number=int(active))
-            field = asyncio.run(
-                StringFlowPlanKeyFactory.build_flow_plan_elem_key(version)
-            )
-            value = redis.hget(versions_key, field)
+            field = asyncio.run(StringFlowPlanKeyFactory.build_plan_field_key(version))
+            value = redis.hget(hash_key, field)
             assert value is not None, f"Active version has no flow plan: {flow_id}"
             plan = FlowPlanDto.model_validate_json(value)
             assert plan.plan_version == version
-            deployments_key = asyncio.run(
-                StringHopDeploymentKeyFactory.build_hop_deployments_key(version)
-            )
-            for hop in (plan.ingress_replica_id, plan.sink_replica_id):
-                worker = redis.hget(
-                    deployments_key, planned_invocable_hop_id_to_json(hop)
-                )
-                assert worker is not None, f"Published endpoint is not deployed: {hop}"
-                assert service_id_from_json(worker) == endpoint_worker_id
+            assert plan.ingress_worker_id == endpoint_worker_id
+            assert plan.sink_worker_id == endpoint_worker_id
+            _assert_worker_plans_published(redis, plan)
             plans[flow_id] = plan
         if not pending:
-            assert len({plan.plan_version for plan in plans.values()}) == 1
             return plans
         if time.monotonic() >= deadline:
             pytest.fail(f"Flow plan publication timed out: {'; '.join(pending)}")
@@ -178,6 +167,46 @@ def wait_for_flow_plans(
 
 async def _flow_keys(flow_id: FlowId) -> tuple[str, str]:
     return (
-        await StringFlowPlanKeyFactory.build_current_plan_key(flow_id),
-        await StringFlowPlanKeyFactory.build_flow_plans_dict_key(flow_id),
+        await StringFlowPlanKeyFactory.build_hash_key(flow_id),
+        await StringFlowPlanKeyFactory.build_current_plan_field_key(),
     )
+
+
+def _assert_worker_plans_published(redis: Redis, flow_plan: FlowPlanDto) -> None:
+    """Check persisted plans; executor initialization happens during inference."""
+    hash_key = StringWorkerPlanKeyFactory.build_hash_key(flow_plan.plan_version)
+    plans: dict[WorkerId, WorkerPlanDto] = {}
+
+    def read(worker_id: WorkerId) -> WorkerPlanDto:
+        if worker_id not in plans:
+            value = redis.hget(
+                hash_key, StringWorkerPlanKeyFactory.build_field_key(worker_id)
+            )
+            assert value is not None, f"Active flow has no worker plan: {worker_id}"
+            plan = WorkerPlanDto.model_validate_json(value)
+            assert plan.plan_version == flow_plan.plan_version
+            plans[worker_id] = plan
+        return plans[worker_id]
+
+    endpoints = (
+        (
+            IngressHopDto(ingress_replica_id=flow_plan.ingress_replica_id),
+            flow_plan.ingress_worker_id,
+        ),
+        (
+            SinkHopDto(sink_replica_id=flow_plan.sink_replica_id),
+            flow_plan.sink_worker_id,
+        ),
+    )
+    for endpoint, endpoint_worker in endpoints:
+        placement = read(endpoint_worker).hop_placement_plan
+        mapping = dict(zip(placement.hops, placement.worker_ids, strict=True))
+        assert mapping.get(endpoint) == endpoint_worker, (
+            f"Endpoint placement disagrees with flow plan: {endpoint}"
+        )
+        for hop, worker_id in mapping.items():
+            target = read(worker_id).hop_placement_plan
+            target_mapping = dict(zip(target.hops, target.worker_ids, strict=True))
+            assert target_mapping.get(hop) == worker_id, (
+                f"Worker placement disagrees for hop: {hop}"
+            )

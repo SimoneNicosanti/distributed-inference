@@ -9,8 +9,6 @@ import pytest
 from pydantic import HttpUrl
 from redis import asyncio as redis_asyncio
 
-from catalog.redis.hop.keys_factory import StringHopDeploymentKeyFactory
-from catalog.redis.hop.redis_hop_deployment_catalog import RedisHopDeploymentCatalog
 from catalog.redis.service.keys_factory import build_catalog_key, build_service_hset_key
 from catalog.redis.service.redis_service_directory import RedisServiceDirectory
 from catalog.view.worker.default_worker_directory import DefaultWorkerDirectory
@@ -60,10 +58,6 @@ from integration.service_instance.service_instance import (
     CapabilityType,
 )
 from integration.service_instance.worker_instance import WorkerInstance
-from integration.shared.id_json import (
-    planned_invocable_hop_id_to_json,
-    service_id_to_json,
-)
 from integration.sink.arrow.model_pass_result.arrow_model_pass_result_schema import (
     build_result_payload_schema,
 )
@@ -102,23 +96,17 @@ async def test_http_to_ingress_and_sink_using_versioned_redis_contracts(
             inputs=(InputSpecDto(name="input", shape=(2,), dtype="float32"),),
         ),
         ingress_replica_id=ingress,
+        ingress_worker_id=ingress_worker,
         sink_replica_id=sink,
+        sink_worker_id=sink_worker,
     )
     values = {
         (
-            await StringFlowPlanKeyFactory.build_flow_plans_dict_key(flow_id),
-            await StringFlowPlanKeyFactory.build_flow_plan_elem_key(version),
+            await StringFlowPlanKeyFactory.build_hash_key(flow_id),
+            await StringFlowPlanKeyFactory.build_plan_field_key(version),
         ): plan.model_dump_json(),
-        (
-            await StringHopDeploymentKeyFactory.build_hop_deployments_key(version),
-            planned_invocable_hop_id_to_json(ingress),
-        ): service_id_to_json(ingress_worker),
-        (
-            await StringHopDeploymentKeyFactory.build_hop_deployments_key(version),
-            planned_invocable_hop_id_to_json(sink),
-        ): service_id_to_json(sink_worker),
     }
-    http_capabilities = {CapabilityType.PLAN_ACTUATION, CapabilityType.FAILURE_RECEIVE}
+    http_capabilities = {CapabilityType.FAILURE_RECEIVE}
     for worker, location in (
         (ingress_worker, "grpc+tcp://ingress:8811"),
         (sink_worker, "grpc+tcp://sink:8820"),
@@ -142,7 +130,6 @@ async def test_http_to_ingress_and_sink_using_versioned_redis_contracts(
                 for capability in (
                     CapabilityType.HOP_INVOCATION,
                     CapabilityType.RESULT_RETRIEVE,
-                    CapabilityType.PLAN_ACTUATION,
                     CapabilityType.IN_NETWORK_PROFILING,
                     CapabilityType.FAILURE_RECEIVE,
                 )
@@ -158,9 +145,6 @@ async def test_http_to_ingress_and_sink_using_versioned_redis_contracts(
     directory = DefaultWorkerDirectory(RedisServiceDirectory(redis))
     runner = DefaultInferenceRunner(
         flow_plan_reader=RedisFlowPlanReader(redis, StringFlowPlanKeyFactory()),
-        hop_deployment_directory=RedisHopDeploymentCatalog(
-            redis, StringHopDeploymentKeyFactory
-        ),
         ingress_gateway=ArrowWorkerIngressGateway(directory),
         sink_gateway=ArrowWorkerSinkGateway(directory),
     )

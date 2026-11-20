@@ -10,10 +10,10 @@ from worker.application.hop_invocation.abc.contribution_assembler import (
     ContributionAssembler,
     ContributionAssemblingError,
 )
-from worker.application.ports.outbound.plan_store.plan_store_errors import (
-    NotExistentPlanError,
+from worker.application.ports.outbound.plan_reader.worker_plan_reader import (
+    WorkerPlanReadError,
 )
-from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import (
+from worker.application.ports.outbound.plan_reader.worker_plan_view_readers import (
     PartitionExecutionPlanReader,
 )
 from worker.domain.context.hop_invocation_context import HopInvocationContext
@@ -72,7 +72,7 @@ class DefaultHopInvocationRequestAssembler(ContributionAssembler):
                     execution_scheme = execution_plan.get_scheme_by_partition_id(
                         replica_id.partition_id
                     )
-                except (NotExistentPlanError, NotExistentPartitionIOSchemeError) as e:
+                except (WorkerPlanReadError, NotExistentPartitionIOSchemeError) as e:
                     raise ContributionAssemblingError(
                         "Plan for assembling does not exist or partition IO Scheme is missing"
                     ) from e

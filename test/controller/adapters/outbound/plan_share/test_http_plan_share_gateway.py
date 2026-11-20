@@ -4,7 +4,7 @@ import httpx
 import pytest
 from pydantic import HttpUrl
 
-from controller.adapters.outbound.plan_share.http_plan_share_gateway import (
+from controller.adapters.outbound.plan_publishing.http_plan_share_gateway import (
     HttpPlanShareGateway,
 )
 from controller.application.ports.outbound.directory.worker_directory_gateway import (

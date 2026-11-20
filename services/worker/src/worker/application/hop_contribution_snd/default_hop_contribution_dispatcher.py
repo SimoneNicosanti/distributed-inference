@@ -1,9 +1,6 @@
 import asyncio
 from typing import override
 
-from catalog.api.hop.hop_deployment_directory import (
-    HopDeploymentDirectory,
-)
 from shared.service.service import WorkerId
 from worker.application.activity.abc.activity_request_factory import (
     ActivityRequestFactory,
@@ -17,6 +14,9 @@ from worker.application.ports.outbound.activity_manager.activity_manager import 
 from worker.application.ports.outbound.hop_contribution_snd.contribution_sender import (
     ContributionSender,
 )
+from worker.application.ports.outbound.plan_reader.worker_plan_view_readers import (
+    HopPlacementPlanReader,
+)
 from worker.domain.activity.activity_request import ActivityType
 from worker.domain.hop.hop_invocation_contribution import (
     HopInvocationContribution,
@@ -28,12 +28,12 @@ class DefaultHopContributionDispatcher(HopContributionDispatcher):
         self,
         activity_request_factory: ActivityRequestFactory,
         activity_manager: ActivityManager,
-        hop_deployment_directory: HopDeploymentDirectory,
+        hop_placement_plan_reader: HopPlacementPlanReader,
         contribution_sender: ContributionSender,
     ) -> None:
         self._activity_request_factory = activity_request_factory
         self._activity_manager = activity_manager
-        self._hop_deployment_directory = hop_deployment_directory
+        self._hop_placement_plan_reader = hop_placement_plan_reader
         self._contribution_sender = contribution_sender
 
     @override
@@ -68,10 +68,9 @@ class DefaultHopContributionDispatcher(HopContributionDispatcher):
     async def _resolve_hop_replica_id(
         self, contribution: HopInvocationContribution
     ) -> WorkerId:
-        worker_id = (
-            await self._hop_deployment_directory.get_worker_for_planned_invocable_hop(
-                plan_version=contribution.plan_version,
-                planned_hop=contribution.destination_hop,
+        hop_placement_plan = (
+            await self._hop_placement_plan_reader.get_hop_placement_plan(
+                version=contribution.plan_version,
             )
         )
-        return worker_id
+        return hop_placement_plan.get_worker_id_for_hop(contribution.destination_hop)

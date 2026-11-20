@@ -22,7 +22,9 @@ async def test_reads_current_version_from_string_or_bytes(value: str | bytes) ->
     version = await reader.get_current_plan_version_for_flow(flow_id)
 
     assert version == PlanVersion(version_number=3)
-    redis.get.assert_awaited_once_with(await factory.build_current_plan_key(flow_id))
+    redis.get.assert_awaited_once_with(
+        await factory.build_current_plan_field_key(flow_id)
+    )
 
 
 @pytest.mark.asyncio

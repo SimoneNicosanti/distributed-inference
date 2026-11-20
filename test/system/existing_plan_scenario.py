@@ -1,5 +1,6 @@
 """Reuse published flow plans without uploading models or requesting optimization."""
 
+import asyncio
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +16,7 @@ from integration.dto.worker_identity.worker_identity_dto import WorkerIdentityDt
 from integration.front_end.http.front_end_http_paths import (
     FRONT_END_LOCAL_WORKER_IDENTITY_PATH,
 )
+from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
 from shared.flow.flow import FlowId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
@@ -29,8 +31,11 @@ class ExistingPlanScenario:
 
 def _latest_active_flow_ids(redis: Redis) -> tuple[FlowId, ...]:
     active_flows: dict[FlowId, PlanVersion] = {}
-    for key in redis.scan_iter(match="flow-plans:*:active-version"):
-        active_version = redis.get(key)
+    active_field = asyncio.run(StringFlowPlanKeyFactory.build_current_plan_field_key())
+    for key in redis.scan_iter(match="flow-plans:*"):
+        if key.count(":") != 1:
+            continue
+        active_version = redis.hget(key, active_field)
         if active_version is not None:
             flow_id = FlowId(flow_id=UUID(key.split(":")[1]))
             active_flows[flow_id] = PlanVersion(version_number=int(active_version))

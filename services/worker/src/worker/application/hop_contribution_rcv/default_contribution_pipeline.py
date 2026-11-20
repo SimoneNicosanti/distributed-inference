@@ -16,8 +16,8 @@ from worker.application.hop_contribution_rcv.abc.contribution_pipeline import (
 from worker.application.ports.outbound.contribution.contribution_store import (
     ContributionStore,
 )
-from worker.application.ports.outbound.plan_store.plan_store_errors import (
-    NotExistentPlanError,
+from worker.application.ports.outbound.plan_reader.worker_plan_reader import (
+    WorkerPlanReadError,
 )
 from worker.application.postbox.abc.outbox import InvalidOutboxDepositError, Outbox
 from worker.domain.hop.hop_invocation_contribution import HopInvocationContribution
@@ -66,7 +66,7 @@ class DefaultContributionPipeline(ContributionPipeline):
                         handle.future.set_result(None)
 
                     return handle
-                except NotExistentPlanError as cause:
+                except WorkerPlanReadError as cause:
                     error = ContributionSubmissionError("Plan version does not exist")
                     error.__cause__ = cause
                     if not handle.future.done():

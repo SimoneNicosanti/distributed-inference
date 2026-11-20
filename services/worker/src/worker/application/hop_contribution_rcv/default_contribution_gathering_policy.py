@@ -8,7 +8,7 @@ from worker.application.hop_contribution_rcv.abc.contribution_gathering_policy i
     HopContributionCollectionKey,
     InvalidContributionError,
 )
-from worker.application.ports.outbound.plan_store.worker_sub_plan_readers import (
+from worker.application.ports.outbound.plan_reader.worker_plan_view_readers import (
     HopRoutingPlanReader,
 )
 from worker.domain.hop.hop_invocation_contribution import (

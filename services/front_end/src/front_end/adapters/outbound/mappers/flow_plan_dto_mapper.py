@@ -16,5 +16,7 @@ class FlowPlanDtoMapper:
                 ),
             ),
             ingress_replica_id=dto.ingress_replica_id,
+            ingress_worker_id=dto.ingress_worker_id,
             sink_replica_id=dto.sink_replica_id,
+            sink_worker_id=dto.sink_worker_id,
         )

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import pytest
 
 from shared.plan.plan_version import PlanVersion
-from worker.adapters.outbound.plan_store.in_memory_plan_store import InMemoryPlanStore
+from worker.adapters.outbound.plan_reader.in_memory_plan_store import InMemoryPlanStore
 
 
 @dataclass(frozen=True, slots=True)

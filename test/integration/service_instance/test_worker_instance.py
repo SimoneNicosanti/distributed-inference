@@ -16,21 +16,25 @@ def test_worker_requires_result_retrieve_capability() -> None:
             service_id=ServiceId(),
             capabilities=[
                 _capability(CapabilityType.HOP_INVOCATION),
-                _capability(CapabilityType.PLAN_ACTUATION),
                 _capability(CapabilityType.IN_NETWORK_PROFILING),
+                _capability(CapabilityType.FAILURE_RECEIVE),
             ],
         )
 
 
-def test_worker_accepts_all_required_capabilities() -> None:
+@pytest.mark.parametrize("include_plan_actuation", [False, True])
+def test_worker_accepts_all_required_capabilities(include_plan_actuation: bool) -> None:
+    capabilities = [
+        _capability(CapabilityType.HOP_INVOCATION),
+        _capability(CapabilityType.IN_NETWORK_PROFILING),
+        _capability(CapabilityType.RESULT_RETRIEVE),
+        _capability(CapabilityType.FAILURE_RECEIVE),
+    ]
+    if include_plan_actuation:
+        capabilities.append(_capability(CapabilityType.PLAN_ACTUATION))
     worker = WorkerInstance(
         service_id=ServiceId(),
-        capabilities=[
-            _capability(CapabilityType.HOP_INVOCATION),
-            _capability(CapabilityType.PLAN_ACTUATION),
-            _capability(CapabilityType.IN_NETWORK_PROFILING),
-            _capability(CapabilityType.RESULT_RETRIEVE),
-        ],
+        capabilities=capabilities,
     )
 
     assert worker.get_capabilities_by_type(CapabilityType.RESULT_RETRIEVE)

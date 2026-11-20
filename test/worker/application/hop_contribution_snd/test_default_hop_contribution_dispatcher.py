@@ -1,14 +1,9 @@
 from typing import override
 
 import pytest
-from front_end.domain.context.model_invocation_context import ModelInvocationContext
-from shared.plan.hop_deployment_id import HopDeploymentId, HopReplicaId
-from worker.domain.context.model_pass_context import ModelPassType
 
-from catalog.api.hop.hop_deployment_directory import (
-    HopDeploymentDirectory,
-)
-from shared.context.model_pass_context import ModelPassContext
+from shared.context.model_invocation_context import ModelInvocationContext
+from shared.context.model_pass_context import ModelPassContext, ModelPassType
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -28,6 +23,9 @@ from worker.application.ports.outbound.activity_manager.activity_manager import 
 from worker.application.ports.outbound.hop_contribution_snd.contribution_sender import (
     ContributionSender,
 )
+from worker.application.ports.outbound.plan_reader.worker_plan_view_readers import (
+    HopPlacementPlanReader,
+)
 from worker.domain.activity.activity_request import (
     ActivityGrant,
     ActivityGrantId,
@@ -37,6 +35,7 @@ from worker.domain.activity.activity_request import (
 )
 from worker.domain.context.hop_invocation_context import HopInvocationContext
 from worker.domain.hop.hop_invocation_contribution import HopInvocationContribution
+from worker.domain.plan.hop_placement_plan import HopPlacementPlan
 from worker.domain.tensor.tensor_bundle import TensorBundle
 
 
@@ -62,19 +61,15 @@ class _ActivityManager(ActivityManager):
         self.released_grant_id = activity_grant_id
 
 
-class _DeploymentDirectory(HopDeploymentDirectory):
-    def __init__(self, worker_id: WorkerId) -> None:
-        self._worker_id = worker_id
-        self.lookup: tuple[PlanVersion, HopReplicaId] | None = None
+class _HopPlacementPlanReader(HopPlacementPlanReader):
+    def __init__(self, plan: HopPlacementPlan) -> None:
+        self._plan = plan
+        self.lookup: PlanVersion | None = None
 
     @override
-    async def get_worker_for_planned_invocable_hop[ReplicaIdT: HopReplicaId](
-        self,
-        plan_version: PlanVersion,
-        replica_id: ReplicaIdT,
-    ) -> HopDeploymentId[ReplicaIdT]:
-        self.lookup = (plan_version, replica_id)
-        return HopDeploymentId(replica_id=replica_id, worker_id=self._worker_id)
+    async def get_hop_placement_plan(self, version: PlanVersion) -> HopPlacementPlan:
+        self.lookup = version
+        return self._plan
 
 
 class _ContributionSender(ContributionSender):
@@ -121,18 +116,20 @@ async def test_dispatch_resolves_worker_before_sending() -> None:
     contribution = _contribution(plan_version, destination_hop)
     worker_id = ServiceId()
     activity_manager = _ActivityManager()
-    deployment_directory = _DeploymentDirectory(worker_id)
+    placement_reader = _HopPlacementPlanReader(
+        HopPlacementPlan(mapping={destination_hop: worker_id})
+    )
     sender = _ContributionSender()
     dispatcher = DefaultHopContributionDispatcher(
         activity_request_factory=DefaultActivityRequestFactory(),
         activity_manager=activity_manager,
-        hop_deployment_directory=deployment_directory,
+        hop_placement_plan_reader=placement_reader,
         contribution_sender=sender,
     )
 
     await dispatcher.dispatch([contribution])
 
-    assert deployment_directory.lookup == (plan_version, destination_hop)
+    assert placement_reader.lookup == plan_version
     assert sender.sent == [(contribution, worker_id)]
     assert activity_manager.acquired_request is not None
     assert (

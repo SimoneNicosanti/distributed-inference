@@ -41,4 +41,4 @@ class RedisPlanVersionFactory(PlanVersionFactory):
         return PlanVersion(version_number=updated_ver_num)
 
     def _plan_version_key(self) -> str:
-        return "current-plan-version"
+        return "current-plan-version:plan-version"

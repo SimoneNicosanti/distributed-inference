@@ -78,7 +78,14 @@ class OptimizationScenario:
     endpoint_worker_id: ServiceId
 
 
-def prepare_optimization_scenario(tmp_path: Path) -> OptimizationScenario:
+def prepare_optimization_scenario(
+    tmp_path: Path,
+    *,
+    arrival_rates: tuple[float, ...] = ARRIVAL_RATES,
+    max_response_times_s: tuple[float, ...] = MAX_RESPONSE_TIMES_S,
+) -> OptimizationScenario:
+    if not arrival_rates or len(arrival_rates) != len(max_response_times_s):
+        raise ValueError("Each flow requires an arrival rate and a response-time limit")
     front_end_base_url = os.getenv("FRONT_END_BASE_URL")
     if front_end_base_url is None:
         pytest.skip("Set FRONT_END_BASE_URL to run system tests")
@@ -99,7 +106,7 @@ def prepare_optimization_scenario(tmp_path: Path) -> OptimizationScenario:
     if not model_path.is_file():
         pytest.fail(f"MODEL_PATH is not a file: {model_path}")
 
-    flow_ids = tuple(FlowId(flow_id=uuid4()) for _ in ARRIVAL_RATES)
+    flow_ids = tuple(FlowId(flow_id=uuid4()) for _ in arrival_rates)
 
     onnx_model = onnx.load(model_path, load_external_data=False)
     onnx.checker.check_model(onnx_model)
@@ -206,8 +213,8 @@ def prepare_optimization_scenario(tmp_path: Path) -> OptimizationScenario:
         )
         for flow_id, arrival_rate, max_response_time in zip(
             flow_ids,
-            ARRIVAL_RATES,
-            MAX_RESPONSE_TIMES_S,
+            arrival_rates,
+            max_response_times_s,
             strict=True,
         )
     )

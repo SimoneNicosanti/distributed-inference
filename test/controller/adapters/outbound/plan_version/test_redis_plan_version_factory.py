@@ -7,8 +7,14 @@ import pytest_asyncio
 from fakeredis import FakeServer
 from fakeredis.aioredis import FakeRedis
 
+from controller.adapters.outbound.plan_publishing.redis_plan_publisher import (
+    RedisPlanPublisher,
+)
 from controller.adapters.outbound.plan_version.redis_plan_version_factory import (
     RedisPlanVersionFactory,
+)
+from controller.application.deployment.default_plan_mappings_builder import (
+    DefaultPlanMappingsBuilder,
 )
 from controller.composition.default_composition_root import DefaultCompositionRoot
 from shared.plan.plan_version import PlanVersion
@@ -68,10 +74,14 @@ async def test_composition_uses_redis_factory_and_manages_actuation_lifecycle(
     ) as manager_type:
         manager = manager_type.return_value
         async with DefaultCompositionRoot().build_actuation_manager_context(
-            AsyncMock(), AsyncMock(), AsyncMock(), redis
+            AsyncMock(), AsyncMock(), redis
         ):
-            factory = manager_type.call_args.args[2]
+            mappings = manager_type.call_args.args[2]
+            assert isinstance(mappings, DefaultPlanMappingsBuilder)
+            factory = mappings._plan_version_factory
             assert isinstance(factory, RedisPlanVersionFactory)
+            publisher = manager_type.call_args.args[3]
+            assert isinstance(publisher, RedisPlanPublisher)
             assert await factory.build_next_plan_version() == PlanVersion(1)
             assert await RedisPlanVersionFactory(
                 redis

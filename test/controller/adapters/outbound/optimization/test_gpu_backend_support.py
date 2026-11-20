@@ -270,7 +270,7 @@ def test_gpu_queue_stability_uses_gpu_service_time(
 
 
 def test_mixed_cpu_gpu_solution_survives_worker_plan_transport() -> None:
-    from controller.adapters.outbound.plan_share.mappers.worker_plan_mapper import (
+    from controller.adapters.outbound.plan_publishing.mappers.worker_plan_mapper import (
         WorkerPlanMapper,
     )
     from controller.application.deployment.builder.endpoint_replica_id_builder import (
@@ -286,7 +286,7 @@ def test_mixed_cpu_gpu_solution_survives_worker_plan_transport() -> None:
         PrepareWorkerPlanRequest,
     )
     from shared.plan.plan_version import PlanVersion
-    from worker.adapters.inbound.deployment.http.service_plan_mapper import (
+    from worker.adapters.outbound.plan_reader.worker_plan_mapper import (
         worker_plan_from_dto,
     )
 

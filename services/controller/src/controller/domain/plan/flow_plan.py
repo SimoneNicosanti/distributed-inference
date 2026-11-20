@@ -7,6 +7,7 @@ from shared.model.keys import TensorKey
 from shared.model.model_variant import ModelVariantId
 from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 from shared.plan.plan_version import PlanVersion
+from shared.service.service import WorkerId
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,7 +16,9 @@ class FlowPlan:
     model_variant_id: ModelVariantId
     input_tensor_properties: Mapping[TensorKey, TensorProperty]
     ingress_replica_id: PlannedIngressReplicaId
+    ingress_worker_id: WorkerId
     sink_replica_id: PlannedSinkReplicaId
+    sink_worker_id: WorkerId
 
     def __post_init__(self) -> None:
         if (

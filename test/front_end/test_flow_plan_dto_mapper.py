@@ -12,6 +12,7 @@ from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
 from shared.plan.hop_logical_id import PlannedIngressReplicaId, PlannedSinkReplicaId
 from shared.plan.plan_version import PlanVersion
+from shared.service.service import ServiceId
 
 
 def _flow_plan_dto(inputs: tuple[InputSpecDto, ...]) -> FlowPlanDto:
@@ -20,7 +21,9 @@ def _flow_plan_dto(inputs: tuple[InputSpecDto, ...]) -> FlowPlanDto:
         plan_version=PlanVersion(version_number=3),
         model_specs=ModelSpecsDto(model_variant_id=variant, inputs=inputs),
         ingress_replica_id=PlannedIngressReplicaId(variant, replica_idx=1),
+        ingress_worker_id=ServiceId(),
         sink_replica_id=PlannedSinkReplicaId(variant, replica_idx=2),
+        sink_worker_id=ServiceId(),
     )
 
 
@@ -48,7 +51,9 @@ def test_maps_all_fields_and_preserves_input_order(
             ),
         ),
         ingress_replica_id=dto.ingress_replica_id,
+        ingress_worker_id=dto.ingress_worker_id,
         sink_replica_id=dto.sink_replica_id,
+        sink_worker_id=dto.sink_worker_id,
     )
 
 

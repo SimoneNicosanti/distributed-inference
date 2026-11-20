@@ -16,6 +16,7 @@ from shared.plan.hop_logical_id import (
     PlannedSinkReplicaId,
 )
 from shared.plan.plan_version import PlanVersion
+from shared.service.service import WorkerId
 
 
 class ResourceAllocationDto(BaseModel):
@@ -125,6 +126,21 @@ class FailurePlanDto(BaseModel):
         return self
 
 
+class HopPlacementPlanDto(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    hops: tuple[InvocableHopDto, ...]
+    worker_ids: tuple[WorkerId, ...]
+
+    @model_validator(mode="after")
+    def validate_hop_workers(self) -> Self:
+        if len(self.hops) != len(self.worker_ids):
+            raise ValueError("Each hop must have a worker")
+        if len(self.hops) != len(set(self.hops)):
+            raise ValueError("Placement plan hops must be unique")
+        return self
+
+
 class WorkerPlanDto(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -134,3 +150,4 @@ class WorkerPlanDto(BaseModel):
     partition_execution_plan: PartitionExecutionPlanDto
     hop_routing_plan: HopRoutingPlanDto
     failure_plan: FailurePlanDto
+    hop_placement_plan: HopPlacementPlanDto

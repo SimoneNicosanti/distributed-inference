@@ -28,7 +28,9 @@ class FlowPlanBuilder:
                     flow.model_variant_id
                 ],
                 ingress_replica_id=endpoint_ids_by_flow[flow.flow_id].ingress,
+                ingress_worker_id=flow.ingress_worker_id,
                 sink_replica_id=endpoint_ids_by_flow[flow.flow_id].sink,
+                sink_worker_id=flow.sink_worker_id,
             )
             for flow in solution.solution.flow_solutions
         }

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from controller.domain.plan.deployment_plan import DeploymentPlan
 from controller.domain.plan.failure_plan import FailurePlan
+from controller.domain.plan.hop_placement_plan import HopPlacementPlan
 from controller.domain.plan.hop_routing_plan import HopRoutingPlan
 from controller.domain.plan.partition_execution_plan import PartitionExecutionPlan
 from controller.domain.plan.scheduling_plan import SchedulingPlan
@@ -16,6 +17,7 @@ class WorkerPlan:
     partition_execution_plan: PartitionExecutionPlan
     hop_routing_plan: HopRoutingPlan
     failure_plan: FailurePlan
+    hop_placement_plan: HopPlacementPlan
 
     def __post_init__(self) -> None:
         deployed_replicas = set(self.deployment_plan.executable_hops)

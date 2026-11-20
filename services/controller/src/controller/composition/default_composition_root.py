@@ -23,8 +23,8 @@ from controller.adapters.outbound.optimizer.http_optimizer_gateway import (
 from controller.adapters.outbound.partition_builder.http_partition_builder_gateway import (
     HttpPartitionBuilderGateway,
 )
-from controller.adapters.outbound.plan_share.http_plan_share_gateway import (
-    HttpPlanShareGateway,
+from controller.adapters.outbound.plan_publishing.redis_plan_publisher import (
+    RedisPlanPublisher,
 )
 from controller.adapters.outbound.plan_version.redis_plan_version_factory import (
     RedisPlanVersionFactory,
@@ -44,9 +44,6 @@ from controller.adapters.outbound.profile.redis_static_profile_store_gateway imp
 from controller.adapters.outbound.store.in_memory_optimization_solution_store import (
     InMemoryOptimizationSolutionStore,
 )
-from controller.adapters.outbound.store.redis_flow_plan_publisher import (
-    RedisFlowPlanPublisher,
-)
 from controller.application.deployment.abc.actuation_manager import ActuationManager
 from controller.application.deployment.abc.solution_observer import SolutionObserver
 from controller.application.deployment.default_actuation_manager import (
@@ -57,9 +54,6 @@ from controller.application.deployment.default_model_partition_build_manager imp
 )
 from controller.application.deployment.default_plan_mappings_builder import (
     DefaultPlanMappingsBuilder,
-)
-from controller.application.deployment.default_plan_three_phase_dispatcher import (
-    DefaultPlanThreePhaseDispatcher,
 )
 from controller.application.deployment.default_solution_to_plan_converter import (
     DefaultSolutionToPlanConverter,
@@ -98,6 +92,7 @@ from integration.redis.model.keys_factory import StringModelKeyFactory
 from integration.redis.profiled_model_variant.keys_factory import (
     StringProfiledModelVariantKeyFactory,
 )
+from integration.redis.worker_plan.keys_factory import StringWorkerPlanKeyFactory
 from integration.redis.worker_profiles.execution_profile_keys import (
     StringExecutionProfileKeyFactory,
 )
@@ -158,9 +153,7 @@ class DefaultCompositionRoot(CompositionRoot):
             )
 
             await stack.enter_async_context(
-                self.build_actuation_manager_context(
-                    solution_store, directory, worker_directory_gateway, redis
-                )
+                self.build_actuation_manager_context(solution_store, directory, redis)
             )
 
             yield optimization_manager
@@ -199,7 +192,6 @@ class DefaultCompositionRoot(CompositionRoot):
         self,
         solution_observer: SolutionObserver,
         directory: ServiceDirectory,
-        worker_directory_gateway: WorkerDirectoryGateway,
         redis: redis_asyncio.Redis,
     ) -> AsyncGenerator[ActuationManager]:
 
@@ -218,11 +210,6 @@ class DefaultCompositionRoot(CompositionRoot):
                 http_client,
                 directory,
             )
-            plan_share_gateway = HttpPlanShareGateway(
-                http_client,
-                worker_directory_gateway,
-            )
-
             plan_version_factory = RedisPlanVersionFactory(redis)
             service_plan_builder = DefaultSolutionToPlanConverter()
 
@@ -230,9 +217,10 @@ class DefaultCompositionRoot(CompositionRoot):
                 solution_observer,
                 DefaultModelPartitionBuildManager(partition_builder_gateway),
                 DefaultPlanMappingsBuilder(plan_version_factory, service_plan_builder),
-                DefaultPlanThreePhaseDispatcher(
-                    plan_share_gateway,
-                    RedisFlowPlanPublisher(redis, StringFlowPlanKeyFactory()),
+                RedisPlanPublisher(
+                    redis=redis,
+                    worker_plan_key_factory=StringWorkerPlanKeyFactory(),
+                    flow_plan_key_factory=StringFlowPlanKeyFactory(),
                 ),
             )
 

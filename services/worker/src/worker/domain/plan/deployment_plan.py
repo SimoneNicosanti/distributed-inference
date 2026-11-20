@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from shared.plan.hop import PlannedExecutableHopId, PlannedInvocableHopId
+from shared.plan.hop import PlannedExecutableHopId
 from shared.plan.hop_logical_id import (
     PlannedIngressReplicaId,
     PlannedSinkReplicaId,
@@ -10,6 +10,9 @@ from shared.plan.hop_logical_id import (
 @dataclass(frozen=True, slots=True)
 class ResourceAllocation:
     use_gpu: bool
+
+
+class NoResourceAllocationForHopError(Exception): ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,8 +39,9 @@ class DeploymentPlan:
     def get_allocation_by_executable_hop(
         self, executable_hop: PlannedExecutableHopId
     ) -> ResourceAllocation:
-        return self.allocations[self.executable_hops.index(executable_hop)]
-
-    @property
-    def planned_hops(self) -> tuple[PlannedInvocableHopId, ...]:
-        return (*self.executable_hops, *self.ingress_hops, *self.sink_hops)
+        try:
+            return self.allocations[self.executable_hops.index(executable_hop)]
+        except ValueError as e:
+            raise NoResourceAllocationForHopError(
+                f"Could not find resource allocation for {executable_hop}"
+            ) from e

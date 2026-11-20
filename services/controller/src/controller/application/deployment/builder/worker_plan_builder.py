@@ -7,6 +7,9 @@ from controller.application.deployment.builder.endpoint_replica_id_builder impor
 from controller.application.deployment.builder.failure_plan_builder import (
     FailurePlanBuilder,
 )
+from controller.application.deployment.builder.hop_placement_plan_builder import (
+    HopPlacementPlanBuilder,
+)
 from controller.application.deployment.builder.hop_routing_plan_builder import (
     HopRoutingPlanBuilder,
 )
@@ -52,6 +55,9 @@ class WorkerPlanBuilder:
         failure_plans = FailurePlanBuilder.build_all(
             worker_ids, solution, endpoint_ids_by_flow
         )
+        placement_plans = HopPlacementPlanBuilder.build_all(
+            worker_ids, solution, replica_ids_by_flow, endpoint_ids_by_flow
+        )
 
         return {
             worker_id: WorkerPlan(
@@ -61,6 +67,7 @@ class WorkerPlanBuilder:
                 partition_execution_plan=execution_plans[worker_id],
                 hop_routing_plan=routing_plans[worker_id],
                 failure_plan=failure_plans[worker_id],
+                hop_placement_plan=placement_plans[worker_id],
             )
             for worker_id in worker_ids
         }
