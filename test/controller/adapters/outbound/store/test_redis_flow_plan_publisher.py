@@ -35,8 +35,14 @@ from front_end.adapters.outbound.inference.redis_flow_plan_reader import (
 )
 from integration.dto.flow_plan.flow_plan_dto import FlowPlanDto
 from integration.dto.worker_plan.worker_plan_dto import WorkerPlanDto
-from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
-from integration.redis.worker_plan.keys_factory import StringWorkerPlanKeyFactory
+from redis_access.address_factory.front_end_plan.address_factory import (
+    HashMapFlowPlanAddressFactory,
+)
+from redis_access.address_factory.worker_plan.address_factory import (
+    HashMapWorkerPlanAddressFactory,
+)
+from redis_access.redis_reader.cached_redis_reader import CachedRedisReader
+from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -85,8 +91,8 @@ def _worker_plans(flows: dict[FlowId, FlowPlan]) -> dict[ServiceId, WorkerPlan]:
 def _publisher(redis: asyncio_redis.Redis) -> RedisPlanPublisher:
     return RedisPlanPublisher(
         redis=redis,
-        worker_plan_key_factory=StringWorkerPlanKeyFactory(),
-        flow_plan_key_factory=StringFlowPlanKeyFactory(),
+        worker_plan_address_factory=HashMapWorkerPlanAddressFactory(),
+        flow_plan_address_factory=HashMapFlowPlanAddressFactory(),
     )
 
 
@@ -126,21 +132,24 @@ async def test_publishes_worker_and_flow_payloads_and_active_hash_fields(
 
     await publisher.publish_plans(workers, flows)
 
-    worker_keys = StringWorkerPlanKeyFactory()
     for worker_id, plan in workers.items():
         payload = await redis.hget(
-            worker_keys.build_hash_key(plan.plan_version),
-            worker_keys.build_field_key(worker_id),
+            f"worker-plans:version-{plan.plan_version.version_number}",
+            str(worker_id.id),
         )
         assert WorkerPlanDto.model_validate_json(payload) == (
             WorkerPlanMapper.to_worker_plan_dto(plan)
         )
 
-    flow_keys = StringFlowPlanKeyFactory()
-    reader = RedisFlowPlanReader(redis, flow_keys)
+    reader = RedisFlowPlanReader(
+        redis,
+        HashMapRedisReader(),
+        CachedRedisReader(HashMapRedisReader(), add_ttl_s=60.0),
+        HashMapFlowPlanAddressFactory(),
+    )
     for flow_id, plan in flows.items():
-        hash_key = await flow_keys.build_hash_key(flow_id)
-        active_field = await flow_keys.build_current_plan_field_key()
+        hash_key = f"flow-plans:{flow_id.flow_id}"
+        active_field = "active-version"
         assert await redis.hget(hash_key, active_field) == "3"
         assert await redis.type(hash_key) == "hash"
         received = await reader.get_flow_plan_by_plan_version(
@@ -160,30 +169,24 @@ async def test_partial_update_preserves_other_active_flows_and_previous_plans(
     old = {first: _plan(), second: _plan(variant_tag="other")}
     old_workers = _worker_plans(old)
     await publisher.publish_plans(old_workers, old)
-    worker_keys = StringWorkerPlanKeyFactory()
-    old_worker_payloads = await redis.hgetall(
-        worker_keys.build_hash_key(PlanVersion(3))
-    )
+    old_worker_payloads = await redis.hgetall("worker-plans:version-3")
     current = {first: replace(old[first], plan_version=PlanVersion(4))}
 
     await publisher.publish_plans(_worker_plans(current), current)
 
-    keys = StringFlowPlanKeyFactory()
-    active_field = await keys.build_current_plan_field_key()
-    assert await redis.hget(await keys.build_hash_key(first), active_field) == "4"
-    assert await redis.hget(await keys.build_hash_key(second), active_field) == "3"
+    active_field = "active-version"
+    assert await redis.hget(f"flow-plans:{first.flow_id}", active_field) == "4"
+    assert await redis.hget(f"flow-plans:{second.flow_id}", active_field) == "3"
     old_payload = await redis.hget(
-        await keys.build_hash_key(first),
-        await keys.build_plan_field_key(PlanVersion(3)),
+        f"flow-plans:{first.flow_id}",
+        f"version-{(PlanVersion(3)).version_number}",
     )
     assert FlowPlanDto.model_validate_json(old_payload) == (
         FlowPlanMapper.to_flow_plan_dto(old[first])
     )
-    assert await redis.hgetall(worker_keys.build_hash_key(PlanVersion(3))) == (
-        old_worker_payloads
-    )
-    assert set(await redis.hkeys(worker_keys.build_hash_key(PlanVersion(4)))) == {
-        worker_keys.build_field_key(worker) for worker in _worker_plans(current)
+    assert await redis.hgetall("worker-plans:version-3") == (old_worker_payloads)
+    assert set(await redis.hkeys("worker-plans:version-4")) == {
+        str(worker.id) for worker in _worker_plans(current)
     }
 
 
@@ -196,22 +199,21 @@ async def test_staging_error_keeps_old_active_version_even_after_partial_writes(
     current = _plan(4)
     previous = replace(current, plan_version=PlanVersion(3))
     flows = {flow_id: current, other_id: _plan(4, "other")}
-    keys = StringFlowPlanKeyFactory()
-    hash_key = await keys.build_hash_key(flow_id)
-    active_field = await keys.build_current_plan_field_key()
+    hash_key = f"flow-plans:{flow_id.flow_id}"
+    active_field = "active-version"
     await redis.hset(
         hash_key,
         mapping={
             active_field: "3",
-            await keys.build_plan_field_key(previous.plan_version): (
+            f"version-{previous.plan_version.version_number}": (
                 FlowPlanMapper.to_flow_plan_dto(previous).model_dump_json()
             ),
         },
     )
     poisoned_key = (
-        StringWorkerPlanKeyFactory.build_hash_key(current.plan_version)
+        f"worker-plans:version-{current.plan_version.version_number}"
         if invalid_key == "worker"
-        else await keys.build_hash_key(other_id)
+        else f"flow-plans:{other_id.flow_id}"
     )
     await redis.set(poisoned_key, "wrong-type")
 
@@ -222,7 +224,8 @@ async def test_staging_error_keeps_old_active_version_even_after_partial_writes(
     # Redis may execute later staging commands despite an earlier command error.
     assert (
         await redis.hget(
-            hash_key, await keys.build_plan_field_key(current.plan_version)
+            hash_key,
+            f"version-{current.plan_version.version_number}",
         )
         is not None
     )
@@ -235,12 +238,14 @@ async def test_worker_only_publication_is_not_ignored(redis: FakeRedis) -> None:
 
     await _publisher(redis).publish_plans({worker: plan}, {})
 
-    keys = StringWorkerPlanKeyFactory()
     payload = await redis.hget(
-        keys.build_hash_key(plan.plan_version), keys.build_field_key(worker)
+        f"worker-plans:version-{plan.plan_version.version_number}",
+        str(worker.id),
     )
     assert WorkerPlanDto.model_validate_json(payload).plan_version == plan.plan_version
-    assert await redis.keys("*") == [keys.build_hash_key(plan.plan_version)]
+    assert await redis.keys("*") == [
+        f"worker-plans:version-{plan.plan_version.version_number}"
+    ]
 
 
 @pytest.mark.asyncio
@@ -291,3 +296,26 @@ async def test_propagates_connection_errors_from_saving_or_activation(
 
     assert redis.pipeline.call_count == phase + 1
     pipelines[phase].execute.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_worker_reader_reads_published_address_and_reuses_cached_payload(
+    redis: FakeRedis,
+) -> None:
+    from worker.adapters.outbound.plan_reader.redis_worker_plan_reader import (
+        RedisWorkerPlanReader,
+    )
+
+    worker = ServiceId(id="worker")
+    version = PlanVersion(8)
+    await _publisher(redis).publish_plans({worker: _worker_plan(version)}, {})
+    reader = RedisWorkerPlanReader(
+        worker,
+        redis,
+        CachedRedisReader(HashMapRedisReader(), add_ttl_s=60.0),
+        HashMapWorkerPlanAddressFactory(),
+    )
+    with patch.object(redis, "hget", wraps=redis.hget) as hget:
+        for _ in range(2):
+            assert (await reader.get_plan_by_version(version)).plan_version == version
+        hget.assert_called_once_with("worker-plans:version-8", "worker")

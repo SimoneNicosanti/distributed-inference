@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
   "distributed-inference-integration",
+  "distributed-inference-redis-access",
   "distributed-inference-shared",
   "pydantic>=2.8",
   "redis>=8.0.1",
@@ -18,4 +19,5 @@ packages = ["src/catalog"]
 
 [tool.uv.sources]
 distributed-inference-integration = { path = "../integration", editable = true }
+distributed-inference-redis-access = { path = "../redis_access", editable = true }
 distributed-inference-shared = { path = "../shared", editable = true }

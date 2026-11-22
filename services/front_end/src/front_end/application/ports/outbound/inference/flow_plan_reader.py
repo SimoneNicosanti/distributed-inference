@@ -5,6 +5,9 @@ from shared.flow.flow import FlowId
 from shared.plan.plan_version import PlanVersion
 
 
+class FlowPlanReadError(Exception): ...
+
+
 class FlowPlanReader(ABC):
     @abstractmethod
     async def get_current_plan_version_for_flow(

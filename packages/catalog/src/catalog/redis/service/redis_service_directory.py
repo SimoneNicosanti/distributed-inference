@@ -7,38 +7,45 @@ from catalog.api.service.service_directory import (
     ServiceDirectory,
     ServiceInstanceReadError,
 )
-from catalog.redis.service.keys_factory import (
-    build_catalog_key,
-    build_service_hset_key,
-)
 from integration.service_instance.service_instance import ServiceInstance
 from redis import RedisError
 from redis import asyncio as redis_asyncio
+from redis_access.address_factory.service.service_instance_address_factory import (
+    ServiceInstanceAddressFactory,
+)
+from redis_access.contract.redis_address import HashMapRedisAddress
+from redis_access.redis_reader.abc.redis_reader import RedisReader, RedisReadError
 from shared.service.service import ServiceId
 
 logger = logging.getLogger(__name__)
 
 
 class RedisServiceDirectory(ServiceDirectory):
-    def __init__(self, redis: redis_asyncio.Redis) -> None:
+    def __init__(
+        self,
+        redis: redis_asyncio.Redis,
+        redis_reader: RedisReader[HashMapRedisAddress],
+        address_factory: ServiceInstanceAddressFactory[HashMapRedisAddress],
+    ) -> None:
         self._redis = redis
+        self._redis_reader = redis_reader
+        self._address_factory = address_factory
 
     @override
     async def get_service_instance_by_service_id(
         self, service_id: ServiceId
     ) -> ServiceInstance:
+
         try:
-            value = await self._redis.hget(
-                build_catalog_key(), build_service_hset_key(service_id)
-            )
-            if value is None:
-                raise KeyError(f"Service {service_id} not found")
+            addr = self._address_factory.build_service_instance_address(service_id)
+            value = await self._redis_reader.read(self._redis, addr)
             instance = ServiceInstance.model_validate_json(value)
 
             if instance.service_id != service_id:
                 raise ValueError("Service instance ID mismatch")
             return instance
-        except (KeyError, ValueError, RedisError) as e:
+
+        except (RedisReadError, ValueError) as e:
             raise ServiceInstanceReadError(
                 f"Could not read service instance for {service_id.id}"
             ) from e
@@ -46,7 +53,8 @@ class RedisServiceDirectory(ServiceDirectory):
     @override
     async def get_all_service_instances(self) -> list[ServiceInstance]:
         try:
-            values = await self._redis.hvals(build_catalog_key())
+            addr = self._address_factory.build_service_catalog_address()
+            values = await self._redis.hvals(addr.key)
 
             return self._build_instances_list(values)
         except (ValueError, RedisError) as e:

@@ -1,0 +1,18 @@
+[project]
+name = "distributed-inference-redis-access"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+  "distributed-inference-shared",
+  "redis>=8.0.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/redis_access"]
+
+[tool.uv.sources]
+distributed-inference-shared = { path = "../shared", editable = true }

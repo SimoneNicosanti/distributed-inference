@@ -13,9 +13,10 @@ from controller.domain.profile.resource_profile import (
     WorkerResourceProfile,
 )
 from integration.dto.worker_profiles.resource_profile_dto import ResourceProfileDto
-from integration.redis.worker_profiles.resource_profile_keys import (
-    ResourceProfileKeyFactory,
+from redis_access.address_factory.worker_profiles.resource_profile_address_factory import (
+    ResourceProfileAddressFactory,
 )
+from redis_access.contract.redis_address import HashMapRedisAddress
 from shared.service.service import WorkerId
 
 
@@ -23,10 +24,14 @@ class RedisResourceProfileStoreGateway(ResourceProfileStoreGateway):
     def __init__(
         self,
         redis: redis_asyncio.Redis,
-        resource_profile_key_factory_cls: type[ResourceProfileKeyFactory],
+        resource_profile_address_factory_cls: type[
+            ResourceProfileAddressFactory[HashMapRedisAddress]
+        ],
     ) -> None:
         self._redis = redis
-        self._resource_profile_key_factory_cls = resource_profile_key_factory_cls
+        self._resource_profile_address_factory_cls = (
+            resource_profile_address_factory_cls
+        )
 
     @override
     async def get_resource_profiles_for_workers(
@@ -40,13 +45,17 @@ class RedisResourceProfileStoreGateway(ResourceProfileStoreGateway):
         if not ordered_worker_ids:
             return []
 
-        redis_keys = [
-            await self._resource_profile_key_factory_cls.build_resource_profile_key_per_worker(
+        addresses = [
+            self._resource_profile_address_factory_cls.build_worker_resource_profile_address(
                 worker_id
             )
             for worker_id in ordered_worker_ids
         ]
-        values = await self._redis.mget(redis_keys)
+        if len({addr.hash_map_key for addr in addresses}) != 1:
+            raise ValueError("Resource profiles must share one hash for batch reads")
+        values = await self._redis.hmget(
+            addresses[0].hash_map_key, [addr.field_key for addr in addresses]
+        )
 
         profiles: list[WorkerResourceProfile] = []
         for worker_id, value in zip(ordered_worker_ids, values, strict=True):

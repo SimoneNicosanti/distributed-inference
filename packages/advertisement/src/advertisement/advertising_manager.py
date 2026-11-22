@@ -6,6 +6,7 @@ from typing import override
 from advertisement.capability_life_checker import (
     CapabilityLifeChecker,
 )
+from blocks.lifecycle.async_lifecycle import AsyncLifecycle
 from catalog.api.service.service_registrar import ServiceRegistrar
 from integration.service_instance.service_instance import (
     Capability,
@@ -13,7 +14,6 @@ from integration.service_instance.service_instance import (
     CapabilityType,
     ServiceInstance,
 )
-from lifecycle.async_lifecycle import AsyncLifecycle
 from shared.service.service import ServiceId
 
 logger = logging.getLogger(__name__)

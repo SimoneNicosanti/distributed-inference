@@ -10,9 +10,10 @@ from controller.domain.profile.network_topology import (
     NetworkConnection,
 )
 from integration.dto.worker_profiles.network_profile_dto import NetworkProfileDto
-from integration.redis.worker_profiles.network_profile_keys import (
-    NetworkProfileKeyFactory,
+from redis_access.address_factory.worker_profiles.network_profile_address_factory import (
+    NetworkProfileAddressFactory,
 )
+from redis_access.contract.redis_address import HashMapRedisAddress
 from shared.service.service import WorkerId
 
 
@@ -20,10 +21,12 @@ class RedisNetworkProfileStoreGateway(NetworkProfileStoreGateway):
     def __init__(
         self,
         redis: redis_asyncio.Redis,
-        network_profile_key_factory_cls: type[NetworkProfileKeyFactory],
+        network_profile_address_factory_cls: type[
+            NetworkProfileAddressFactory[HashMapRedisAddress]
+        ],
     ) -> None:
         self._redis = redis
-        self._network_profile_key_factory_cls = network_profile_key_factory_cls
+        self._network_profile_address_factory_cls = network_profile_address_factory_cls
 
     @override
     async def get_network_connections_by_workers(
@@ -37,13 +40,17 @@ class RedisNetworkProfileStoreGateway(NetworkProfileStoreGateway):
             requested_worker_ids,
             key=lambda worker_id: str(worker_id.id),
         )
-        redis_keys = [
-            await self._network_profile_key_factory_cls.build_network_profile_key_per_worker(
+        addresses = [
+            self._network_profile_address_factory_cls.build_worker_network_profile_address(
                 worker_id
             )
             for worker_id in ordered_worker_ids
         ]
-        values = await self._redis.mget(redis_keys)
+        if len({addr.hash_map_key for addr in addresses}) != 1:
+            raise ValueError("Network profiles must share one hash for batch reads")
+        values = await self._redis.hmget(
+            addresses[0].hash_map_key, [addr.field_key for addr in addresses]
+        )
 
         connections: list[NetworkConnection] = []
         for worker_id, value in zip(ordered_worker_ids, values, strict=True):

@@ -3,6 +3,7 @@ import logging
 from contextlib import suppress
 from typing import override
 
+from blocks.lifecycle.async_lifecycle import AsyncLifecycle
 from controller.application.deployment.abc.actuation_manager import ActuationManager
 from controller.application.deployment.abc.model_partition_build_manager import (
     ModelPartitionBuildManager,
@@ -17,7 +18,6 @@ from controller.application.ports.outbound.plan_publishing.plan_publisher import
 from controller.domain.optimization.solution.enriched_optimization_solution import (
     EnrichedOptimizationSolution,
 )
-from lifecycle.async_lifecycle import AsyncLifecycle
 
 logger = logging.getLogger(__name__)
 

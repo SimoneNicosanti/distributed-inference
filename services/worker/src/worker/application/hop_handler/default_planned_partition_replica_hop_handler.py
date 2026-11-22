@@ -2,7 +2,7 @@ import asyncio
 from contextlib import suppress
 from typing import override
 
-from lifecycle.async_lifecycle import AsyncLifecycle
+from blocks.lifecycle.async_lifecycle import AsyncLifecycle
 from shared.plan.hop_logical_id import PlannedPartitionReplicaId
 from worker.application.activity.abc.activity_request_factory import (
     ActivityRequestFactory,

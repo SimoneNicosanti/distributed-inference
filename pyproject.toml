@@ -197,11 +197,11 @@ mypy_path = [
   "$MYPY_CONFIG_FILE_DIR/packages/catalog/src",
   "$MYPY_CONFIG_FILE_DIR/packages/integration/src",
   "$MYPY_CONFIG_FILE_DIR/packages/shared/src",
-  "$MYPY_CONFIG_FILE_DIR/packages/lifecycle/src",
-  "$MYPY_CONFIG_FILE_DIR/packages/scheduling/src",
+  "$MYPY_CONFIG_FILE_DIR/packages/blocks/src",
   "$MYPY_CONFIG_FILE_DIR/packages/utils/src",
   "$MYPY_CONFIG_FILE_DIR/packages/artifacts/src",
   "$MYPY_CONFIG_FILE_DIR/packages/advertisement/src",
+  "$MYPY_CONFIG_FILE_DIR/packages/redis_access/src",
 
   "$MYPY_CONFIG_FILE_DIR/services/artifact_materializer/src",
   "$MYPY_CONFIG_FILE_DIR/services/artifact_store/src",
@@ -280,11 +280,11 @@ extraPaths = [
   "packages/catalog/src",
   "packages/integration/src",
   "packages/shared/src",
-  "packages/lifecycle/src",
-  "packages/scheduling/src",
+  "packages/blocks/src",
   "packages/utils/src",
   "packages/artifacts/src",
   "packages/advertisement/src",
+  "packages/redis_access/src",
 
   "services", ]
 

@@ -4,9 +4,10 @@ version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
   "distributed-inference-advertisement[http]",
+  "distributed-inference-blocks",
   "distributed-inference-catalog",
   "distributed-inference-integration",
-  "distributed-inference-lifecycle",
+  "distributed-inference-redis-access",
   "distributed-inference-shared",
   "fastapi>=0.139.2",
   "gurobipy>=13.0.1,<14",
@@ -26,7 +27,8 @@ packages = ["src/controller"]
 
 [tool.uv.sources]
 distributed-inference-advertisement = { path = "../../packages/advertisement", editable = true }
+distributed-inference-blocks = { path = "../../packages/blocks", editable = true }
 distributed-inference-catalog = { path = "../../packages/catalog", editable = true }
 distributed-inference-integration = { path = "../../packages/integration", editable = true }
-distributed-inference-lifecycle = { path = "../../packages/lifecycle", editable = true }
+distributed-inference-redis-access = { path = "../../packages/redis_access", editable = true }
 distributed-inference-shared = { path = "../../packages/shared", editable = true }

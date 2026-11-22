@@ -3,7 +3,7 @@ import logging
 from contextlib import suppress
 from typing import override
 
-from lifecycle.async_lifecycle import AsyncLifecycle
+from blocks.lifecycle.async_lifecycle import AsyncLifecycle
 from shared.service.service import WorkerId
 from worker.application.ports.outbound.profiling.resource.cpu_profiler import (
     CpuProfiler,

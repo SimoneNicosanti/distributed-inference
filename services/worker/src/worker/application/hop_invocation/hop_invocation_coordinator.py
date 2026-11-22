@@ -3,7 +3,7 @@ import logging
 from contextlib import suppress
 from typing import cast, override
 
-from lifecycle.async_lifecycle import AsyncLifecycle
+from blocks.lifecycle.async_lifecycle import AsyncLifecycle
 from shared.context.model_pass_context import ModelPassContext
 from shared.plan.hop import PlannedInvocableHopId
 from shared.plan.hop_logical_id import (

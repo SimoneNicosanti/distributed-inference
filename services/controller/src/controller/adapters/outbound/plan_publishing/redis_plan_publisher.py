@@ -13,8 +13,13 @@ from controller.application.ports.outbound.plan_publishing.plan_publisher import
 )
 from controller.domain.plan.flow_plan import FlowPlan
 from controller.domain.plan.worker_plan import WorkerPlan
-from integration.redis.front_end_plan.keys_factory import FlowPlanKeyFactory
-from integration.redis.worker_plan.keys_factory import WorkerPlanKeyFactory
+from redis_access.address_factory.front_end_plan.address_factory import (
+    FlowPlanAddressFactory,
+)
+from redis_access.address_factory.worker_plan.address_factory import (
+    WorkerPlanAddressFactory,
+)
+from redis_access.contract.redis_address import HashMapRedisAddress
 from shared.flow.flow import FlowId
 from shared.service.service import WorkerId
 
@@ -23,12 +28,12 @@ class RedisPlanPublisher(PlanPublisher):
     def __init__(
         self,
         redis: asyncio_redis.Redis,
-        worker_plan_key_factory: WorkerPlanKeyFactory,
-        flow_plan_key_factory: FlowPlanKeyFactory,
+        worker_plan_address_factory: WorkerPlanAddressFactory[HashMapRedisAddress],
+        flow_plan_address_factory: FlowPlanAddressFactory[HashMapRedisAddress],
     ) -> None:
         self._redis = redis
-        self._flow_plan_key_factory = flow_plan_key_factory
-        self._worker_plan_key_factory = worker_plan_key_factory
+        self._flow_plan_address_factory = flow_plan_address_factory
+        self._worker_plan_address_factory = worker_plan_address_factory
 
     @override
     async def publish_plans(
@@ -36,40 +41,44 @@ class RedisPlanPublisher(PlanPublisher):
         worker_plans: dict[WorkerId, WorkerPlan],
         flow_plans: dict[FlowId, FlowPlan],
     ) -> None:
-        entries: list[tuple[str, str, str]] = []
-        activations: list[tuple[str, str, str]] = []
+        entries: list[tuple[HashMapRedisAddress, str]] = []
+        activations: list[tuple[HashMapRedisAddress, str]] = []
         for worker_id, worker_plan in worker_plans.items():
             payload = WorkerPlanMapper.to_worker_plan_dto(worker_plan).model_dump_json()
-            hash_key = self._worker_plan_key_factory.build_hash_key(
-                worker_plan.plan_version
+            addr = (
+                self._worker_plan_address_factory.build_versioned_worker_plan_address(
+                    worker_plan.plan_version, worker_id
+                )
             )
-            field_key = self._worker_plan_key_factory.build_field_key(worker_id)
-            entries.append((hash_key, field_key, payload))
+            entries.append((addr, payload))
 
         for flow_id, flow_plan in flow_plans.items():
             payload = FlowPlanMapper.to_flow_plan_dto(flow_plan).model_dump_json()
-            hash_key = await self._flow_plan_key_factory.build_hash_key(flow_id)
-            version_key = await self._flow_plan_key_factory.build_plan_field_key(
-                flow_plan.plan_version
+            addr = (
+                await self._flow_plan_address_factory.build_versioned_flow_plan_address(
+                    flow_plan.plan_version, flow_id
+                )
             )
-            active_field = (
-                await self._flow_plan_key_factory.build_current_plan_field_key()
+            active_addr = (
+                await self._flow_plan_address_factory.build_flow_active_plan_version(
+                    flow_id
+                )
             )
-            entries.append((hash_key, version_key, payload))
+            entries.append((addr, payload))
             activations.append(
-                (hash_key, active_field, str(flow_plan.plan_version.version_number))
+                (active_addr, str(flow_plan.plan_version.version_number))
             )
 
         if not entries:
             return
 
         async with self._redis.pipeline(transaction=True) as pipeline:
-            for hash_key, field_key, payload in entries:
-                pipeline.hset(hash_key, field_key, payload)
+            for addr, payload in entries:
+                pipeline.hset(addr.hash_map_key, addr.field_key, payload)
             await pipeline.execute()
 
         if activations:
             async with self._redis.pipeline(transaction=True) as pipeline:
-                for hash_key, active_field, version in activations:
-                    pipeline.hset(hash_key, active_field, version)
+                for addr, version in activations:
+                    pipeline.hset(addr.hash_map_key, addr.field_key, version)
                 await pipeline.execute()

@@ -16,7 +16,9 @@ from integration.dto.worker_identity.worker_identity_dto import WorkerIdentityDt
 from integration.front_end.http.front_end_http_paths import (
     FRONT_END_LOCAL_WORKER_IDENTITY_PATH,
 )
-from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
+from redis_access.address_factory.front_end_plan.address_factory import (
+    HashMapFlowPlanAddressFactory,
+)
 from shared.flow.flow import FlowId
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import ServiceId
@@ -31,13 +33,15 @@ class ExistingPlanScenario:
 
 def _latest_active_flow_ids(redis: Redis) -> tuple[FlowId, ...]:
     active_flows: dict[FlowId, PlanVersion] = {}
-    active_field = asyncio.run(StringFlowPlanKeyFactory.build_current_plan_field_key())
     for key in redis.scan_iter(match="flow-plans:*"):
         if key.count(":") != 1:
             continue
-        active_version = redis.hget(key, active_field)
+        flow_id = FlowId(flow_id=UUID(key.split(":")[1]))
+        addr = asyncio.run(
+            HashMapFlowPlanAddressFactory.build_flow_active_plan_version(flow_id)
+        )
+        active_version = redis.hget(addr.hash_map_key, addr.field_key)
         if active_version is not None:
-            flow_id = FlowId(flow_id=UUID(key.split(":")[1]))
             active_flows[flow_id] = PlanVersion(version_number=int(active_version))
     if not active_flows:
         pytest.fail(

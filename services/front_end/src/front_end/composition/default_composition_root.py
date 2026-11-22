@@ -45,10 +45,17 @@ from front_end.composition.composition_root import (
     CompositionRoot,
     FrontEndComposition,
 )
-from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
 from integration.worker.http_worker_constants import (
     DEFAULT_LOCAL_WORKER_HTTP_BASE_URL,
 )
+from redis_access.address_factory.front_end_plan.address_factory import (
+    HashMapFlowPlanAddressFactory,
+)
+from redis_access.address_factory.service.service_instance_address_factory import (
+    HashMapServiceInstanceAddressFactory,
+)
+from redis_access.redis_reader.cached_redis_reader import CachedRedisReader
+from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
 
 DEFAULT_MODEL_MANAGER_HTTP_BASE_URL = "http://model-manager:8000"
 DEFAULT_CONTROLLER_HTTP_BASE_URL = "http://controller:8000"
@@ -69,11 +76,20 @@ class DefaultCompositionRoot(CompositionRoot):
             redis = await stack.enter_async_context(
                 self.build_redis_connection_context()
             )
-            service_directory = RedisServiceDirectory(redis)
+            service_directory = RedisServiceDirectory(
+                redis, HashMapRedisReader(), HashMapServiceInstanceAddressFactory()
+            )
             directory = DefaultWorkerDirectory(service_directory)
 
             inference = DefaultInferenceRunner(
-                flow_plan_reader=RedisFlowPlanReader(redis, StringFlowPlanKeyFactory()),
+                flow_plan_reader=RedisFlowPlanReader(
+                    redis=redis,
+                    current_version_reader=HashMapRedisReader(),
+                    versioned_plan_reader=CachedRedisReader(
+                        HashMapRedisReader(), add_ttl_s=60.0
+                    ),
+                    address_factory=HashMapFlowPlanAddressFactory(),
+                ),
                 ingress_gateway=ArrowWorkerIngressGateway(
                     directory,
                     timeout_s=float(

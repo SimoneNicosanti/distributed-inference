@@ -5,7 +5,7 @@ from asyncio import Future
 from dataclasses import dataclass
 from typing import Any, override
 
-from scheduling.queue_request import QueueRequest
+from blocks.scheduling.queue_request import QueueRequest
 from shared.plan.hop import PlannedExecutableHopId
 from shared.plan.plan_version import PlanVersion
 from worker.application.ports.outbound.plan_reader.worker_plan_view_readers import (

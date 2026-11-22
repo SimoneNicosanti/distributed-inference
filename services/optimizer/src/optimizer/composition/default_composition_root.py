@@ -27,6 +27,9 @@ from optimizer.composition.composition_root import CompositionRoot
 from optimizer.domain.formulation.compact.misocp.misocp_compact_formulation_config import (
     MisocpCompactFormulationConfig,
 )
+from redis_access.address_factory.service.service_instance_address_factory import (
+    HashMapServiceInstanceAddressFactory,
+)
 
 DEFAULT_REDIS_URL = "redis://redis:6379/0"
 
@@ -88,7 +91,11 @@ class DefaultCompositionRoot(CompositionRoot):
         service_instance: ServiceInstance,
     ) -> AsyncGenerator[AdvertisingManager]:
         async with httpx.AsyncClient() as http_client:
-            registrar = RedisServiceRegistrar(redis, entry_ttl_s=60)
+            registrar = RedisServiceRegistrar(
+                redis,
+                entry_ttl_s=60,
+                address_factory=HashMapServiceInstanceAddressFactory(),
+            )
             advertising_manager = AdvertisingManager(
                 registrar,
                 service_instance.service_id,

@@ -1,4 +1,3 @@
-import asyncio
 from pathlib import Path
 from unittest.mock import Mock
 from uuid import UUID
@@ -33,8 +32,6 @@ from integration.dto.worker_plan.worker_plan_dto import (
     SchedulingPlanDto,
     WorkerPlanDto,
 )
-from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
-from integration.redis.worker_plan.keys_factory import StringWorkerPlanKeyFactory
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_partition import ModelPartitionId
@@ -107,14 +104,10 @@ def _publish_plan(
         sink_worker_id=ServiceId(id=endpoint_worker),
     )
     redis.hset(
-        asyncio.run(StringFlowPlanKeyFactory.build_hash_key(flow)),
+        f"flow-plans:{flow.flow_id}",
         mapping={
-            asyncio.run(StringFlowPlanKeyFactory.build_current_plan_field_key()): str(
-                version_number
-            ),
-            asyncio.run(
-                StringFlowPlanKeyFactory.build_plan_field_key(version)
-            ): plan.model_dump_json(),
+            "active-version": str(version_number),
+            f"version-{version.version_number}": plan.model_dump_json(),
         },
     )
     partition = PlannedPartitionReplicaId(
@@ -155,8 +148,8 @@ def _publish_plan(
             hop_placement_plan=placement,
         )
         redis.hset(
-            StringWorkerPlanKeyFactory.build_hash_key(version),
-            StringWorkerPlanKeyFactory.build_field_key(worker),
+            f"worker-plans:version-{version.version_number}",
+            str(worker.id),
             worker_plan.model_dump_json(),
         )
     return plan
@@ -177,10 +170,8 @@ def test_load_existing_plan_reads_latest_active_version_without_writes(
         update={"plan_version": PlanVersion(version_number=99)}
     )
     redis.hset(
-        asyncio.run(StringFlowPlanKeyFactory.build_hash_key(flows[0])),
-        asyncio.run(
-            StringFlowPlanKeyFactory.build_plan_field_key(inactive_plan.plan_version)
-        ),
+        f"flow-plans:{flows[0].flow_id}",
+        f"version-{inactive_plan.plan_version.version_number}",
         inactive_plan.model_dump_json(),
     )
     commands = Mock(wraps=redis.execute_command)
@@ -206,8 +197,8 @@ def test_load_existing_plan_does_not_reoptimize_missing_plans(
     redis: fakeredis.FakeRedis, existing_plan_environment: list[httpx.Request]
 ) -> None:
     redis.hset(
-        asyncio.run(StringFlowPlanKeyFactory.build_hash_key(_flow(1))),
-        asyncio.run(StringFlowPlanKeyFactory.build_current_plan_field_key()),
+        f"flow-plans:{(_flow(1)).flow_id}",
+        "active-version",
         "7",
     )
 
@@ -233,8 +224,8 @@ def test_load_existing_plan_rejects_missing_worker_plan(
 ) -> None:
     plan = _publish_plan(redis, _flow(1), 7)
     redis.hdel(
-        StringWorkerPlanKeyFactory.build_hash_key(plan.plan_version),
-        StringWorkerPlanKeyFactory.build_field_key(ServiceId(id=worker)),
+        f"worker-plans:version-{plan.plan_version.version_number}",
+        str((ServiceId(id=worker)).id),
     )
 
     with pytest.raises(AssertionError, match="Active flow has no worker plan"):
@@ -247,7 +238,7 @@ def test_load_existing_plan_ignores_staged_flows_and_legacy_keys(
     flow = _flow(1)
     plan = _publish_plan(redis, flow, 7)
     redis.hset(
-        asyncio.run(StringFlowPlanKeyFactory.build_hash_key(_flow(2))),
+        f"flow-plans:{(_flow(2)).flow_id}",
         "version-99",
         plan.model_dump_json(),
     )
@@ -276,8 +267,8 @@ def test_publication_readiness_rejects_worker_version_mismatch(
 ) -> None:
     flow = _flow(1)
     plan = _publish_plan(redis, flow, 7)
-    key = StringWorkerPlanKeyFactory.build_hash_key(plan.plan_version)
-    field = StringWorkerPlanKeyFactory.build_field_key(ServiceId(id=worker))
+    key = f"worker-plans:version-{plan.plan_version.version_number}"
+    field = str((ServiceId(id=worker)).id)
     worker_plan = WorkerPlanDto.model_validate_json(redis.hget(key, field))
     redis.hset(
         key,
@@ -297,8 +288,8 @@ def test_publication_readiness_rejects_inconsistent_placement(
 ) -> None:
     flow = _flow(1)
     plan = _publish_plan(redis, flow, 7)
-    key = StringWorkerPlanKeyFactory.build_hash_key(plan.plan_version)
-    field = StringWorkerPlanKeyFactory.build_field_key(ServiceId(id=worker))
+    key = f"worker-plans:version-{plan.plan_version.version_number}"
+    field = str((ServiceId(id=worker)).id)
     worker_plan = WorkerPlanDto.model_validate_json(redis.hget(key, field))
     placement = worker_plan.hop_placement_plan
     redis.hset(

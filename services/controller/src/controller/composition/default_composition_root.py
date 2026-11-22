@@ -87,22 +87,31 @@ from controller.domain.optimization.problem.compact_optimization_problem import 
     ObjectiveKind,
     OptimizationPolicy,
 )
-from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
-from integration.redis.model.keys_factory import StringModelKeyFactory
-from integration.redis.profiled_model_variant.keys_factory import (
-    StringProfiledModelVariantKeyFactory,
-)
-from integration.redis.worker_plan.keys_factory import StringWorkerPlanKeyFactory
-from integration.redis.worker_profiles.execution_profile_keys import (
-    StringExecutionProfileKeyFactory,
-)
-from integration.redis.worker_profiles.network_profile_keys import (
-    StringNetworkProfileKeyFactory,
-)
-from integration.redis.worker_profiles.resource_profile_keys import (
-    StringResourceProfileKeyFactory,
-)
 from integration.service_instance.service_instance import ServiceInstance
+from redis_access.address_factory.front_end_plan.address_factory import (
+    HashMapFlowPlanAddressFactory,
+)
+from redis_access.address_factory.model.address_factory import KeyModelAddressFactory
+from redis_access.address_factory.profiled_model_variant.address_factory import (
+    HashMapProfiledModelVariantAddressFactory,
+)
+from redis_access.address_factory.service.service_instance_address_factory import (
+    HashMapServiceInstanceAddressFactory,
+)
+from redis_access.address_factory.worker_plan.address_factory import (
+    HashMapWorkerPlanAddressFactory,
+)
+from redis_access.address_factory.worker_profiles.execution_profile_address_factory import (
+    HashMapExecutionProfileAddressFactory,
+)
+from redis_access.address_factory.worker_profiles.network_profile_address_factory import (
+    HashMapNetworkProfileAddressFactory,
+)
+from redis_access.address_factory.worker_profiles.resource_profile_address_factory import (
+    HashMapResourceProfileAddressFactory,
+)
+from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
+from redis_access.redis_reader.key_redis_reader import KeyRedisReader
 
 DEFAULT_OPTIMIZER_HTTP_BASE_URL = "http://optimizer:8000"
 
@@ -135,7 +144,9 @@ class DefaultCompositionRoot(CompositionRoot):
                 self.build_advertising_manager_context(redis, service_instance)
             )
 
-            directory = RedisServiceDirectory(redis)
+            directory = RedisServiceDirectory(
+                redis, HashMapRedisReader(), HashMapServiceInstanceAddressFactory()
+            )
             worker_directory = DefaultWorkerDirectory(directory)
             worker_directory_gateway = DefaultWorkerDirectoryGateway(worker_directory)
 
@@ -219,8 +230,8 @@ class DefaultCompositionRoot(CompositionRoot):
                 DefaultPlanMappingsBuilder(plan_version_factory, service_plan_builder),
                 RedisPlanPublisher(
                     redis=redis,
-                    worker_plan_key_factory=StringWorkerPlanKeyFactory(),
-                    flow_plan_key_factory=StringFlowPlanKeyFactory(),
+                    worker_plan_address_factory=HashMapWorkerPlanAddressFactory(),
+                    flow_plan_address_factory=HashMapFlowPlanAddressFactory(),
                 ),
             )
 
@@ -236,16 +247,20 @@ class DefaultCompositionRoot(CompositionRoot):
     ) -> OptimizationContextBuilder:
 
         static_profile_store_gateway = RedisStaticProfileStoreGateway(
-            redis, StringModelKeyFactory, StringProfiledModelVariantKeyFactory
+            redis,
+            KeyModelAddressFactory,
+            HashMapProfiledModelVariantAddressFactory,
+            model_reader=KeyRedisReader(),
+            variant_reader=HashMapRedisReader(),
         )
         network_profile_store_gateway = RedisNetworkProfileStoreGateway(
-            redis, StringNetworkProfileKeyFactory
+            redis, HashMapNetworkProfileAddressFactory
         )
         execution_profile_store_gateway = RedisExecutionProfileStoreGateway(
-            redis, StringExecutionProfileKeyFactory
+            redis, HashMapExecutionProfileAddressFactory
         )
         resource_profile_store_gateway = RedisResourceProfileStoreGateway(
-            redis, StringResourceProfileKeyFactory
+            redis, HashMapResourceProfileAddressFactory
         )
 
         optimization_context_builder = DefaultOptimizationContextBuilder(
@@ -271,7 +286,11 @@ class DefaultCompositionRoot(CompositionRoot):
         self, redis: redis_asyncio.Redis, service_instance: ServiceInstance
     ) -> AsyncGenerator[AdvertisingManager]:
         async with httpx.AsyncClient() as http_client:
-            registrar = RedisServiceRegistrar(redis, entry_ttl_s=60)
+            registrar = RedisServiceRegistrar(
+                redis,
+                entry_ttl_s=60,
+                address_factory=HashMapServiceInstanceAddressFactory(),
+            )
             advertising_manager = AdvertisingManager(
                 registrar,
                 service_instance.service_id,

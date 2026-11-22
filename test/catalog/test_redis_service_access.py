@@ -3,11 +3,21 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from redis import asyncio as redis_asyncio
 
-from catalog.redis.service.keys_factory import build_catalog_key, build_service_hset_key
+from catalog.api.service.service_directory import ServiceInstanceReadError
 from catalog.redis.service.redis_service_directory import RedisServiceDirectory
 from catalog.redis.service.redis_service_registrar import RedisServiceRegistrar
 from integration.service_instance.service_instance import ServiceInstance
+from redis_access.address_factory.service.service_instance_address_factory import (
+    HashMapServiceInstanceAddressFactory,
+)
+from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
 from shared.service.service import ServiceId
+
+
+def _directory(redis: redis_asyncio.Redis) -> RedisServiceDirectory:
+    return RedisServiceDirectory(
+        redis, HashMapRedisReader(), HashMapServiceInstanceAddressFactory()
+    )
 
 
 @pytest.fixture
@@ -18,8 +28,8 @@ def service_instance() -> ServiceInstance:
 @pytest.mark.asyncio
 async def test_directory_reads_without_ttl(service_instance: ServiceInstance) -> None:
     redis = AsyncMock(spec=redis_asyncio.Redis)
-    redis.hget.return_value = service_instance.model_dump_json()
-    directory = RedisServiceDirectory(redis)
+    redis.hget = AsyncMock(return_value=service_instance.model_dump_json())
+    directory = _directory(redis)
 
     result = await directory.get_service_instance_by_service_id(
         service_instance.service_id
@@ -27,7 +37,7 @@ async def test_directory_reads_without_ttl(service_instance: ServiceInstance) ->
 
     assert result == service_instance
     redis.hget.assert_awaited_once_with(
-        build_catalog_key(), build_service_hset_key(service_instance.service_id)
+        "catalog:services", str(service_instance.service_id.id)
     )
     redis.pipeline.assert_not_called()
     assert not hasattr(directory, "register_or_renew")
@@ -36,10 +46,10 @@ async def test_directory_reads_without_ttl(service_instance: ServiceInstance) ->
 @pytest.mark.asyncio
 async def test_directory_rejects_missing_service() -> None:
     redis = AsyncMock(spec=redis_asyncio.Redis)
-    redis.hget.return_value = None
+    redis.hget = AsyncMock(return_value=None)
 
-    with pytest.raises(KeyError, match="not found"):
-        await RedisServiceDirectory(redis).get_service_instance_by_service_id(
+    with pytest.raises(ServiceInstanceReadError):
+        await _directory(redis).get_service_instance_by_service_id(
             ServiceId(id="missing")
         )
 
@@ -47,26 +57,28 @@ async def test_directory_rejects_missing_service() -> None:
 @pytest.mark.asyncio
 async def test_directory_lists_services(service_instance: ServiceInstance) -> None:
     redis = AsyncMock(spec=redis_asyncio.Redis)
-    redis.hvals.return_value = [service_instance.model_dump_json()]
+    redis.hvals = AsyncMock(return_value=[service_instance.model_dump_json()])
 
-    assert await RedisServiceDirectory(redis).get_all_service_instances() == [
-        service_instance
-    ]
-    redis.hvals.assert_awaited_once_with(build_catalog_key())
+    assert await _directory(redis).get_all_service_instances() == [service_instance]
+    redis.hvals.assert_awaited_once_with("catalog:services")
 
 
 @pytest.mark.asyncio
 async def test_directory_lists_empty_catalog() -> None:
     redis = AsyncMock(spec=redis_asyncio.Redis)
-    redis.hvals.return_value = []
+    redis.hvals = AsyncMock(return_value=[])
 
-    assert await RedisServiceDirectory(redis).get_all_service_instances() == []
+    assert await _directory(redis).get_all_service_instances() == []
 
 
 @pytest.mark.parametrize("ttl", [0, -1])
 def test_registrar_requires_positive_ttl(ttl: int) -> None:
     with pytest.raises(ValueError, match="entry_ttl must be positive"):
-        RedisServiceRegistrar(AsyncMock(spec=redis_asyncio.Redis), entry_ttl_s=ttl)
+        RedisServiceRegistrar(
+            AsyncMock(spec=redis_asyncio.Redis),
+            entry_ttl_s=ttl,
+            address_factory=HashMapServiceInstanceAddressFactory(),
+        )
 
 
 @pytest.mark.asyncio
@@ -77,18 +89,22 @@ async def test_registrar_writes_and_renews_field_atomically(
     pipeline = MagicMock()
     pipeline.execute = AsyncMock()
     redis.pipeline.return_value = pipeline
-    registrar = RedisServiceRegistrar(redis, entry_ttl_s=60)
+    registrar = RedisServiceRegistrar(
+        redis,
+        entry_ttl_s=60,
+        address_factory=HashMapServiceInstanceAddressFactory(),
+    )
 
     await registrar.register_or_renew(service_instance)
 
     redis.pipeline.assert_called_once_with(transaction=True)
     pipeline.hset.assert_called_once_with(
-        build_catalog_key(),
-        build_service_hset_key(service_instance.service_id),
+        "catalog:services",
+        str(service_instance.service_id.id),
         service_instance.model_dump_json(),
     )
     pipeline.hexpire.assert_called_once_with(
-        build_catalog_key(), 60, build_service_hset_key(service_instance.service_id)
+        "catalog:services", 60, str(service_instance.service_id.id)
     )
     pipeline.execute.assert_awaited_once_with()
     assert not hasattr(registrar, "get_all_service_instances")

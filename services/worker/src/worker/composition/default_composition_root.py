@@ -24,27 +24,34 @@ from artifacts.storage.cached_artifact_store import CachedArtifactStore
 from artifacts.storage.local_artifact_store import LocalArtifactStore
 from artifacts.storage.s3.s3_artifact_store import S3ArtifactStore
 from artifacts.storage.s3.s3_client import S3Client
+from blocks.lifecycle.async_lifecycle import AsyncLifecycle
 from catalog.redis.service.redis_service_directory import RedisServiceDirectory
 from catalog.redis.service.redis_service_registrar import RedisServiceRegistrar
 from catalog.view.worker.default_worker_directory import DefaultWorkerDirectory
-from integration.redis.model_partition.keys_factory import (
-    StringModelPartitionKeyFactory,
-)
-from integration.redis.profiled_model_variant.keys_factory import (
-    StringProfiledModelVariantKeyFactory,
-)
-from integration.redis.worker_plan.keys_factory import StringWorkerPlanKeyFactory
-from integration.redis.worker_profiles.execution_profile_keys import (
-    StringExecutionProfileKeyFactory,
-)
-from integration.redis.worker_profiles.network_profile_keys import (
-    StringNetworkProfileKeyFactory,
-)
-from integration.redis.worker_profiles.resource_profile_keys import (
-    StringResourceProfileKeyFactory,
-)
 from integration.service_instance.worker_instance import WorkerInstance
-from lifecycle.async_lifecycle import AsyncLifecycle
+from redis_access.address_factory.model_partition.address_factory import (
+    HashMapModelPartitionAddressFactory,
+)
+from redis_access.address_factory.profiled_model_variant.address_factory import (
+    HashMapProfiledModelVariantAddressFactory,
+)
+from redis_access.address_factory.service.service_instance_address_factory import (
+    HashMapServiceInstanceAddressFactory,
+)
+from redis_access.address_factory.worker_plan.address_factory import (
+    HashMapWorkerPlanAddressFactory,
+)
+from redis_access.address_factory.worker_profiles.execution_profile_address_factory import (
+    HashMapExecutionProfileAddressFactory,
+)
+from redis_access.address_factory.worker_profiles.network_profile_address_factory import (
+    HashMapNetworkProfileAddressFactory,
+)
+from redis_access.address_factory.worker_profiles.resource_profile_address_factory import (
+    HashMapResourceProfileAddressFactory,
+)
+from redis_access.redis_reader.cached_redis_reader import CachedRedisReader
+from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
 from shared.context.model_pass_context import ModelPassId
 from worker.adapters.outbound.activity_manager.local_activity_manager import (
     LocalActivityManagerAdapter,
@@ -209,10 +216,15 @@ class DefaultCompositionRoot(CompositionRoot):
                 self.build_artifact_store_context()
             )
 
-            directory = RedisServiceDirectory(redis)
+            directory = RedisServiceDirectory(
+                redis, HashMapRedisReader(), HashMapServiceInstanceAddressFactory()
+            )
             service_directory = DefaultWorkerDirectory(directory)
             worker_plan_reader = RedisWorkerPlanReader(
-                worker_id, redis, StringWorkerPlanKeyFactory()
+                worker_id=worker_id,
+                redis=redis,
+                redis_reader=CachedRedisReader(HashMapRedisReader(), add_ttl_s=60.0),
+                address_factory=HashMapWorkerPlanAddressFactory(),
             )
             worker_plan_view_reader = AllWorkerPlanViewReader(worker_plan_reader)
             activity_request_factory = DefaultActivityRequestFactory()
@@ -227,7 +239,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 worker_id=worker_id,
                 deployment_plan_reader=worker_plan_view_reader,
                 model_partition_metadata_reader=RedisModelPartitionMetadataReader(
-                    redis, StringModelPartitionKeyFactory
+                    redis, HashMapRedisReader(), HashMapModelPartitionAddressFactory()
                 ),
                 artifact_store=artifact_store,
                 partition_executor_factory=OnnxPartitionExecutorFactory(),
@@ -350,7 +362,7 @@ class DefaultCompositionRoot(CompositionRoot):
             cpu_profiler=CgroupCpuProfiler(),
             memory_profiler=CgroupRamProfiler(),
             res_profile_publisher=RedisResourceProfilePublisher(
-                worker_id, redis, StringResourceProfileKeyFactory
+                worker_id, redis, HashMapResourceProfileAddressFactory
             ),
         )
         network_coordinator = DefaultNetworkProfilingCoordinator(
@@ -360,15 +372,19 @@ class DefaultCompositionRoot(CompositionRoot):
             service_directory=service_directory,
             net_probe_client=ArrowNetworkProbeClient(),
             net_profile_publisher=RedisNetworkProfilePublisher(
-                worker_id, redis, StringNetworkProfileKeyFactory
+                worker_id, redis, HashMapNetworkProfileAddressFactory
             ),
         )
 
         static_profile_reader = RedisModelStaticProfileReader(
-            redis, StringProfiledModelVariantKeyFactory
+            redis,
+            HashMapProfiledModelVariantAddressFactory,
+            redis_reader=HashMapRedisReader(),
         )
         execution_profile_store = RedisModelExecutionProfileStore(
-            redis, StringExecutionProfileKeyFactory
+            redis,
+            HashMapExecutionProfileAddressFactory,
+            redis_reader=HashMapRedisReader(),
         )
         pending_models_poller = DefaultPendingModelsPoller(
             worker_id=worker_id,
@@ -429,7 +445,11 @@ class DefaultCompositionRoot(CompositionRoot):
                 *build_arrow_capability_life_checkers(service_instance),
             ]
             advertising_manager = AdvertisingManager(
-                RedisServiceRegistrar(redis, entry_ttl_s=60),
+                RedisServiceRegistrar(
+                    redis,
+                    entry_ttl_s=60,
+                    address_factory=HashMapServiceInstanceAddressFactory(),
+                ),
                 service_instance.service_id,
                 capability_life_checkers,
                 heartbeat_interval_s=20,

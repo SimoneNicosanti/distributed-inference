@@ -4,7 +4,7 @@ from contextlib import aclosing, suppress
 from typing import override
 
 from artifacts.storage.artifact_store import ArtifactStore
-from lifecycle.async_lifecycle import AsyncLifecycle
+from blocks.lifecycle.async_lifecycle import AsyncLifecycle
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import WorkerId
 from worker.application.ports.outbound.profiling.model_execution.model_execution_profile_publisher import (

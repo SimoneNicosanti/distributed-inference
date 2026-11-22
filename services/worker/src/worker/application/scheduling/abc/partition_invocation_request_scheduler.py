@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from asyncio import Future
 from typing import Any, override
 
-from scheduling.request_scheduler import RequestScheduler
+from blocks.scheduling.request_scheduler import RequestScheduler
 from shared.plan.hop import PlannedExecutableHopId
 from worker.domain.hop.hop_invocation import (
     HopInvocationRequest,

@@ -16,6 +16,7 @@ COPY services/front_end/pyproject.toml services/front_end/pyproject.toml
 COPY packages/artifacts/pyproject.toml packages/artifacts/pyproject.toml
 COPY packages/catalog/pyproject.toml packages/catalog/pyproject.toml
 COPY packages/integration/pyproject.toml packages/integration/pyproject.toml
+COPY packages/redis_access/pyproject.toml packages/redis_access/pyproject.toml
 COPY packages/shared/pyproject.toml packages/shared/pyproject.toml
 
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -29,6 +30,7 @@ COPY services/front_end/src services/front_end/src
 COPY packages/artifacts/src packages/artifacts/src
 COPY packages/catalog/src packages/catalog/src
 COPY packages/integration/src packages/integration/src
+COPY packages/redis_access/src packages/redis_access/src
 COPY packages/shared/src packages/shared/src
 
 RUN --mount=type=cache,target=/root/.cache/uv \

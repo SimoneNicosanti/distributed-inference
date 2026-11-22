@@ -21,17 +21,25 @@ from integration.dto.worker_profiles.execution_profile_dto import (
 )
 from integration.dto.worker_profiles.network_profile_dto import NetworkProfileDto
 from integration.dto.worker_profiles.resource_profile_dto import ResourceProfileDto
-from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
-from integration.redis.worker_plan.keys_factory import StringWorkerPlanKeyFactory
-from integration.redis.worker_profiles.execution_profile_keys import (
-    StringExecutionProfileKeyFactory,
+from redis_access.address_factory.front_end_plan.address_factory import (
+    HashMapFlowPlanAddressFactory,
 )
-from integration.redis.worker_profiles.network_profile_keys import (
-    StringNetworkProfileKeyFactory,
+from redis_access.address_factory.service.service_instance_address_factory import (
+    HashMapServiceInstanceAddressFactory,
 )
-from integration.redis.worker_profiles.resource_profile_keys import (
-    StringResourceProfileKeyFactory,
+from redis_access.address_factory.worker_plan.address_factory import (
+    HashMapWorkerPlanAddressFactory,
 )
+from redis_access.address_factory.worker_profiles.execution_profile_address_factory import (
+    HashMapExecutionProfileAddressFactory,
+)
+from redis_access.address_factory.worker_profiles.network_profile_address_factory import (
+    HashMapNetworkProfileAddressFactory,
+)
+from redis_access.address_factory.worker_profiles.resource_profile_address_factory import (
+    HashMapResourceProfileAddressFactory,
+)
+from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
 from shared.flow.flow import FlowId
 from shared.model.model_variant import ModelVariantId
 from shared.plan.plan_version import PlanVersion
@@ -76,7 +84,11 @@ async def _wait_for_worker_profiles(
     expected_count = int(os.getenv("EXPECTED_WORKER_COUNT", "1"))
     assert expected_count > 0
     async with redis_asyncio.Redis.from_url(redis_url, decode_responses=True) as redis:
-        directory = DefaultWorkerDirectory(RedisServiceDirectory(redis))
+        directory = DefaultWorkerDirectory(
+            RedisServiceDirectory(
+                redis, HashMapRedisReader(), HashMapServiceInstanceAddressFactory()
+            )
+        )
         while True:
             pending: list[str] = []
             try:
@@ -85,25 +97,35 @@ async def _wait_for_worker_profiles(
                 if len(worker_ids) < expected_count or ingress_id not in worker_ids:
                     pending.append(f"Workers not ready: {worker_ids}")
                 for worker_id in worker_ids:
-                    execution_key = await StringExecutionProfileKeyFactory.build_execution_profile_key_per_worker(
+                    resource_addr = HashMapResourceProfileAddressFactory.build_worker_resource_profile_address(
                         worker_id
                     )
-                    resource_key = await StringResourceProfileKeyFactory.build_resource_profile_key_per_worker(
+                    network_addr = HashMapNetworkProfileAddressFactory.build_worker_network_profile_address(
                         worker_id
                     )
-                    network_key = await StringNetworkProfileKeyFactory.build_network_profile_key_per_worker(
-                        worker_id
-                    )
+                    execution_addresses = [
+                        await HashMapExecutionProfileAddressFactory.build_worker_model_execution_profile_address(
+                            worker_id, variant_id
+                        )
+                        for variant_id in variant_ids
+                    ]
+                    execution_values = [
+                        await redis.hget(addr.hash_map_key, addr.field_key)
+                        for addr in execution_addresses
+                    ]
                     profiles = [
                         ModelExecutionProfileDto.model_validate_json(value)
-                        for value in await redis.hvals(execution_key)
+                        for value in execution_values
+                        if value is not None
                     ]
                     assert all(profile.worker_id == worker_id for profile in profiles)
                     if not variant_ids <= {
                         profile.model_variant_id for profile in profiles
                     }:
                         pending.append(f"Execution profiles missing: {worker_id}")
-                    resource = await redis.get(resource_key)
+                    resource = await redis.hget(
+                        resource_addr.hash_map_key, resource_addr.field_key
+                    )
                     if resource is None:
                         pending.append(f"Resource profile missing: {worker_id}")
                     else:
@@ -111,7 +133,9 @@ async def _wait_for_worker_profiles(
                             ResourceProfileDto.model_validate_json(resource).worker_id
                             == worker_id
                         )
-                    network = await redis.get(network_key)
+                    network = await redis.hget(
+                        network_addr.hash_map_key, network_addr.field_key
+                    )
                     if network is None:
                         pending.append(f"Network profile missing: {worker_id}")
                     else:
@@ -149,8 +173,12 @@ def wait_for_flow_plans(
                 pending.append(f"No active version: {flow_id}")
                 continue
             version = PlanVersion(version_number=int(active))
-            field = asyncio.run(StringFlowPlanKeyFactory.build_plan_field_key(version))
-            value = redis.hget(hash_key, field)
+            addr = asyncio.run(
+                HashMapFlowPlanAddressFactory.build_versioned_flow_plan_address(
+                    version, flow_id
+                )
+            )
+            value = redis.hget(addr.hash_map_key, addr.field_key)
             assert value is not None, f"Active version has no flow plan: {flow_id}"
             plan = FlowPlanDto.model_validate_json(value)
             assert plan.plan_version == version
@@ -166,22 +194,20 @@ def wait_for_flow_plans(
 
 
 async def _flow_keys(flow_id: FlowId) -> tuple[str, str]:
-    return (
-        await StringFlowPlanKeyFactory.build_hash_key(flow_id),
-        await StringFlowPlanKeyFactory.build_current_plan_field_key(),
-    )
+    addr = await HashMapFlowPlanAddressFactory.build_flow_active_plan_version(flow_id)
+    return addr.hash_map_key, addr.field_key
 
 
 def _assert_worker_plans_published(redis: Redis, flow_plan: FlowPlanDto) -> None:
     """Check persisted plans; executor initialization happens during inference."""
-    hash_key = StringWorkerPlanKeyFactory.build_hash_key(flow_plan.plan_version)
     plans: dict[WorkerId, WorkerPlanDto] = {}
 
     def read(worker_id: WorkerId) -> WorkerPlanDto:
         if worker_id not in plans:
-            value = redis.hget(
-                hash_key, StringWorkerPlanKeyFactory.build_field_key(worker_id)
+            addr = HashMapWorkerPlanAddressFactory.build_versioned_worker_plan_address(
+                flow_plan.plan_version, worker_id
             )
+            value = redis.hget(addr.hash_map_key, addr.field_key)
             assert value is not None, f"Active flow has no worker plan: {worker_id}"
             plan = WorkerPlanDto.model_validate_json(value)
             assert plan.plan_version == flow_plan.plan_version

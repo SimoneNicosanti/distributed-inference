@@ -3,10 +3,10 @@ import logging
 from contextlib import suppress
 from typing import override
 
+from blocks.lifecycle.async_lifecycle import AsyncLifecycle
 from catalog.api.worker.worker_directory import (
     WorkerDirectory,
 )
-from lifecycle.async_lifecycle import AsyncLifecycle
 from shared.service.service import WorkerId
 from worker.application.activity.abc.activity_request_factory import (
     ActivityRequestFactory,

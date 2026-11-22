@@ -7,10 +7,10 @@ dependencies = [
   "botocore>=1.43.116",
   "distributed-inference-advertisement[arrow,http]",
   "distributed-inference-artifacts",
+  "distributed-inference-blocks",
   "distributed-inference-catalog",
   "distributed-inference-integration",
-  "distributed-inference-lifecycle",
-  "distributed-inference-scheduling",
+  "distributed-inference-redis-access",
   "distributed-inference-shared",
   "fastapi>=0.139.2",
   "httpx>=0.28.1",
@@ -33,8 +33,8 @@ packages = ["src/worker"]
 [tool.uv.sources]
 distributed-inference-advertisement = { path = "../../packages/advertisement", editable = true }
 distributed-inference-artifacts = { path = "../../packages/artifacts", editable = true }
+distributed-inference-blocks = { path = "../../packages/blocks", editable = true }
 distributed-inference-catalog = { path = "../../packages/catalog", editable = true }
 distributed-inference-integration = { path = "../../packages/integration", editable = true }
-distributed-inference-lifecycle = { path = "../../packages/lifecycle", editable = true }
-distributed-inference-scheduling = { path = "../../packages/scheduling", editable = true }
+distributed-inference-redis-access = { path = "../../packages/redis_access", editable = true }
 distributed-inference-shared = { path = "../../packages/shared", editable = true }

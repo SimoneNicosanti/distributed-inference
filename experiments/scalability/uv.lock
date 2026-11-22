@@ -259,9 +259,9 @@ name = "distributed-inference-advertisement"
 version = "0.1.0"
 source = { editable = "../../packages/advertisement" }
 dependencies = [
+    { name = "distributed-inference-blocks" },
     { name = "distributed-inference-catalog" },
     { name = "distributed-inference-integration" },
-    { name = "distributed-inference-lifecycle" },
     { name = "distributed-inference-shared" },
 ]
 
@@ -272,9 +272,9 @@ http = [
 
 [package.metadata]
 requires-dist = [
+    { name = "distributed-inference-blocks", editable = "../../packages/blocks" },
     { name = "distributed-inference-catalog", editable = "../../packages/catalog" },
     { name = "distributed-inference-integration", editable = "../../packages/integration" },
-    { name = "distributed-inference-lifecycle", editable = "../../packages/lifecycle" },
     { name = "distributed-inference-shared", editable = "../../packages/shared" },
     { name = "httpx", marker = "extra == 'http'", specifier = ">=0.28.1" },
     { name = "pyarrow", marker = "extra == 'arrow'", specifier = ">=25.0.0" },
@@ -307,11 +307,23 @@ test = [
 ]
 
 [[package]]
+name = "distributed-inference-blocks"
+version = "0.1.0"
+source = { editable = "../../packages/blocks" }
+dependencies = [
+    { name = "aiorwlock" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "aiorwlock", specifier = ">=1.5.1" }]
+
+[[package]]
 name = "distributed-inference-catalog"
 version = "0.1.0"
 source = { editable = "../../packages/catalog" }
 dependencies = [
     { name = "distributed-inference-integration" },
+    { name = "distributed-inference-redis-access" },
     { name = "distributed-inference-shared" },
     { name = "pydantic" },
     { name = "redis" },
@@ -320,6 +332,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "distributed-inference-integration", editable = "../../packages/integration" },
+    { name = "distributed-inference-redis-access", editable = "../../packages/redis_access" },
     { name = "distributed-inference-shared", editable = "../../packages/shared" },
     { name = "pydantic", specifier = ">=2.8" },
     { name = "redis", specifier = ">=8.0.1" },
@@ -331,9 +344,10 @@ version = "0.1.0"
 source = { editable = "../../services/controller" }
 dependencies = [
     { name = "distributed-inference-advertisement", extra = ["http"] },
+    { name = "distributed-inference-blocks" },
     { name = "distributed-inference-catalog" },
     { name = "distributed-inference-integration" },
-    { name = "distributed-inference-lifecycle" },
+    { name = "distributed-inference-redis-access" },
     { name = "distributed-inference-shared" },
     { name = "fastapi" },
     { name = "gurobipy" },
@@ -347,9 +361,10 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "distributed-inference-advertisement", extras = ["http"], editable = "../../packages/advertisement" },
+    { name = "distributed-inference-blocks", editable = "../../packages/blocks" },
     { name = "distributed-inference-catalog", editable = "../../packages/catalog" },
     { name = "distributed-inference-integration", editable = "../../packages/integration" },
-    { name = "distributed-inference-lifecycle", editable = "../../packages/lifecycle" },
+    { name = "distributed-inference-redis-access", editable = "../../packages/redis_access" },
     { name = "distributed-inference-shared", editable = "../../packages/shared" },
     { name = "fastapi", specifier = ">=0.139.2" },
     { name = "gurobipy", specifier = ">=13.0.1,<14" },
@@ -380,11 +395,6 @@ requires-dist = [
 ]
 
 [[package]]
-name = "distributed-inference-lifecycle"
-version = "0.1.0"
-source = { editable = "../../packages/lifecycle" }
-
-[[package]]
 name = "distributed-inference-model-manager"
 version = "0.1.0"
 source = { editable = "../../services/model_manager" }
@@ -394,9 +404,10 @@ dependencies = [
     { name = "botocore" },
     { name = "distributed-inference-advertisement", extra = ["http"] },
     { name = "distributed-inference-artifacts" },
+    { name = "distributed-inference-blocks" },
     { name = "distributed-inference-catalog" },
     { name = "distributed-inference-integration" },
-    { name = "distributed-inference-lifecycle" },
+    { name = "distributed-inference-redis-access" },
     { name = "distributed-inference-shared" },
     { name = "distributed-inference-utils" },
     { name = "fastapi" },
@@ -419,9 +430,10 @@ requires-dist = [
     { name = "botocore", specifier = ">=1.43.116" },
     { name = "distributed-inference-advertisement", extras = ["http"], editable = "../../packages/advertisement" },
     { name = "distributed-inference-artifacts", editable = "../../packages/artifacts" },
+    { name = "distributed-inference-blocks", editable = "../../packages/blocks" },
     { name = "distributed-inference-catalog", editable = "../../packages/catalog" },
     { name = "distributed-inference-integration", editable = "../../packages/integration" },
-    { name = "distributed-inference-lifecycle", editable = "../../packages/lifecycle" },
+    { name = "distributed-inference-redis-access", editable = "../../packages/redis_access" },
     { name = "distributed-inference-shared", editable = "../../packages/shared" },
     { name = "distributed-inference-utils", editable = "../../packages/utils" },
     { name = "fastapi", specifier = ">=0.139.2" },
@@ -435,6 +447,21 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.8" },
     { name = "redis", specifier = ">=8.0.1" },
     { name = "uvicorn", extras = ["standard"] },
+]
+
+[[package]]
+name = "distributed-inference-redis-access"
+version = "0.1.0"
+source = { editable = "../../packages/redis_access" }
+dependencies = [
+    { name = "distributed-inference-shared" },
+    { name = "redis" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "distributed-inference-shared", editable = "../../packages/shared" },
+    { name = "redis", specifier = ">=8.0.1" },
 ]
 
 [[package]]

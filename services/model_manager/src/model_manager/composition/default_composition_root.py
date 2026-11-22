@@ -20,13 +20,6 @@ from artifacts.storage.s3.s3_artifact_store import S3ArtifactStore
 from artifacts.storage.s3.s3_client import S3Client
 from catalog.api.service.service_registrar import ServiceRegistrar
 from catalog.redis.service.redis_service_registrar import RedisServiceRegistrar
-from integration.redis.model.keys_factory import StringModelKeyFactory
-from integration.redis.model_partition.keys_factory import (
-    StringModelPartitionKeyFactory,
-)
-from integration.redis.profiled_model_variant.keys_factory import (
-    StringProfiledModelVariantKeyFactory,
-)
 from integration.service_instance.service_instance import ServiceInstance
 from model_manager.adapters.outbound.model_max_cut_size_computer.pulp_max_cut_size_computer import (
     PulpMaxCutSizeComputer,
@@ -70,6 +63,18 @@ from model_manager.application.ports.outbound.model_partition_extractor import (
 )
 from model_manager.application.ports.outbound.model_profiler import ModelProfiler
 from model_manager.composition.composition_root import CompositionRoot
+from redis_access.address_factory.model.address_factory import KeyModelAddressFactory
+from redis_access.address_factory.model_partition.address_factory import (
+    HashMapModelPartitionAddressFactory,
+)
+from redis_access.address_factory.profiled_model_variant.address_factory import (
+    HashMapProfiledModelVariantAddressFactory,
+)
+from redis_access.address_factory.service.service_instance_address_factory import (
+    HashMapServiceInstanceAddressFactory,
+)
+from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
+from redis_access.redis_reader.key_redis_reader import KeyRedisReader
 
 
 class DefaultCompositionRoot(CompositionRoot):
@@ -85,7 +90,11 @@ class DefaultCompositionRoot(CompositionRoot):
                 self.build_redis_connection_context()
             )
 
-            registrar = RedisServiceRegistrar(redis, entry_ttl_s=60)
+            registrar = RedisServiceRegistrar(
+                redis,
+                entry_ttl_s=60,
+                address_factory=HashMapServiceInstanceAddressFactory(),
+            )
             await stack.enter_async_context(
                 self.build_advertising_manager_context(registrar, service_instance)
             )
@@ -98,9 +107,11 @@ class DefaultCompositionRoot(CompositionRoot):
 
             model_metadata_store = RedisModelMetadataStore(
                 redis,
-                StringModelKeyFactory,
-                StringProfiledModelVariantKeyFactory,
-                StringModelPartitionKeyFactory,
+                KeyModelAddressFactory,
+                HashMapProfiledModelVariantAddressFactory,
+                HashMapModelPartitionAddressFactory,
+                model_reader=KeyRedisReader(),
+                variant_reader=HashMapRedisReader(),
             )
 
             model_splitter = self.build_model_partition_extractor()

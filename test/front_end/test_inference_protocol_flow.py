@@ -9,7 +9,6 @@ import pytest
 from pydantic import HttpUrl
 from redis import asyncio as redis_asyncio
 
-from catalog.redis.service.keys_factory import build_catalog_key, build_service_hset_key
 from catalog.redis.service.redis_service_directory import RedisServiceDirectory
 from catalog.view.worker.default_worker_directory import DefaultWorkerDirectory
 from front_end.adapters.outbound.inference.arrow_worker_ingress_gateway import (
@@ -49,7 +48,6 @@ from integration.front_end.http.front_end_http_schema import (
     RunInferenceRequest,
     RunInferenceResponse,
 )
-from integration.redis.front_end_plan.keys_factory import StringFlowPlanKeyFactory
 from integration.service_instance.service_instance import (
     ArrowUrl,
     Capability,
@@ -64,6 +62,14 @@ from integration.sink.arrow.model_pass_result.arrow_model_pass_result_schema imp
 from integration.worker.hop_contribution.arrow.arrow_hop_invocation_contribution_schema import (
     CONTEXT_FIELD_NAME,
 )
+from redis_access.address_factory.front_end_plan.address_factory import (
+    HashMapFlowPlanAddressFactory,
+)
+from redis_access.address_factory.service.service_instance_address_factory import (
+    HashMapServiceInstanceAddressFactory,
+)
+from redis_access.redis_reader.cached_redis_reader import CachedRedisReader
+from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -102,8 +108,8 @@ async def test_http_to_ingress_and_sink_using_versioned_redis_contracts(
     )
     values = {
         (
-            await StringFlowPlanKeyFactory.build_hash_key(flow_id),
-            await StringFlowPlanKeyFactory.build_plan_field_key(version),
+            f"flow-plans:{flow_id.flow_id}",
+            f"version-{version.version_number}",
         ): plan.model_dump_json(),
     }
     http_capabilities = {CapabilityType.FAILURE_RECEIVE}
@@ -111,7 +117,7 @@ async def test_http_to_ingress_and_sink_using_versioned_redis_contracts(
         (ingress_worker, "grpc+tcp://ingress:8811"),
         (sink_worker, "grpc+tcp://sink:8820"),
     ):
-        values[build_catalog_key(), build_service_hset_key(worker)] = WorkerInstance(
+        values["catalog:services", str(worker.id)] = WorkerInstance(
             service_id=worker,
             capabilities=[
                 Capability(
@@ -136,15 +142,26 @@ async def test_http_to_ingress_and_sink_using_versioned_redis_contracts(
             ],
         ).model_dump_json()
     redis = AsyncMock(spec=redis_asyncio.Redis)
-    redis.get = AsyncMock(return_value=str(version.version_number))
+    values[f"flow-plans:{flow_id.flow_id}", "active-version"] = str(
+        version.version_number
+    )
 
     async def hget(key: str, field: str) -> str | None:
         return values.get((key, field))
 
     redis.hget = AsyncMock(side_effect=hget)
-    directory = DefaultWorkerDirectory(RedisServiceDirectory(redis))
+    directory = DefaultWorkerDirectory(
+        RedisServiceDirectory(
+            redis, HashMapRedisReader(), HashMapServiceInstanceAddressFactory()
+        )
+    )
     runner = DefaultInferenceRunner(
-        flow_plan_reader=RedisFlowPlanReader(redis, StringFlowPlanKeyFactory()),
+        flow_plan_reader=RedisFlowPlanReader(
+            redis,
+            HashMapRedisReader(),
+            CachedRedisReader(HashMapRedisReader(), add_ttl_s=60.0),
+            HashMapFlowPlanAddressFactory(),
+        ),
         ingress_gateway=ArrowWorkerIngressGateway(directory),
         sink_gateway=ArrowWorkerSinkGateway(directory),
     )

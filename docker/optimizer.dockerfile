@@ -15,8 +15,9 @@ WORKDIR /app
 COPY services/optimizer/pyproject.toml services/optimizer/pyproject.toml
 COPY packages/advertisement/pyproject.toml packages/advertisement/pyproject.toml
 COPY packages/catalog/pyproject.toml packages/catalog/pyproject.toml
+COPY packages/redis_access/pyproject.toml packages/redis_access/pyproject.toml
 COPY packages/integration/pyproject.toml packages/integration/pyproject.toml
-COPY packages/lifecycle/pyproject.toml packages/lifecycle/pyproject.toml
+COPY packages/blocks/pyproject.toml packages/blocks/pyproject.toml
 COPY packages/shared/pyproject.toml packages/shared/pyproject.toml
 
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -29,8 +30,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY services/optimizer/src services/optimizer/src
 COPY packages/advertisement/src packages/advertisement/src
 COPY packages/catalog/src packages/catalog/src
+COPY packages/redis_access/src packages/redis_access/src
 COPY packages/integration/src packages/integration/src
-COPY packages/lifecycle/src packages/lifecycle/src
+COPY packages/blocks/src packages/blocks/src
 COPY packages/shared/src packages/shared/src
 
 RUN --mount=type=cache,target=/root/.cache/uv \

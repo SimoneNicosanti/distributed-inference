@@ -3,9 +3,10 @@ from typing import override
 from redis import RedisError
 from redis import asyncio as redis_asyncio
 
-from integration.redis.worker_profiles.resource_profile_keys import (
-    ResourceProfileKeyFactory,
+from redis_access.address_factory.worker_profiles.resource_profile_address_factory import (
+    ResourceProfileAddressFactory,
 )
+from redis_access.contract.redis_address import HashMapRedisAddress
 from shared.service.service import WorkerId
 from worker.adapters.outbound.profiling.publisher.mappers.resource_profile_mapper import (
     ResourceProfileMapper,
@@ -22,25 +23,27 @@ class RedisResourceProfilePublisher(ResourceProfilePublisher):
         self,
         worker_id: WorkerId,
         redis: redis_asyncio.Redis,
-        resource_profile_key_factory_cls: type[ResourceProfileKeyFactory],
+        resource_profile_address_factory_cls: type[
+            ResourceProfileAddressFactory[HashMapRedisAddress]
+        ],
     ) -> None:
         self._worker_id = worker_id
         self._redis = redis
-        self._resource_profile_key_factory_cls = resource_profile_key_factory_cls
+        self._resource_profile_address_factory_cls = (
+            resource_profile_address_factory_cls
+        )
 
     @override
     async def publish_resource_profile(self, resource_profile: ResourceProfile) -> None:
         try:
-            redis_key = await self._resource_profile_key_factory_cls.build_resource_profile_key_per_worker(
+            addr = self._resource_profile_address_factory_cls.build_worker_resource_profile_address(
                 self._worker_id
             )
             redis_value = ResourceProfileMapper.resource_profile_to_dto(
                 self._worker_id,
                 resource_profile,
             ).model_dump_json()
-            success = await self._redis.set(redis_key, redis_value)
-            if not success:
-                raise ResourceProfileWriteError("Unable to publish resource profile")
+            await self._redis.hset(addr.hash_map_key, addr.field_key, redis_value)
 
         except (ValueError, RedisError) as e:
             raise ResourceProfileWriteError("Unable to publish resource profile") from e
