@@ -21,6 +21,7 @@ from redis_access.address_factory.worker_profiles.execution_profile_address_fact
     ExecutionProfileAddressFactory,
 )
 from redis_access.contract.redis_address import HashMapRedisAddress
+from redis_access.redis_reader.abc.batch_redis_reader import BatchRedisReader
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import WorkerId
 
@@ -32,8 +33,10 @@ class RedisExecutionProfileStoreGateway(ExecutionProfileStoreGateway):
         execution_profile_address_factory_cls: type[
             ExecutionProfileAddressFactory[HashMapRedisAddress]
         ],
+        batch_reader: BatchRedisReader[HashMapRedisAddress],
     ) -> None:
         self._redis = redis
+        self._batch_reader = batch_reader
         self._execution_profile_address_factory_cls = (
             execution_profile_address_factory_cls
         )
@@ -61,32 +64,36 @@ class RedisExecutionProfileStoreGateway(ExecutionProfileStoreGateway):
                 for worker_id in ordered_worker_ids
             ]
 
-        async with self._redis.pipeline(transaction=False) as pipeline:
-            for worker_id in ordered_worker_ids:
-                addresses = [
-                    await self._execution_profile_address_factory_cls.build_worker_model_execution_profile_address(
-                        worker_id, variant_id
-                    )
-                    for variant_id in ordered_model_variant_ids
-                ]
-                if len({addr.hash_map_key for addr in addresses}) != 1:
-                    raise ValueError(
-                        "Execution profiles must share one hash for batch reads"
-                    )
-                pipeline.hmget(
-                    addresses[0].hash_map_key, [addr.field_key for addr in addresses]
+        addresses: list[HashMapRedisAddress] = []
+        for worker_id in ordered_worker_ids:
+            worker_addresses = [
+                await self._execution_profile_address_factory_cls.build_worker_model_execution_profile_address(
+                    worker_id, variant_id
                 )
-            stored_profiles_by_worker = await pipeline.execute()
+                for variant_id in ordered_model_variant_ids
+            ]
+            if len({addr.hash_map_key for addr in worker_addresses}) != 1:
+                raise ValueError(
+                    "Execution profiles must share one hash for batch reads"
+                )
+            addresses.extend(worker_addresses)
+
+        stored_profiles = await self._batch_reader.read_many(
+            self._redis, tuple(addresses)
+        )
+        if len(stored_profiles) != len(addresses):
+            raise ValueError("Batch read must return one value per address")
+        profiles_per_worker = len(ordered_model_variant_ids)
 
         return [
             self._build_worker_profiles(
                 worker_id,
-                stored_profiles,
+                stored_profiles[
+                    index * profiles_per_worker : (index + 1) * profiles_per_worker
+                ],
                 ordered_model_variant_ids,
             )
-            for worker_id, stored_profiles in zip(
-                ordered_worker_ids, stored_profiles_by_worker, strict=True
-            )
+            for index, worker_id in enumerate(ordered_worker_ids)
         ]
 
     @classmethod

@@ -9,10 +9,12 @@ from redis_access.contract.redis_address import (
     RedisAddress,
 )
 from redis_access.contract.redis_value import RedisValue
-from redis_access.redis_reader.abc.redis_reader import RedisReader
+from redis_access.redis_reader.abc.single_value_redis_reader import (
+    SingleValueRedisReader,
+)
 
 
-class CachedRedisReader[AddrT: RedisAddress](RedisReader[AddrT]):
+class CachedSingleValueRedisReader[AddrT: RedisAddress](SingleValueRedisReader[AddrT]):
     @dataclass(frozen=True, slots=True)
     class _CacheEntry:
         value: RedisValue
@@ -26,7 +28,7 @@ class CachedRedisReader[AddrT: RedisAddress](RedisReader[AddrT]):
 
     def __init__(
         self,
-        redis_reader: RedisReader[AddrT],
+        redis_reader: SingleValueRedisReader[AddrT],
         add_ttl_s: float | None = None,
         access_ttl_s: float | None = None,
     ) -> None:
@@ -40,11 +42,11 @@ class CachedRedisReader[AddrT: RedisAddress](RedisReader[AddrT]):
         self._add_ttl_s = add_ttl_s
         self._access_ttl_s = access_ttl_s
 
-        self._cache: dict[AddrT, CachedRedisReader._CacheEntry] = {}
-        self._pending_reads: dict[AddrT, CachedRedisReader._PendingRead] = {}
+        self._cache: dict[AddrT, CachedSingleValueRedisReader._CacheEntry] = {}
+        self._pending_reads: dict[AddrT, CachedSingleValueRedisReader._PendingRead] = {}
 
     @override
-    async def read(self, redis: Redis, addr: AddrT) -> RedisValue:
+    async def read_single(self, redis: Redis, addr: AddrT) -> RedisValue:
         value = self._get_cached_value(addr)
         if value is not None:
             return value
@@ -62,7 +64,7 @@ class CachedRedisReader[AddrT: RedisAddress](RedisReader[AddrT]):
                 if value is not None:
                     return value
 
-                value = await self._redis_reader.read(redis, addr)
+                value = await self._redis_reader.read_single(redis, addr)
                 now = time.monotonic()
                 self._cache[addr] = self._CacheEntry(value, now, now)
                 return value

@@ -39,7 +39,9 @@ from redis_access.address_factory.worker_profiles.network_profile_address_factor
 from redis_access.address_factory.worker_profiles.resource_profile_address_factory import (
     HashMapResourceProfileAddressFactory,
 )
-from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
+from redis_access.redis_reader.redis.hash_map_redis_reader import (
+    HashMapRedisReader,
+)
 from shared.flow.flow import FlowId
 from shared.model.model_variant import ModelVariantId
 from shared.plan.plan_version import PlanVersion
@@ -86,7 +88,10 @@ async def _wait_for_worker_profiles(
     async with redis_asyncio.Redis.from_url(redis_url, decode_responses=True) as redis:
         directory = DefaultWorkerDirectory(
             RedisServiceDirectory(
-                redis, HashMapRedisReader(), HashMapServiceInstanceAddressFactory()
+                redis,
+                HashMapRedisReader(),
+                HashMapServiceInstanceAddressFactory(),
+                enumeration_reader=HashMapRedisReader(),
             )
         )
         while True:

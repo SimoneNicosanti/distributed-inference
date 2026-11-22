@@ -15,8 +15,12 @@ from integration.dto.flow_plan.flow_plan_dto import FlowPlanDto, ModelSpecsDto
 from redis_access.address_factory.front_end_plan.address_factory import (
     HashMapFlowPlanAddressFactory,
 )
-from redis_access.redis_reader.cached_redis_reader import CachedRedisReader
-from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
+from redis_access.redis_reader.cached.cached_single_value_redis_reader import (
+    CachedSingleValueRedisReader,
+)
+from redis_access.redis_reader.redis.hash_map_redis_reader import (
+    HashMapRedisReader,
+)
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -35,7 +39,9 @@ def _reader(redis: Redis) -> RedisFlowPlanReader:
     return RedisFlowPlanReader(
         redis=redis,
         current_version_reader=HashMapRedisReader(),
-        versioned_plan_reader=CachedRedisReader(HashMapRedisReader(), add_ttl_s=60.0),
+        versioned_plan_reader=CachedSingleValueRedisReader(
+            HashMapRedisReader(), add_ttl_s=60.0
+        ),
         address_factory=HashMapFlowPlanAddressFactory(),
     )
 
@@ -178,7 +184,7 @@ async def test_versioned_payload_cache_expires_after_sixty_seconds(
 ) -> None:
     from types import SimpleNamespace
 
-    import redis_access.redis_reader.cached_redis_reader as cache_module
+    import redis_access.redis_reader.cached.cached_single_value_redis_reader as cache_module
 
     now = 0.0
     monkeypatch.setattr(cache_module, "time", SimpleNamespace(monotonic=lambda: now))

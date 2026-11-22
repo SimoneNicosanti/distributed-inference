@@ -117,8 +117,11 @@ async def test_redis_profile_contract_from_model_manager_to_worker_and_controlle
     from redis_access.address_factory.profiled_model_variant.address_factory import (
         HashMapProfiledModelVariantAddressFactory,
     )
-    from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
-    from redis_access.redis_reader.key_redis_reader import KeyRedisReader
+    from redis_access.redis_reader.redis.hash_map_redis_reader import (
+        HashMapRedisReader,
+    )
+    from redis_access.redis_reader.redis.key_redis_reader import KeyRedisReader
+    from redis_access.redis_reader.redis.set_redis_reader import SetRedisReader
     from worker.adapters.outbound.profiling.store.redis_model_static_profile_reader import (
         RedisModelStaticProfileReader,
     )
@@ -131,6 +134,8 @@ async def test_redis_profile_contract_from_model_manager_to_worker_and_controlle
             HashMapModelPartitionAddressFactory,
             KeyRedisReader(),
             HashMapRedisReader(),
+            model_existence_checker=KeyRedisReader(),
+            variant_existence_checker=HashMapRedisReader(),
         )
         variant_id = profiled_variant.model_variant_id
         assert not await store.check_profiled_model_variant_existence(variant_id)
@@ -149,7 +154,10 @@ async def test_redis_profile_contract_from_model_manager_to_worker_and_controlle
             == profiled_variant.profile.topology.edges()
         )
         worker_reader = RedisModelStaticProfileReader(
-            redis, HashMapProfiledModelVariantAddressFactory, HashMapRedisReader()
+            redis,
+            HashMapProfiledModelVariantAddressFactory,
+            HashMapRedisReader(),
+            ids_reader=SetRedisReader(),
         )
         assert await worker_reader.get_all_model_static_profile_ids() == [variant_id]
         assert (
@@ -161,6 +169,7 @@ async def test_redis_profile_contract_from_model_manager_to_worker_and_controlle
             HashMapProfiledModelVariantAddressFactory,
             KeyRedisReader(),
             HashMapRedisReader(),
+            ids_reader=SetRedisReader(),
         )
         profiles = await controller_reader.get_all_model_variant_static_profiles()
         assert len(profiles) == 1

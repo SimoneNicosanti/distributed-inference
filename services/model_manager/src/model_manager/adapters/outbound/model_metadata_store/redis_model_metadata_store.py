@@ -30,9 +30,10 @@ from redis_access.address_factory.profiled_model_variant.address_factory import 
     ProfiledModelVariantAddressFactory,
 )
 from redis_access.contract.redis_address import HashMapRedisAddress, KeyRedisAddress
-from redis_access.redis_reader.abc.redis_reader import (
-    RedisReader,
+from redis_access.redis_reader.abc.redis_existence_checker import RedisExistenceChecker
+from redis_access.redis_reader.abc.single_value_redis_reader import (
     RedisValueNotFoundError,
+    SingleValueRedisReader,
 )
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -49,8 +50,10 @@ class RedisModelMetadataStore(ModelMetadataStore):
         model_partition_address_factory_cls: type[
             ModelPartitionAddressFactory[HashMapRedisAddress]
         ],
-        model_reader: RedisReader[KeyRedisAddress],
-        variant_reader: RedisReader[HashMapRedisAddress],
+        model_reader: SingleValueRedisReader[KeyRedisAddress],
+        variant_reader: SingleValueRedisReader[HashMapRedisAddress],
+        model_existence_checker: RedisExistenceChecker[KeyRedisAddress],
+        variant_existence_checker: RedisExistenceChecker[HashMapRedisAddress],
     ) -> None:
         self._redis = redis
         self._model_address_factory_cls = model_address_factory_cls
@@ -60,6 +63,8 @@ class RedisModelMetadataStore(ModelMetadataStore):
         self._model_partition_address_factory_cls = model_partition_address_factory_cls
         self._model_reader = model_reader
         self._variant_reader = variant_reader
+        self._model_existence_checker = model_existence_checker
+        self._variant_existence_checker = variant_existence_checker
 
     @override
     async def add_model(self, model: Model) -> None:
@@ -75,7 +80,7 @@ class RedisModelMetadataStore(ModelMetadataStore):
         model_key = await self._model_address_factory_cls.build_model_address(model_id)
 
         try:
-            value = await self._model_reader.read(self._redis, model_key)
+            value = await self._model_reader.read_single(self._redis, model_key)
         except RedisValueNotFoundError as e:
             raise ValueError(f"Model {model_id} not found") from e
 
@@ -88,8 +93,7 @@ class RedisModelMetadataStore(ModelMetadataStore):
     async def check_model_existence(self, model_id: ModelId) -> bool:
         model_key = await self._model_address_factory_cls.build_model_address(model_id)
 
-        num_values = await self._redis.exists(model_key.key)
-        return num_values > 0
+        return await self._model_existence_checker.exists(self._redis, model_key)
 
     @override
     async def add_profiled_model_variant(
@@ -127,7 +131,7 @@ class RedisModelMetadataStore(ModelMetadataStore):
             model_variant_id
         )
         try:
-            value = await self._variant_reader.read(self._redis, addr)
+            value = await self._variant_reader.read_single(self._redis, addr)
         except RedisValueNotFoundError as e:
             raise ValueError(
                 f"Profiled model variant {model_variant_id} not found"
@@ -146,8 +150,7 @@ class RedisModelMetadataStore(ModelMetadataStore):
         addr = await self._profiled_model_variant_address_factory_cls.build_profiled_model_variant_address(
             model_variant_id
         )
-        exists = await self._redis.hexists(addr.hash_map_key, addr.field_key)
-        return exists
+        return await self._variant_existence_checker.exists(self._redis, addr)
 
     @override
     async def add_model_partition(

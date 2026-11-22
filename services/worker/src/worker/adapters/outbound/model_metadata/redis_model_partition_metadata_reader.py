@@ -7,7 +7,10 @@ from redis_access.address_factory.model_partition.address_factory import (
     ModelPartitionAddressFactory,
 )
 from redis_access.contract.redis_address import HashMapRedisAddress
-from redis_access.redis_reader.abc.redis_reader import RedisReader, RedisReadError
+from redis_access.redis_reader.abc.single_value_redis_reader import (
+    RedisReadError,
+    SingleValueRedisReader,
+)
 from shared.artifact.artifact_ref import ArtifactRef
 from shared.model.model_partition import ModelPartitionId
 from worker.application.ports.outbound.model_metadata.model_partition_metadata_reader import (
@@ -20,7 +23,7 @@ class RedisModelPartitionMetadataReader(ModelPartitionMetadataReader):
     def __init__(
         self,
         redis: redis_asyncio.Redis,
-        redis_reader: RedisReader[HashMapRedisAddress],
+        redis_reader: SingleValueRedisReader[HashMapRedisAddress],
         address_factory: ModelPartitionAddressFactory[HashMapRedisAddress],
     ) -> None:
         self._redis = redis
@@ -36,7 +39,7 @@ class RedisModelPartitionMetadataReader(ModelPartitionMetadataReader):
                 partition_id
             )
 
-            dto_json = await self._redis_reader.read(self._redis, addr)
+            dto_json = await self._redis_reader.read_single(self._redis, addr)
 
             dto = ModelPartitionDto.model_validate_json(dto_json)
             if dto.model_partition_id != partition_id:

@@ -68,8 +68,12 @@ from redis_access.address_factory.front_end_plan.address_factory import (
 from redis_access.address_factory.service.service_instance_address_factory import (
     HashMapServiceInstanceAddressFactory,
 )
-from redis_access.redis_reader.cached_redis_reader import CachedRedisReader
-from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
+from redis_access.redis_reader.cached.cached_single_value_redis_reader import (
+    CachedSingleValueRedisReader,
+)
+from redis_access.redis_reader.redis.hash_map_redis_reader import (
+    HashMapRedisReader,
+)
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -152,14 +156,17 @@ async def test_http_to_ingress_and_sink_using_versioned_redis_contracts(
     redis.hget = AsyncMock(side_effect=hget)
     directory = DefaultWorkerDirectory(
         RedisServiceDirectory(
-            redis, HashMapRedisReader(), HashMapServiceInstanceAddressFactory()
+            redis,
+            HashMapRedisReader(),
+            HashMapServiceInstanceAddressFactory(),
+            enumeration_reader=HashMapRedisReader(),
         )
     )
     runner = DefaultInferenceRunner(
         flow_plan_reader=RedisFlowPlanReader(
             redis,
             HashMapRedisReader(),
-            CachedRedisReader(HashMapRedisReader(), add_ttl_s=60.0),
+            CachedSingleValueRedisReader(HashMapRedisReader(), add_ttl_s=60.0),
             HashMapFlowPlanAddressFactory(),
         ),
         ingress_gateway=ArrowWorkerIngressGateway(directory),

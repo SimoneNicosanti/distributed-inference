@@ -2,7 +2,6 @@ import logging
 from typing import override
 
 from pydantic import ValidationError
-from redis import RedisError
 from redis import asyncio as redis_asyncio
 
 from integration.dto.model.profiled_model_variant_dto import (
@@ -12,8 +11,12 @@ from integration.shared.id_json import model_variant_id_from_json
 from redis_access.address_factory.profiled_model_variant.address_factory import (
     ProfiledModelVariantAddressFactory,
 )
-from redis_access.contract.redis_address import HashMapRedisAddress
-from redis_access.redis_reader.abc.redis_reader import RedisReader, RedisReadError
+from redis_access.contract.redis_address import HashMapRedisAddress, KeyRedisAddress
+from redis_access.redis_reader.abc.multi_value_redis_reader import MultiValueRedisReader
+from redis_access.redis_reader.abc.single_value_redis_reader import (
+    RedisReadError,
+    SingleValueRedisReader,
+)
 from shared.model.model_variant import ModelVariantId
 from worker.adapters.outbound.profiling.store.mappers.model_static_profile_mapper import (
     ModelStaticProfileMapper,
@@ -36,24 +39,26 @@ class RedisModelStaticProfileReader(ModelStaticProfileReader):
         profiled_model_variant_address_factory_cls: type[
             ProfiledModelVariantAddressFactory[HashMapRedisAddress]
         ],
-        redis_reader: RedisReader[HashMapRedisAddress],
+        redis_reader: SingleValueRedisReader[HashMapRedisAddress],
+        ids_reader: MultiValueRedisReader[KeyRedisAddress],
     ) -> None:
         self._redis = redis
         self._redis_reader = redis_reader
+        self._ids_reader = ids_reader
         self._profiled_model_variant_address_factory_cls = (
             profiled_model_variant_address_factory_cls
         )
 
     @override
     async def get_all_model_static_profile_ids(self) -> list[ModelVariantId]:
-        ids_key = self._profiled_model_variant_address_factory_cls.build_profiled_model_variant_ids_address().key
+        ids_address = self._profiled_model_variant_address_factory_cls.build_profiled_model_variant_ids_address()
 
         try:
             ids: list[ModelVariantId] = []
-            async for value in self._redis.sscan_iter(ids_key):
+            for value in await self._ids_reader.read_all(self._redis, ids_address):
                 self._append_id_to_list_from_value(ids, value)
             return ids
-        except RedisError as e:
+        except RedisReadError as e:
             raise ModelStaticProfileReadError(
                 "Unable to read model static profile IDs"
             ) from e
@@ -76,13 +81,13 @@ class RedisModelStaticProfileReader(ModelStaticProfileReader):
             addr = await self._profiled_model_variant_address_factory_cls.build_profiled_model_variant_address(
                 model_variant_id
             )
-            value = await self._redis_reader.read(self._redis, addr)
+            value = await self._redis_reader.read_single(self._redis, addr)
 
             dto = ProfiledModelVariantDto.model_validate_json(value)
             if dto.model_variant_id != model_variant_id:
                 raise ValueError("Stored model variant ID mismatch")
             return ModelStaticProfileMapper.model_static_profile_from_dto(dto)
-        except (ValueError, RedisError, RedisReadError) as e:
+        except (ValueError, RedisReadError) as e:
             raise ModelStaticProfileReadError(
                 f"Unable to read model static profile {model_variant_id}"
             ) from e

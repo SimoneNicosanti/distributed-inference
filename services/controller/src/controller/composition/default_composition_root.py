@@ -110,8 +110,11 @@ from redis_access.address_factory.worker_profiles.network_profile_address_factor
 from redis_access.address_factory.worker_profiles.resource_profile_address_factory import (
     HashMapResourceProfileAddressFactory,
 )
-from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
-from redis_access.redis_reader.key_redis_reader import KeyRedisReader
+from redis_access.redis_reader.redis.hash_map_redis_reader import (
+    HashMapRedisReader,
+)
+from redis_access.redis_reader.redis.key_redis_reader import KeyRedisReader
+from redis_access.redis_reader.redis.set_redis_reader import SetRedisReader
 
 DEFAULT_OPTIMIZER_HTTP_BASE_URL = "http://optimizer:8000"
 
@@ -145,7 +148,10 @@ class DefaultCompositionRoot(CompositionRoot):
             )
 
             directory = RedisServiceDirectory(
-                redis, HashMapRedisReader(), HashMapServiceInstanceAddressFactory()
+                redis,
+                HashMapRedisReader(),
+                HashMapServiceInstanceAddressFactory(),
+                enumeration_reader=HashMapRedisReader(),
             )
             worker_directory = DefaultWorkerDirectory(directory)
             worker_directory_gateway = DefaultWorkerDirectoryGateway(worker_directory)
@@ -252,15 +258,22 @@ class DefaultCompositionRoot(CompositionRoot):
             HashMapProfiledModelVariantAddressFactory,
             model_reader=KeyRedisReader(),
             variant_reader=HashMapRedisReader(),
+            ids_reader=SetRedisReader(),
         )
         network_profile_store_gateway = RedisNetworkProfileStoreGateway(
-            redis, HashMapNetworkProfileAddressFactory
+            redis,
+            HashMapNetworkProfileAddressFactory,
+            batch_reader=HashMapRedisReader(),
         )
         execution_profile_store_gateway = RedisExecutionProfileStoreGateway(
-            redis, HashMapExecutionProfileAddressFactory
+            redis,
+            HashMapExecutionProfileAddressFactory,
+            batch_reader=HashMapRedisReader(),
         )
         resource_profile_store_gateway = RedisResourceProfileStoreGateway(
-            redis, HashMapResourceProfileAddressFactory
+            redis,
+            HashMapResourceProfileAddressFactory,
+            batch_reader=HashMapRedisReader(),
         )
 
         optimization_context_builder = DefaultOptimizationContextBuilder(

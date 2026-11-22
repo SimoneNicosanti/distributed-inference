@@ -8,7 +8,11 @@ from redis_access.address_factory.worker_profiles.execution_profile_address_fact
     ExecutionProfileAddressFactory,
 )
 from redis_access.contract.redis_address import HashMapRedisAddress
-from redis_access.redis_reader.abc.redis_reader import RedisReader
+from redis_access.redis_reader.abc.hash_fields_redis_reader import HashFieldsRedisReader
+from redis_access.redis_reader.abc.redis_existence_checker import RedisExistenceChecker
+from redis_access.redis_reader.abc.single_value_redis_reader import (
+    RedisReadError,
+)
 from shared.model.model_variant import ModelVariantId
 from shared.service.service import WorkerId
 from worker.adapters.outbound.profiling.store.mappers.model_execution_profile_mapper import (
@@ -36,13 +40,15 @@ class RedisModelExecutionProfileStore(
         execution_profile_address_factory_cls: type[
             ExecutionProfileAddressFactory[HashMapRedisAddress]
         ],
-        redis_reader: RedisReader[HashMapRedisAddress],
+        fields_reader: HashFieldsRedisReader,
+        existence_checker: RedisExistenceChecker[HashMapRedisAddress],
     ) -> None:
         self._redis = redis
         self._execution_profile_address_factory_cls = (
             execution_profile_address_factory_cls
         )
-        self._redis_reader = redis_reader
+        self._fields_reader = fields_reader
+        self._existence_checker = existence_checker
 
     @override
     async def puplish_model_execution_profile(
@@ -71,12 +77,12 @@ class RedisModelExecutionProfileStore(
             addr = await self._execution_profile_address_factory_cls.build_worker_execution_profiles_address(
                 worker_id
             )
-            fields = await self._redis.hkeys(addr.key)
+            fields = await self._fields_reader.read_fields(self._redis, addr)
             return sorted(
                 (model_variant_id_from_json(field) for field in fields),
                 key=lambda variant: (variant.model_id.model_name, variant.variant_tag),
             )
-        except (ValueError, RedisError) as e:
+        except (ValueError, RedisReadError) as e:
             raise ModelExecutionProfileReadError(
                 f"Unable to read model execution profile IDs: worker={worker_id}"
             ) from e
@@ -89,8 +95,8 @@ class RedisModelExecutionProfileStore(
             addr = await self._execution_profile_address_factory_cls.build_worker_model_execution_profile_address(
                 worker_id, model_version_id
             )
-            return await self._redis.hexists(addr.hash_map_key, addr.field_key)
-        except (ValueError, RedisError) as e:
+            return await self._existence_checker.exists(self._redis, addr)
+        except (ValueError, RedisReadError) as e:
             raise ModelExecutionProfileReadError(
                 f"Unable to check execution profile existence: worker={worker_id}, model={model_version_id}"
             ) from e

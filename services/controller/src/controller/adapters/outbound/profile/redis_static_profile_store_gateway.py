@@ -26,9 +26,10 @@ from redis_access.address_factory.profiled_model_variant.address_factory import 
     ProfiledModelVariantAddressFactory,
 )
 from redis_access.contract.redis_address import HashMapRedisAddress, KeyRedisAddress
-from redis_access.redis_reader.abc.redis_reader import (
-    RedisReader,
+from redis_access.redis_reader.abc.multi_value_redis_reader import MultiValueRedisReader
+from redis_access.redis_reader.abc.single_value_redis_reader import (
     RedisValueNotFoundError,
+    SingleValueRedisReader,
 )
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -42,12 +43,14 @@ class RedisStaticProfileStoreGateway(StaticProfileStoreGateway):
         profiled_model_variant_address_factory_cls: type[
             ProfiledModelVariantAddressFactory[HashMapRedisAddress]
         ],
-        model_reader: RedisReader[KeyRedisAddress],
-        variant_reader: RedisReader[HashMapRedisAddress],
+        model_reader: SingleValueRedisReader[KeyRedisAddress],
+        variant_reader: SingleValueRedisReader[HashMapRedisAddress],
+        ids_reader: MultiValueRedisReader[KeyRedisAddress],
     ) -> None:
         self._redis = redis
         self._model_reader = model_reader
         self._variant_reader = variant_reader
+        self._ids_reader = ids_reader
         self._model_address_factory_class = model_address_factory_cls
         self._profiled_model_variant_address_factory_cls = (
             profiled_model_variant_address_factory_cls
@@ -57,10 +60,10 @@ class RedisStaticProfileStoreGateway(StaticProfileStoreGateway):
     async def get_all_model_variant_static_profiles(
         self,
     ) -> list[ModelVariantStaticProfile]:
-        ids_key = self._profiled_model_variant_address_factory_cls.build_profiled_model_variant_ids_address().key
+        ids_address = self._profiled_model_variant_address_factory_cls.build_profiled_model_variant_ids_address()
         model_variant_ids = [
             model_variant_id_from_json(value)
-            async for value in self._redis.sscan_iter(ids_key)
+            for value in await self._ids_reader.read_all(self._redis, ids_address)
         ]
         model_variant_ids.sort(key=model_variant_id_to_json)
         if not model_variant_ids:
@@ -97,7 +100,7 @@ class RedisStaticProfileStoreGateway(StaticProfileStoreGateway):
             model_variant_id
         )
         try:
-            value = await self._variant_reader.read(self._redis, addr)
+            value = await self._variant_reader.read_single(self._redis, addr)
         except RedisValueNotFoundError as e:
             raise ValueError(
                 f"Profiled model variant {model_variant_id} not found"
@@ -113,7 +116,7 @@ class RedisStaticProfileStoreGateway(StaticProfileStoreGateway):
     async def _get_model(self, model_id: ModelId) -> ModelDto:
         key = await self._model_address_factory_class.build_model_address(model_id)
         try:
-            value = await self._model_reader.read(self._redis, key)
+            value = await self._model_reader.read_single(self._redis, key)
         except RedisValueNotFoundError as e:
             raise ValueError(f"Model {model_id} not found") from e
 

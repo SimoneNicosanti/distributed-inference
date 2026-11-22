@@ -41,8 +41,12 @@ from redis_access.address_factory.front_end_plan.address_factory import (
 from redis_access.address_factory.worker_plan.address_factory import (
     HashMapWorkerPlanAddressFactory,
 )
-from redis_access.redis_reader.cached_redis_reader import CachedRedisReader
-from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
+from redis_access.redis_reader.cached.cached_single_value_redis_reader import (
+    CachedSingleValueRedisReader,
+)
+from redis_access.redis_reader.redis.hash_map_redis_reader import (
+    HashMapRedisReader,
+)
 from shared.flow.flow import FlowId
 from shared.model.model import ModelId
 from shared.model.model_variant import ModelVariantId
@@ -144,7 +148,7 @@ async def test_publishes_worker_and_flow_payloads_and_active_hash_fields(
     reader = RedisFlowPlanReader(
         redis,
         HashMapRedisReader(),
-        CachedRedisReader(HashMapRedisReader(), add_ttl_s=60.0),
+        CachedSingleValueRedisReader(HashMapRedisReader(), add_ttl_s=60.0),
         HashMapFlowPlanAddressFactory(),
     )
     for flow_id, plan in flows.items():
@@ -312,7 +316,7 @@ async def test_worker_reader_reads_published_address_and_reuses_cached_payload(
     reader = RedisWorkerPlanReader(
         worker,
         redis,
-        CachedRedisReader(HashMapRedisReader(), add_ttl_s=60.0),
+        CachedSingleValueRedisReader(HashMapRedisReader(), add_ttl_s=60.0),
         HashMapWorkerPlanAddressFactory(),
     )
     with patch.object(redis, "hget", wraps=redis.hget) as hget:

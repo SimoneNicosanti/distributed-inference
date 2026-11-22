@@ -50,8 +50,13 @@ from redis_access.address_factory.worker_profiles.network_profile_address_factor
 from redis_access.address_factory.worker_profiles.resource_profile_address_factory import (
     HashMapResourceProfileAddressFactory,
 )
-from redis_access.redis_reader.cached_redis_reader import CachedRedisReader
-from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
+from redis_access.redis_reader.cached.cached_single_value_redis_reader import (
+    CachedSingleValueRedisReader,
+)
+from redis_access.redis_reader.redis.hash_map_redis_reader import (
+    HashMapRedisReader,
+)
+from redis_access.redis_reader.redis.set_redis_reader import SetRedisReader
 from shared.context.model_pass_context import ModelPassId
 from worker.adapters.outbound.activity_manager.local_activity_manager import (
     LocalActivityManagerAdapter,
@@ -217,13 +222,18 @@ class DefaultCompositionRoot(CompositionRoot):
             )
 
             directory = RedisServiceDirectory(
-                redis, HashMapRedisReader(), HashMapServiceInstanceAddressFactory()
+                redis,
+                CachedSingleValueRedisReader(HashMapRedisReader(), add_ttl_s=60.0),
+                HashMapServiceInstanceAddressFactory(),
+                enumeration_reader=HashMapRedisReader(),
             )
             service_directory = DefaultWorkerDirectory(directory)
             worker_plan_reader = RedisWorkerPlanReader(
                 worker_id=worker_id,
                 redis=redis,
-                redis_reader=CachedRedisReader(HashMapRedisReader(), add_ttl_s=60.0),
+                redis_reader=CachedSingleValueRedisReader(
+                    HashMapRedisReader(), add_ttl_s=60.0
+                ),
                 address_factory=HashMapWorkerPlanAddressFactory(),
             )
             worker_plan_view_reader = AllWorkerPlanViewReader(worker_plan_reader)
@@ -239,7 +249,9 @@ class DefaultCompositionRoot(CompositionRoot):
                 worker_id=worker_id,
                 deployment_plan_reader=worker_plan_view_reader,
                 model_partition_metadata_reader=RedisModelPartitionMetadataReader(
-                    redis, HashMapRedisReader(), HashMapModelPartitionAddressFactory()
+                    redis,
+                    HashMapRedisReader(),
+                    HashMapModelPartitionAddressFactory(),
                 ),
                 artifact_store=artifact_store,
                 partition_executor_factory=OnnxPartitionExecutorFactory(),
@@ -380,11 +392,13 @@ class DefaultCompositionRoot(CompositionRoot):
             redis,
             HashMapProfiledModelVariantAddressFactory,
             redis_reader=HashMapRedisReader(),
+            ids_reader=SetRedisReader(),
         )
         execution_profile_store = RedisModelExecutionProfileStore(
             redis,
             HashMapExecutionProfileAddressFactory,
-            redis_reader=HashMapRedisReader(),
+            fields_reader=HashMapRedisReader(),
+            existence_checker=HashMapRedisReader(),
         )
         pending_models_poller = DefaultPendingModelsPoller(
             worker_id=worker_id,

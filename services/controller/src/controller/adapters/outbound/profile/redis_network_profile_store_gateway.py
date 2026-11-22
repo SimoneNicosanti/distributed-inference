@@ -14,6 +14,7 @@ from redis_access.address_factory.worker_profiles.network_profile_address_factor
     NetworkProfileAddressFactory,
 )
 from redis_access.contract.redis_address import HashMapRedisAddress
+from redis_access.redis_reader.abc.batch_redis_reader import BatchRedisReader
 from shared.service.service import WorkerId
 
 
@@ -24,8 +25,10 @@ class RedisNetworkProfileStoreGateway(NetworkProfileStoreGateway):
         network_profile_address_factory_cls: type[
             NetworkProfileAddressFactory[HashMapRedisAddress]
         ],
+        batch_reader: BatchRedisReader[HashMapRedisAddress],
     ) -> None:
         self._redis = redis
+        self._batch_reader = batch_reader
         self._network_profile_address_factory_cls = network_profile_address_factory_cls
 
     @override
@@ -48,9 +51,7 @@ class RedisNetworkProfileStoreGateway(NetworkProfileStoreGateway):
         ]
         if len({addr.hash_map_key for addr in addresses}) != 1:
             raise ValueError("Network profiles must share one hash for batch reads")
-        values = await self._redis.hmget(
-            addresses[0].hash_map_key, [addr.field_key for addr in addresses]
-        )
+        values = await self._batch_reader.read_many(self._redis, tuple(addresses))
 
         connections: list[NetworkConnection] = []
         for worker_id, value in zip(ordered_worker_ids, values, strict=True):

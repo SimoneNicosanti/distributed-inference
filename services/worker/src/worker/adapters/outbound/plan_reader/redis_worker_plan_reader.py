@@ -7,7 +7,10 @@ from redis_access.address_factory.worker_plan.address_factory import (
     WorkerPlanAddressFactory,
 )
 from redis_access.contract.redis_address import HashMapRedisAddress
-from redis_access.redis_reader.abc.redis_reader import RedisReader, RedisReadError
+from redis_access.redis_reader.abc.single_value_redis_reader import (
+    RedisReadError,
+    SingleValueRedisReader,
+)
 from shared.plan.plan_version import PlanVersion
 from shared.service.service import WorkerId
 from worker.adapters.outbound.plan_reader.worker_plan_mapper import worker_plan_from_dto
@@ -23,7 +26,7 @@ class RedisWorkerPlanReader(WorkerPlanReader):
         self,
         worker_id: WorkerId,
         redis: asyncio_redis.Redis,
-        redis_reader: RedisReader[HashMapRedisAddress],
+        redis_reader: SingleValueRedisReader[HashMapRedisAddress],
         address_factory: WorkerPlanAddressFactory[HashMapRedisAddress],
     ) -> None:
         super().__init__()
@@ -39,7 +42,7 @@ class RedisWorkerPlanReader(WorkerPlanReader):
             addr = self._address_factory.build_versioned_worker_plan_address(
                 version, self._worker_id
             )
-            value = await self._redis_reader.read(self._redis, addr)
+            value = await self._redis_reader.read_single(self._redis, addr)
             dto = WorkerPlanDto.model_validate_json(value)
 
             if dto.plan_version != version:

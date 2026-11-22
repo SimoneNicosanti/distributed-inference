@@ -54,8 +54,12 @@ from redis_access.address_factory.front_end_plan.address_factory import (
 from redis_access.address_factory.service.service_instance_address_factory import (
     HashMapServiceInstanceAddressFactory,
 )
-from redis_access.redis_reader.cached_redis_reader import CachedRedisReader
-from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
+from redis_access.redis_reader.cached.cached_single_value_redis_reader import (
+    CachedSingleValueRedisReader,
+)
+from redis_access.redis_reader.redis.hash_map_redis_reader import (
+    HashMapRedisReader,
+)
 
 DEFAULT_MODEL_MANAGER_HTTP_BASE_URL = "http://model-manager:8000"
 DEFAULT_CONTROLLER_HTTP_BASE_URL = "http://controller:8000"
@@ -77,7 +81,10 @@ class DefaultCompositionRoot(CompositionRoot):
                 self.build_redis_connection_context()
             )
             service_directory = RedisServiceDirectory(
-                redis, HashMapRedisReader(), HashMapServiceInstanceAddressFactory()
+                redis,
+                HashMapRedisReader(),
+                HashMapServiceInstanceAddressFactory(),
+                enumeration_reader=HashMapRedisReader(),
             )
             directory = DefaultWorkerDirectory(service_directory)
 
@@ -85,7 +92,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 flow_plan_reader=RedisFlowPlanReader(
                     redis=redis,
                     current_version_reader=HashMapRedisReader(),
-                    versioned_plan_reader=CachedRedisReader(
+                    versioned_plan_reader=CachedSingleValueRedisReader(
                         HashMapRedisReader(), add_ttl_s=60.0
                     ),
                     address_factory=HashMapFlowPlanAddressFactory(),

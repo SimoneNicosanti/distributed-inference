@@ -73,8 +73,10 @@ from redis_access.address_factory.profiled_model_variant.address_factory import 
 from redis_access.address_factory.service.service_instance_address_factory import (
     HashMapServiceInstanceAddressFactory,
 )
-from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
-from redis_access.redis_reader.key_redis_reader import KeyRedisReader
+from redis_access.redis_reader.redis.hash_map_redis_reader import (
+    HashMapRedisReader,
+)
+from redis_access.redis_reader.redis.key_redis_reader import KeyRedisReader
 
 
 class DefaultCompositionRoot(CompositionRoot):
@@ -112,6 +114,8 @@ class DefaultCompositionRoot(CompositionRoot):
                 HashMapModelPartitionAddressFactory,
                 model_reader=KeyRedisReader(),
                 variant_reader=HashMapRedisReader(),
+                model_existence_checker=KeyRedisReader(),
+                variant_existence_checker=HashMapRedisReader(),
             )
 
             model_splitter = self.build_model_partition_extractor()

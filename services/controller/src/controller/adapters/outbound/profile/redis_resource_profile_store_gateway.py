@@ -17,6 +17,7 @@ from redis_access.address_factory.worker_profiles.resource_profile_address_facto
     ResourceProfileAddressFactory,
 )
 from redis_access.contract.redis_address import HashMapRedisAddress
+from redis_access.redis_reader.abc.batch_redis_reader import BatchRedisReader
 from shared.service.service import WorkerId
 
 
@@ -27,8 +28,10 @@ class RedisResourceProfileStoreGateway(ResourceProfileStoreGateway):
         resource_profile_address_factory_cls: type[
             ResourceProfileAddressFactory[HashMapRedisAddress]
         ],
+        batch_reader: BatchRedisReader[HashMapRedisAddress],
     ) -> None:
         self._redis = redis
+        self._batch_reader = batch_reader
         self._resource_profile_address_factory_cls = (
             resource_profile_address_factory_cls
         )
@@ -53,9 +56,7 @@ class RedisResourceProfileStoreGateway(ResourceProfileStoreGateway):
         ]
         if len({addr.hash_map_key for addr in addresses}) != 1:
             raise ValueError("Resource profiles must share one hash for batch reads")
-        values = await self._redis.hmget(
-            addresses[0].hash_map_key, [addr.field_key for addr in addresses]
-        )
+        values = await self._batch_reader.read_many(self._redis, tuple(addresses))
 
         profiles: list[WorkerResourceProfile] = []
         for worker_id, value in zip(ordered_worker_ids, values, strict=True):

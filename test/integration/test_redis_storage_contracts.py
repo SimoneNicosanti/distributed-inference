@@ -36,8 +36,10 @@ from redis_access.address_factory.worker_profiles.network_profile_address_factor
 from redis_access.address_factory.worker_profiles.resource_profile_address_factory import (
     HashMapResourceProfileAddressFactory,
 )
-from redis_access.redis_reader.hash_map_redis_reader import HashMapRedisReader
-from redis_access.redis_reader.key_redis_reader import KeyRedisReader
+from redis_access.redis_reader.redis.hash_map_redis_reader import (
+    HashMapRedisReader,
+)
+from redis_access.redis_reader.redis.key_redis_reader import KeyRedisReader
 from shared.artifact.artifact_ref import ArtifactRef
 from shared.model.model import CNNArchitectureInfo, ModelId, ModelTask
 from shared.model.model_partition import ModelPartitionId
@@ -104,7 +106,10 @@ def _execution(variant: ModelVariantId, duration: float = 0.1) -> ModelExecution
 
 def _store(redis: FakeRedis) -> RedisModelExecutionProfileStore:
     return RedisModelExecutionProfileStore(
-        redis, HashMapExecutionProfileAddressFactory, HashMapRedisReader()
+        redis,
+        HashMapExecutionProfileAddressFactory,
+        fields_reader=HashMapRedisReader(),
+        existence_checker=HashMapRedisReader(),
     )
 
 
@@ -125,7 +130,7 @@ async def test_resource_and_network_round_trip_and_updates_are_fresh(
     )
     await publisher.publish_resource_profile(resource)
     gateway = RedisResourceProfileStoreGateway(
-        redis, HashMapResourceProfileAddressFactory
+        redis, HashMapResourceProfileAddressFactory, batch_reader=HashMapRedisReader()
     )
     assert len(await gateway.get_resource_profiles_for_workers([first, missing])) == 1
     await publisher.publish_resource_profile(
@@ -143,7 +148,7 @@ async def test_resource_and_network_round_trip_and_updates_are_fresh(
         NetworkProfile((WorkerConnection(second, ConnectionInfo(1000, 0.01)),))
     )
     network = RedisNetworkProfileStoreGateway(
-        redis, HashMapNetworkProfileAddressFactory
+        redis, HashMapNetworkProfileAddressFactory, batch_reader=HashMapRedisReader()
     )
     connections = await network.get_network_connections_by_workers(
         [first, second, missing]
@@ -163,6 +168,8 @@ async def test_resource_and_network_round_trip_and_updates_are_fresh(
 async def test_execution_profiles_are_isolated_by_worker_and_variant(
     redis: FakeRedis,
 ) -> None:
+    from unittest.mock import patch
+
     worker, other = ServiceId(id="worker"), ServiceId(id="other")
     first, second = (
         ModelVariantId(ModelId("one"), "tag"),
@@ -170,32 +177,54 @@ async def test_execution_profiles_are_isolated_by_worker_and_variant(
     )
     missing = ModelVariantId(ModelId("missing"), "tag")
     store = _store(redis)
+    batch_reader = HashMapRedisReader()
+    gateway = RedisExecutionProfileStoreGateway(
+        redis, HashMapExecutionProfileAddressFactory, batch_reader=batch_reader
+    )
     assert await store.get_all_profiled_model_ids_by_worker_id(worker) == []
     await store.puplish_model_execution_profile(worker, _execution(first))
     await store.puplish_model_execution_profile(worker, _execution(second))
-    await store.puplish_model_execution_profile(other, _execution(first))
+    await store.puplish_model_execution_profile(other, _execution(first, 0.3))
     assert set(await store.get_all_profiled_model_ids_by_worker_id(worker)) == {
         first,
         second,
     }
-    assert len(await store.get_all_profiles_by_worker_id(worker)) == 2
+    profiles = await gateway.get_execution_profiles_for_workers_and_variants(
+        [worker], [first, second]
+    )
+    assert len(profiles[0].execution_profiles) == 2
     assert await store.check_model_execution_profile_exists(worker, first)
     assert not await store.check_model_execution_profile_exists(worker, missing)
-    assert await store.get_model_execution_profile_by_worker_id(
-        worker, first
-    ) == _execution(first)
+    profile = profiles[0].execution_profiles[first]
+    assert (
+        profile.shape_execution_profiles[0]
+        .backend_profiles[0]
+        .layer_profiles["layer"]
+        .execution_time_s
+        == 0.1
+    )
     await store.puplish_model_execution_profile(worker, _execution(first, 0.5))
-    assert await store.get_model_execution_profile_by_worker_id(
-        worker, first
-    ) == _execution(first, 0.5)
     assert len(await store.get_all_profiled_model_ids_by_worker_id(worker)) == 2
-    gateway = RedisExecutionProfileStoreGateway(
-        redis, HashMapExecutionProfileAddressFactory
-    )
-    profiles = await gateway.get_execution_profiles_for_workers_and_variants(
-        [worker, other], [first, missing]
-    )
+    with (
+        patch.object(batch_reader, "read_many", wraps=batch_reader.read_many) as reads,
+        patch.object(redis, "pipeline", wraps=redis.pipeline) as pipelines,
+    ):
+        profiles = await gateway.get_execution_profiles_for_workers_and_variants(
+            [worker, other, worker], [first, missing, first]
+        )
+        reads.assert_awaited_once()
+        assert len(reads.call_args.args[1]) == 4
+        pipelines.assert_called_once_with(transaction=False)
     assert all(set(profile.execution_profiles) == {first} for profile in profiles)
+    times_by_worker = {
+        profile.worker_id: profile.execution_profiles[first]
+        .shape_execution_profiles[0]
+        .backend_profiles[0]
+        .layer_profiles["layer"]
+        .execution_time_s
+        for profile in profiles
+    }
+    assert times_by_worker == {worker: 0.5, other: 0.3}
     assert (
         await gateway.get_execution_profiles_for_workers_and_variants([worker], [])
     )[0].execution_profiles == {}
@@ -238,9 +267,13 @@ async def test_concurrent_execution_publications_use_single_writes_without_share
         assert set(
             await _store(redis).get_all_profiled_model_ids_by_worker_id(worker)
         ) == set(variants)
-        assert len(await _store(redis).get_all_profiles_by_worker_id(worker)) == len(
-            variants
-        )
+    gateway = RedisExecutionProfileStoreGateway(
+        redis, HashMapExecutionProfileAddressFactory, batch_reader=HashMapRedisReader()
+    )
+    profiles = await gateway.get_execution_profiles_for_workers_and_variants(
+        workers, variants
+    )
+    assert all(len(profile.execution_profiles) == len(variants) for profile in profiles)
     assert set(await redis.keys("*")) == {
         b"worker-profiles:execution:first-worker",
         b"worker-profiles:execution:second-worker",
@@ -260,7 +293,6 @@ async def test_profile_ids_follow_hash_fields_without_a_separate_index(
     )
     await redis.hdel(address.hash_map_key, address.field_key)
     assert await store.get_all_profiled_model_ids_by_worker_id(worker) == []
-    assert await store.get_all_profiles_by_worker_id(worker) == []
     assert not await store.check_model_execution_profile_exists(worker, variant)
 
 
@@ -279,6 +311,35 @@ async def test_execution_publication_propagates_redis_write_failure(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["fields", "exists"])
+async def test_execution_store_preserves_read_error_translation(
+    redis: FakeRedis, operation: str
+) -> None:
+    from redis.exceptions import ResponseError
+
+    from redis_access.redis_reader.abc.single_value_redis_reader import RedisReadError
+    from worker.application.ports.outbound.profiling.model_execution.model_execution_profile_reader import (
+        ModelExecutionProfileReadError,
+    )
+
+    worker = ServiceId(id="worker")
+    variant = ModelVariantId(ModelId("model"), "tag")
+    container = await HashMapExecutionProfileAddressFactory.build_worker_execution_profiles_address(
+        worker
+    )
+    await redis.set(container.key, "wrong-type")
+
+    with pytest.raises(ModelExecutionProfileReadError) as caught:
+        if operation == "fields":
+            await _store(redis).get_all_profiled_model_ids_by_worker_id(worker)
+        else:
+            await _store(redis).check_model_execution_profile_exists(worker, variant)
+
+    assert isinstance(caught.value.__cause__, RedisReadError)
+    assert isinstance(caught.value.__cause__.__cause__, ResponseError)
+
+
+@pytest.mark.asyncio
 async def test_model_and_partition_metadata_share_addresses_and_remain_fresh(
     redis: FakeRedis,
 ) -> None:
@@ -289,6 +350,8 @@ async def test_model_and_partition_metadata_share_addresses_and_remain_fresh(
         HashMapModelPartitionAddressFactory,
         KeyRedisReader(),
         HashMapRedisReader(),
+        model_existence_checker=KeyRedisReader(),
+        variant_existence_checker=HashMapRedisReader(),
     )
     model = Model(
         ModelId("model"), ModelInfo(ModelTask.CLASSIFICATION, CNNArchitectureInfo())
@@ -335,7 +398,7 @@ async def test_execution_gateway_rejects_profile_under_another_variant_field(
     ).model_dump_json()
     await redis.hset(address.hash_map_key, address.field_key, payload)
     gateway = RedisExecutionProfileStoreGateway(
-        redis, HashMapExecutionProfileAddressFactory
+        redis, HashMapExecutionProfileAddressFactory, batch_reader=HashMapRedisReader()
     )
     with pytest.raises(ValueError, match="variant does not match"):
         await gateway.get_execution_profiles_for_workers_and_variants(
@@ -353,7 +416,7 @@ async def test_readers_distinguish_missing_values_from_redis_failures(
     from redis.exceptions import ConnectionError as RedisConnectionError
 
     from redis_access.contract.redis_address import HashMapRedisAddress, KeyRedisAddress
-    from redis_access.redis_reader.abc.redis_reader import (
+    from redis_access.redis_reader.abc.single_value_redis_reader import (
         RedisReadError,
         RedisValueNotFoundError,
     )
@@ -361,13 +424,17 @@ async def test_readers_distinguish_missing_values_from_redis_failures(
     reader, address, method = (
         (KeyRedisReader(), KeyRedisAddress("missing"), "get")
         if kind == "key"
-        else (HashMapRedisReader(), HashMapRedisAddress("missing", "field"), "hget")
+        else (
+            HashMapRedisReader(),
+            HashMapRedisAddress("missing", "field"),
+            "hget",
+        )
     )
     with pytest.raises(RedisValueNotFoundError):
-        await reader.read(redis, address)
+        await reader.read_single(redis, address)
     with patch.object(redis, method, side_effect=RedisConnectionError("offline")):
         with pytest.raises(RedisReadError) as error:
-            await reader.read(redis, address)
+            await reader.read_single(redis, address)
         assert not isinstance(error.value, RedisValueNotFoundError)
         assert isinstance(error.value.__cause__, RedisConnectionError)
 
@@ -380,7 +447,7 @@ async def test_model_store_does_not_report_backend_failure_as_missing_model(
 
     from redis.exceptions import ConnectionError as RedisConnectionError
 
-    from redis_access.redis_reader.abc.redis_reader import RedisReadError
+    from redis_access.redis_reader.abc.single_value_redis_reader import RedisReadError
 
     store = RedisModelMetadataStore(
         redis,
@@ -389,6 +456,8 @@ async def test_model_store_does_not_report_backend_failure_as_missing_model(
         HashMapModelPartitionAddressFactory,
         KeyRedisReader(),
         HashMapRedisReader(),
+        model_existence_checker=KeyRedisReader(),
+        variant_existence_checker=HashMapRedisReader(),
     )
     with pytest.raises(ValueError, match="not found"):
         await store.get_model(ModelId("missing"))
