@@ -26,7 +26,6 @@ model pool can change assignments. Arrivals, deadlines and endpoint placements
 remain shared with the default `performance` mode.
 
 ```bash
-# After setting PYTHONPATH as described below:
 uv run --python 3.14 --project experiments/scalability --locked scalability main --model-selection model_variant --output experiments/scalability/results/fixed-models
 # Compare both modes on each base instance (twice as many runs):
 uv run --python 3.14 --project experiments/scalability --locked scalability main --model-selection performance model_variant --output experiments/scalability/results/model-selection
@@ -48,7 +47,6 @@ records without a selection mode are interpreted as `performance`.
 ## Assignment versus cumulative
 
 ```bash
-# After setting PYTHONPATH as described below:
 uv run --python 3.14 --project experiments/scalability --locked scalability main --formulation assignment --output experiments/scalability/results/main-assignment
 uv run --python 3.14 --project experiments/scalability --locked scalability main --formulation cumulative --output experiments/scalability/results/main-cumulative
 
@@ -85,12 +83,8 @@ strategies. See [algorithm, configuration and validation](../../docs/optimizatio
 
 Run commands from the repository root. Python 3.14 or later is required.
 
-The optimizer currently has an empty `pyproject.toml`, so it is consumed from its
-source tree. Set this once before the commands below (from the repository root):
-
-```bash
-export PYTHONPATH="$PWD/services/optimizer/src${PYTHONPATH:+:$PYTHONPATH}"
-```
+`uv` installs the optimizer from `services/optimizer` as a local editable
+dependency of the benchmark.
 
 The benchmark retains the controller dependency for raw profile types and their
 DTO mapper; it does not use controller optimization requests, context, factory or

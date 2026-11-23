@@ -34,7 +34,7 @@ class RedisPlanVersionFactory(PlanVersionFactory):
         curr_ver_num = 0 if value is None else int(value)
         updated_ver_num = curr_ver_num + 1
 
-        pipe.multi()
+        pipe.multi()  # type: ignore
         pipe.set(key, updated_ver_num)
         await pipe.execute()
 

@@ -54,8 +54,8 @@ from worker.adapters.outbound.profiling.publisher.redis_network_profile_publishe
 from worker.adapters.outbound.profiling.publisher.redis_resource_profile_publisher import (
     RedisResourceProfilePublisher,
 )
-from worker.adapters.outbound.profiling.store.redis_model_execution_profile_store import (
-    RedisModelExecutionProfileStore,
+from worker.adapters.outbound.profiling.publisher.redis_model_execution_profile_publisher import (
+    RedisModelExecutionProfilePublisher,
 )
 from worker.application.ports.outbound.profiling.model_execution.model_execution_profile_publisher import (
     ModelExecutionProfileWriteError,
@@ -104,8 +104,8 @@ def _execution(variant: ModelVariantId, duration: float = 0.1) -> ModelExecution
     )
 
 
-def _store(redis: FakeRedis) -> RedisModelExecutionProfileStore:
-    return RedisModelExecutionProfileStore(
+def _store(redis: FakeRedis) -> RedisModelExecutionProfilePublisher:
+    return RedisModelExecutionProfilePublisher(
         redis,
         HashMapExecutionProfileAddressFactory,
         fields_reader=HashMapRedisReader(),
@@ -316,11 +316,11 @@ async def test_execution_store_preserves_read_error_translation(
     redis: FakeRedis, operation: str
 ) -> None:
     from redis.exceptions import ResponseError
-
-    from redis_access.redis_reader.abc.single_value_redis_reader import RedisReadError
     from worker.application.ports.outbound.profiling.model_execution.model_execution_profile_reader import (
         ModelExecutionProfileReadError,
     )
+
+    from redis_access.redis_reader.abc.single_value_redis_reader import RedisReadError
 
     worker = ServiceId(id="worker")
     variant = ModelVariantId(ModelId("model"), "tag")
@@ -383,7 +383,7 @@ async def test_model_and_partition_metadata_share_addresses_and_remain_fresh(
 async def test_execution_gateway_rejects_profile_under_another_variant_field(
     redis: FakeRedis,
 ) -> None:
-    from worker.adapters.outbound.profiling.store.mappers.model_execution_profile_mapper import (
+    from worker.adapters.outbound.profiling.publisher.mappers.model_execution_profile_mapper import (
         ModelExecutionProfileMapper,
     )
 

@@ -45,6 +45,9 @@ from model_manager.adapters.outbound.model_profiler.onnx_model_topology_builder 
 from model_manager.adapters.outbound.model_profiler.onnx_shape_profile_computer import (
     OnnxShapeProfileComputer,
 )
+from model_manager.adapters.outbound.model_variant_producer.redis_available_model_variant_producer import (
+    RedisAvailableModelVariantProducer,
+)
 from model_manager.application.default_artifact_ref_factory import (
     DefaultArtifactRefFactory,
 )
@@ -127,6 +130,9 @@ class DefaultCompositionRoot(CompositionRoot):
                 artifact_ref_factory,
                 model_metadata_store,
                 model_splitter,
+                available_model_variant_producer=RedisAvailableModelVariantProducer(
+                    redis
+                ),
             )
 
             yield model_manager, model_manager, model_manager

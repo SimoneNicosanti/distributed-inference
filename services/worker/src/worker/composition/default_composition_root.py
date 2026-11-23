@@ -86,11 +86,20 @@ from worker.adapters.outbound.profiling.model_execution.ort.ort_engine_model_exe
 from worker.adapters.outbound.profiling.network.arrow.arrow_network_probe_client import (
     ArrowNetworkProbeClient,
 )
+from worker.adapters.outbound.profiling.publisher.redis_model_execution_profile_publisher import (
+    RedisModelExecutionProfilePublisher,
+)
 from worker.adapters.outbound.profiling.publisher.redis_network_profile_publisher import (
     RedisNetworkProfilePublisher,
 )
 from worker.adapters.outbound.profiling.publisher.redis_resource_profile_publisher import (
     RedisResourceProfilePublisher,
+)
+from worker.adapters.outbound.profiling.reader.redis_model_static_profile_reader import (
+    RedisModelStaticProfileReader,
+)
+from worker.adapters.outbound.profiling.reader.redis_pending_model_variant_consumer import (
+    RedisPendingModelVariantConsumer,
 )
 from worker.adapters.outbound.profiling.resource.cgroup_cpu_profiler import (
     CgroupCpuProfiler,
@@ -101,12 +110,6 @@ from worker.adapters.outbound.profiling.resource.cgroup_ram_profiler import (
 from worker.adapters.outbound.profiling.resource.no_gpu_profiler import NoGpuProfiler
 from worker.adapters.outbound.profiling.resource.nvidia_gpu_profiler import (
     NvidiaGpuProfiler,
-)
-from worker.adapters.outbound.profiling.store.redis_model_execution_profile_store import (
-    RedisModelExecutionProfileStore,
-)
-from worker.adapters.outbound.profiling.store.redis_model_static_profile_reader import (
-    RedisModelStaticProfileReader,
 )
 from worker.adapters.outbound.profiling.utils.nvidia_gpu_availability_checker import (
     NvidiaGPUAvailabilityChecker,
@@ -174,9 +177,6 @@ from worker.application.profiling.default_model_execution_profiling_coordinator 
 )
 from worker.application.profiling.default_network_profiling_coordinator import (
     DefaultNetworkProfilingCoordinator,
-)
-from worker.application.profiling.default_pending_models_poller import (
-    DefaultPendingModelsPoller,
 )
 from worker.application.profiling.default_resource_profiling_coordinator import (
     DefaultResourceProfilingCoordinator,
@@ -394,16 +394,12 @@ class DefaultCompositionRoot(CompositionRoot):
             redis_reader=HashMapRedisReader(),
             ids_reader=SetRedisReader(),
         )
-        execution_profile_store = RedisModelExecutionProfileStore(
+        execution_profile_publisher = RedisModelExecutionProfilePublisher(
             redis,
             HashMapExecutionProfileAddressFactory,
-            fields_reader=HashMapRedisReader(),
-            existence_checker=HashMapRedisReader(),
         )
-        pending_models_poller = DefaultPendingModelsPoller(
-            worker_id=worker_id,
-            model_static_profile_reader=static_profile_reader,
-            model_execution_profile_reader=execution_profile_store,
+        pending_models_consumer = RedisPendingModelVariantConsumer(
+            worker_id=worker_id, redis=redis
         )
 
         backends = [Backend.CPU]
@@ -412,7 +408,7 @@ class DefaultCompositionRoot(CompositionRoot):
 
         model_execution_coordinator = DefaultModelExecutionProfilingCoordinator(
             worker_id=worker_id,
-            pending_models_poller=pending_models_poller,
+            pending_models_consumer=pending_models_consumer,
             model_static_profile_reader=static_profile_reader,
             model_execution_profiler=DefaultModelExecutionProfiler(
                 activity_request_factory=activity_request_factory,
@@ -421,7 +417,7 @@ class DefaultCompositionRoot(CompositionRoot):
                 engine_profiler=OrtModelExecutionProfiler(),
             ),
             artifact_store=artifact_store,
-            model_exec_profile_publisher=execution_profile_store,
+            model_exec_profile_publisher=execution_profile_publisher,
         )
 
         await self.start_lifecycle(stack, resource_coordinator)

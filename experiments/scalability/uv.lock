@@ -450,6 +450,41 @@ requires-dist = [
 ]
 
 [[package]]
+name = "distributed-inference-optimizer"
+version = "0.1.0"
+source = { editable = "../../services/optimizer" }
+dependencies = [
+    { name = "distributed-inference-advertisement", extra = ["http"] },
+    { name = "distributed-inference-blocks" },
+    { name = "distributed-inference-catalog" },
+    { name = "distributed-inference-integration" },
+    { name = "distributed-inference-redis-access" },
+    { name = "distributed-inference-shared" },
+    { name = "fastapi" },
+    { name = "gurobipy" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "redis" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "distributed-inference-advertisement", extras = ["http"], editable = "../../packages/advertisement" },
+    { name = "distributed-inference-blocks", editable = "../../packages/blocks" },
+    { name = "distributed-inference-catalog", editable = "../../packages/catalog" },
+    { name = "distributed-inference-integration", editable = "../../packages/integration" },
+    { name = "distributed-inference-redis-access", editable = "../../packages/redis_access" },
+    { name = "distributed-inference-shared", editable = "../../packages/shared" },
+    { name = "fastapi", specifier = ">=0.139.2" },
+    { name = "gurobipy", specifier = ">=13.0.1,<14" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "pydantic", specifier = ">=2.8" },
+    { name = "redis", specifier = ">=8.0.1" },
+    { name = "uvicorn", extras = ["standard"] },
+]
+
+[[package]]
 name = "distributed-inference-redis-access"
 version = "0.1.0"
 source = { editable = "../../packages/redis_access" }
@@ -471,6 +506,7 @@ source = { editable = "." }
 dependencies = [
     { name = "distributed-inference-controller" },
     { name = "distributed-inference-model-manager" },
+    { name = "distributed-inference-optimizer" },
     { name = "matplotlib" },
     { name = "pulp", extra = ["highs"] },
     { name = "pydantic" },
@@ -498,6 +534,7 @@ export = [
 requires-dist = [
     { name = "distributed-inference-controller", editable = "../../services/controller" },
     { name = "distributed-inference-model-manager", editable = "../../services/model_manager" },
+    { name = "distributed-inference-optimizer", editable = "../../services/optimizer" },
     { name = "matplotlib", specifier = ">=3.8" },
     { name = "pulp", extras = ["highs"], specifier = ">=4.2.0" },
     { name = "pydantic", specifier = ">=2.8" },

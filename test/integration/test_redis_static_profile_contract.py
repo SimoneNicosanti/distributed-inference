@@ -122,7 +122,7 @@ async def test_redis_profile_contract_from_model_manager_to_worker_and_controlle
     )
     from redis_access.redis_reader.redis.key_redis_reader import KeyRedisReader
     from redis_access.redis_reader.redis.set_redis_reader import SetRedisReader
-    from worker.adapters.outbound.profiling.store.redis_model_static_profile_reader import (
+    from worker.adapters.outbound.profiling.reader.redis_model_static_profile_reader import (
         RedisModelStaticProfileReader,
     )
 

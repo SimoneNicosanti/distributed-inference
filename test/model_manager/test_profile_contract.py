@@ -71,10 +71,10 @@ from shared.service.service import ServiceId
 from worker.adapters.outbound.profiling.model_execution.ort.ort_engine_model_execution_profiler import (
     OrtModelExecutionProfiler,
 )
-from worker.adapters.outbound.profiling.store.mappers.model_execution_profile_mapper import (
+from worker.adapters.outbound.profiling.publisher.mappers.model_execution_profile_mapper import (
     ModelExecutionProfileMapper,
 )
-from worker.adapters.outbound.profiling.store.mappers.model_static_profile_mapper import (
+from worker.adapters.outbound.profiling.reader.mappers.model_static_profile_mapper import (
     ModelStaticProfileMapper,
 )
 from worker.domain.profiling.model_execution.model_execution_profile import (

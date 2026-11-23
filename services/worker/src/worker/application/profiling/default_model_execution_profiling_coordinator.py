@@ -13,20 +13,22 @@ from worker.application.ports.outbound.profiling.model_execution.model_execution
 from worker.application.ports.outbound.profiling.model_execution.model_static_profile_reader import (
     ModelStaticProfileReader,
 )
+from worker.application.ports.outbound.profiling.model_execution.pending_model_variant_consumer import (
+    PendingModelVariantConsumer,
+)
 from worker.application.profiling.abc.model_execution_profiler import (
     ModelExecutionProfiler,
 )
 from worker.application.profiling.abc.model_execution_profiling_coordinator import (
     ModelExecutionProfilingCoordinator,
 )
-from worker.application.profiling.abc.pending_models_poller import (
-    PendingModelsPoller,
-)
 from worker.domain.profiling.model_execution.model_execution_profile import (
     ModelExecutionProfile,
 )
 
 logger = logging.getLogger(__name__)
+
+EXECUTION_PROFILING_INTERVAL_S = 1 * 60
 
 
 class DefaultModelExecutionProfilingCoordinator(
@@ -35,14 +37,14 @@ class DefaultModelExecutionProfilingCoordinator(
     def __init__(
         self,
         worker_id: WorkerId,
-        pending_models_poller: PendingModelsPoller,
+        pending_models_consumer: PendingModelVariantConsumer,
         model_static_profile_reader: ModelStaticProfileReader,
         model_execution_profiler: ModelExecutionProfiler,
         artifact_store: ArtifactStore,
         model_exec_profile_publisher: ModelExecutionProfilePublisher,
     ):
         self._worker_id = worker_id
-        self._pending_models_poller = pending_models_poller
+        self._pending_models_consumer = pending_models_consumer
         self._model_static_profile_reader = model_static_profile_reader
         self._model_execution_profiler = model_execution_profiler
         self._artifact_store = artifact_store
@@ -94,15 +96,33 @@ class DefaultModelExecutionProfilingCoordinator(
                 self._worker_id,
                 model_variant_id,
             )
+            return
+
+        try:
+            await self._pending_models_consumer.acknowledge(model_variant_id)
+        except Exception:
+            logger.exception(
+                "Error while acknowledging success profile: worker=%s, model=%s",
+                self._worker_id,
+                model_variant_id,
+            )
 
     async def _profile_loop(self) -> None:
-        async with aclosing(
-            self._pending_models_poller.pending_model_ids()
-        ) as pending_model_ids:
-            async for pending_model_id in pending_model_ids:
-                await self._coordinate_model_execution_profiling(
-                    model_variant_id=pending_model_id
+        while True:
+            try:
+                async with aclosing(
+                    self._pending_models_consumer.pending_model_variant_ids()
+                ) as pending_model_ids:
+                    async for pending_model_id in pending_model_ids:
+                        await self._coordinate_model_execution_profiling(
+                            model_variant_id=pending_model_id
+                        )
+            except Exception:
+                logger.exception(
+                    "Execution profiling round failed",
                 )
+
+            await asyncio.sleep(EXECUTION_PROFILING_INTERVAL_S)
 
     @override
     async def start(self) -> None:

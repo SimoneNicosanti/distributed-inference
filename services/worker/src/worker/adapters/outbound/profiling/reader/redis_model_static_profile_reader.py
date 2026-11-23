@@ -18,7 +18,7 @@ from redis_access.redis_reader.abc.single_value_redis_reader import (
     SingleValueRedisReader,
 )
 from shared.model.model_variant import ModelVariantId
-from worker.adapters.outbound.profiling.store.mappers.model_static_profile_mapper import (
+from worker.adapters.outbound.profiling.reader.mappers.model_static_profile_mapper import (
     ModelStaticProfileMapper,
 )
 from worker.application.ports.outbound.profiling.model_execution.model_static_profile_reader import (
@@ -48,20 +48,6 @@ class RedisModelStaticProfileReader(ModelStaticProfileReader):
         self._profiled_model_variant_address_factory_cls = (
             profiled_model_variant_address_factory_cls
         )
-
-    @override
-    async def get_all_model_static_profile_ids(self) -> list[ModelVariantId]:
-        ids_address = self._profiled_model_variant_address_factory_cls.build_profiled_model_variant_ids_address()
-
-        try:
-            ids: list[ModelVariantId] = []
-            for value in await self._ids_reader.read_all(self._redis, ids_address):
-                self._append_id_to_list_from_value(ids, value)
-            return ids
-        except RedisReadError as e:
-            raise ModelStaticProfileReadError(
-                "Unable to read model static profile IDs"
-            ) from e
 
     def _append_id_to_list_from_value(
         self, ids: list[ModelVariantId], value: str | bytes

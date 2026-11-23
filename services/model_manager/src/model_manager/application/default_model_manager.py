@@ -14,6 +14,9 @@ from model_manager.application.ports.inbound.model_registry import ModelRegistry
 from model_manager.application.ports.inbound.model_variant_registry import (
     ModelVariantRegistry,
 )
+from model_manager.application.ports.outbound.available_model_variant_producer import (
+    AvailableModelVariantProducer,
+)
 from model_manager.application.ports.outbound.model_metadata_store import (
     ModelMetadataStore,
 )
@@ -43,6 +46,7 @@ class DefaultModelManager(ModelRegistry, ModelVariantRegistry, ModelPartitioner)
         artifact_ref_factory: ArtifactRefFactory,
         model_metadata_store: ModelMetadataStore,
         model_splitter: ModelPartitionExtractor,
+        available_model_variant_producer: AvailableModelVariantProducer,
     ):
         self._model_profiler = model_profiler
         self._model_variant_id_factory = model_variant_id_factory
@@ -55,6 +59,8 @@ class DefaultModelManager(ModelRegistry, ModelVariantRegistry, ModelPartitioner)
         self._pending_model_variants: dict[
             ModelVariantId, tuple[ModelVariant, ArtifactRef]
         ] = {}
+
+        self._available_model_variant_producer = available_model_variant_producer
 
     @override
     async def register_model(self, model: Model) -> None:
@@ -118,6 +124,9 @@ class DefaultModelManager(ModelRegistry, ModelVariantRegistry, ModelPartitioner)
         )
         await self._model_metadata_store.add_profiled_model_variant(
             profiled_model_variant
+        )
+        await self._available_model_variant_producer.publish_available_model_variant(
+            model_variant_id
         )
 
         self._pending_model_variants.pop(model_variant_id, None)
