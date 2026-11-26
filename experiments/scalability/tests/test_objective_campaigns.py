@@ -17,9 +17,10 @@ def test_each_instance_has_independent_runs_for_all_objectives(
 ) -> None:
     baseline = list(campaign_specs(config, "pilot"))
     expanded = list(campaign_specs(config, "pilot", objectives=BENCHMARK_OBJECTIVES))
-    assert len(expanded) == 4 * len(baseline)
+    objective_count = len(BENCHMARK_OBJECTIVES)
+    assert len(expanded) == objective_count * len(baseline)
     for index, original in enumerate(baseline):
-        group = expanded[4 * index : 4 * index + 4]
+        group = expanded[objective_count * index : objective_count * (index + 1)]
         assert tuple(spec.objective for spec in group) == BENCHMARK_OBJECTIVES
         assert all(
             replace(spec, objective=original.objective) == original for spec in group
@@ -34,7 +35,7 @@ def test_each_instance_has_independent_runs_for_all_objectives(
             )
             for spec in group
         }
-        assert len(ids) == 4
+        assert len(ids) == objective_count
 
 
 def test_subset_selection_is_deduplicated_and_preserves_order(
@@ -54,7 +55,8 @@ def test_subset_selection_is_deduplicated_and_preserves_order(
 @pytest.mark.parametrize(
     "selection,multiplier",
     [
-        ("all", 4),
+        ("all", len(BENCHMARK_OBJECTIVES)),
+        ("arrival_weighted_normalized_response_time", 1),
         ("deadline_violations", 1),
         ("deadline_violations arrival_weighted_accuracy", 2),
     ],

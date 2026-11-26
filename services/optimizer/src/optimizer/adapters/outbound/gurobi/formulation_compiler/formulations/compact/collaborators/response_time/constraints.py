@@ -37,13 +37,9 @@ def add_response_time_constraints(
     max_components = data.problem.policy.max_components
     objective_kind = data.problem.policy.objective
     p = problem
-    connections = problem.connections_by_pair
     for flow in p.flows:
         flow_index = p.flow_index[flow]
         workers = p.problem.flows[flow].workers
-        successors_by_worker = {
-            source: problem.successors_by_worker[source] for source in workers
-        }
         batch_fill = gp.quicksum(
             p.batch_fill_time_s[flow, model_variant]
             * assignment.configuration_selected[flow, model_variant]
@@ -64,16 +60,9 @@ def add_response_time_constraints(
             for cut in range(1, max_components)
         )
         latency = gp.quicksum(
-            (
-                0.0
-                if source == target
-                else connections[source, target].round_trip_time_s / 2
-            )
-            * network.adjacent_component_workers[flow, cut, source, target]
+            network.source_latency_s[flow, cut, source]
             for cut in range(1, max_components)
             for source in workers
-            for target in workers
-            if source == target or target in successors_by_worker[source]
         )
         model.addConstr(
             qos.response_time_s[flow]
@@ -86,6 +75,7 @@ def add_response_time_constraints(
         )
         if objective_kind in {
             ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+            ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_TIME,
             ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
         }:
             model.addConstr(

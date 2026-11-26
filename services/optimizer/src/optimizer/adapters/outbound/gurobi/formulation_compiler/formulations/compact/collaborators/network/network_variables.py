@@ -15,7 +15,7 @@ class NetworkVariables:
     tensor_crossing_auxiliary: dict[
         tuple[FlowId, ModelConfigurationKey, TensorKey, int], gp.Var
     ]
-    adjacent_component_workers: dict[tuple[FlowId, int, WorkerId, WorkerId], gp.Var]
+    source_latency_s: dict[tuple[FlowId, int, WorkerId], gp.Var]
     transmission_time_s: dict[
         tuple[FlowId, ModelConfigurationKey, int, WorkerId], gp.Var
     ]

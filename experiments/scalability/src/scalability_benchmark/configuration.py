@@ -18,6 +18,7 @@ BENCHMARK_OBJECTIVES = (
     ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
     ObjectiveKind.DEADLINE_VIOLATIONS,
     ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY,
+    ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_TIME,
 )
 
 
@@ -128,7 +129,9 @@ class FlowSettings(Settings):
     arrival_weight_range: tuple[float, float]
     reference_model: str
     reference_tier: Literal["device"]
-    calibration: Literal["full_pool_reference_utilization"]
+    calibration: Literal[
+        "full_pool_reference_utilization", "per_instance_reference_utilization"
+    ]
     max_energy_consumption: float = Field(gt=0)
 
     @model_validator(mode="after")
@@ -154,17 +157,15 @@ class OptimizationSettings(Settings):
     @classmethod
     def benchmark_objective(cls, value: ObjectiveKind) -> ObjectiveKind:
         if value not in BENCHMARK_OBJECTIVES:
-            raise ValueError("Select one of the four benchmark objectives")
+            raise ValueError("Select one of the supported benchmark objectives")
         return value
 
 
 class SolverSettings(Settings):
-    strategy: Literal["full", "incremental"] = "full"
+    strategy: Literal["full", "incremental", "incremental-persistent"] = "full"
     insertion_time_limit_s: float | None = Field(
         default=None, gt=0, allow_inf_nan=False
     )
-    repair_time_limit_s: float | None = Field(default=None, gt=0, allow_inf_nan=False)
-    final_time_limit_s: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     formulation: CompactFormulationKind = CompactFormulationKind.ASSIGNMENT
     timeout_s: float = Field(gt=0)
     relative_gap: float = Field(ge=0)
@@ -198,6 +199,7 @@ class PilotSettings(Settings):
 
 
 class ExperimentConfig(Settings):
+    model_selection: Literal["performance", "model_variant"] = "performance"
     root: Path
     seeds: tuple[int, ...]
     catalog: CatalogSettings
@@ -228,10 +230,13 @@ class ExperimentConfig(Settings):
             raise ValueError("The device must be CPU-only")
         if any(self.hardware[tier].backend != "gpu" for tier in ("edge", "cloud")):
             raise ValueError("Edge and cloud must provide GPUs")
-        progression = tuple((i, 0) for i in range(4))
-        if self.infrastructure != progression:
+        if (
+            not self.infrastructure
+            or len(set(self.infrastructure)) != len(self.infrastructure)
+            or any(edge < 0 or cloud < 0 for edge, cloud in self.infrastructure)
+        ):
             raise ValueError(
-                "Infrastructure must preserve all 11 ordered configurations"
+                "Infrastructure configurations must be nonempty, unique and nonnegative"
             )
         if set(self.network) != {
             "device-edge",
@@ -286,7 +291,23 @@ class ExperimentConfig(Settings):
 def load_configuration(path: Path) -> ExperimentConfig:
     with path.open(encoding="utf-8") as handle:
         raw = yaml.safe_load(handle)
-    config = ExperimentConfig.model_validate(raw)
+    config_type: type[ExperimentConfig] = ExperimentConfig
+    if raw.get("model_selection") == "model_variant":
+        from scalability_benchmark.model_variant_configuration import (
+            ModelVariantExperimentConfig,
+        )
+
+        config_type = ModelVariantExperimentConfig
+    config = config_type.model_validate(raw)
     return config.model_copy(
         update={"root": (path.resolve().parent / config.root).resolve()}
     )
+
+
+def default_configuration_path(
+    model_selection: Literal["performance", "model_variant"] = "performance",
+) -> Path:
+    filename = (
+        "performance.yaml" if model_selection == "performance" else "model-variant.yaml"
+    )
+    return Path(__file__).resolve().parents[2] / "config" / filename

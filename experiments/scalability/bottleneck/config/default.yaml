@@ -1,0 +1,28 @@
+base_config: ../../config/performance.yaml
+output: ../results/default-b-reference
+flow_counts: [5, 10, 20, 30, 50, 75, 100]
+seeds: [42, 43]
+loads: [0.8]
+objectives: [arrival_weighted_normalized_response_time]
+formulation: cumulative
+# Original eleven prefixes remain addressable: indices 0..10, total workers 1..11.
+infrastructure_indices: [1]
+model_count: 3
+max_components: 5
+priority_count: 2
+start_modes: [cold, warm]
+include_primary_fixed: false
+anchor_flow_count: 20
+candidate_model_counts: []
+component_counts: []
+worker_counts: []
+priority_counts: []
+solver:
+  time_limit_seconds: 300
+  mip_gap: 0.01
+  threads: 1
+  seed: 0
+  console: false
+  measure_presolve: true
+  presolve_probe_seconds: 30
+reference: {validation_seconds: 30}

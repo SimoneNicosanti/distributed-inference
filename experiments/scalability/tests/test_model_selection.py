@@ -1,13 +1,25 @@
-"""Explicit variants share seeded workloads with performance selection."""
+"""Fixed B6 requests share seeded workloads without sweeping model counts."""
 
 import csv
 from dataclasses import replace
 
 import pytest
-from scalability_benchmark import analysis, cli
-from scalability_benchmark.campaigns import MODEL_SELECTIONS, RunSpec, campaign_specs
-from scalability_benchmark.configuration import BENCHMARK_OBJECTIVES
+import pytest_asyncio
+import yaml
+from scalability_benchmark import analysis, cli, instances, model_variant_cli
+from scalability_benchmark.campaigns import (
+    FIXED_MODEL_NAME,
+    RunSpec,
+    campaign_specs,
+)
+from scalability_benchmark.catalog import CatalogEntry, synthetic_accuracies
+from scalability_benchmark.configuration import (
+    BENCHMARK_OBJECTIVES,
+    default_configuration_path,
+    load_configuration,
+)
 from scalability_benchmark.instances import (
+    build_scenario,
     instance_flows,
     make_instance,
     request_record,
@@ -20,6 +32,8 @@ from optimizer.domain.formulation.compact.misocp.compact_formulation_kind import
     CompactFormulationKind,
 )
 from optimizer.domain.problem.compact.compact_optimization_problem import ObjectiveKind
+from shared.model.model import ModelId
+from shared.model.model_variant import ModelVariantId
 
 from . import test_optimizer_contract as fixture_module
 
@@ -43,46 +57,139 @@ def _spec(scenario, **changes):
     )
 
 
-def test_campaign_expands_selection_modes_and_preserves_run_identity(config):
-    baseline = list(campaign_specs(config, "main"))
-    specs = list(
-        campaign_specs(
-            config,
-            "main",
-            model_selections=MODEL_SELECTIONS * 2,
-            objectives=BENCHMARK_OBJECTIVES,
-        )
+@pytest.fixture
+def fixed_config():
+    return load_configuration(default_configuration_path("model_variant"))
+
+
+@pytest_asyncio.fixture
+async def fixed_scenario(fixed_config, make_model, monkeypatch, tmp_path):
+    settings = fixed_config.catalog.models[0]
+    entry = CatalogEntry(
+        settings,
+        tmp_path / settings.filename,
+        ModelVariantId(ModelId(settings.name), "fp32-batch1"),
+        synthetic_accuracies(fixed_config, 42)[settings.name],
+        {settings.filename: "mock-hash"},
     )
-    assert len(specs) == len(baseline) * 2 * len(BENCHMARK_OBJECTIVES)
-    assert {spec.model_selection for spec in specs} == set(MODEL_SELECTIONS)
+    profiled = []
+
+    async def profile(entry, cache, software_hash):
+        profiled.append(entry.settings.name)
+        return make_model(entry)
+
+    monkeypatch.setattr(instances, "discover_catalog", lambda config, seed: (entry,))
+    monkeypatch.setattr(instances, "profile_entry", profile)
+    result = await build_scenario(fixed_config, 42, tmp_path, "test-software")
+    assert profiled == [FIXED_MODEL_NAME]
+    assert len(result.models) == 1
+    return result
+
+
+@pytest.mark.parametrize("mode", ["performance", "model_variant"])
+def test_separate_campaigns_preserve_objective_expansion(config, fixed_config, mode):
+    selected = config if mode == "performance" else fixed_config
+    baseline = list(campaign_specs(selected, "main"))
+    specs = list(campaign_specs(selected, "main", objectives=BENCHMARK_OBJECTIVES))
+    assert len(specs) == len(baseline) * len(BENCHMARK_OBJECTIVES)
+    assert {spec.model_selection for spec in specs} == {mode}
     assert len({fingerprint(spec.as_record()) for spec in specs}) == len(specs)
     assert specs[0] == baseline[0]
-    assert replace(specs[1], model_selection="performance") == specs[0]
+    if mode == "model_variant":
+        assert {spec.model_count for spec in specs} == {1}
+    else:
+        assert {spec.model_count for spec in specs} == set(config.main.models)
 
 
-@pytest.mark.parametrize("selection", [(), ("unknown",)])
-def test_campaign_rejects_invalid_selection(config, selection):
-    with pytest.raises(ValueError, match="Select performance or model_variant"):
-        list(campaign_specs(config, "main", model_selections=selection))
+@pytest.mark.parametrize("campaign", ["main", "sensitivity", "pilot"])
+def test_fixed_campaign_has_one_candidate_without_model_fields(fixed_config, campaign):
+    raw = yaml.safe_load(default_configuration_path("model_variant").read_text())
+    for name in ("main", "sensitivity"):
+        assert "models" not in raw[name]
+    assert all("models" not in case for case in raw["pilot"]["cases"])
+    specs = list(campaign_specs(fixed_config, campaign))
+    assert specs and {spec.model_count for spec in specs} == {1}
+    assert len(set(specs)) == len(specs)
+    assert {spec.model_selection for spec in specs} == {"model_variant"}
+    assert tuple(m.name for m in fixed_config.catalog.models) == (FIXED_MODEL_NAME,)
 
 
-def test_cli_plan_counts_both_modes(config, monkeypatch, capsys):
-    # The live YAML contains pilot indices beyond its reduced worker pool.
-    config = config.model_copy(
-        update={
-            "pilot": config.pilot.model_copy(update={"cases": (config.pilot.cases[0],)})
-        }
-    )
-    monkeypatch.setattr(cli, "load_configuration", lambda path: config)
-    monkeypatch.setattr(
-        "sys.argv", ["scalability", "plan", "--model-selection", *MODEL_SELECTIONS]
-    )
-    cli.main()
-    count = 2 * len(list(campaign_specs(config, "main")))
+@pytest.mark.parametrize("section", ["main", "sensitivity", "pilot"])
+def test_fixed_config_rejects_candidate_sweeps(tmp_path, section):
+    raw = yaml.safe_load(default_configuration_path("model_variant").read_text())
+    if section == "pilot":
+        raw["pilot"]["cases"][0]["models"] = 2
+    else:
+        raw[section]["models"] = [1, 2]
+    path = tmp_path / "invalid.yaml"
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError):
+        load_configuration(path)
+
+
+def test_fixed_config_requires_b6_catalog(tmp_path):
+    raw = yaml.safe_load(default_configuration_path("model_variant").read_text())
+    raw["catalog"]["models"][0]["name"] = "resnet50"
+    raw["flows"]["reference_model"] = "resnet50"
+    path = tmp_path / "invalid.yaml"
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match="requires only efficientnet_b6"):
+        load_configuration(path)
+
+
+@pytest.mark.parametrize("mode", ["performance", "model_variant"])
+def test_cli_plans_only_its_own_experiment(mode, monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["scalability-" + mode, "plan"])
+    entrypoint = cli.main if mode == "performance" else model_variant_cli.main
+    entrypoint()
+    config = load_configuration(default_configuration_path(mode))
+    count = len(list(campaign_specs(config, "main")))
     assert f"main: {count} runs;" in capsys.readouterr().out
 
 
-def test_pinned_variants_are_repeatable_and_only_use_available_models(scenario):
+@pytest.mark.parametrize("mode", ["performance", "model_variant"])
+def test_cli_rejects_other_experiment_config(mode, monkeypatch):
+    other = "model_variant" if mode == "performance" else "performance"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "scalability-" + mode,
+            "plan",
+            "--config",
+            str(default_configuration_path(other)),
+        ],
+    )
+    with pytest.raises(SystemExit) as error:
+        (cli.main if mode == "performance" else model_variant_cli.main)()
+    assert error.value.code == 2
+
+
+@pytest.mark.parametrize("mode", ["performance", "model_variant"])
+def test_cli_rejects_combined_mode_flag(mode, monkeypatch):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "scalability-" + mode,
+            "plan",
+            "--model-selection",
+            "performance",
+            "model_variant",
+        ],
+    )
+    with pytest.raises(SystemExit) as error:
+        (cli.main if mode == "performance" else model_variant_cli.main)()
+    assert error.value.code == 2
+
+
+def test_outputs_and_configs_are_independent(config, fixed_config):
+    assert config.model_selection == "performance"
+    assert fixed_config.model_selection == "model_variant"
+    assert config.root / config.output != fixed_config.root / fixed_config.output
+    assert config.main.models != fixed_config.main.models
+    assert default_configuration_path() != default_configuration_path("model_variant")
+
+
+def test_every_flow_requests_b6_independently_of_available_prefix(scenario):
     spec = _spec(scenario)
     requests = instance_flows(scenario, spec)
     assert requests == instance_flows(scenario, spec)
@@ -96,11 +203,17 @@ def test_pinned_variants_are_repeatable_and_only_use_available_models(scenario):
             formulation=CompactFormulationKind.CUMULATIVE,
         ),
     )
-    available = {
-        model.entry.variant_id for model in scenario.models[: spec.model_count]
-    }
-    assert {flow.model_variant_id for flow in requests} <= available
-    assert len({flow.model_variant_id for flow in requests}) > 1
+    b6 = next(
+        model
+        for model in scenario.models
+        if model.entry.settings.name == FIXED_MODEL_NAME
+    )
+    assert b6 not in scenario.models[:1]
+    assert {flow.model_variant_id for flow in requests} == {b6.entry.variant_id}
+    for count in (1, 2, len(scenario.models)):
+        selected = replace(spec, model_count=count)
+        assert requests == instance_flows(scenario, selected)
+        assert make_instance(scenario, spec) == make_instance(scenario, selected)
     for original, pinned in zip(scenario.flows[spec.load], requests, strict=True):
         assert (
             replace(
@@ -120,16 +233,20 @@ def test_pinned_variants_are_repeatable_and_only_use_available_models(scenario):
     assert set(problem.variants) == {flow.model_variant_id for flow in requests}
     record = request_record(requests[0])
     assert record["minimum_accuracy"] is None and record["dataset"] is None
-    assert record["model_variant_id"]["model_id"]["model_name"] in {
-        model.entry.settings.name for model in scenario.models[: spec.model_count]
-    }
+    assert record["model_variant_id"]["model_id"]["model_name"] == FIXED_MODEL_NAME
 
 
-def test_single_available_model_is_assigned_to_every_flow(scenario):
-    requests = instance_flows(scenario, _spec(scenario, model_count=1))
-    assert {request.model_variant_id for request in requests} == {
-        scenario.models[0].entry.variant_id
-    }
+def test_fixed_requests_fail_if_b6_profile_is_missing(scenario):
+    scenario = replace(
+        scenario,
+        models=tuple(
+            model
+            for model in scenario.models
+            if model.entry.settings.name != FIXED_MODEL_NAME
+        ),
+    )
+    with pytest.raises(ValueError, match="exactly one efficientnet_b6"):
+        instance_flows(scenario, _spec(scenario, model_count=1))
 
 
 def test_fixed_selection_ignores_performance_threshold(scenario):
@@ -148,8 +265,9 @@ def test_fixed_selection_ignores_performance_threshold(scenario):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["performance", "model_variant"])
 async def test_campaign_records_pinned_requests_and_resumes_each_mode(
-    scenario, tmp_path, monkeypatch
+    scenario, fixed_config, tmp_path, monkeypatch, mode
 ):
     async def build(*args):
         return scenario
@@ -167,15 +285,14 @@ async def test_campaign_records_pinned_requests_and_resumes_each_mode(
     )
     for resume in (False, True):
         await cli.run_campaign(
-            scenario.config,
+            scenario.config if mode == "performance" else fixed_config,
             "main",
             tmp_path,
             resume=resume,
             retry_errors=False,
             limit=2,
-            model_selections=MODEL_SELECTIONS,
         )
-    assert calls == list(MODEL_SELECTIONS)
+    assert calls == [mode, mode]
     records = list(read_journal(tmp_path / "runs.jsonl").values())
     assert len(records) == 2
     for record in records:
@@ -186,10 +303,15 @@ async def test_campaign_records_pinned_requests_and_resumes_each_mode(
         assert all(
             (flow["minimum_accuracy"] is None) == fixed for flow in record["flows"]
         )
+        if fixed:
+            assert record["model_count"] == 1
+            assert record["model_names"] == [FIXED_MODEL_NAME]
+            assert all(
+                flow["model_variant_id"]["model_id"]["model_name"] == FIXED_MODEL_NAME
+                for flow in record["flows"]
+            )
     with (tmp_path / "summary.csv").open() as handle:
-        assert {row["model_selection"] for row in csv.DictReader(handle)} == set(
-            MODEL_SELECTIONS
-        )
+        assert {row["model_selection"] for row in csv.DictReader(handle)} == {mode}
 
 
 def test_analysis_separates_modes_and_understands_historical_records(
@@ -248,10 +370,11 @@ def test_analysis_separates_modes_and_understands_historical_records(
         ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
     ],
 )
-@pytest.mark.parametrize("strategy", ["full", "incremental"])
+@pytest.mark.parametrize("strategy", ["full", "incremental", "incremental-persistent"])
 async def test_native_solver_accepts_fixed_variant_requests(
-    scenario, kind, objective, strategy
+    fixed_scenario, kind, objective, strategy
 ):
+    scenario = fixed_scenario
     config = scenario.config.model_copy(
         update={
             "optimization": scenario.config.optimization.model_copy(
@@ -263,7 +386,7 @@ async def test_native_solver_accepts_fixed_variant_requests(
     spec = _spec(
         scenario,
         flow_count=2,
-        model_count=2,
+        model_count=1,
         objective=objective,
         formulation=kind,
         strategy=strategy,

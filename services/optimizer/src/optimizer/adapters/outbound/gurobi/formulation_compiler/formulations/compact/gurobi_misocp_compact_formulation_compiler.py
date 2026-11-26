@@ -77,8 +77,12 @@ class GurobiMisocpCompactFormulationModelBuilder(
             else CompactObjectiveBuilder()
         )
 
-    def _create_variables(
-        self, model: gp.Model, data: MisocpCompactFormulation
+    def create_variables(
+        self,
+        model: gp.Model,
+        data: MisocpCompactFormulation,
+        *,
+        existing: CompactVariables | None = None,
     ) -> CompactVariables:
         return CompactVariables(
             assignment=(
@@ -87,17 +91,27 @@ class GurobiMisocpCompactFormulationModelBuilder(
                 else self._assignment
             ).create_variables(model, data),
             execution=self._execution.create_variables(model, data),
-            compute_queue=self._compute_queue.create_variables(model, data),
-            network=self._network.create_variables(model, data),
-            memory=self._memory.create_variables(model, data),
+            compute_queue=self._compute_queue.create_variables(
+                model, data, existing=existing.compute_queue if existing else None
+            ),
+            network=self._network.create_variables(
+                model, data, existing=existing.network if existing else None
+            ),
+            memory=self._memory.create_variables(
+                model, data, existing=existing.memory if existing else None
+            ),
             qos=self._response_time.create_variables(model, data),
         )
 
-    @override
-    def build_model_from_formulation(
-        self, model: gp.Model, data: MisocpCompactFormulation
-    ) -> CompactVariables:
-        variables = self._create_variables(model, data)
+    def add_constraints(
+        self,
+        model: gp.Model,
+        data: MisocpCompactFormulation,
+        variables: CompactVariables,
+        *,
+        include_shared: bool = True,
+    ) -> None:
+        """Connect flow blocks, optionally including worker-wide constraints."""
         assignment_builder = (
             self._cumulative_assignment
             if data.representation is CompactFormulationKind.CUMULATIVE
@@ -113,12 +127,21 @@ class GurobiMisocpCompactFormulationModelBuilder(
             assignment=variables.assignment,
             execution=variables.execution,
             compute_queue=variables.compute_queue,
+            include_shared=include_shared,
         )
         self._network.add_constraints(
-            model, data, assignment=variables.assignment, network=variables.network
+            model,
+            data,
+            assignment=variables.assignment,
+            network=variables.network,
+            include_shared=include_shared,
         )
         self._memory.add_constraints(
-            model, data, assignment=variables.assignment, memory=variables.memory
+            model,
+            data,
+            assignment=variables.assignment,
+            memory=variables.memory,
+            include_capacity=include_shared,
         )
         self._response_time.add_constraints(
             model,
@@ -129,6 +152,13 @@ class GurobiMisocpCompactFormulationModelBuilder(
             network=variables.network,
             qos=variables.qos,
         )
+
+    @override
+    def build_model_from_formulation(
+        self, model: gp.Model, data: MisocpCompactFormulation
+    ) -> CompactVariables:
+        variables = self.create_variables(model, data)
+        self.add_constraints(model, data, variables)
         self._objective.set_objective(
             model, data, assignment=variables.assignment, qos=variables.qos
         )

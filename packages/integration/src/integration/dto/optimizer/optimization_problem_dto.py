@@ -27,6 +27,7 @@ from shared.model.model_variant import ModelVariantId
 
 class ObjectiveKindDto(StrEnum):
     ARRIVAL_WEIGHTED_RESPONSE_TIME = auto()
+    ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_TIME = auto()
     ARRIVAL_WEIGHTED_ACCURACY = auto()
     DEADLINE_VIOLATIONS = auto()
     ARRIVAL_WEIGHTED_NORMALIZED_DELAY = auto()

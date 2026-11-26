@@ -18,10 +18,17 @@ from .constraints import add_memory_constraints
 
 class CompactMemoryBuilder:
     def create_variables(
-        self, model: gp.Model, data: MisocpCompactFormulation
+        self,
+        model: gp.Model,
+        data: MisocpCompactFormulation,
+        *,
+        existing: MemoryVariables | None = None,
     ) -> MemoryVariables:
         variables = _add_compact_memory_variables(
-            model, data, max_components=data.problem.policy.max_components
+            model,
+            data,
+            max_components=data.problem.policy.max_components,
+            existing=existing,
         )
         return variables
 
@@ -32,8 +39,15 @@ class CompactMemoryBuilder:
         *,
         assignment: AssignmentVariables,
         memory: MemoryVariables,
+        include_capacity: bool = True,
     ) -> None:
-        add_memory_constraints(model, data, assignment=assignment, memory=memory)
+        add_memory_constraints(
+            model,
+            data,
+            assignment=assignment,
+            memory=memory,
+            include_capacity=include_capacity,
+        )
 
 
 def _add_compact_memory_variables(
@@ -41,6 +55,7 @@ def _add_compact_memory_variables(
     problem: MisocpCompactFormulation,
     *,
     max_components: int,
+    existing: MemoryVariables | None = None,
 ) -> MemoryVariables:
     weights = {}
     for flow in problem.flows:
@@ -58,7 +73,9 @@ def _add_compact_memory_variables(
                     )
     return MemoryVariables(
         component_weight_mb=weights,
-        max_activation_mb={
+        max_activation_mb=existing.max_activation_mb
+        if existing is not None
+        else {
             worker: model.addVar(
                 lb=0,
                 ub=bytes_to_megabytes(

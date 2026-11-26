@@ -53,6 +53,7 @@ def test_response_time_and_accuracy_objectives_require_deadline(
     )
     if objective in {
         ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME,
+        ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_TIME,
         ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY,
     }:
         with pytest.raises(OptimizationInfeasibleError):

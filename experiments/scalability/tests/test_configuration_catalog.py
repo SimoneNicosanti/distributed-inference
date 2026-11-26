@@ -47,10 +47,9 @@ def test_default_campaign_contract(config: ExperimentConfig) -> None:
         for spec in main
     )
     assert len({fingerprint(spec.as_record()) for spec in main + sensitivity}) == 968
-    assert (
-        len(list(campaign_specs(config, "main", objectives=BENCHMARK_OBJECTIVES)))
-        == 3080
-    )
+    assert len(
+        list(campaign_specs(config, "main", objectives=BENCHMARK_OBJECTIVES))
+    ) == len(main) * len(BENCHMARK_OBJECTIVES)
     assert {spec.timeout_s for spec in campaign_specs(config, "pilot")} == {60}
 
 

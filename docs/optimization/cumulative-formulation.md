@@ -1,5 +1,9 @@
 # Assignment and cumulative compact MISOCP
 
+Transmission latency now uses per-source `xi[f,k,s]` variables and exact
+upper/lower bounds. Pair-transition `q` variables are removed from the shared
+network block. See [source latency formulation and validation](transmission-latency.md).
+
 The optimizer owns both representations. `assignment` remains the default;
 `cumulative` changes the layer representation, precedence rows and tensor-prefix
 expressions. Controllers, optimization problems, DTOs and public solutions are
@@ -190,7 +194,8 @@ required.
 Modified:
 
 - `experiments/scalability/README.md`
-- `experiments/scalability/config/default.yaml`
+- `experiments/scalability/config/performance.yaml`
+- `experiments/scalability/config/model-variant.yaml`
 - `experiments/scalability/scripts/check_static.py`
 - `experiments/scalability/src/scalability_benchmark/analysis.py`
 - `experiments/scalability/src/scalability_benchmark/campaigns.py`

@@ -42,6 +42,14 @@ class CompactObjectiveBuilder:
                 arrival_rates[flow] / total_arrival_rate * qos.response_time_s[flow]
                 for flow in p.flows
             )
+        elif objective_kind == ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_TIME:
+            objective = gp.quicksum(
+                arrival_rates[flow]
+                / total_arrival_rate
+                * qos.response_time_s[flow]
+                / float(problem.problem.flows[flow].max_response_time_s)
+                for flow in p.flows
+            )
         elif objective_kind == ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY:
             coefficients = {}
             for flow in p.flows:
@@ -82,33 +90,39 @@ class CompactObjectiveBuilder:
             violations = []
             for flow in p.flows:
                 index = p.flow_index[flow]
-                violated = model.addVar(
-                    lb=0.0,
-                    ub=1.0,
-                    vtype=GRB.BINARY,
-                    name=f"deadline_violation[{index}]",
-                )
-                model.addGenConstrIndicator(
-                    violated,
-                    False,
-                    qos.response_time_s[flow],
-                    GRB.LESS_EQUAL,
-                    float(problem.problem.flows[flow].max_response_time_s),
-                    name=f"deadline_if_not_violated[{index}]",
-                )
+                if flow not in qos.deadline_violation:
+                    violated = model.addVar(
+                        lb=0.0,
+                        ub=1.0,
+                        vtype=GRB.BINARY,
+                        name=f"deadline_violation[{index}]",
+                    )
+                    model.addGenConstrIndicator(
+                        violated,
+                        False,
+                        qos.response_time_s[flow],
+                        GRB.LESS_EQUAL,
+                        float(problem.problem.flows[flow].max_response_time_s),
+                        name=f"deadline_if_not_violated[{index}]",
+                    )
+                    qos.deadline_violation[flow] = violated
+                violated = qos.deadline_violation[flow]
                 violations.append(violated)
             objective = gp.quicksum(violations)
         elif objective_kind == ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_DELAY:
             delays = {}
             for flow in p.flows:
                 index = p.flow_index[flow]
-                delay = model.addVar(lb=0.0, name=f"response_delay[{index}]")
-                model.addConstr(
-                    delay
-                    >= qos.response_time_s[flow]
-                    - float(problem.problem.flows[flow].max_response_time_s),
-                    name=f"response_delay_lower[{index}]",
-                )
+                if flow not in qos.response_delay_s:
+                    delay = model.addVar(lb=0.0, name=f"response_delay[{index}]")
+                    model.addConstr(
+                        delay
+                        >= qos.response_time_s[flow]
+                        - float(problem.problem.flows[flow].max_response_time_s),
+                        name=f"response_delay_lower[{index}]",
+                    )
+                    qos.response_delay_s[flow] = delay
+                delay = qos.response_delay_s[flow]
                 delays[flow] = delay
             objective = gp.quicksum(
                 arrival_rates[flow]

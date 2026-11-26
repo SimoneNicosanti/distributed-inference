@@ -16,6 +16,8 @@ dependencies = [
 
 [project.scripts]
 scalability = "scalability_benchmark.cli:main"
+scalability-performance = "scalability_benchmark.cli:main"
+scalability-model-variant = "scalability_benchmark.model_variant_cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.9", "mypy>=2.3", "types-pyyaml>=6"]

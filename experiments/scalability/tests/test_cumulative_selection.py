@@ -171,6 +171,7 @@ async def test_paired_comparison_reuses_one_scenario(
     loader_spec.loader.exec_module(module)
     config = scenario.config.model_copy(
         update={
+            "model_selection": model_selection,
             "optimization": scenario.config.optimization.model_copy(
                 update={"max_components": 1, "priority_count": 1}
             )

@@ -21,6 +21,9 @@ from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compac
 from optimizer.adapters.outbound.gurobi.formulation_compiler.gurobi_formulation_compiler import (
     GurobiFormulationCompiler,
 )
+from optimizer.adapters.outbound.gurobi.formulation_compiler.persistent_compact_formulation_compiler import (
+    GurobiPersistentCompactFormulationCompiler,
+)
 from optimizer.adapters.outbound.gurobi.result_translation.formulations.compact.gurobi_misocp_compact_solved_compiled_formulation_translator import (
     GurobiMisocpCompactSolvedCompiledFormulationTranslator,
 )
@@ -37,6 +40,9 @@ from optimizer.application.strategies.full_solver_strategy import FullSolverStra
 from optimizer.application.strategies.incremental.incremental_flow_solver_strategy import (
     IncrementalFlowSolverStrategy,
     IncrementalFlowStrategyConfig,
+)
+from optimizer.application.strategies.incremental.persistent_incremental_flow_solver_strategy import (
+    PersistentIncrementalFlowSolverStrategy,
 )
 from optimizer.application.strategies.solver_strategy_kind import SolverStrategyKind
 from optimizer.domain.formulation.compact.misocp.misocp_compact_formulation import (
@@ -87,10 +93,19 @@ def build_compact_gurobi_solver_strategy(
             solver=native_solver,
             solved_model_translator=translator,
         )
-    return IncrementalFlowSolverStrategy(
+    persistent_compiler = (
+        GurobiPersistentCompactFormulationCompiler(
+            output_flag=solver_config.output_flag
+        )
+        if strategy_config.strategy == SolverStrategyKind.INCREMENTAL_PERSISTENT
+        else None
+    )
+    incremental = IncrementalFlowSolverStrategy(
         formulation_builder=builder,
         formulation_config=formulation_config,
-        formulation_compiler=compiler,
+        formulation_compiler=persistent_compiler
+        if persistent_compiler is not None
+        else compiler,
         solver=native_solver,
         solved_model_translator=translator,
         model_adapter=CompactGurobiIncrementalModelAdapter(),
@@ -99,22 +114,11 @@ def build_compact_gurobi_solver_strategy(
                 solver_config,
                 time_limit_s=strategy_config.insertion_time_limit_s
                 or solver_config.time_limit_s,
-                solution_limit=1,
-                record_incumbent_history=True,
-            ),
-            repair_solver_config=replace(
-                solver_config,
-                time_limit_s=strategy_config.repair_time_limit_s
-                or solver_config.time_limit_s,
-                solution_limit=1,
-                record_incumbent_history=True,
-            ),
-            final_solver_config=replace(
-                solver_config,
-                time_limit_s=strategy_config.final_time_limit_s
-                or solver_config.time_limit_s,
                 solution_limit=None,
                 record_incumbent_history=True,
             ),
         ),
     )
+    if persistent_compiler is not None:
+        return PersistentIncrementalFlowSolverStrategy(incremental, persistent_compiler)
+    return incremental

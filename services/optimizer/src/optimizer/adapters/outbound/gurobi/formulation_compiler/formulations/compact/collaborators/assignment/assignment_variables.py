@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
 from typing import cast, override
 
@@ -26,6 +26,19 @@ class AssignmentVariables:
     component_worker: dict[tuple[FlowId, int, WorkerId], gp.Var]
     component_active: dict[tuple[FlowId, int], gp.Var]
     component_last: dict[tuple[FlowId, int], gp.Var]
+
+    def extend(self, added: AssignmentVariables) -> None:
+        """Append flow assignments while retaining existing native variables."""
+        if self.max_components != added.max_components:
+            raise ValueError("Cannot change max_components while extending assignments")
+        self.configuration_selected.update(added.configuration_selected)
+        if isinstance(self.layer_component, MutableMapping):
+            self.layer_component.update(added.layer_component)
+        else:
+            self.layer_component = {**self.layer_component, **added.layer_component}
+        self.component_worker.update(added.component_worker)
+        self.component_active.update(added.component_active)
+        self.component_last.update(added.component_last)
 
     def layer_prefix_at(
         self,
@@ -73,6 +86,13 @@ class AssignmentVariables:
 @dataclass(slots=True)
 class CumulativeAssignmentVariables(AssignmentVariables):
     layer_cumulative: dict[LayerComponentKey, gp.Var]
+
+    @override
+    def extend(self, added: AssignmentVariables) -> None:
+        if not isinstance(added, CumulativeAssignmentVariables):
+            raise ValueError("Cannot mix assignment representations")
+        AssignmentVariables.extend(self, added)
+        self.layer_cumulative.update(added.layer_cumulative)
 
     @override
     def layer_prefix_at(

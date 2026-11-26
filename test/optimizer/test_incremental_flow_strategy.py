@@ -85,7 +85,7 @@ def solution_for(problem, objective=1.0):
 
 @dataclass
 class Outcome:
-    termination: Termination = Termination.SOLUTION_LIMIT
+    termination: Termination = Termination.OPTIMAL
     incumbent: bool = True
     objective: float = 1.0
     valid: bool = True
@@ -120,7 +120,10 @@ class FakeSolver(Solver):
         if outcome.error:
             raise outcome.error
         model.valid = outcome.valid
-        model.solution = solution_for(model.formulation.problem, outcome.objective)
+        model.solution = replace(
+            solution_for(model.formulation.problem, outcome.objective),
+            is_optimal=outcome.termination == Termination.OPTIMAL,
+        )
         return SolverOutput(
             outcome.termination,
             model if outcome.incumbent else None,
@@ -134,9 +137,9 @@ class FakeSolver(Solver):
 
 
 class FakeAdapter(IncrementalModelAdapter):
-    async def initialize_model(self, model, solution, *, fix_decisions):
+    async def initialize_model(self, model, solution):
         assert model.alive
-        model.seed, model.fixed = solution, fix_decisions
+        model.seed = solution
 
     def is_valid_solution(self, model):
         assert model.alive
@@ -157,7 +160,7 @@ def strategy(outcomes):
         formulation_builder=MisocpCompactFormulationBuilder(),
         formulation_config=MisocpCompactFormulationConfig(0.5),
         formulation_compiler=compiler,
-        config=IncrementalFlowStrategyConfig("insertion", "repair", "final"),
+        config=IncrementalFlowStrategyConfig("insertion"),
         solver=solver,
         solved_model_translator=FakeTranslator(),
         model_adapter=FakeAdapter(),
@@ -167,52 +170,31 @@ def strategy(outcomes):
 
 
 @pytest.mark.asyncio
-async def test_successful_insertions_then_exactly_one_free_final_solve():
+async def test_each_prefix_is_unrestricted_and_receives_only_previous_start():
     problem = dag_problem(variants=1, flows=3)
-    runner, compiler, solver, observed = strategy([Outcome() for _ in range(4)])
+    runner, compiler, solver, observed = strategy([Outcome() for _ in range(3)])
     result = await runner.solve(problem)
     assert len(result.flow_solutions) == 3
-    assert [len(m.formulation.problem.flows) for m in compiler.models] == [1, 2, 3, 3]
-    assert [m.fixed for m in compiler.models] == [False, True, True, False]
-    assert [c for _, c in solver.calls] == ["insertion"] * 3 + ["final"]
+    assert result.is_optimal
+    assert [len(m.formulation.problem.flows) for m in compiler.models] == [1, 2, 3]
+    assert not any(m.fixed for m in compiler.models)
+    assert [c for _, c in solver.calls] == ["insertion"] * 3
     assert [len(m.seed.flow_solutions) if m.seed else 0 for m in compiler.models] == [
         0,
         1,
         2,
-        3,
     ]
+    assert compiler.models[1].seed is compiler.models[0].solution
+    assert compiler.models[2].seed is compiler.models[1].solution
+    assert result is compiler.models[-1].solution
     assert all(not m.alive for m in compiler.models)
     diagnostics = runner.diagnostics
-    assert diagnostics.successful_restricted_insertions == 2
-    assert diagnostics.global_repair_count == 0
-    assert diagnostics.as_record()["native_solve_count"] == 4
+    assert diagnostics.successful_insertions == 2
+    assert diagnostics.as_record()["native_solve_count"] == 3
+    assert "prefix_wall_time_s" in diagnostics.as_record()
+    assert "incremental_construction_time_s" not in diagnostics.as_record()
+    assert diagnostics.returned_source == "last_prefix"
     assert observed == [diagnostics]
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "termination, reason",
-    [
-        (Termination.INFEASIBLE, "restricted_infeasible"),
-        (Termination.TIME_LIMIT, "restricted_timeout_without_incumbent"),
-    ],
-)
-async def test_failed_insertion_recovers_with_partial_hint_and_free_decisions(
-    termination, reason
-):
-    runner, compiler, _, _ = strategy(
-        [Outcome(), Outcome(termination, False), Outcome(), Outcome()]
-    )
-    await runner.solve(dag_problem(variants=1, flows=2))
-    insertion, repair, final = compiler.models[1:]
-    assert insertion.fixed and not repair.fixed and not final.fixed
-    assert repair is not insertion
-    assert repair.seed is insertion.seed
-    assert len(repair.seed.flow_solutions) == 1
-    diagnostics = runner.diagnostics
-    assert diagnostics.global_repair_count == 1
-    assert diagnostics.attempts[2].reason == reason
-    assert diagnostics.attempts[2].stage == IncrementalStage.REPAIR
 
 
 @pytest.mark.asyncio
@@ -220,64 +202,39 @@ async def test_failed_insertion_recovers_with_partial_hint_and_free_decisions(
     "termination",
     [Termination.INFEASIBLE, Termination.TIME_LIMIT, Termination.NUMERICAL_FAILURE],
 )
-async def test_unsuccessful_repair_preserves_status_and_never_returns_smaller_solution(
-    termination,
-):
-    runner, compiler, _, _ = strategy(
-        [Outcome(), Outcome(Termination.INFEASIBLE, False), Outcome(termination, False)]
-    )
+async def test_failed_prefix_stops_without_retry_or_smaller_solution(termination):
+    runner, compiler, _, _ = strategy([Outcome(), Outcome(termination, False)])
     with pytest.raises(IncrementalFlowSolveError) as failure:
-        await runner.solve(dag_problem(variants=1, flows=2))
+        await runner.solve(dag_problem(variants=1, flows=3))
     assert failure.value.termination == termination
-    assert failure.value.attempt.stage == IncrementalStage.REPAIR
+    assert failure.value.attempt.stage == IncrementalStage.INSERTION
     assert runner.diagnostics.completed_flow_count == 1
     assert runner.diagnostics.returned_source is None
-    assert len(compiler.models) == 3
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "final",
-    [
-        Outcome(Termination.TIME_LIMIT, False),
-        Outcome(Termination.TIME_LIMIT, True, 2),
-        Outcome(Termination.NUMERICAL_FAILURE, True, 0),
-        Outcome(Termination.OPTIMAL, True, 0, False),
-        Outcome(error=RuntimeError("native failure")),
-    ],
-)
-async def test_final_failure_or_worse_incumbent_retains_complete_valid_fallback(final):
-    runner, _, _, _ = strategy([Outcome(), Outcome(), final])
-    result = await runner.solve(dag_problem(variants=1, flows=2))
-    assert len(result.flow_solutions) == 2
-    assert result.objective_value == 1
-    assert not result.is_optimal
-    assert runner.diagnostics.returned_source == "incremental"
-    assert runner.diagnostics.completed_flow_count == 2
-    assert len(runner.diagnostics.attempts) == 3
+    assert len(compiler.models) == 2
+    assert not any(m.alive for m in compiler.models)
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "objective,before,after",
     [
-        (ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME, 2, 1),
-        (ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY, 1, 2),
+        (ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME, 1, 2),
+        (ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY, 2, 1),
     ],
 )
-async def test_final_candidate_comparison_respects_objective_sense(
+async def test_last_prefix_is_returned_without_comparing_different_problems(
     objective, before, after
 ):
-    problem = dag_problem(variants=1, flows=1)
-    problem = replace(problem, policy=replace(problem.policy, objective=objective))
+    base = dag_problem(variants=1, flows=2)
+    problem = replace(base, policy=replace(base.policy, objective=objective))
     runner, compiler, _, _ = strategy(
-        [Outcome(objective=before), Outcome(Termination.TIME_LIMIT, True, after)]
+        [Outcome(objective=before), Outcome(objective=after)]
     )
     result = await runner.solve(problem)
     assert result.objective_value == after
-    assert runner.diagnostics.returned_source == "final"
+    assert len(result.flow_solutions) == 2
     assert len(compiler.models) == 2
-    assert not any(m.fixed for m in compiler.models)
+    assert runner.diagnostics.returned_source == "last_prefix"
 
 
 @pytest.mark.asyncio
@@ -302,7 +259,6 @@ async def test_invalid_insertion_incumbent_is_not_accepted():
     with pytest.raises(IncrementalFlowSolveError):
         await runner.solve(dag_problem(variants=1, flows=2))
     assert runner.diagnostics.attempts[-1].error_type == "ValueError"
-    assert runner.diagnostics.global_repair_count == 0
 
 
 @pytest.mark.asyncio
@@ -346,18 +302,18 @@ def test_prefix_preserves_identity_of_profiles_and_original_flow_parameters():
 
 
 @pytest.mark.asyncio
-async def test_timeout_with_valid_incumbent_continues_without_repair():
+async def test_timeout_with_valid_incumbent_continues_to_next_unrestricted_prefix():
     runner, _, _, _ = strategy(
         [
             Outcome(Termination.TIME_LIMIT, True),
             Outcome(Termination.TIME_LIMIT, True),
-            Outcome(Termination.OPTIMAL, True),
         ]
     )
     result = await runner.solve(dag_problem(variants=1, flows=2))
     assert len(result.flow_solutions) == 2
-    assert runner.diagnostics.global_repair_count == 0
-    assert runner.diagnostics.successful_restricted_insertions == 1
+    assert len(runner.diagnostics.attempts) == 2
+    assert runner.diagnostics.successful_insertions == 1
+    assert not result.is_optimal
 
 
 @pytest.mark.asyncio

@@ -31,7 +31,7 @@ def main() -> None:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path(__file__).resolve().parents[1] / "config/default.yaml",
+        default=Path(__file__).resolve().parents[1] / "config/performance.yaml",
     )
     parser.add_argument("--seed", type=int)
     parser.add_argument("--opset", type=int)

@@ -16,6 +16,7 @@ type CampaignName = Literal["pilot", "main", "sensitivity"]
 type ModelSelection = Literal["performance", "model_variant"]
 
 MODEL_SELECTIONS: tuple[ModelSelection, ...] = ("performance", "model_variant")
+FIXED_MODEL_NAME = "efficientnet_b6"
 
 
 @dataclass(frozen=True)
@@ -30,10 +31,8 @@ class RunSpec:
     timeout_s: float
     objective: ObjectiveKind = ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME
     formulation: CompactFormulationKind = CompactFormulationKind.ASSIGNMENT
-    strategy: Literal["full", "incremental"] = "full"
+    strategy: Literal["full", "incremental", "incremental-persistent"] = "full"
     insertion_time_limit_s: float | None = None
-    repair_time_limit_s: float | None = None
-    final_time_limit_s: float | None = None
     model_selection: ModelSelection = "performance"
 
     @property
@@ -44,11 +43,7 @@ class RunSpec:
     def solver_budget_upper_bound_s(self) -> float:
         if self.strategy == "full":
             return self.timeout_s
-        return (
-            self.flow_count * (self.insertion_time_limit_s or self.timeout_s)
-            + (self.flow_count - 1) * (self.repair_time_limit_s or self.timeout_s)
-            + (self.final_time_limit_s or self.timeout_s)
-        )
+        return self.flow_count * (self.insertion_time_limit_s or self.timeout_s)
 
     def as_record(self) -> dict[str, object]:
         return {**asdict(self), "worker_count": self.worker_count}
@@ -59,11 +54,11 @@ def campaign_specs(
     name: CampaignName,
     *,
     objectives: tuple[ObjectiveKind, ...] | None = None,
-    model_selections: tuple[ModelSelection, ...] = ("performance",),
 ) -> Iterator[RunSpec]:
-    selections = tuple(dict.fromkeys(model_selections))
-    if not selections or any(value not in MODEL_SELECTIONS for value in selections):
-        raise ValueError("Select performance or model_variant model selection")
+    if config.model_selection == "model_variant" and not any(
+        model.name == FIXED_MODEL_NAME for model in config.catalog.models
+    ):
+        raise ValueError(f"model_variant requires {FIXED_MODEL_NAME} in the catalog")
     selected = tuple(
         dict.fromkeys(
             ObjectiveKind(value)
@@ -77,20 +72,17 @@ def campaign_specs(
     if not selected:
         raise ValueError("Select at least one objective")
     if any(objective not in BENCHMARK_OBJECTIVES for objective in selected):
-        raise ValueError("Select one of the four benchmark objectives")
+        raise ValueError("Select one of the supported benchmark objectives")
     for spec in _instance_specs(config, name):
         for objective in selected:
-            for selection in selections:
-                yield replace(
-                    spec,
-                    objective=objective,
-                    formulation=config.solver.formulation,
-                    strategy=config.solver.strategy,
-                    insertion_time_limit_s=config.solver.insertion_time_limit_s,
-                    repair_time_limit_s=config.solver.repair_time_limit_s,
-                    final_time_limit_s=config.solver.final_time_limit_s,
-                    model_selection=selection,
-                )
+            yield replace(
+                spec,
+                objective=objective,
+                formulation=config.solver.formulation,
+                strategy=config.solver.strategy,
+                insertion_time_limit_s=config.solver.insertion_time_limit_s,
+                model_selection=config.model_selection,
+            )
 
 
 def _instance_specs(config: ExperimentConfig, name: CampaignName) -> Iterator[RunSpec]:

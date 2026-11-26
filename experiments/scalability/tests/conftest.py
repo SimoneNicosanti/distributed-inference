@@ -17,7 +17,7 @@ from shared.model.model import CNNArchitectureInfo, ModelTask
 @pytest.fixture
 def config() -> ExperimentConfig:
     return load_configuration(
-        Path(__file__).resolve().parents[1] / "config/default.yaml"
+        Path(__file__).resolve().parents[1] / "config/performance.yaml"
     )
 
 

@@ -13,20 +13,17 @@ SUMMARY_FIELDS = (
     "scenario_id",
     "campaign",
     "model_selection",
+    "solver_backend",
+    "backend_version",
+    "mathematical_mode",
+    "problem_fingerprint",
     "objective",
     "formulation",
     "strategy",
     "insertion_time_limit_s",
-    "repair_time_limit_s",
-    "final_time_limit_s",
-    "successful_restricted_insertions",
-    "global_repair_count",
+    "successful_insertions",
     "native_solve_count",
-    "incremental_construction_time_s",
-    "global_repair_time_s",
-    "final_global_time_s",
-    "objective_before_final",
-    "objective_after_final",
+    "prefix_wall_time_s",
     "returned_source",
     "repetition",
     "seed",
@@ -39,6 +36,7 @@ SUMMARY_FIELDS = (
     "timeout_s",
     "solver_runtime_s",
     "time_to_first_incumbent_s",
+    "first_incumbent_time_kind",
     "wall_time_s",
     "construction_time_s",
     "original_variables",
@@ -56,6 +54,11 @@ SUMMARY_FIELDS = (
     "feasible_incumbent",
     "solution_extracted",
     "objective_value",
+    "objective_value_recomputed",
+    "underlying_native_objective",
+    "independently_validated",
+    "max_constraint_violation",
+    "gap_definition",
     "objective_bound",
     "final_gap",
     "timeout_reached",
@@ -120,7 +123,15 @@ def write_summary(path: Path, latest: dict[str, dict[str, Any]]) -> None:
         writer.writeheader()
         for record in latest.values():
             if record["state"] == "finished":
-                writer.writerow(record)
+                writer.writerow(
+                    {
+                        **record,
+                        "prefix_wall_time_s": record.get(
+                            "prefix_wall_time_s",
+                            record.get("incremental_construction_time_s"),
+                        ),
+                    }
+                )
         handle.flush()
         os.fsync(handle.fileno())
     temporary.replace(path)

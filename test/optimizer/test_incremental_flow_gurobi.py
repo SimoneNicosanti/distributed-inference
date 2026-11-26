@@ -1,4 +1,4 @@
-"""Native MISOCP checks for partial starts, fixing, repair and shared queues."""
+"""Native MISOCP checks for partial starts, unrestricted prefixes and shared queues."""
 
 from dataclasses import replace
 
@@ -68,7 +68,7 @@ async def solve_native(model):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind", list(Kind))
-async def test_partial_start_and_fixings_touch_only_prior_primary_decisions(kind):
+async def test_partial_start_preserves_all_bounds_and_only_sets_prior_decisions(kind):
     problem = dag_problem(variants=2, flows=2, workers=1, components=2)
     prefix = compact_problem_prefix(problem, 1)
     async with compiler().compile_formulation(formulation(prefix, kind)) as model:
@@ -88,38 +88,13 @@ async def test_partial_start_and_fixings_touch_only_prior_primary_decisions(kind
             if v.index not in decision_indices
         )
         original_bounds = {v.index: (v.LB, v.UB) for v in model.native_model.getVars()}
-        await CompactGurobiIncrementalModelAdapter().initialize_model(
-            model, seed, fix_decisions=True
-        )
-        assert all(v.LB == v.UB == value for v, value in decisions)
+        await CompactGurobiIncrementalModelAdapter().initialize_model(model, seed)
         assert all(
             original_bounds[v.index] == (v.LB, v.UB)
             for v in model.native_model.getVars()
-            if v.index not in decision_indices
         )
         solution = await solve_native(model)
         assert_solution(problem, solution)
-        old_flow = next(
-            f
-            for f in solution.flow_solutions
-            if f.flow_id == seed.flow_solutions[0].flow_id
-        )
-        assert [
-            (c.worker_id, c.priority, c.layer_keys) for c in old_flow.components
-        ] == [
-            (c.worker_id, c.priority, c.layer_keys)
-            for c in seed.flow_solutions[0].components
-        ]
-    # Fresh repair has original domains even after an insertion model was fixed.
-    async with compiler().compile_formulation(formulation(problem, kind)) as model:
-        await CompactGurobiIncrementalModelAdapter().initialize_model(
-            model, seed, fix_decisions=False
-        )
-        assert all(
-            v.LB != v.UB
-            for v, _ in compact_solution_decisions(model, seed, allow_partial=True)
-            if original_bounds[v.index][0] != original_bounds[v.index][1]
-        )
 
 
 @pytest.mark.asyncio
@@ -163,9 +138,7 @@ async def test_insertion_recomputes_queueing_latency_of_previous_flow(kind):
     ) as model:
         seed = await solve_native(model)
     async with compiler().compile_formulation(formulation(problem, kind)) as model:
-        await CompactGurobiIncrementalModelAdapter().initialize_model(
-            model, seed, fix_decisions=True
-        )
+        await CompactGurobiIncrementalModelAdapter().initialize_model(model, seed)
         solution = await solve_native(model)
         previous = next(
             f
@@ -182,16 +155,9 @@ async def test_insertion_recomputes_queueing_latency_of_previous_flow(kind):
         assert_solution(problem, solution)
 
 
-class OptimalFirstFlowSolver(GurobiSolver):
-    async def solve_compiled_formulation(self, model, config):
-        if len(model.formulation.problem.flows) == 1:
-            config = replace(config, solution_limit=None)
-        return await super().solve_compiled_formulation(model, config)
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind", list(Kind))
-async def test_proven_infeasible_restricted_insertion_is_repaired_by_moving_old_flow(
+async def test_unrestricted_prefix_moves_previous_flow_without_fixing_or_repair(
     kind,
 ):
     base = dag_problem(variants=1, workers=2, components=1, flows=2)
@@ -223,15 +189,13 @@ async def test_proven_infeasible_restricted_insertion_is_repaired_by_moving_old_
         MisocpCompactFormulationConfig(0.5, kind),
         SOLVER_CONFIG,
         strategy_config=GurobiStrategyConfig(SolverStrategyKind.INCREMENTAL),
-        solver=OptimalFirstFlowSolver(),
     )
     solution = await runner.solve(problem)
     assert_solution(problem, solution)
     diagnostics = runner.diagnostics
-    assert diagnostics.global_repair_count == 1
-    assert diagnostics.attempts[1].termination == Termination.INFEASIBLE
-    assert diagnostics.attempts[2].reason == "restricted_infeasible"
-    assert diagnostics.attempts[-1].fixed_flow_count == 0
+    assert len(diagnostics.attempts) == 2
+    assert diagnostics.successful_insertions == 1
+    assert all(a.termination == Termination.OPTIMAL for a in diagnostics.attempts)
     assert (
         next(f for f in solution.flow_solutions if f.flow_id == first)
         .components[0]
@@ -262,13 +226,14 @@ async def test_native_strategy_covers_both_representations_and_all_objectives(
     assert isinstance(runner, IncrementalFlowSolverStrategy)
     solution = await runner.solve(problem)
     assert_solution(problem, solution)
-    assert runner.diagnostics.global_repair_count == 0
-    assert len(runner.diagnostics.attempts) == 3
-    before = runner.diagnostics.objective_before_final
-    if objective == ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY:
-        assert solution.objective_value >= before - 1e-6
-    else:
-        assert solution.objective_value <= before + 1e-6
+    assert len(runner.diagnostics.attempts) == 2
+    assert all(
+        attempt.termination == Termination.OPTIMAL
+        for attempt in runner.diagnostics.attempts
+    )
+    assert solution.objective_value == pytest.approx(
+        runner.diagnostics.attempts[-1].objective_value
+    )
 
 
 def test_default_strategy_and_config_validation():
@@ -288,20 +253,17 @@ def test_default_strategy_and_config_validation():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind", list(Kind))
-async def test_single_flow_always_runs_final_and_preserves_incumbent_on_native_timeout(
-    kind,
-):
+async def test_single_flow_is_solved_once_and_retains_optimality(kind):
     problem = dag_problem(variants=1, workers=1, components=1)
     runner = build_compact_gurobi_solver_strategy(
         MisocpCompactFormulationConfig(0.5, kind),
         SOLVER_CONFIG,
-        strategy_config=GurobiStrategyConfig("incremental", final_time_limit_s=1e-9),
+        strategy_config=GurobiStrategyConfig("incremental"),
     )
     solution = await runner.solve(problem)
     assert {flow.flow_id for flow in solution.flow_solutions} == set(problem.flows)
     assert solution.flow_solutions[0].mean_response_time_s > 0
-    assert len(runner.diagnostics.attempts) == 2
-    assert runner.diagnostics.attempts[-1].stage == "final"
-    assert runner.diagnostics.attempts[-1].termination == Termination.TIME_LIMIT
-    assert solution.objective_value <= runner.diagnostics.objective_before_final
-    assert not solution.is_optimal
+    assert len(runner.diagnostics.attempts) == 1
+    assert runner.diagnostics.attempts[0].stage == "first_flow"
+    assert runner.diagnostics.attempts[0].termination == Termination.OPTIMAL
+    assert solution.is_optimal

@@ -20,6 +20,7 @@ def add_memory_constraints(
     *,
     assignment: AssignmentVariables,
     memory: MemoryVariables,
+    include_capacity: bool = True,
 ) -> None:
     problem = data
     max_components = data.problem.policy.max_components
@@ -57,6 +58,15 @@ def add_memory_constraints(
                         * (assignment.configuration_selected[flow, variant] + e - 1),
                         name=f"compact_activation[{suffix}]",
                     )
+    if include_capacity:
+        add_memory_capacity_constraints(model, data, memory=memory)
+
+
+def add_memory_capacity_constraints(
+    model: gp.Model, data: MisocpCompactFormulation, *, memory: MemoryVariables
+) -> None:
+    p = data
+    problem = data
     for worker in p.workers:
         model.addConstr(
             gp.quicksum(

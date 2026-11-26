@@ -33,6 +33,7 @@ def add_network_constraints(
     *,
     assignment: AssignmentVariables,
     network: NetworkVariables,
+    include_shared: bool = True,
 ) -> None:
     for flow in data.flows:
         for variant in data.configurations_by_flow[flow]:
@@ -49,7 +50,9 @@ def add_network_constraints(
                 cuts=range(1, data.problem.policy.max_components),
             )
     add_transmission_constraints(model, data, assignment=assignment, network=network)
-    add_network_queue_constraints(model, data, network=network)
+    add_network_queue_constraints(
+        model, data, network=network, include_shared=include_shared
+    )
 
 
 def add_transmission_constraints(
@@ -79,12 +82,11 @@ def add_transmission_constraints(
             default=0.0,
         )
         for cut in range(1, max_components):
-            _add_transition_marginal_constraints(
+            _add_latency_constraints(
                 model,
                 p,
                 assignment,
                 network,
-                topology=problem,
                 flow=flow,
                 cut=cut,
             )
@@ -164,52 +166,61 @@ def add_transmission_constraints(
 
 
 def add_network_queue_constraints(
-    model: gp.Model, data: MisocpCompactFormulation, *, network: NetworkVariables
+    model: gp.Model,
+    data: MisocpCompactFormulation,
+    *,
+    network: NetworkVariables,
+    include_shared: bool = True,
+    include_local: bool = True,
 ) -> None:
     problem = data
     max_components = data.problem.policy.max_components
     network_utilization_limit = data.problem.policy.network_utilization_limit
     p = problem
     bins = range(1, len(p.network_bin_limits))
-    for worker in p.workers:
-        selected = tuple(network.network_bin_selected[worker, i] for i in bins)
-        rho = network.network_utilization[worker]
-        model.addConstr(
-            rho
-            == gp.quicksum(
-                p.service_arrival_rate_per_s[flow, variant]
-                * network.transmission_time_s[flow, variant, cut, worker]
-                for flow in p.flows
-                if worker in p.problem.flows[flow].workers
-                for variant in p.configurations_by_flow[flow]
-                for cut in range(1, max_components)
-            ),
-            name=f"network_utilization_value[{p.worker_index[worker]}]",
-        )
-        model.addConstr(
-            rho <= network_utilization_limit,
-            name=f"network_stability[{p.worker_index[worker]}]",
-        )
-        model.addConstr(
-            gp.quicksum(selected) == 1,
-            name=f"choose_network_bin[{p.worker_index[worker]}]",
-        )
-        model.addConstr(
-            gp.quicksum(
-                p.network_bin_limits[i - 1] * network.network_bin_selected[worker, i]
-                for i in bins
+    if include_shared:
+        for worker in p.workers:
+            selected = tuple(network.network_bin_selected[worker, i] for i in bins)
+            rho = network.network_utilization[worker]
+            model.addConstr(
+                rho
+                == gp.quicksum(
+                    p.service_arrival_rate_per_s[flow, variant]
+                    * network.transmission_time_s[flow, variant, cut, worker]
+                    for flow in p.flows
+                    if worker in p.problem.flows[flow].workers
+                    for variant in p.configurations_by_flow[flow]
+                    for cut in range(1, max_components)
+                ),
+                name=f"network_utilization_value[{p.worker_index[worker]}]",
             )
-            <= rho,
-            name=f"network_bin_lower[{p.worker_index[worker]}]",
-        )
-        model.addConstr(
-            rho
-            <= gp.quicksum(
-                p.network_bin_limits[i] * network.network_bin_selected[worker, i]
-                for i in bins
-            ),
-            name=f"network_bin_upper[{p.worker_index[worker]}]",
-        )
+            model.addConstr(
+                rho <= network_utilization_limit,
+                name=f"network_stability[{p.worker_index[worker]}]",
+            )
+            model.addConstr(
+                gp.quicksum(selected) == 1,
+                name=f"choose_network_bin[{p.worker_index[worker]}]",
+            )
+            model.addConstr(
+                gp.quicksum(
+                    p.network_bin_limits[i - 1]
+                    * network.network_bin_selected[worker, i]
+                    for i in bins
+                )
+                <= rho,
+                name=f"network_bin_lower[{p.worker_index[worker]}]",
+            )
+            model.addConstr(
+                rho
+                <= gp.quicksum(
+                    p.network_bin_limits[i] * network.network_bin_selected[worker, i]
+                    for i in bins
+                ),
+                name=f"network_bin_upper[{p.worker_index[worker]}]",
+            )
+    if not include_local:
+        return
     for flow in p.flows:
         for cut in range(1, max_components):
             responses = []
@@ -289,41 +300,53 @@ def _tensor_crossing_cut(
             )
 
 
-def _add_transition_marginal_constraints(
+def _add_latency_constraints(
     model: gp.Model,
     problem: MisocpCompactFormulation,
     assignment: AssignmentVariables,
     network: NetworkVariables,
     *,
-    topology: MisocpCompactFormulation,
     flow: FlowId,
     cut: int,
 ) -> None:
+    """Exact source latency, independent of model choice and transmitted volume."""
     flow_index = problem.flow_index[flow]
     workers = problem.problem.flows[flow].workers
-
     for source in workers:
-        successors = topology.successors_by_worker[source]
-        outgoing = tuple(
-            network.adjacent_component_workers[flow, cut, source, target]
-            for target in workers
-            if source == target or target in successors
+        source_index = problem.worker_index[source]
+        placed = assignment.component_worker[flow, cut, source]
+        latency = network.source_latency_s[flow, cut, source]
+        by_destination = {}
+        for target in workers:
+            if target == source:
+                continue
+            target_index = problem.worker_index[target]
+            destination = assignment.component_worker[flow, cut + 1, target]
+            link = problem.connections_by_pair.get((source, target))
+            if link is None:
+                model.addConstr(
+                    placed + destination <= 1,
+                    name=f"missing_transition[{flow_index},{cut},{source_index},{target_index}]",
+                )
+                continue
+            value = link.round_trip_time_s / 2
+            by_destination[target] = value
+            model.addConstr(
+                latency >= value * (placed + destination - 1),
+                name=f"latency_lower[{flow_index},{cut},{source_index},{target_index}]",
+            )
+        upper = max(by_destination.values(), default=0.0)
+        model.addConstr(
+            latency <= upper * placed,
+            name=f"latency_source_upper[{flow_index},{cut},{source_index}]",
         )
         model.addConstr(
-            gp.quicksum(outgoing) <= assignment.component_worker[flow, cut, source],
-            name=(f"q_outgoing[{flow_index},{cut},{problem.worker_index[source]}]"),
-        )
-
-    for target in workers:
-        predecessors = topology.predecessors_by_worker[target]
-        incoming = (
-            network.adjacent_component_workers[flow, cut, source, target]
-            for source in workers
-            if source == target or source in predecessors
-        )
-        model.addConstr(
-            gp.quicksum(incoming) == assignment.component_worker[flow, cut + 1, target],
-            name=f"q_incoming[{flow_index},{cut},{problem.worker_index[target]}]",
+            latency
+            <= gp.quicksum(
+                value * assignment.component_worker[flow, cut + 1, target]
+                for target, value in by_destination.items()
+            ),
+            name=f"latency_destination_upper[{flow_index},{cut},{source_index}]",
         )
 
 

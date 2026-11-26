@@ -14,16 +14,19 @@ def observation(
     *,
     timeout: bool = False,
     error: bool = False,
+    wall: object = None,
     workers: int = 1,
     flows: int = 1,
 ) -> dict[str, Any]:
     return {
         "solver_runtime_s": runtime,
+        "wall_time_s": wall,
         "time_to_first_incumbent_s": first,
         "timeout_reached": timeout,
         "termination": "solver_error" if error else "other_termination",
         "worker_count": workers,
         "flow_count": flows,
+        "model_count": 1,
     }
 
 
@@ -47,8 +50,8 @@ def test_timeout_and_missing_times_have_distinct_denominators() -> None:
 
 @pytest.mark.parametrize("value", [None, True, -1, float("nan"), float("inf")])
 def test_invalid_or_missing_times_are_not_zero_samples(value: object) -> None:
-    for metric in ("solver_runtime_s", "time_to_first_incumbent_s"):
-        summary = summarize_times([observation(value, value)], metric)
+    for metric in ("solver_runtime_s", "time_to_first_incumbent_s", "wall_time_s"):
+        summary = summarize_times([observation(value, value, wall=value)], metric)
         assert summary.total == 1
         assert summary.values == ()
         assert summary.median_s is None
@@ -80,3 +83,48 @@ def test_pairwise_cells_keep_observation_coverage_and_missing_combinations() -> 
 def test_unknown_metric_is_rejected() -> None:
     with pytest.raises(ValueError, match="Unknown time metric"):
         summarize_times([], "typo")
+
+
+def test_wall_time_uses_recorded_elapsed_time_and_keeps_coverage() -> None:
+    records = [
+        observation(1, wall=0),
+        observation(3, wall=30, timeout=True),
+        observation(300, timeout=True),
+        observation(0.5, wall=2, error=True),
+    ]
+    summary = summarize_times(records, "wall_time_s")
+    assert summary.total == 4
+    assert summary.values == (0.0, 30.0)
+    assert summary.median_s == 15
+    assert summary.timeouts == (30.0,)
+
+
+def test_analysis_renders_wall_time_boxplots_in_separate_experiment_group(
+    tmp_path,
+) -> None:
+    from scalability_benchmark.analysis import analyze
+    from scalability_benchmark.persistence import ResultStore
+
+    record = {
+        **observation(1, 0.1, wall=3),
+        "run_id": "wall-time",
+        "state": "finished",
+        "campaign": "main",
+        "objective": "arrival_weighted_normalized_delay",
+        "load": 0.7,
+        "formulation": "cumulative",
+        "strategy": "incremental",
+        "model_selection": "model_variant",
+        "feasible_incumbent": True,
+        "infeasibility_proven": False,
+        "final_gap": 0,
+    }
+    with ResultStore(tmp_path, resume=False) as store:
+        store.append(record)
+        store.append({**record, "run_id": "missing-wall-time", "wall_time_s": None})
+    analyze(tmp_path)
+    destination = tmp_path / "analysis/model_variant/incremental/cumulative"
+    prefix = "main-arrival_weighted_normalized_delay-load-0.7"
+    for kind in ("time-boxplots", "wall-time-boxplots", "time-cdf", "time-heatmaps"):
+        for extension in ("png", "pdf"):
+            assert (destination / f"{prefix}-{kind}.{extension}").stat().st_size > 0

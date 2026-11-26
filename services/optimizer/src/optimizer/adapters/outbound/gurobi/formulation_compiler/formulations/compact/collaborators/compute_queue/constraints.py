@@ -23,6 +23,8 @@ def add_compute_queue_constraints(
     assignment: AssignmentVariables,
     execution: ExecutionVariables,
     compute_queue: ComputeQueueVariables,
+    include_local: bool = True,
+    include_shared: bool = True,
 ) -> None:
     problem = data
     max_components = data.problem.policy.max_components
@@ -37,7 +39,11 @@ def add_compute_queue_constraints(
         max_components=max_components,
         priority_count=priority_count,
         compute_utilization_limit=compute_utilization_limit,
+        include_local=include_local,
+        include_shared=include_shared,
     )
+    if not include_shared:
+        return
     p = problem
     bounds = {}
     for worker in p.workers:
@@ -95,6 +101,8 @@ def _add_execution_queue_constraints(
     max_components: int,
     priority_count: int,
     compute_utilization_limit: float,
+    include_local: bool = True,
+    include_shared: bool = True,
 ) -> None:
     p = problem
     priorities = range(1, priority_count + 1)
@@ -110,34 +118,38 @@ def _add_execution_queue_constraints(
         for worker in p.problem.flows[flow].workers
     }
 
-    for flow in p.flows:
-        flow_index = p.flow_index[flow]
-        for component in range(1, max_components + 1):
-            for worker in p.problem.flows[flow].workers:
-                worker_index = p.worker_index[worker]
-                _worker_priority_assigned_to_executed_components(
-                    model,
-                    assignment,
-                    compute_queue,
-                    priorities,
-                    flow,
-                    flow_index,
-                    component,
-                    worker,
-                    worker_index,
-                )
-                _define_component_utilization_for_selected_priority(
-                    model,
-                    compute_queue,
-                    compute_utilization_limit,
-                    priorities,
-                    class_utilization,
-                    flow,
-                    flow_index,
-                    component,
-                    worker,
-                    worker_index,
-                )
+    if include_local:
+        for flow in p.flows:
+            flow_index = p.flow_index[flow]
+            for component in range(1, max_components + 1):
+                for worker in p.problem.flows[flow].workers:
+                    worker_index = p.worker_index[worker]
+                    _worker_priority_assigned_to_executed_components(
+                        model,
+                        assignment,
+                        compute_queue,
+                        priorities,
+                        flow,
+                        flow_index,
+                        component,
+                        worker,
+                        worker_index,
+                    )
+                    _define_component_utilization_for_selected_priority(
+                        model,
+                        compute_queue,
+                        compute_utilization_limit,
+                        priorities,
+                        class_utilization,
+                        flow,
+                        flow_index,
+                        component,
+                        worker,
+                        worker_index,
+                    )
+
+    if not include_shared:
+        return
 
     for worker in p.workers:
         worker_index = p.worker_index[worker]

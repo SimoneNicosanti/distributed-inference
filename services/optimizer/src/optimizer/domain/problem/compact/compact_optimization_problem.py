@@ -25,6 +25,7 @@ from shared.service.service import WorkerId
 
 class ObjectiveKind(StrEnum):
     ARRIVAL_WEIGHTED_RESPONSE_TIME = auto()
+    ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_TIME = auto()
     ARRIVAL_WEIGHTED_ACCURACY = auto()
     DEADLINE_VIOLATIONS = auto()
     ARRIVAL_WEIGHTED_NORMALIZED_DELAY = auto()

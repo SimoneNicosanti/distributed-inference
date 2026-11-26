@@ -4,15 +4,13 @@ from optimizer.domain.solution.optimization_solution import OptimizationSolution
 
 
 class IncrementalModelAdapter[CompiledFormulationT, SolvedCompiledFormulationT](ABC):
-    """Backend operations; fixing decisions must never fix performance auxiliaries."""
+    """Backend operations for partial MIP starts and incumbent validation."""
 
     @abstractmethod
     async def initialize_model(
         self,
         model: CompiledFormulationT,
         solution: OptimizationSolution,
-        *,
-        fix_decisions: bool,
     ) -> None: ...
 
     @abstractmethod

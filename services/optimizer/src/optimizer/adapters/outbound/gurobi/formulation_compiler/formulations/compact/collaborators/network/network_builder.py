@@ -26,19 +26,19 @@ from .constraints import add_network_constraints
 
 class CompactNetworkBuilder:
     def create_variables(
-        self, model: gp.Model, data: MisocpCompactFormulation
+        self,
+        model: gp.Model,
+        data: MisocpCompactFormulation,
+        *,
+        existing: NetworkVariables | None = None,
     ) -> NetworkVariables:
-        variables = _add_network_variables(
+        return _add_network_variables(
             model,
             data,
             max_components=data.problem.policy.max_components,
             network_utilization_limit=data.problem.policy.network_utilization_limit,
+            existing=existing,
         )
-        for placement in variables.adjacent_component_workers.values():
-            placement.VType = GRB.CONTINUOUS
-            placement.LB = 0
-            placement.UB = 1
-        return variables
 
     def add_constraints(
         self,
@@ -47,8 +47,15 @@ class CompactNetworkBuilder:
         *,
         assignment: AssignmentVariables,
         network: NetworkVariables,
+        include_shared: bool = True,
     ) -> None:
-        add_network_constraints(model, data, assignment=assignment, network=network)
+        add_network_constraints(
+            model,
+            data,
+            assignment=assignment,
+            network=network,
+            include_shared=include_shared,
+        )
 
 
 def _add_network_variables(
@@ -57,19 +64,17 @@ def _add_network_variables(
     *,
     max_components: int,
     network_utilization_limit: float,
+    existing: NetworkVariables | None = None,
 ) -> NetworkVariables:
     tensor_crossing_auxiliary: dict[
         tuple[FlowId, ModelConfigurationKey, TensorKey, int], gp.Var
     ] = {}
-    adjacent_component_workers: dict[
-        tuple[FlowId, int, WorkerId, WorkerId], gp.Var
-    ] = {}
+    source_latency_s: dict[tuple[FlowId, int, WorkerId], gp.Var] = {}
     transmission_time_s: dict[
         tuple[FlowId, ModelConfigurationKey, int, WorkerId], gp.Var
     ] = {}
     component_transmission_response_s: dict[tuple[FlowId, int], gp.Var] = {}
     cuts = range(1, max_components)
-    topology = problem
 
     for flow in problem.flows:
         flow_index = problem.flow_index[flow]
@@ -108,24 +113,19 @@ def _add_network_variables(
             )
             for source in problem.problem.flows[flow].workers:
                 source_index = problem.worker_index[source]
-                successors = topology.successors_by_worker[source]
-                for target in problem.problem.flows[flow].workers:
-                    if source != target and target not in successors:
-                        continue
-                    target_index = problem.worker_index[target]
-                    adjacent_component_workers[flow, cut, source, target] = (
-                        model.addVar(
-                            vtype=GRB.BINARY,
-                            name=(
-                                f"q[{flow_index},{cut},{source_index},{target_index}]"
-                            ),
-                        )
-                    )
+                source_latency_s[flow, cut, source] = model.addVar(
+                    lb=0.0,
+                    name=f"xi[{flow_index},{cut},{source_index}]",
+                )
 
-    network_utilization: dict[WorkerId, gp.Var] = {}
-    network_bin_selected: dict[tuple[WorkerId, int], gp.Var] = {}
+    network_utilization: dict[WorkerId, gp.Var] = (
+        existing.network_utilization if existing is not None else {}
+    )
+    network_bin_selected: dict[tuple[WorkerId, int], gp.Var] = (
+        existing.network_bin_selected if existing is not None else {}
+    )
     network_bin_count = len(problem.network_bin_limits) - 1
-    for worker in problem.workers:
+    for worker in problem.workers if existing is None else ():
         worker_index = problem.worker_index[worker]
         network_utilization[worker] = model.addVar(
             lb=0.0,
@@ -168,7 +168,7 @@ def _add_network_variables(
                 )
     return NetworkVariables(
         tensor_crossing_auxiliary=tensor_crossing_auxiliary,
-        adjacent_component_workers=adjacent_component_workers,
+        source_latency_s=source_latency_s,
         transmission_time_s=transmission_time_s,
         network_utilization=network_utilization,
         network_bin_selected=network_bin_selected,

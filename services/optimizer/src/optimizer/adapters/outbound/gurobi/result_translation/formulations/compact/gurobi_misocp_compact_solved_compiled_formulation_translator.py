@@ -196,11 +196,7 @@ class GurobiMisocpCompactSolvedCompiledFormulationTranslator(
         compute_queue = variables.compute_queue
         network = variables.network
         topology = data.problem.variants[selected_model.model_variant_id]
-        connections = data.connections_by_pair
         workers = data.problem.flows[flow].workers
-        successors_by_worker = {
-            source: data.successors_by_worker[source] for source in workers
-        }
         components: list[ComponentSolution] = []
 
         for component in range(1, data.problem.policy.max_components + 1):
@@ -243,17 +239,8 @@ class GurobiMisocpCompactSolvedCompiledFormulationTranslator(
             )
             transmission_latency = (
                 sum(
-                    (
-                        0.0
-                        if source == target
-                        else connections[source, target].round_trip_time_s / 2
-                    )
-                    * network.adjacent_component_workers[
-                        flow, component, source, target
-                    ].X
+                    network.source_latency_s[flow, component, source].X
                     for source in workers
-                    for target in workers
-                    if source == target or target in successors_by_worker[source]
                 )
                 if component < data.problem.policy.max_components
                 else 0.0

@@ -88,7 +88,7 @@ async def test_existing_operational_cases_with_compact(monkeypatch, case):
             variable
             for variable in model.getVars()
             if variable.VarName.startswith(
-                ("u[", "e[", "active[", "last[", "c[", "n[", "q[")
+                ("u[", "e[", "active[", "last[", "c[", "n[", "xi[")
             )
         )
         assert all(variable.VType == gp.GRB.CONTINUOUS for variable in implicit)

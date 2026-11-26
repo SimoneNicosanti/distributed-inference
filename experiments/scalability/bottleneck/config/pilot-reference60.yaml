@@ -1,0 +1,15 @@
+base_config: ../../config/performance.yaml
+output: ../results/pilot-reference60-b-reference
+flow_counts: [5, 10]
+seeds: [42]
+loads: [0.8]
+objectives: [arrival_weighted_normalized_response_time]
+formulation: cumulative
+infrastructure_indices: [1]
+model_count: 3
+max_components: 5
+priority_count: 2
+start_modes: [cold, warm]
+include_primary_fixed: true
+solver: {time_limit_seconds: 5, mip_gap: 0.01, threads: 1, seed: 0, presolve_probe_seconds: 5}
+reference: {validation_seconds: 5}

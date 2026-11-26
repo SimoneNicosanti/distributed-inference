@@ -174,7 +174,7 @@ def _network(
     }
     return NetworkVariables(
         tensor_crossing_auxiliary=auxiliary,
-        adjacent_component_workers={},
+        source_latency_s={},
         transmission_time_s={},
         network_utilization={},
         network_bin_selected={},

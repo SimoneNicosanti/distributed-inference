@@ -51,44 +51,44 @@ def main() -> None:
         tomllib.load(handle)
     with (experiment / "uv.lock").open("rb") as handle:
         tomllib.load(handle)
-    raw = yaml.safe_load((experiment / "config/default.yaml").read_text())
-    progression = [[index, 0] for index in range(11)]
-    assert raw["infrastructure"] == progression
-    assert raw["seeds"] == [42]
-    counts = {}
-    for name in ("main", "sensitivity"):
-        campaign = raw[name]
-        counts[name] = (
-            len(raw["seeds"])
-            * len(campaign["loads"])
-            * len(campaign["flows"])
-            * len(campaign["models"])
-            * len(progression)
+    grids = {}
+    outputs = set()
+    for mode, filename in (
+        ("performance", "performance.yaml"),
+        ("model_variant", "model-variant.yaml"),
+    ):
+        raw = yaml.safe_load((experiment / "config" / filename).read_text())
+        assert raw["model_selection"] == mode
+        outputs.add(raw["output"])
+        names = {model["name"] for model in raw["catalog"]["models"]}
+        assert raw["flows"]["reference_model"] in names
+        if mode == "model_variant":
+            assert names == {"efficientnet_b6"}
+            assert all("models" not in raw[name] for name in ("main", "sensitivity"))
+            assert all("models" not in case for case in raw["pilot"]["cases"])
+        counts = {}
+        for name in ("main", "sensitivity"):
+            campaign = raw[name]
+            assert campaign["flows"] and all(
+                1 <= count <= raw["flows"]["pool_size"] for count in campaign["flows"]
+            )
+            models = campaign.get("models", [1])
+            assert models and all(1 <= count <= len(names) for count in models)
+            counts[name] = (
+                len(raw["seeds"])
+                * len(campaign["loads"])
+                * len(campaign["flows"])
+                * len(models)
+                * len(raw["infrastructure"])
+            )
+            assert counts[name] > 0
+        assert all(
+            1 <= case["flows"] <= raw["flows"]["pool_size"]
+            and 0 <= case["infrastructure_index"] < len(raw["infrastructure"])
+            for case in raw["pilot"]["cases"]
         )
-        assert counts[name] > 0
-    assert raw["main"]["loads"] == [0.7] and not raw["sensitivity"]["enabled"]
-    assert raw["pilot"]["load"] == 0.7
-    assert raw["flows"]["deadline_s"] == [0.2, 3.0]
-    assert raw["sensitivity"]["loads"] == [0.3, 0.8]
-    assert raw["solver"]["timeout_s"] == 300 and raw["solver"]["relative_gap"] == 0.01
-    assert (
-        raw["pilot"]["timeout_s"] == 60 and raw["optimization"]["max_components"] == 7
-    )
-    assert len(raw["catalog"]["models"]) == 10 and raw["flows"]["pool_size"] == 7
-    assert raw["main"]["models"] == list(range(1, 11))
-    assert raw["main"]["flows"] and all(
-        1 <= count <= raw["flows"]["pool_size"] for count in raw["main"]["flows"]
-    )
-    assert raw["sensitivity"]["models"] == [1, 5, 10]
-    assert raw["sensitivity"]["flows"] == [1, 4, 7]
-    assert len(raw["pilot"]["cases"]) == 6
-    assert any(
-        case["flows"] == 7 and case["models"] == 10 for case in raw["pilot"]["cases"]
-    )
-    assert all(
-        1 <= case["flows"] <= 7 and 1 <= case["models"] <= 10
-        for case in raw["pilot"]["cases"]
-    )
+        grids[mode] = counts
+    assert len(outputs) == 2
     adapter = Path(
         "services/optimizer/src/optimizer/adapters/outbound/gurobi/solver/gurobi_solver.py"
     )
@@ -126,14 +126,17 @@ def main() -> None:
         / "gurobi/formulation_compiler/formulations/compact/gurobi_misocp_compact_formulation_compiler.py"
     )
     assert native_calls(compiler.read_text(), "build_model_from_formulation") == [
-        "self._create_variables",
+        "self.create_variables",
+        "self.add_constraints",
+        "self._objective.set_objective",
+    ]
+    assert native_calls(compiler.read_text(), "add_constraints") == [
         "assignment_builder.add_constraints",
         "self._execution.add_constraints",
         "self._compute_queue.add_constraints",
         "self._network.add_constraints",
         "self._memory.add_constraints",
         "self._response_time.add_constraints",
-        "self._objective.set_objective",
     ]
     builder = optimizer / "gurobi/formulation_compiler/gurobi_formulation_compiler.py"
     for path in (full_strategy, compiler, builder):
@@ -225,7 +228,7 @@ def main() -> None:
             for target in node.targets
         )
     )
-    assert isinstance(objectives, ast.Tuple) and len(objectives.elts) == 4
+    assert isinstance(objectives, ast.Tuple) and len(objectives.elts) == 5
     assert all(
         isinstance(item, ast.Attribute) and item.attr != "CONSTANT"
         for item in objectives.elts
@@ -340,6 +343,7 @@ def main() -> None:
         if isinstance(target, ast.Name)
     } == {
         "ARRIVAL_WEIGHTED_RESPONSE_TIME",
+        "ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_TIME",
         "ARRIVAL_WEIGHTED_ACCURACY",
         "DEADLINE_VIOLATIONS",
         "ARRIVAL_WEIGHTED_NORMALIZED_DELAY",
@@ -362,6 +366,7 @@ def main() -> None:
     assert isinstance(test.comparators[0], ast.Set)
     assert {ast.unparse(item) for item in test.comparators[0].elts} == {
         "ObjectiveKind.ARRIVAL_WEIGHTED_RESPONSE_TIME",
+        "ObjectiveKind.ARRIVAL_WEIGHTED_NORMALIZED_RESPONSE_TIME",
         "ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY",
     }
     formulation_tree = ast.parse((root / production[2]).read_text())
@@ -394,7 +399,7 @@ def main() -> None:
             for node in ast.walk(tree)
         ), name
     print(
-        f"Static inspection: {len(sources) + 3} Python syntax trees; YAML/TOML valid; base grids {counts['main']}/{counts['sensitivity']}; 10 models; 7-flow pool; 11 infrastructures; four alternative objectives; conditional deadlines; no implicit deadline bounds; optimizer contracts, solver call order, incumbent callback and offline plotting wiring valid"
+        f"Static inspection: {len(sources) + 3} Python syntax trees; YAML/TOML valid; separate grids {grids}; five alternative objectives; conditional deadlines; no implicit deadline bounds; optimizer contracts, solver call order, incumbent callback and offline plotting wiring valid"
     )
     print(
         "No benchmark imports, tests, profiling, export, plotting or solver execution"

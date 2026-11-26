@@ -87,7 +87,7 @@ def _network_variables(model: gp.Model) -> NetworkVariables:
     }
     return NetworkVariables(
         tensor_crossing_auxiliary={},
-        adjacent_component_workers={},
+        source_latency_s={},
         transmission_time_s=transmission_time_s,
         network_utilization={worker: model.addVar(lb=0.0) for worker in _WORKERS},
         network_bin_selected={

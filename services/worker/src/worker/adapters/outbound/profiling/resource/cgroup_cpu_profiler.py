@@ -69,7 +69,7 @@ class CgroupCpuProfiler(CpuProfiler):
     @staticmethod
     def _get_logical_cpu_count() -> int:
         logical_cpu_count = os.process_cpu_count()
-        if logical_cpu_count is None or logical_cpu_count <= 0:
+        if logical_cpu_count is None or logical_cpu_count <= 0:  # type: ignore
             raise RuntimeError("Unable to determine the process CPU count")
         return logical_cpu_count
 

@@ -30,12 +30,15 @@ class TimeDistribution:
 
 
 def summarize_times(records: list[dict[str, Any]], metric: str) -> TimeDistribution:
-    if metric not in TIME_METRICS:
+    if metric not in TIME_METRICS and metric != "wall_time_s":
         raise ValueError(f"Unknown time metric: {metric}")
     non_timeouts: list[float] = []
     timeouts: list[float] = []
     for record in records:
-        if metric == "solver_runtime_s" and record["termination"] == "solver_error":
+        if (
+            metric in {"solver_runtime_s", "wall_time_s"}
+            and record["termination"] == "solver_error"
+        ):
             continue
         value = record.get(metric)
         if (
@@ -83,6 +86,7 @@ def plot_aggregate_times(
 
     for kind, draw in (
         ("time-boxplots", _boxplots),
+        ("wall-time-boxplots", _wall_time_boxplots),
         ("time-cdf", _cdf),
         ("time-heatmaps", _heatmaps),
     ):
@@ -93,11 +97,31 @@ def plot_aggregate_times(
         plt.close(figure)
 
 
-def _boxplots(records: list[dict[str, Any]], dimensions: dict[str, str]) -> Any:
+def _wall_time_boxplots(
+    records: list[dict[str, Any]], dimensions: dict[str, str]
+) -> Any:
+    return _boxplots(
+        records, dimensions, metrics={"wall_time_s": "Observed wall time (s)"}
+    )
+
+
+def _boxplots(
+    records: list[dict[str, Any]],
+    dimensions: dict[str, str],
+    *,
+    metrics: dict[str, str] | None = None,
+) -> Any:
     import matplotlib.pyplot as plt
 
-    figure, axes = plt.subplots(2, 3, figsize=(16, 9), constrained_layout=True)
-    for row, (metric, label) in zip(axes, TIME_METRICS.items(), strict=True):
+    metrics = TIME_METRICS if metrics is None else metrics
+    figure, axes = plt.subplots(
+        len(metrics),
+        len(dimensions),
+        figsize=(16, 4.5 * len(metrics)),
+        squeeze=False,
+        constrained_layout=True,
+    )
+    for row, (metric, label) in zip(axes, metrics.items(), strict=True):
         for axis, (dimension, dimension_label) in zip(
             row, dimensions.items(), strict=True
         ):

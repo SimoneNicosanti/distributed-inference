@@ -179,7 +179,11 @@ def analyze(directory: Path) -> None:
     # Import only for analysis: scenario construction and solves do not need plotting.
     for selection, strategy, formulation in sorted(
         {
-            (record_model_selection(r), record_strategy(r), record_formulation(r))
+            (
+                record_model_selection(r),
+                record_strategy(r),
+                record_formulation(r),
+            )
             for r in records
         }
     ):

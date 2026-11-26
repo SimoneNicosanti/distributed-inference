@@ -72,13 +72,13 @@ def test_implicit_integrality_from_binary_layer_and_priority_assignments(monkeyp
         assert model.NumGenConstrs == 0
         for variable in model.getVars():
             if variable.VarName.startswith(
-                ("u[", "e[", "active[", "last[", "n[", "c[", "q[")
+                ("u[", "e[", "active[", "last[", "n[", "c[", "xi[")
             ):
                 assert variable.VType == gp.GRB.CONTINUOUS
         original(model)
         for variable in model.getVars():
             if variable.VarName.startswith(
-                ("u[", "e[", "active[", "last[", "n[", "c[", "q[")
+                ("u[", "e[", "active[", "last[", "n[", "c[", "xi[")
             ):
                 assert pytest.approx(round(variable.X), abs=1e-7) == variable.X
 
@@ -195,9 +195,9 @@ def test_transmission_link_latency_and_sparse_topology(missing_link):
             assert pytest.approx(1) == times[request.flow_id, variant, 1, workers[0]].X
             assert pytest.approx(0) == times[request.flow_id, variant, 1, workers[1]].X
             assert (
-                pytest.approx(1)
-                == variables.network.adjacent_component_workers[
-                    request.flow_id, 1, *workers
+                pytest.approx(problem.connections_by_pair[workers].round_trip_time_s / 2)
+                == variables.network.source_latency_s[
+                    request.flow_id, 1, workers[0]
                 ].X
             )
 

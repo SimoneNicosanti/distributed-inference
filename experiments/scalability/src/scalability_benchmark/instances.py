@@ -20,7 +20,7 @@ from optimizer.domain.problem.other.model_input_concrete_shapes import (
     ModelInputConcreteShapes,
 )
 from optimizer.domain.problem.other.network_connection import NetworkConnection
-from scalability_benchmark.campaigns import RunSpec
+from scalability_benchmark.campaigns import FIXED_MODEL_NAME, RunSpec
 from scalability_benchmark.catalog import discover_catalog
 from scalability_benchmark.configuration import ExperimentConfig
 from scalability_benchmark.flows import SyntheticFlow, flow_pool
@@ -40,7 +40,6 @@ from scalability_benchmark.profiling.static_costs import (
     layer_weight_size_bytes,
     tensor_size_bytes,
 )
-from scalability_benchmark.randomness import stream
 from shared.model.keys import LayerKey
 
 
@@ -59,23 +58,50 @@ def request_record(request: SyntheticFlow) -> dict[str, object]:
     }
 
 
-def instance_flows(scenario: Scenario, spec: RunSpec) -> tuple[SyntheticFlow, ...]:
-    """Pin each flow within the available model prefix using its own seeded stream."""
-    flows = scenario.flows[spec.load][: spec.flow_count]
+def instance_models(scenario: Scenario, spec: RunSpec) -> tuple[StaticModel, ...]:
+    """Select the available prefix or the single explicitly requested B6 variant."""
     if spec.model_selection == "performance":
-        return flows
+        return scenario.models[: spec.model_count]
     if spec.model_selection != "model_variant":
         raise ValueError("Unknown model selection")
-    models = scenario.models[: spec.model_count]
+    models = tuple(
+        model
+        for model in scenario.models
+        if model.entry.settings.name == FIXED_MODEL_NAME
+    )
+    if len(models) != 1:
+        raise ValueError(
+            f"model_variant requires exactly one {FIXED_MODEL_NAME} variant"
+        )
+    return models
+
+
+def instance_flows(scenario: Scenario, spec: RunSpec) -> tuple[SyntheticFlow, ...]:
+    """Keep performance requests or explicitly request B6 for every flow."""
+    flows = scenario.flows[spec.load][: spec.flow_count]
+    if scenario.config.flows.calibration == "per_instance_reference_utilization":
+        config = scenario.config.model_copy(
+            update={
+                "flows": scenario.config.flows.model_copy(
+                    update={"pool_size": spec.flow_count}
+                )
+            }
+        )
+        flows = flow_pool(
+            config,
+            spec.seed,
+            spec.load,
+            scenario.reference_time_s,
+            scenario.workers[0].id,
+        )
+    if spec.model_selection == "performance":
+        return flows
+    model = instance_models(scenario, spec)[0]
     return tuple(
         replace(
             flow,
             performance_requirement=None,
-            model_variant_id=stream(
-                spec.seed, "model-selection", str(flow.flow_id.flow_id)
-            )
-            .choice(models)
-            .entry.variant_id,
+            model_variant_id=model.entry.variant_id,
         )
         for flow in flows
     )
@@ -205,13 +231,8 @@ def make_instance(
         raise ValueError("Run specification does not belong to this scenario")
     if (spec.edge_count, spec.cloud_count) not in scenario.config.infrastructure:
         raise ValueError("Unknown infrastructure configuration")
-    models = scenario.models[: spec.model_count]
+    models = instance_models(scenario, spec)
     requests = instance_flows(scenario, spec)
-    if spec.model_selection == "model_variant":
-        requested_variants = {request.model_variant_id for request in requests}
-        models = tuple(
-            model for model in models if model.entry.variant_id in requested_variants
-        )
     workers = select_workers(scenario.workers, spec.edge_count, spec.cloud_count)
     variants = {}
     configurations = {}

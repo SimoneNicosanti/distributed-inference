@@ -1,7 +1,7 @@
 import asyncio
 import math
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from time import perf_counter
 from typing import Protocol, override
 
@@ -30,7 +30,6 @@ from optimizer.domain.formulation.formulation import Formulation
 from optimizer.domain.formulation.formulation_config import FormulationConfig
 from optimizer.domain.problem.compact.compact_optimization_problem import (
     CompactOptimizationProblem,
-    ObjectiveKind,
 )
 from optimizer.domain.solution.optimization_solution import OptimizationSolution
 
@@ -43,8 +42,6 @@ class IncrementalSolveStatistics(Protocol):
 @dataclass(frozen=True, slots=True)
 class IncrementalFlowStrategyConfig[SolverConfigT]:
     insertion_solver_config: SolverConfigT
-    repair_solver_config: SolverConfigT
-    final_solver_config: SolverConfigT
 
 
 class IncrementalFlowSolveError(SolveError):
@@ -65,7 +62,7 @@ class IncrementalFlowSolverStrategy[
     SolvedCompiledFormulationT,
     SolverStatisticsT: IncrementalSolveStatistics,
 ](SolverStrategy[CompactOptimizationProblem]):
-    """Fixed-decision insertion, conditional repair, then one unrestricted solve."""
+    """Optimize each complete prefix, using prior decisions only as a MIP start."""
 
     def __init__(
         self,
@@ -109,10 +106,7 @@ class IncrementalFlowSolverStrategy[
         attempts: list[IncrementalAttemptDiagnostics] = []
         incumbent = None
         returned = None
-        source = None
         completed = 0
-        before_final = None
-        after_final = None
         try:
             for count in range(1, len(problem.flows) + 1):
                 prefix = compact_problem_prefix(problem, count)
@@ -123,66 +117,22 @@ class IncrementalFlowSolverStrategy[
                     else IncrementalStage.INSERTION,
                     self._config.insertion_solver_config,
                     incumbent,
-                    fix_decisions=incumbent is not None,
-                    reason=None,
                     attempts=attempts,
                 )
-                if candidate is None and incumbent is not None:
-                    termination = attempts[-1].termination
-                    if termination in {
-                        SolverTerminationKind.INFEASIBLE,
-                        SolverTerminationKind.TIME_LIMIT,
-                    }:
-                        candidate = await self._attempt(
-                            prefix,
-                            IncrementalStage.REPAIR,
-                            self._config.repair_solver_config,
-                            incumbent,
-                            fix_decisions=False,
-                            reason="restricted_infeasible"
-                            if termination == SolverTerminationKind.INFEASIBLE
-                            else "restricted_timeout_without_incumbent",
-                            attempts=attempts,
-                        )
                 if candidate is None:
                     raise IncrementalFlowSolveError(attempts[-1])
                 incumbent = candidate
                 completed = count
 
             assert incumbent is not None
-            before_final = incumbent.objective_value
-            final = await self._attempt(
-                problem,
-                IncrementalStage.FINAL,
-                self._config.final_solver_config,
-                incumbent,
-                fix_decisions=False,
-                reason=None,
-                attempts=attempts,
-            )
-            after_final = final.objective_value if final is not None else None
-            maximize = (
-                problem.policy.objective == ObjectiveKind.ARRIVAL_WEIGHTED_ACCURACY
-            )
-            final_is_better = final is not None and (
-                final.objective_value >= incumbent.objective_value
-                if maximize
-                else final.objective_value <= incumbent.objective_value
-            )
-            if final_is_better:
-                returned, source = final, "final"
-            else:
-                returned, source = replace(incumbent, is_optimal=False), "incremental"
-            assert returned is not None
+            returned = incumbent
             return returned
         finally:
             self.diagnostics = IncrementalFlowDiagnostics(
                 attempts=tuple(attempts),
                 completed_flow_count=completed,
-                objective_before_final=before_final,
-                objective_after_final=after_final,
                 returned_objective_value=returned.objective_value if returned else None,
-                returned_source=source,
+                returned_source="last_prefix" if returned is not None else None,
                 wall_time_s=perf_counter() - started,
             )
             if self._observer is not None:
@@ -195,8 +145,6 @@ class IncrementalFlowSolverStrategy[
         solver_config: SolverConfigT,
         seed: OptimizationSolution | None,
         *,
-        fix_decisions: bool,
-        reason: str | None,
         attempts: list[IncrementalAttemptDiagnostics],
     ) -> OptimizationSolution | None:
         started = perf_counter()
@@ -215,9 +163,7 @@ class IncrementalFlowSolverStrategy[
             ) as compiled:
                 construction_time = perf_counter() - started
                 if seed is not None:
-                    await self._model_adapter.initialize_model(
-                        compiled, seed, fix_decisions=fix_decisions
-                    )
+                    await self._model_adapter.initialize_model(compiled, seed)
                 solver_called = True
                 output = await self._solver.solve_compiled_formulation(
                     compiled, solver_config
@@ -255,10 +201,6 @@ class IncrementalFlowSolverStrategy[
                 IncrementalAttemptDiagnostics(
                     stage=stage,
                     flow_count=len(problem.flows),
-                    fixed_flow_count=len(seed.flow_solutions)
-                    if fix_decisions and seed
-                    else 0,
-                    reason=reason,
                     termination=output.termination if output else None,
                     feasible_incumbent=solution is not None,
                     objective_value=output.objective_value if output else None,

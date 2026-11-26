@@ -12,37 +12,57 @@ The compact MISOCP supports two layer representations: `assignment` (default)
 and `cumulative`. The old `compact` name remains an alias for `assignment`.
 Select with `solver.formulation` in YAML or `--formulation` on the CLI; `legacy`
 is rejected.
-The benchmark exposes four optimization objectives. The optimizer's `CONSTANT`
+The benchmark exposes five optimization objectives, including
+`arrival_weighted_normalized_response_time`. The optimizer's `CONSTANT`
 feasibility objective is excluded from configuration and `--objectives all`.
 Profiles must contain `max_cut_size_mib`. Historical result files remain readable.
 
-## Explicit model per flow
+## Separate experiments
 
-`--model-selection model_variant` assigns each flow one model variant, sampled
-uniformly with replacement from that run's available model prefix. The seed and
-flow identity determine the assignment, so it stays identical across worker
-configurations, objectives and formulations for the same model pool. Growing the
-model pool can change assignments. Arrivals, deadlines and endpoint placements
-remain shared with the default `performance` mode.
+Each experiment has its own command, configuration and default output:
+
+| Experiment | Command | YAML | Output |
+| --- | --- | --- | --- |
+| Performance requirements; optimizer chooses models | `scalability-performance` | `config/performance.yaml` | `results/performance` |
+| Every flow explicitly requests EfficientNet B6 | `scalability-model-variant` | `config/model-variant.yaml` | `results/model-variant` |
 
 ```bash
-uv run --python 3.14 --project experiments/scalability --locked scalability main --model-selection model_variant --output experiments/scalability/results/fixed-models
-# Compare both modes on each base instance (twice as many runs):
-uv run --python 3.14 --project experiments/scalability --locked scalability main --model-selection performance model_variant --output experiments/scalability/results/model-selection
+# Inspect independent plans without profiling or solving.
+uv run --project experiments/scalability --locked scalability-performance plan
+uv run --project experiments/scalability --locked scalability-model-variant plan
+
+# Run either experiment independently.
+uv run --project experiments/scalability --locked scalability-performance main
+uv run --project experiments/scalability --locked scalability-model-variant main
 ```
 
-`model_count` counts available models; explicit selection can use fewer distinct
-models because assignments may repeat. Each flow admits only its assigned variant
-and has no performance threshold. With `arrival_weighted_accuracy`, all choices
-are fixed and the objective is zero. The `performance` mode remains the default.
-The paired `scripts/compare_formulations.py` command also accepts
-`--model-selection model_variant`.
+`scalability` remains the performance command. The campaign CLI no longer accepts
+`--model-selection` or executes both modes together. Each command rejects a YAML
+for the other experiment. Both retain `pilot`, `main`, `sensitivity`, `plan`,
+`analyze`, `--config`, `--output`, `--strategy`, `--formulation` and
+`--objectives`.
 
-Run identities, JSONL, CSV and aggregates include `model_selection`; JSONL flow
-records contain the assigned `model_variant_id`. Explicit-mode figures are under
-`analysis/model_variant/` (then strategy/formulation subdirectories). Historical
-records without a selection mode are interpreted as `performance`.
+The performance YAML retains all ten models and the `main.models`,
+`sensitivity.models` and pilot `models` fields. Its baseline is restored from revision `611dc9e`: flows 1–7, model counts 1–10,
+ResNet-50 calibration, deadlines 0.2–3 seconds, up to seven components and three
+priorities. The independent experiment mode and output directory are retained.
 
+The model-variant YAML contains only `efficientnet_b6`. Its main, sensitivity and
+pilot sections omit `models`: the schema supplies exactly one candidate and
+rejects a candidate-count sweep. Every request has `model_variant_id` set to B6,
+no performance threshold, and exactly one eligible variant. Missing B6 is an error.
+The default calibration reference is B6 on the device. With
+`arrival_weighted_accuracy`, model choices are fixed and the objective is zero.
+
+The instance generator, compiler, solver, persistence and analysis remain shared.
+Run identities, JSONL, CSV and aggregates retain `model_selection`; JSONL flow
+records contain the assigned `model_variant_id`. Historical records without a
+selection mode are interpreted as `performance`. Default outputs, manifests and
+profile caches are independent. An explicit `--output` overrides that destination.
+
+The paired `scripts/compare_formulations.py` helper keeps its single-mode
+`--model-selection model_variant` option and automatically selects the B6 YAML
+unless `--config` is supplied. Both formulations receive identical requests.
 
 ## Assignment versus cumulative
 
@@ -68,16 +88,46 @@ See [mathematics, validation and measured comparison](../../docs/optimization/cu
 ## Incremental strategy
 
 Select `--strategy incremental` or `solver.strategy: incremental` in YAML.
-The optimizer inserts flows with previous decisions fixed, repairs failed
-insertions with all decisions free, then always performs a final unrestricted
-solve. Both `assignment` and `cumulative` are supported. The default remains
-`full`.
+The optimizer solves flow 1, then flows 1–2, then flows 1–3, and so on in input
+order. Every prefix is unrestricted. The previous solution supplies only a
+partial MIP start: earlier models, partitions, placements and priorities can
+all change. With the B6 experiment, model choice remains fixed by the requests.
+Both `assignment` and `cumulative` are supported; `full` remains the default.
 
-Optional YAML solver fields `insertion_time_limit_s`, `repair_time_limit_s`, and
-`final_time_limit_s` override the ordinary per-solve timeout for those stages.
-They do not impose a whole-strategy timeout. JSONL includes stage diagnostics;
-CSV includes repair/solve counts and strategy timing. Analysis separates the
-strategies. See [algorithm, configuration and validation](../../docs/optimization/incremental-flow-strategy.md).
+Each prefix optimizes to the configured gap or timeout, without a first-solution
+limit. A timeout with a validated incumbent can continue; a prefix with no valid
+incumbent stops the strategy. There is no separate repair or final solve: the
+last prefix already optimizes the complete problem. Thus F flows require F solves.
+
+Optional YAML `insertion_time_limit_s` overrides the ordinary timeout for every
+prefix. The budget is F times this per-solve limit, excluding construction.
+The obsolete repair/final timeout fields are removed. JSONL contains prefix
+diagnostics; CSV includes `successful_insertions` and `native_solve_count`.
+The final gap and bound belong to the complete last prefix; discovery histories
+remain per solve. Analysis keeps full and incremental strategies separate.
+See [algorithm, configuration and validation](../../docs/optimization/incremental-flow-strategy.md).
+
+## Persistent incremental strategy
+
+Select `--strategy incremental-persistent` or
+`solver.strategy: incremental-persistent`. It uses the same unrestricted
+flow-by-flow optimization and partial MIP starts as `incremental`, while keeping
+one native Gurobi model alive. It adds new-flow blocks, updates shared network
+and memory rows, and refreshes compute-queue constraints and bounds. Earlier
+flow decisions remain free. Both assignment representations and experiment
+modes are supported.
+
+```bash
+uv run --project experiments/scalability --locked scalability-model-variant main \
+  --strategy incremental-persistent --formulation cumulative \
+  --output experiments/scalability/results/model-variant/incremental-persistent
+```
+
+The existing `incremental` option remains available for comparison. Prefix time
+limits and the F-solve budget are the same; identities, diagnostics and analysis
+directories distinguish the strategies. Wall-time boxplots include construction
+and update costs. No large-model runtime improvement has yet been measured.
+See [persistent compiler, bounds and validation](../../docs/optimization/persistent-incremental-flow-strategy.md).
 
 ## Setup
 
@@ -107,11 +157,19 @@ PyTorch CPU index. It does not install CUDA, NVIDIA runtime packages or Triton.
 
 ## Explicit model preparation
 
-Place all ten ONNX files in `experiments/scalability/models/`, or prepare them:
+The performance experiment needs all ten ONNX files in
+`experiments/scalability/models/`; fixed B6 needs only `efficientnet_b6.onnx`.
+Prepare the performance catalog explicitly:
 
 ```bash
 uv sync --project experiments/scalability --locked --group export
 uv run --project experiments/scalability --locked --group export python experiments/scalability/scripts/export_models.py
+```
+
+To prepare only the B6 experiment catalog:
+
+```bash
+uv run --project experiments/scalability --locked --group export python experiments/scalability/scripts/export_models.py --config experiments/scalability/config/model-variant.yaml
 ```
 
 Default: deterministic random weights, no downloads. The benchmark uses synthetic
@@ -158,7 +216,7 @@ The existing profiler currently requires input `images`; it is not modified.
 # Six representative runs, native solver timeout 60 seconds, then offline analysis.
 uv run --project experiments/scalability --locked scalability pilot --output experiments/scalability/results/pilot --analyze
 
-# Main: seed 42, load 0.7, 4 flow counts x 10 model counts x 11 infrastructures.
+# Performance main: seed 42, load 0.7, 7 flow counts x 10 model counts x 11 infrastructures.
 uv run --project experiments/scalability --locked scalability main --output experiments/scalability/results/main
 
 # Resume: completed timeouts and proven infeasibility are completed outcomes.
@@ -182,13 +240,18 @@ Campaign `enabled` flags describe default inclusion; explicitly selecting a name
 campaign opts into it, including sensitivity even with its default `enabled: false`.
 There is no command that implicitly executes both campaigns.
 
-Main: **440** configurations (4–7 flows), 300-second timeout and relative gap **0.01**.
-Sensitivity: **198** additional configurations, loads 0.3/0.8, flow counts 1/4/7,
-model counts 1/5/10, all 11 infrastructures. Solver time budgets: 36 hours
-40 minutes and 16 hours 30 minutes, 53 hours 10 minutes combined.
-Main plus sensitivity contains **638** runs; the six-case pilot brings this to
-**644** per objective. Model construction, profiling, persistence and solver
-shutdown add time; these figures are not strict wall-clock bounds.
+Current counts per objective:
+
+| Experiment | Pilot | Main | Sensitivity | Main solver budget |
+| --- | --- | --- | --- | --- |
+| Performance | 6 | 770 | 198 | 64 h 10 min |
+| Fixed B6 | 6 | 22 | 66 | 1 h 50 min |
+
+Both main grids use seed 42, load 0.7, eleven infrastructures and a 300-second
+solve limit with relative gap 0.01. Performance uses flows 1–7; fixed B6 uses flows
+5/7. Sensitivity is optional. Construction,
+profiling, persistence and solver shutdown add time; these budgets are not strict
+wall-clock bounds. Use each command's `plan` after changing its YAML.
 
 ## Objective selection
 
@@ -197,6 +260,7 @@ Each run optimizes exactly one objective. Accepted YAML/CLI values:
 | Objective | Behavior |
 | --- | --- |
 | `arrival_weighted_response_time` | Minimize arrival-weighted response; enforce every response deadline. Default YAML objective. |
+| `arrival_weighted_normalized_response_time` | Minimize the arrival-weighted fraction of each deadline consumed; enforce every response deadline. |
 | `arrival_weighted_accuracy` | Maximize arrival-weighted accuracy; enforce every response deadline. |
 | `deadline_violations` | Minimize the number of missed deadlines using binary indicators. |
 | `arrival_weighted_normalized_delay` | Minimize arrival-weighted positive delay divided by each flow's deadline. |
@@ -205,7 +269,7 @@ Each run optimizes exactly one objective. Accepted YAML/CLI values:
 # Plan all objectives without loading models or running a solver.
 uv run --project experiments/scalability --locked scalability plan --objectives all
 
-# Run all four independently on the same generated instances.
+# Run all five independently on the same generated instances.
 uv run --project experiments/scalability --locked scalability main --objectives all --output experiments/scalability/results/main-objectives
 
 # Select only a subset.
@@ -215,10 +279,10 @@ uv run --project experiments/scalability --locked scalability main --objectives 
 Omitting `--objectives` uses `optimization.objective` from YAML. Names are
 deduplicated while preserving order; `all` must be used alone. There is no
 hierarchical optimization or response-time tie-break. The former response-slack
-objective names are replaced by the four values above.
+objective names are replaced by the values above.
 
-The counts/budgets above are **per objective**. Selecting all four gives 1,760
-main runs, 792 sensitivity runs and 24 pilot runs with the default configuration;
+The counts/budgets above are **per objective**. Selecting all five gives 3,850
+performance main runs or 110 fixed-B6 main runs;
 solver time budgets scale by the number selected. `--limit N` limits total runs
 after objective expansion. Run IDs include the objective, so `--resume` skips
 only completed runs for that objective. Instance generation and profile caches
@@ -237,7 +301,7 @@ the YAML-generated score rather than a measured prediction metric.
 
 ## Synthetic assumptions
 
-All assumptions are in `config/default.yaml`; changes are included in result IDs.
+All assumptions are in `config/performance.yaml` and `config/model-variant.yaml`; changes are included in result IDs.
 There is no automatic calibration adjustment, deadline relaxation or feasibility
 repair. Report pilot findings before changing assumptions.
 
@@ -339,6 +403,13 @@ candidate using native solver runtime, excluding construction. It appears in
 JSONL and `summary.csv`. Strict improvements are filtered for minimization or
 maximization; non-improving candidates are ignored.
 
+For incremental strategies, `construction_time_s` sums prefix preparation and
+native construction/update time. `prefix_wall_time_s` sums complete prefix
+attempts, including solves. It replaces the misleading name
+`incremental_construction_time_s`; CSV export also recognizes that historical
+field without changing archived JSONL records. Model dimensions use one shared
+collector across scalability, bottleneck and priority experiments.
+
 `raw_solver_statistics.incumbent_history` in each finished JSONL event contains
 `{runtime_s, objective_value}` samples at 0, 1, 2, ... seconds, plus termination
 when it falls between whole seconds. Samples carry forward the best objective
@@ -413,6 +484,13 @@ observations are present:
   whiskers use the standard 1.5-IQR rule and outliers remain visible. Orange
   crosses identify observations from timeout runs. Each category reports the
   observed/total count. The other factors and seeds are pooled.
+* `analysis/<campaign>-<objective>-load-<load>-wall-time-boxplots.{pdf,png}`:
+  recorded `wall_time_s` distributions grouped by worker, flow and model counts,
+  with the same quartiles, timeout crosses and observed/total coverage.
+  Wall time covers the solver execution wrapper, including model construction,
+  all incremental prefix solves, extraction and validation; it excludes earlier
+  scenario profiling and subsequent journal writes. Missing historical values
+  are omitted without substituting native runtime; solver-error runs are excluded.
 * `analysis/<campaign>-<objective>-load-<load>-time-cdf.{pdf,png}`:
   conditional empirical cumulative distributions for each time metric, with
   separate curves for all observations, timeout runs and other runs. Every
@@ -454,3 +532,8 @@ SCALABILITY_INTEGRATION=1 uv run --project experiments/scalability --locked pyte
 Static-only verification commands and execution-path evidence are documented in
 `VALIDATION.md`. No successful runtime interoperability, export, ONNX profiling,
 Gurobi solve, recovery or plot generation is claimed without executing those checks.
+
+## Bottleneck diagnostics
+
+Bounds-only A–E ablations, shared validated references, cold/warm runs and censored
+scalability analysis: [bottleneck study](bottleneck/README.md).

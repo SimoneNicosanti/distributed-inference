@@ -1,0 +1,39 @@
+# Existing catalog, operator efficiencies, static profiler and export settings.
+base_config: ../../scalability/config/default.yaml
+output: ../results
+seeds: [42]
+flows: [2, 3, 5]
+target_loads: [0.3, 0.5, 0.7, 0.8]
+pilot_loads: [0.3, 0.8]
+priority_counts: [1, 2]
+workloads:
+  - name: homogeneous
+    category: homogeneous
+    models: [resnet50]
+  - name: heterogeneous
+    category: heterogeneous
+    models: [resnet50, resnet101, resnet152, efficientnet_b0, efficientnet_b2, efficientnet_b4]
+arrival_weight_range: [0.8, 1.2]
+# arrival_weights: {2: [1.0, 1.0], 3: [1.0, 1.0, 1.0], 5: [1, 1, 1, 1, 1]}
+deadline: {strategy: reference_response_multiplier, multiplier: 3.0}
+optimization:
+  objective: arrival_weighted_response_time
+  max_components: 5
+  compute_utilization_limit: 0.9
+  network_utilization_limit: 0.8
+  relative_error: 0.1
+solver:
+  strategy: full
+  formulation: assignment
+  timeout_s: 300
+  relative_gap: 0.01
+  threads: 1
+  seed: 0
+  output_flag: false
+hardware:
+  device: {backend: cpu, cpu_cores: 4, ram_gib: 8, vram_gib: 0, compute_flops_s: 80000000000, memory_bytes_s: 20000000000, overhead_s: 0.000005}
+  edge: {backend: gpu, cpu_cores: 8, ram_gib: 16, vram_gib: 8, compute_flops_s: 3000000000000, memory_bytes_s: 120000000000, overhead_s: 0.000025}
+# Shared GPU on a wired 10 Gbit/s device-edge link. No disabled constraints.
+network: {one_way_ms: [0.2, 0.5], throughput_mbps: [8000, 10000]}
+tight_gap: 0.01
+reference_check: true

@@ -30,6 +30,9 @@ from optimizer.application.strategies.full_solver_strategy import FullSolverStra
 from optimizer.application.strategies.incremental.incremental_flow_solver_strategy import (
     IncrementalFlowSolverStrategy,
 )
+from optimizer.application.strategies.incremental.persistent_incremental_flow_solver_strategy import (
+    PersistentIncrementalFlowSolverStrategy,
+)
 from optimizer.application.strategies.solver_strategy_kind import SolverStrategyKind
 from optimizer.composition.default_composition_root import DefaultCompositionRoot
 from optimizer.domain.formulation.compact.misocp.compact_formulation_kind import (
@@ -58,8 +61,11 @@ def test_builds_optimizer_owned_strategy(strategy_kind: SolverStrategyKind) -> N
         assert isinstance(strategy, FullSolverStrategy)
         assert strategy._solver_config.time_limit_s == 7
     else:
+        if strategy_kind == SolverStrategyKind.INCREMENTAL_PERSISTENT:
+            assert isinstance(strategy, PersistentIncrementalFlowSolverStrategy)
+            strategy = strategy._strategy
         assert isinstance(strategy, IncrementalFlowSolverStrategy)
-        assert strategy._config.final_solver_config.time_limit_s == 7
+        assert strategy._config.insertion_solver_config.time_limit_s == 7
     assert (
         strategy._formulation_config.representation == CompactFormulationKind.CUMULATIVE
     )

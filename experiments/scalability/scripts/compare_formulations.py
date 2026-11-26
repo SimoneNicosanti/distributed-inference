@@ -12,7 +12,10 @@ from scalability_benchmark.campaigns import (
     ModelSelection,
     campaign_specs,
 )
-from scalability_benchmark.configuration import load_configuration
+from scalability_benchmark.configuration import (
+    default_configuration_path,
+    load_configuration,
+)
 from scalability_benchmark.instances import (
     build_scenario,
     instance_flows,
@@ -36,11 +39,13 @@ async def compare(
     model_selection: ModelSelection = "performance",
 ) -> None:
     config = load_configuration(config_path)
+    if config.model_selection != model_selection:
+        raise ValueError(
+            f"Select a {model_selection} configuration for this comparison"
+        )
     software = software_provenance()
     with ResultStore(output, resume=False) as store:
-        specs = itertools.islice(
-            campaign_specs(config, "main", model_selections=(model_selection,)), limit
-        )
+        specs = itertools.islice(campaign_specs(config, "main"), limit)
         for seed, group in itertools.groupby(specs, key=lambda spec: spec.seed):
             source_hash = str(software["source_hash"])
             scenario = await build_scenario(
@@ -88,7 +93,6 @@ def main() -> None:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path(__file__).resolve().parents[1] / "config/default.yaml",
     )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--limit", type=int, default=1)
@@ -101,7 +105,7 @@ def main() -> None:
         parser.error("--limit and --repetitions must be positive")
     asyncio.run(
         compare(
-            args.config,
+            args.config or default_configuration_path(args.model_selection),
             args.output,
             args.limit,
             args.repetitions,

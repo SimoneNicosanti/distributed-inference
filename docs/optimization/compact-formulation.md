@@ -1,5 +1,9 @@
 # Compact MISOCP formulation
 
+Current transmission latency uses source-based `xi[f,k,s]` variables, independently
+of model selection and payload; pair-transition `q` variables have been removed.
+See [the current latency formulation](transmission-latency.md).
+
 The current normalized input contract requires exactly one configuration per
 variant; see [Compact problem contract](compact-problem-contract.md). This replaces
 the earlier policy of admitting all profiled shapes of each variant.
@@ -44,7 +48,7 @@ quadratic and general constraint counts, node count, timings, objective, final
 bound and gap. Scalability records include the selected formulation and memory
 assumption. Presolve reductions and root-relaxation statistics are not collected.
 
-## Four alternative objectives
+## Five alternative objectives
 
 Each solve selects exactly one `ObjectiveKind`, using `setObjective` once.
 There are no hierarchical objectives, combined penalties or latency tie-breaks.
@@ -53,6 +57,7 @@ Let `w_f = arrival_rate[f] / sum_f arrival_rate[f]`.
 | Setting | Objective | Hard response deadline |
 | --- | --- | --- |
 | `arrival_weighted_response_time` | Minimize `sum_f w_f * R[f]` | `R[f] <= deadline[f]` for every flow |
+| `arrival_weighted_normalized_response_time` | Minimize `sum_f w_f * R[f] / deadline[f]` | `R[f] <= deadline[f]` for every flow |
 | `arrival_weighted_accuracy` | Maximize `sum_f w_f * sum_m accuracy[f,m] * u[f,m]` | `R[f] <= deadline[f]` for every flow |
 | `deadline_violations` | Minimize the unweighted count `sum_f v[f]` | Only the indicator `v[f] == 0 => R[f] <= deadline[f]` |
 | `arrival_weighted_normalized_delay` | Minimize `sum_f w_f * D[f] / deadline[f]` | None; `D[f] >= 0` and `D[f] >= R[f] - deadline[f]` |
@@ -62,8 +67,23 @@ one indicator and one binary variable are added per flow only for that objective
 Delay variables are continuous and nonnegative, one per flow only for the delay
 objective; positive arrival weights make the delay epigraph tight at optimum.
 No response deadline remains hidden in response, transmission or queue variable
-bounds. The response-time and accuracy objectives add unconditional hard deadlines;
-violation-count and delay objectives retain their conditional/soft treatment.
+bounds. Both response-time objectives and the accuracy objective add unconditional
+hard deadlines; violation-count and delay objectives retain their conditional/soft
+treatment.
+
+`arrival_weighted_normalized_response_time` minimizes the mean fraction of the
+deadline consumed by requests:
+
+\[
+J = \frac{1}{\sum_f \Lambda_f}
+    \sum_{f \in \mathcal F} \Lambda_f \frac{T_f}{D_f}.
+\]
+
+Here `Lambda_f` is the request arrival rate, `T_f` is the modeled mean response
+time, and `D_f` is the response deadline. The objective remains sensitive to
+response-time and scheduling priority improvements when every deadline is satisfied. With hard deadlines,
+`0 <= J <= 1`. No deadline slack or extra penalty is introduced. The existing
+`arrival_weighted_response_time` remains the default.
 
 Accuracy uses the type and dataset of each flow's existing performance requirement:
 accuracy, mAP@50 or mAP@75. Matching finite profile values supply `a_m`; if duplicate
@@ -108,7 +128,7 @@ and the previously enabled/commented strengthenings otherwise retain their roles
 
 ### Campaign selection and verification
 
-`--objectives all` runs all four objectives independently for every instance.
+`--objectives all` runs all five objectives independently for every instance.
 `--objectives NAME [NAME ...]` selects a subset; omitted uses the YAML objective.
 Run specifications, IDs, CSVs, effective solver statistics and plots include the
 objective. Aggregation never pools different objectives. The scenario is reused
@@ -419,7 +439,7 @@ bounds,structure,execution,transmission,memory,execution_queue,network_queue}.py
 optimization adapter. New tests are `test_compact_formulation.py`,
 `test_compact_integration.py`, and `test_compact_memory_and_profiles.py` beside the
 existing optimization tests. The benchmark solver test additionally exercises
-both selectors; `experiments/scalability/config/default.yaml` explicitly selects
+both selectors; `experiments/scalability/config/performance.yaml` explicitly selects
 legacy. This document and the comparison JSON complete the changed-file list.
 
 ## Historical model size and measured timings

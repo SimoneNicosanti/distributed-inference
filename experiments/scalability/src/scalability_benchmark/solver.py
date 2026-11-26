@@ -1,8 +1,9 @@
 """Run the production full strategy and retain its standardized solve output."""
 
 from dataclasses import asdict
+from importlib.metadata import version
 from time import perf_counter
-from typing import override
+from typing import Any, override
 
 from gurobipy import GRB
 
@@ -31,6 +32,7 @@ from optimizer.application.abc.solver_strategy import (
     SolveError,
     SolverStrategy,
 )
+from optimizer.application.evaluation.queueing import QueueingMode
 from optimizer.application.ports.outbound.solver import Solver
 from optimizer.application.ports.outbound.solver_result import (
     SolverOutput,
@@ -38,6 +40,9 @@ from optimizer.application.ports.outbound.solver_result import (
 )
 from optimizer.application.strategies.incremental.incremental_flow_solver_strategy import (
     IncrementalFlowSolverStrategy,
+)
+from optimizer.application.strategies.incremental.persistent_incremental_flow_solver_strategy import (
+    PersistentIncrementalFlowSolverStrategy,
 )
 from optimizer.application.strategies.solver_strategy_kind import SolverStrategyKind
 from optimizer.domain.formulation.compact.misocp.compact_formulation_kind import (
@@ -53,9 +58,14 @@ from optimizer.domain.problem.compact.compact_optimization_problem import (
     CompactOptimizationProblem,
     ObjectiveKind,
 )
+from optimizer.domain.solution.optimization_solution import OptimizationSolution
 from scalability_benchmark.campaigns import RunSpec
 from scalability_benchmark.configuration import ExperimentConfig
 from scalability_benchmark.instances import Scenario, make_instance
+from scalability_benchmark.model_metrics import dimensions
+from scalability_benchmark.randomness import fingerprint
+from scalability_benchmark.serialization import jsonable
+from scalability_benchmark.validation import validation_observations
 
 type CompactGurobiModel = GurobiCompiledFormulation[
     MisocpCompactFormulation, CompactVariables
@@ -78,6 +88,8 @@ class _RecordingSolver(
     ) -> None:
         self._solver = solver
         self.output: CompactSolverOutput | None = None
+        self.model_dimensions: dict[str, int] = {}
+        self.priority_variables: dict[str, int] = {}
 
     @override
     async def solve_compiled_formulation(
@@ -86,6 +98,12 @@ class _RecordingSolver(
         solver_config: GurobiSolverConfig,
     ) -> CompactSolverOutput:
         self.output = None
+        native = compiled_formulation.native_model
+        queue = compiled_formulation.variables.compute_queue
+        self.model_dimensions = dimensions(native)
+        self.priority_variables = {
+            "component_priority_variables": len(queue.component_priority),
+        }
         self.output = await self._solver.solve_compiled_formulation(
             compiled_formulation, solver_config
         )
@@ -201,6 +219,15 @@ def classify(
         }
         else None,
         "original_variables": statistics.original_variables if statistics else None,
+        "original_continuous_variables": statistics.continuous_variables
+        if statistics
+        else None,
+        "original_linear_constraints": statistics.linear_constraints
+        if statistics
+        else None,
+        "original_quadratic_constraints": statistics.quadratic_constraints
+        if statistics
+        else None,
         "original_binary_variables": statistics.binary_variables
         if statistics
         else None,
@@ -238,6 +265,7 @@ def classify(
 async def execute_solver(
     scenario: Scenario, spec: RunSpec, config: ExperimentConfig
 ) -> dict[str, object]:
+    problem: CompactOptimizationProblem | None = None
     started = perf_counter()
     failure = None
     solution = None
@@ -261,8 +289,6 @@ async def execute_solver(
             strategy_config=GurobiStrategyConfig(
                 strategy=SolverStrategyKind(spec.strategy),
                 insertion_time_limit_s=spec.insertion_time_limit_s,
-                repair_time_limit_s=spec.repair_time_limit_s,
-                final_time_limit_s=spec.final_time_limit_s,
             ),
         )
         solution = await strategy.solve(problem)
@@ -271,7 +297,10 @@ async def execute_solver(
     output = recorder.output if recorder is not None else None
     diagnostics = (
         strategy.diagnostics
-        if isinstance(strategy, IncrementalFlowSolverStrategy)
+        if isinstance(
+            strategy,
+            (IncrementalFlowSolverStrategy, PersistentIncrementalFlowSolverStrategy),
+        )
         else None
     )
     if (
@@ -285,6 +314,8 @@ async def execute_solver(
     )
     extra: dict[str, object] = {}
     if diagnostics is not None:
+        last = diagnostics.attempts[-1] if diagnostics.attempts else None
+        complete_prefix = last is not None and last.flow_count == spec.flow_count
         record = diagnostics.as_record()
         extra = {
             "strategy_diagnostics": record,
@@ -306,34 +337,63 @@ async def execute_solver(
                 "construction_time_s": sum(
                     attempt.construction_time_s for attempt in diagnostics.attempts
                 ),
-                # Native history/bounds belong to the last attempt, not the strategy.
+                # Discovery times refer to individual solves; the last complete
+                # prefix supplies valid bounds for the complete problem.
                 "time_to_first_incumbent_s": None,
                 "time_to_zero_tardiness_s": None,
-                "final_gap": None,
-                "objective_bound": None,
+                "final_gap": result["final_gap"] if complete_prefix else None,
+                "objective_bound": result["objective_bound"]
+                if complete_prefix
+                else None,
                 "infeasibility_proven": False,
             }
         )
-        last = diagnostics.attempts[-1] if diagnostics.attempts else None
         full_infeasible = (
             failure is not None
             and last is not None
-            and last.stage != "insertion"
             and last.flow_count == spec.flow_count
             and last.termination == SolverTerminationKind.INFEASIBLE
         )
         result["infeasibility_proven"] = full_infeasible
-        if solution is not None:
-            result["termination"] = (
-                "feasible_fallback"
-                if diagnostics.returned_source == "incremental"
-                else result["termination"]
-            )
-        elif not full_infeasible and result["termination"] == "proven_infeasible":
+        if not full_infeasible and result["termination"] == "proven_infeasible":
             result["termination"] = "incremental_failure"
+    validation: dict[str, Any] = {}
+    if problem is not None and solution is not None:
+        try:
+            validation = validation_observations(
+                problem,
+                solution,
+                QueueingMode.LEGACY_EQUIVALENT,
+                config.optimization.relative_error,
+            )
+        except Exception as error:
+            validation = {
+                "independently_validated": False,
+                "validation_error_type": type(error).__name__,
+                "validation_error_details": str(error),
+            }
     return {
         **result,
         **extra,
+        **validation,
+        "solver_backend": "gurobi",
+        "backend_version": version("gurobipy"),
+        "mathematical_mode": "misocp-legacy",
+        "gap_definition": "abs(objective-bound)/abs(objective); Gurobi zero-objective conventions",
+        "first_incumbent_time_kind": "native_MIPSOL_callback",
+        "problem_fingerprint": fingerprint(jsonable(problem))
+        if problem is not None
+        else None,
+        "model_dimensions": recorder.model_dimensions if recorder else None,
+        "model_dimensions_scope": "last_native_solve",
+        "presolved_model_dimensions": None,
+        "root_relaxation_time_s": None,
+        **(recorder.priority_variables if recorder else {}),
+        **(
+            _solution_observations(problem, solution)
+            if solution is not None and problem is not None
+            else {}
+        ),
         "strategy": spec.strategy,
         "model_selection": spec.model_selection,
         "formulation": spec.formulation.value,
@@ -348,8 +408,6 @@ async def execute_solver(
         "requested_solver_configuration": {
             "strategy": spec.strategy,
             "insertion_time_limit_s": spec.insertion_time_limit_s,
-            "repair_time_limit_s": spec.repair_time_limit_s,
-            "final_time_limit_s": spec.final_time_limit_s,
             "formulation": spec.formulation.value,
             "time_limit_s": spec.timeout_s,
             "mip_gap": config.solver.relative_gap,
@@ -357,4 +415,57 @@ async def execute_solver(
             "seed": config.solver.seed,
             "objective": spec.objective.value,
         },
+    }
+
+
+def _solution_observations(
+    problem: CompactOptimizationProblem, solution: OptimizationSolution
+) -> dict[str, Any]:
+    class_load = {
+        str(s.id): {str(p): 0.0 for p in range(1, problem.policy.priority_count + 1)}
+        for s in problem.workers
+    }
+    flows = []
+    for flow in solution.flow_solutions:
+        request = problem.flows[flow.flow_id]
+        configuration = next(
+            c
+            for c in request.configurations
+            if c.model_variant_id == flow.model_variant_id
+            and (
+                flow.input_shapes is None
+                or c.input_shapes.input_shapes == flow.input_shapes
+            )
+        )
+        rate = (
+            request.arrival_rate_per_s
+            / problem.configurations[configuration].batch_size
+        )
+        components = []
+        for component in flow.components:
+            worker = str(component.worker_id.id)
+            load = rate * component.mean_execution_time_s
+            class_load[worker][str(component.priority)] += load
+            components.append(
+                {
+                    "index": component.component_index,
+                    "worker": worker,
+                    "priority": component.priority,
+                    "utilization": load,
+                    "waiting_s": component.mean_execution_queue_time_s,
+                }
+            )
+        flows.append(
+            {
+                "flow_id": str(flow.flow_id.flow_id),
+                "response_time_s": flow.mean_response_time_s,
+                "tardiness_s": max(
+                    flow.mean_response_time_s - request.max_response_time_s, 0
+                ),
+                "components": components,
+            }
+        )
+    return {
+        "flow_metrics": flows,
+        "worker_priority_utilization": class_load,
     }

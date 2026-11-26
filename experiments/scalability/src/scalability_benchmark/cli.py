@@ -14,7 +14,6 @@ from optimizer.domain.problem.compact.compact_optimization_problem import (
     ObjectiveKind,
 )
 from scalability_benchmark.campaigns import (
-    MODEL_SELECTIONS,
     CampaignName,
     ModelSelection,
     campaign_specs,
@@ -22,11 +21,13 @@ from scalability_benchmark.campaigns import (
 from scalability_benchmark.configuration import (
     BENCHMARK_OBJECTIVES,
     ExperimentConfig,
+    default_configuration_path,
     load_configuration,
 )
 from scalability_benchmark.instances import (
     build_scenario,
     instance_flows,
+    instance_models,
     request_record,
 )
 from scalability_benchmark.persistence import ResultStore, atomic_json
@@ -44,12 +45,13 @@ async def run_campaign(
     retry_errors: bool,
     limit: int | None,
     objectives: tuple[ObjectiveKind, ...] | None = None,
-    model_selections: tuple[ModelSelection, ...] = ("performance",),
 ) -> None:
     provenance = software_provenance()
     provenance_hash = fingerprint(provenance)
     specs = campaign_specs(
-        config, campaign, objectives=objectives, model_selections=model_selections
+        config,
+        campaign,
+        objectives=objectives,
     )
     if limit is not None:
         specs = iter(itertools.islice(specs, limit))
@@ -86,7 +88,7 @@ async def run_campaign(
                     **spec.as_record(),
                     "model_names": [
                         model.entry.settings.name
-                        for model in scenario.models[: spec.model_count]
+                        for model in instance_models(scenario, spec)
                     ],
                     "flows": [
                         request_record(request)
@@ -119,7 +121,7 @@ async def run_campaign(
                 )
 
 
-def main() -> None:
+def main(*, model_selection: ModelSelection = "performance") -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command", choices=("pilot", "main", "sensitivity", "plan", "analyze")
@@ -127,19 +129,14 @@ def main() -> None:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path(__file__).resolve().parents[2] / "config/default.yaml",
+        default=default_configuration_path(model_selection),
     )
     parser.add_argument(
         "--seed", type=int, action="append", help="Repeat to override the seed list"
     )
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--strategy", choices=("full", "incremental"))
     parser.add_argument(
-        "--model-selection",
-        nargs="+",
-        choices=MODEL_SELECTIONS,
-        default=["performance"],
-        help="Run performance-based selection, explicit per-flow variants, or both",
+        "--strategy", choices=("full", "incremental", "incremental-persistent")
     )
     parser.add_argument(
         "--formulation",
@@ -150,7 +147,7 @@ def main() -> None:
         "--objectives",
         nargs="+",
         choices=(*BENCHMARK_OBJECTIVES, "all"),
-        help="Run each selected objective independently; all selects all four (default: YAML objective)",
+        help="Run each selected objective independently; all selects every supported objective (default: YAML objective)",
     )
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--retry-errors", action="store_true")
@@ -180,9 +177,13 @@ def main() -> None:
                 dict.fromkeys(ObjectiveKind(value) for value in args.objectives)
             )
     config = load_configuration(args.config)
-    model_selections = cast(tuple[ModelSelection, ...], tuple(args.model_selection))
+    if config.model_selection != model_selection:
+        parser.error(
+            f"This command requires a {model_selection} configuration; "
+            "use scalability-performance or scalability-model-variant with its own YAML"
+        )
     if args.strategy is not None:
-        config = ExperimentConfig.model_validate(
+        config = type(config).model_validate(
             {
                 **config.model_dump(),
                 "solver": {**config.solver.model_dump(), "strategy": args.strategy},
@@ -197,7 +198,7 @@ def main() -> None:
             }
         )
     if args.seed:
-        config = ExperimentConfig.model_validate(
+        config = type(config).model_validate(
             {**config.model_dump(), "seeds": tuple(args.seed)}
         )
     output = args.output.resolve() if args.output else config.root / config.output
@@ -212,13 +213,12 @@ def main() -> None:
                     config,
                     name,
                     objectives=objectives,
-                    model_selections=model_selections,
                 )
             )
             budget = sum(spec.solver_budget_upper_bound_s for spec in specs) / 3600
             label = (
                 "solver budget upper bound"
-                if config.solver.strategy == "incremental"
+                if config.solver.strategy != "full"
                 else "solver budget"
             )
             print(f"{name}: {len(specs)} runs; {label}={budget:g} h")
@@ -233,7 +233,6 @@ def main() -> None:
                     retry_errors=args.retry_errors,
                     limit=args.limit,
                     objectives=objectives,
-                    model_selections=model_selections,
                 )
             )
         except KeyboardInterrupt:

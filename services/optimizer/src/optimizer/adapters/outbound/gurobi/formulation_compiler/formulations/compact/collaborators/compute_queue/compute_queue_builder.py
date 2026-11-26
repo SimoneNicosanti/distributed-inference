@@ -21,16 +21,20 @@ from .constraints import add_compute_queue_constraints
 
 class CompactComputeQueueBuilder:
     def create_variables(
-        self, model: gp.Model, data: MisocpCompactFormulation
+        self,
+        model: gp.Model,
+        data: MisocpCompactFormulation,
+        *,
+        existing: ComputeQueueVariables | None = None,
     ) -> ComputeQueueVariables:
-        variables = _add_compute_queue_variables(
+        return _add_compute_queue_variables(
             model,
             data,
             max_components=data.problem.policy.max_components,
             priority_count=data.problem.policy.priority_count,
             compute_utilization_limit=data.problem.policy.compute_utilization_limit,
+            existing=existing,
         )
-        return variables
 
     def add_constraints(
         self,
@@ -40,6 +44,8 @@ class CompactComputeQueueBuilder:
         assignment: AssignmentVariables,
         execution: ExecutionVariables,
         compute_queue: ComputeQueueVariables,
+        include_local: bool = True,
+        include_shared: bool = True,
     ) -> None:
         add_compute_queue_constraints(
             model,
@@ -47,6 +53,8 @@ class CompactComputeQueueBuilder:
             assignment=assignment,
             execution=execution,
             compute_queue=compute_queue,
+            include_local=include_local,
+            include_shared=include_shared,
         )
 
 
@@ -57,6 +65,7 @@ def _add_compute_queue_variables(
     max_components: int,
     priority_count: int,
     compute_utilization_limit: float,
+    existing: ComputeQueueVariables | None = None,
 ) -> ComputeQueueVariables:
     component_priority: dict[tuple[FlowId, int, WorkerId, int], gp.Var] = {}
     priority_class_utilization: dict[tuple[FlowId, int, WorkerId, int], gp.Var] = {}
@@ -92,6 +101,20 @@ def _add_compute_queue_variables(
                             ),
                         )
                     )
+
+    if existing is not None:
+        return ComputeQueueVariables(
+            component_priority=component_priority,
+            priority_used=existing.priority_used,
+            priority_class_utilization=priority_class_utilization,
+            higher_priority_utilization=existing.higher_priority_utilization,
+            compute_bin_selected=existing.compute_bin_selected,
+            queue_wait_bin_s=existing.queue_wait_bin_s,
+            queue_wait_s=existing.queue_wait_s,
+            weighted_queue_wait_s=existing.weighted_queue_wait_s,
+            remaining_compute_capacity=existing.remaining_compute_capacity,
+            component_queue_wait_s=component_queue_wait_s,
+        )
 
     priority_used: dict[tuple[WorkerId, int], gp.Var] = {}
     lower_priority_utilization: dict[tuple[WorkerId, int], gp.Var] = {}

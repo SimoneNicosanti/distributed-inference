@@ -64,6 +64,30 @@ def test_committed_corruption_is_not_silently_discarded(tmp_path: Path) -> None:
     assert path.read_bytes() == b'{"invalid":\n'
 
 
+@pytest.mark.parametrize(
+    "times,expected",
+    [
+        ({"incremental_construction_time_s": 12.0}, "12.0"),
+        ({"prefix_wall_time_s": 9.0}, "9.0"),
+        ({"incremental_construction_time_s": 12.0, "prefix_wall_time_s": 9.0}, "9.0"),
+    ],
+)
+def test_summary_names_prefix_wall_time_and_preserves_archived_records(
+    tmp_path: Path, times: dict[str, float], expected: str
+) -> None:
+    with ResultStore(tmp_path, resume=False) as store:
+        store.append({**record("prefixes"), "construction_time_s": 1.0, **times})
+    journal = (tmp_path / "runs.jsonl").read_bytes()
+    with ResultStore(tmp_path, resume=True):
+        pass
+    with (tmp_path / "summary.csv").open(newline="") as handle:
+        row = next(csv.DictReader(handle))
+    assert row["prefix_wall_time_s"] == expected
+    assert row["construction_time_s"] == "1.0"
+    assert "incremental_construction_time_s" not in row
+    assert (tmp_path / "runs.jsonl").read_bytes() == journal
+
+
 def test_only_one_writer_can_enter(tmp_path: Path) -> None:
     with (
         ResultStore(tmp_path, resume=True),

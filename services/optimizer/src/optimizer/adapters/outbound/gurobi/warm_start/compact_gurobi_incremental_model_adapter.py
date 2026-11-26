@@ -1,8 +1,6 @@
 import math
 from typing import override
 
-from gurobipy import GRB
-
 from optimizer.adapters.outbound.gurobi.entities.gurobi_compiled_formulation import (
     GurobiCompiledFormulation,
 )
@@ -11,9 +9,6 @@ from optimizer.adapters.outbound.gurobi.formulation_compiler.formulations.compac
 )
 from optimizer.adapters.outbound.gurobi.warm_start.compact_gurobi_warm_start_applier import (
     CompactGurobiWarmStartApplier,
-)
-from optimizer.adapters.outbound.gurobi.warm_start.compact_solution_decisions import (
-    compact_solution_decisions,
 )
 from optimizer.application.strategies.incremental.incremental_model_adapter import (
     IncrementalModelAdapter,
@@ -39,21 +34,8 @@ class CompactGurobiIncrementalModelAdapter(
         self,
         model: CompactGurobiModel,
         solution: OptimizationSolution,
-        *,
-        fix_decisions: bool,
     ) -> None:
-        decisions = compact_solution_decisions(model, solution, allow_partial=True)
-        if any(
-            value < variable.LB or value > variable.UB for variable, value in decisions
-        ):
-            raise ValueError("Seed decisions conflict with target variable bounds")
         await self._warm_start_applier.apply_partial_warm_start(model, solution)
-        if fix_decisions:
-            variables = [variable for variable, _ in decisions]
-            values = [value for _, value in decisions]
-            model.native_model.setAttr(GRB.Attr.LB, variables, values)
-            model.native_model.setAttr(GRB.Attr.UB, variables, values)
-            model.native_model.update()
 
     @override
     def is_valid_solution(self, model: CompactGurobiModel) -> bool:
